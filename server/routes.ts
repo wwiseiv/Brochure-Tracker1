@@ -1461,16 +1461,28 @@ Purpose: ${purpose}
 ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       }
 
+      console.log("Email generation request:", { businessName, businessType, purpose, hasAgentNotes: !!agentNotes });
+      
       const response = await client.chat.completions.create({
         model: "gpt-5",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        max_completion_tokens: 1024,
+        max_completion_tokens: 2048,
       });
       
       const generatedEmail = response.choices[0]?.message?.content || "";
+      
+      console.log("Email generation response:", { 
+        hasContent: !!generatedEmail, 
+        contentLength: generatedEmail.length,
+        finishReason: response.choices[0]?.finish_reason 
+      });
+      
+      if (!generatedEmail) {
+        console.warn("AI returned empty email response");
+      }
       
       res.json({ email: generatedEmail });
     } catch (error) {
