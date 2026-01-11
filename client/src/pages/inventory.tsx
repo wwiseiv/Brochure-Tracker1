@@ -30,6 +30,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { BottomNav } from "@/components/BottomNav";
+import { QRScanner } from "@/components/QRScanner";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -50,6 +51,12 @@ import {
   ArrowUpFromLine,
   Send,
   Clock,
+  QrCode,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useState } from "react";
@@ -138,6 +145,25 @@ export default function InventoryPage() {
   const [bulkBrochureIds, setBulkBrochureIds] = useState("");
 
   const [expandedHolders, setExpandedHolders] = useState<Set<string>>(new Set());
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<"register" | "assign">("register");
+  const [selectedHolderForScan, setSelectedHolderForScan] = useState<string>("");
+  const [scanAssignDialogOpen, setScanAssignDialogOpen] = useState(false);
+
+  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
+  const [importExportMode, setImportExportMode] = useState<"import" | "export">("import");
+  const [selectedHolderForIO, setSelectedHolderForIO] = useState<string>("house");
+  const [ioStep, setIOStep] = useState<"select" | "action" | "result">("select");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importDragActive, setImportDragActive] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    total: number;
+    registered: number;
+    transferred: number;
+    failed: string[];
+  } | null>(null);
+  const [isProcessingIO, setIsProcessingIO] = useState(false);
 
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
@@ -380,6 +406,298 @@ export default function InventoryPage() {
       toHolderType: "house",
       toHolderId: null,
     });
+  };
+
+  const handleScanToRegister = () => {
+    setScanMode("register");
+    setScannerOpen(true);
+  };
+
+  const handleScanAndAssign = () => {
+    setScanAssignDialogOpen(true);
+  };
+
+  const handleConfirmScanAssign = () => {
+    if (!selectedHolderForScan) return;
+    setScanMode("assign");
+    setScanAssignDialogOpen(false);
+    setScannerOpen(true);
+  };
+
+  const handleScanSuccess = async (scannedId: string) => {
+    const brochureId = scannedId.trim();
+    if (!brochureId) return;
+
+    try {
+      let alreadyRegistered = false;
+      
+      const registerRes = await apiRequest("POST", "/api/brochures/register", { brochureId });
+      if (!registerRes.ok) {
+        const errorData = await registerRes.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || "";
+        if (errorMessage.toLowerCase().includes("already") || registerRes.status === 409) {
+          alreadyRegistered = true;
+        } else {
+          throw new Error(errorMessage || "Failed to register brochure");
+        }
+      }
+
+      if (scanMode === "assign" && selectedHolderForScan) {
+        const assignee = assignees?.find(a => a.userId === selectedHolderForScan);
+        if (assignee) {
+          const transferRes = await apiRequest("POST", `/api/brochures/${brochureId}/transfer`, {
+            toHolderType: assignee.role === "relationship_manager" ? "relationship_manager" : "agent",
+            toHolderId: selectedHolderForScan,
+          });
+          if (!transferRes.ok) {
+            const errorData = await transferRes.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.message || "Failed to assign brochure");
+          }
+          toast({
+            title: alreadyRegistered ? "Brochure assigned" : "Brochure registered & assigned",
+            description: `${brochureId} assigned to ${assignee.name || assignee.userId.slice(0, 8)}`,
+          });
+        }
+      } else {
+        if (alreadyRegistered) {
+          toast({
+            title: "Already registered",
+            description: `${brochureId} is already in the system`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Brochure registered",
+            description: `${brochureId} added to house inventory`,
+          });
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/house"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/my-inventory"] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process brochure",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseScanner = () => {
+    setScannerOpen(false);
+    setSelectedHolderForScan("");
+  };
+
+  const openImportDialog = () => {
+    setImportExportMode("import");
+    setSelectedHolderForIO("house");
+    setIOStep("select");
+    setImportFile(null);
+    setImportResult(null);
+    setImportExportDialogOpen(true);
+  };
+
+  const openExportDialog = () => {
+    setImportExportMode("export");
+    setSelectedHolderForIO("house");
+    setIOStep("select");
+    setImportExportDialogOpen(true);
+  };
+
+  const handleIOContinue = () => {
+    if (importExportMode === "import") {
+      setIOStep("action");
+    } else {
+      handleExportCSV();
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setImportDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === "text/csv" || file.name.endsWith(".csv"))) {
+      setImportFile(file);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please upload a CSV file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImportFile(file);
+    }
+  };
+
+  const parseCSVContent = (content: string): string[] => {
+    return content
+      .split(/[\n,]+/)
+      .map(id => id.trim().replace(/^["']|["']$/g, ""))
+      .filter(id => id.length > 0 && !id.toLowerCase().includes("brochure_id"));
+  };
+
+  const handleImportCSV = async () => {
+    if (!importFile) return;
+
+    setIsProcessingIO(true);
+    try {
+      const content = await importFile.text();
+      const brochureIds = parseCSVContent(content);
+
+      if (brochureIds.length === 0) {
+        toast({
+          title: "No valid IDs",
+          description: "The CSV file contains no valid brochure IDs.",
+          variant: "destructive",
+        });
+        setIsProcessingIO(false);
+        return;
+      }
+
+      const registerRes = await apiRequest("POST", "/api/brochures/register-bulk", {
+        brochureIds,
+        notes: `CSV import - ${brochureIds.length} brochures`,
+      });
+
+      if (!registerRes.ok) {
+        throw new Error("Failed to register brochures");
+      }
+
+      const registerData = await registerRes.json();
+      let transferred = 0;
+      const failed: string[] = [];
+
+      if (selectedHolderForIO !== "house") {
+        const assignee = assignees?.find(a => a.userId === selectedHolderForIO);
+        if (assignee) {
+          const transferRes = await apiRequest("POST", "/api/brochures/transfer-bulk", {
+            brochureIds: registerData.registered > 0 ? brochureIds : [],
+            toHolderType: assignee.role === "relationship_manager" ? "relationship_manager" : "agent",
+            toHolderId: selectedHolderForIO,
+            notes: `CSV import transfer`,
+          });
+
+          if (transferRes.ok) {
+            const transferData = await transferRes.json();
+            transferred = transferData.transferred || 0;
+            if (transferData.failed) {
+              failed.push(...transferData.failed.map((f: any) => f.brochureId || f));
+            }
+          }
+        }
+      }
+
+      setImportResult({
+        total: brochureIds.length,
+        registered: registerData.registered || 0,
+        transferred,
+        failed: registerData.alreadyExists || failed,
+      });
+      setIOStep("result");
+
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/house"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brochures/my-inventory"] });
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Failed to import CSV",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingIO(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    setIsProcessingIO(true);
+    try {
+      let brochures: BrochureWithLocation[] = [];
+      let holderName = "House";
+
+      if (selectedHolderForIO === "house") {
+        const res = await fetch("/api/brochures/house", { credentials: "include" });
+        if (!res.ok) {
+          throw new Error("Failed to fetch house inventory");
+        }
+        brochures = await res.json();
+      } else {
+        const assignee = assignees?.find(a => a.userId === selectedHolderForIO);
+        if (assignee) {
+          holderName = assignee.name || assignee.userId.slice(0, 8);
+          const holderType = assignee.role === "relationship_manager" ? "relationship_manager" : "agent";
+          const res = await fetch(`/api/brochures/holder/${holderType}/${selectedHolderForIO}`, {
+            credentials: "include",
+          });
+          if (!res.ok) {
+            throw new Error(`Failed to fetch brochures for ${holderName}`);
+          }
+          brochures = await res.json();
+        }
+      }
+
+      if (brochures.length === 0) {
+        toast({
+          title: "No brochures",
+          description: "There are no brochures to export for the selected holder.",
+          variant: "destructive",
+        });
+        setIsProcessingIO(false);
+        return;
+      }
+
+      const csvHeader = "brochure_id,holder_type,holder_name,registered_at,status\n";
+      const csvRows = brochures.map(b => {
+        const loc = b.location;
+        return [
+          b.id,
+          loc?.holderType || "house",
+          loc?.holderType === "house" ? "House" : holderName,
+          loc?.assignedAt ? format(new Date(loc.assignedAt), "yyyy-MM-dd HH:mm:ss") : "",
+          b.status,
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
+      }).join("\n");
+
+      const csvContent = csvHeader + csvRows;
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `brochures_${holderName.replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export complete",
+        description: `Exported ${brochures.length} brochures to CSV.`,
+      });
+
+      setImportExportDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export CSV",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingIO(false);
+    }
+  };
+
+  const closeImportExportDialog = () => {
+    setImportExportDialogOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+    setIOStep("select");
   };
 
   const openHistoryDialog = (brochureId: string) => {
@@ -670,6 +988,38 @@ export default function InventoryPage() {
                         <Plus className="h-5 w-5" />
                         Register New Brochures
                       </h3>
+                      
+                      <div className="flex gap-2 mb-4">
+                        <Button
+                          onClick={handleScanToRegister}
+                          className="flex-1 min-h-[48px]"
+                          data-testid="button-scan-to-register"
+                        >
+                          <QrCode className="h-4 w-4 mr-2" />
+                          Scan to Register
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleScanAndAssign}
+                          className="flex-1 min-h-[48px]"
+                          data-testid="button-scan-and-assign"
+                        >
+                          <QrCode className="h-4 w-4 mr-2" />
+                          Scan & Assign
+                        </Button>
+                      </div>
+                      
+                      <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-card px-2 text-muted-foreground">
+                            Or enter manually
+                          </span>
+                        </div>
+                      </div>
+                      
                       <div className="flex gap-2 mb-4">
                         <Button
                           variant={registerMode === "single" ? "default" : "outline"}
@@ -754,6 +1104,36 @@ export default function InventoryPage() {
                           </Button>
                         </form>
                       )}
+                    </Card>
+
+                    <Card className="p-4" data-testid="card-import-export">
+                      <h3 className="font-semibold mb-4 flex items-center gap-2">
+                        <FileSpreadsheet className="h-5 w-5" />
+                        Import / Export
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Bulk import brochure IDs from CSV or export brochure data
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={openImportDialog}
+                          className="flex-1 min-h-[48px]"
+                          data-testid="button-import-csv"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Import CSV
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={openExportDialog}
+                          className="flex-1 min-h-[48px]"
+                          data-testid="button-export-csv"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Export CSV
+                        </Button>
+                      </div>
                     </Card>
 
                     <Card className="p-4" data-testid="card-house-inventory">
@@ -1232,6 +1612,332 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={scanAssignDialogOpen} onOpenChange={setScanAssignDialogOpen}>
+        <DialogContent className="max-w-md mx-auto" data-testid="dialog-scan-assign">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Scan & Assign
+            </DialogTitle>
+            <DialogDescription>
+              Select who to assign scanned brochures to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="scan-assignee">Assign scanned brochures to</Label>
+              <Select
+                value={selectedHolderForScan}
+                onValueChange={setSelectedHolderForScan}
+              >
+                <SelectTrigger className="min-h-[48px]" data-testid="select-scan-assignee">
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignees?.map((assignee) => (
+                    <SelectItem
+                      key={assignee.userId}
+                      value={assignee.userId}
+                      data-testid={`select-scan-option-${assignee.userId}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {assignee.role === "relationship_manager" ? (
+                          <Users className="h-4 w-4" />
+                        ) : (
+                          <User className="h-4 w-4" />
+                        )}
+                        {assignee.name || assignee.userId.slice(0, 12)}
+                        <Badge variant="outline" className="text-xs ml-1">
+                          {assignee.role === "relationship_manager" ? "RM" : "Agent"}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setScanAssignDialogOpen(false);
+                setSelectedHolderForScan("");
+              }}
+              data-testid="button-cancel-scan-assign"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmScanAssign}
+              disabled={!selectedHolderForScan}
+              data-testid="button-start-scan-assign"
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              Start Scanning
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importExportDialogOpen} onOpenChange={(open) => {
+        if (!open) closeImportExportDialog();
+        else setImportExportDialogOpen(true);
+      }}>
+        <DialogContent className="max-w-md mx-auto" data-testid="dialog-import-export">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {importExportMode === "import" ? (
+                <>
+                  <Upload className="h-5 w-5" />
+                  Import Brochures
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5" />
+                  Export Brochures
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {ioStep === "select" && (
+                importExportMode === "import"
+                  ? "Select where to import brochures to"
+                  : "Select which holder's brochures to export"
+              )}
+              {ioStep === "action" && "Upload a CSV file with brochure IDs"}
+              {ioStep === "result" && "Import complete"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {ioStep === "select" && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="io-holder">
+                  {importExportMode === "import" ? "Import to" : "Export from"}
+                </Label>
+                <Select
+                  value={selectedHolderForIO}
+                  onValueChange={setSelectedHolderForIO}
+                >
+                  <SelectTrigger className="min-h-[48px]" data-testid="select-io-holder">
+                    <SelectValue placeholder="Select holder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="house" data-testid="select-io-house">
+                      <div className="flex items-center gap-2">
+                        <Home className="h-4 w-4" />
+                        House Inventory
+                      </div>
+                    </SelectItem>
+                    {assignees?.map((assignee) => (
+                      <SelectItem
+                        key={assignee.userId}
+                        value={assignee.userId}
+                        data-testid={`select-io-${assignee.userId}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {assignee.role === "relationship_manager" ? (
+                            <Users className="h-4 w-4" />
+                          ) : (
+                            <User className="h-4 w-4" />
+                          )}
+                          {assignee.name || assignee.userId.slice(0, 12)}
+                          <Badge variant="outline" className="text-xs ml-1">
+                            {assignee.role === "relationship_manager" ? "RM" : "Agent"}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {ioStep === "action" && importExportMode === "import" && (
+            <div className="space-y-4 py-4">
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  importDragActive
+                    ? "border-primary bg-primary/10"
+                    : "border-muted-foreground/25"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setImportDragActive(true);
+                }}
+                onDragLeave={() => setImportDragActive(false)}
+                onDrop={handleFileDrop}
+                data-testid="dropzone-import"
+              >
+                {importFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileSpreadsheet className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="font-medium">{importFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(importFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setImportFile(null)}
+                      data-testid="button-remove-file"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Drag and drop a CSV file here
+                    </p>
+                    <label htmlFor="csv-file-input">
+                      <Button variant="outline" size="sm" asChild>
+                        <span>Browse files</span>
+                      </Button>
+                      <input
+                        id="csv-file-input"
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        data-testid="input-csv-file"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                CSV should contain brochure IDs, one per line or comma-separated
+              </p>
+            </div>
+          )}
+
+          {ioStep === "result" && importResult && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <div>
+                  <p className="font-semibold text-green-800 dark:text-green-300">
+                    Import Complete
+                  </p>
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    {importResult.registered} of {importResult.total} brochures registered
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total IDs processed:</span>
+                  <span className="font-medium">{importResult.total}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Registered:</span>
+                  <span className="font-medium text-green-600">{importResult.registered}</span>
+                </div>
+                {selectedHolderForIO !== "house" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Transferred:</span>
+                    <span className="font-medium">{importResult.transferred}</span>
+                  </div>
+                )}
+                {importResult.failed.length > 0 && (
+                  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <p className="text-amber-800 dark:text-amber-300 font-medium mb-1">
+                      {importResult.failed.length} already existed
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 truncate">
+                      {importResult.failed.slice(0, 3).join(", ")}
+                      {importResult.failed.length > 3 && ` +${importResult.failed.length - 3} more`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {ioStep === "select" && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={closeImportExportDialog}
+                  data-testid="button-cancel-io"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleIOContinue}
+                  disabled={!selectedHolderForIO || isProcessingIO}
+                  data-testid="button-continue-io"
+                >
+                  {isProcessingIO ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : importExportMode === "import" ? (
+                    "Continue"
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+            {ioStep === "action" && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setIOStep("select")}
+                  data-testid="button-back-io"
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleImportCSV}
+                  disabled={!importFile || isProcessingIO}
+                  data-testid="button-import"
+                >
+                  {isProcessingIO ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+            {ioStep === "result" && (
+              <Button onClick={closeImportExportDialog} data-testid="button-done-io">
+                Done
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {scannerOpen && (
+        <QRScanner
+          onScanSuccess={handleScanSuccess}
+          onClose={handleCloseScanner}
+          continuous={true}
+          title={scanMode === "assign" ? "Scan & Assign" : "Scan to Register"}
+        />
+      )}
 
       <BottomNav />
     </div>

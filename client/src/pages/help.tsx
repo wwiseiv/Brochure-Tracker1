@@ -52,7 +52,9 @@ import {
   StickyNote,
   Repeat,
   Lightbulb,
-  Send
+  Send,
+  Search,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -139,6 +141,7 @@ export default function HelpPage() {
     queryKey: ["/api/me/role"],
   });
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [feedbackType, setFeedbackType] = useState<string>("feature_suggestion");
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -472,6 +475,30 @@ export default function HelpPage() {
       icon: <Package className="w-5 h-5 text-orange-600" />,
     },
     {
+      title: "Individual Brochure Tracking",
+      description: "Track each brochure by QR code with complete chain of custody. See who has each brochure and full transfer history.",
+      link: "/inventory",
+      icon: <Database className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Scan to Register",
+      description: "Use your phone camera to scan brochure QR codes directly into inventory. No manual data entry needed.",
+      link: "/inventory",
+      icon: <QrCode className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Scan & Assign",
+      description: "Scan brochures and assign them directly to team members in one step. Perfect for handing out brochures to agents.",
+      link: "/inventory",
+      icon: <Send className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "CSV Import/Export",
+      description: "Bulk import brochure IDs from a CSV file or export your inventory to spreadsheets. Select specific holders for import or export.",
+      link: "/inventory",
+      icon: <FileText className="w-5 h-5 text-orange-600" />,
+    },
+    {
       title: "Low-Stock Alerts",
       description: "Set thresholds to get notified when inventory runs low. Never be caught without brochures during a sales call.",
       link: "/inventory",
@@ -614,150 +641,126 @@ export default function HelpPage() {
           </p>
         </div>
 
-        <HelpSection
-          title="Getting Started"
-          description="New to BrochureDrop? Start here to get up and running quickly."
-          items={gettingStartedItems}
-          badge="New Users"
-        />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search help topics..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10"
+            data-testid="input-help-search"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              onClick={() => setSearchQuery("")}
+              data-testid="button-clear-search"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
 
-        <Separator />
+        {(() => {
+          const query = searchQuery.toLowerCase().trim();
+          
+          const allSections = [
+            { title: "Getting Started", description: "New to BrochureDrop? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
+            { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
+            { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
+            { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
+            { title: "Offline & Mobile", description: "BrochureDrop is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
+            { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users" },
+            { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users" },
+            { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users" },
+            { title: "Team Activity Feed", description: "Stay connected with your team and celebrate wins together.", items: activityFeatures, badge: "All Users" },
+            { title: "Route Optimizer", description: "Plan the most efficient driving routes for your daily pickups.", items: routeFeatures, badge: "All Users" },
+            { title: "Follow-up Sequences", description: "Automate your follow-up process with pre-built email sequences.", items: sequenceFeatures, badge: "All Users" },
+            { title: "Smart Location Reminders", description: "Get notified when you're near merchants with pending pickups.", items: locationReminderFeatures, badge: "All Users" },
+          ];
 
-        <HelpSection
-          title="Navigation & Core Features"
-          description="The main features you'll use every day as a field sales representative."
-          items={agentFeatures}
-          badge="All Users"
-        />
+          const filteredSections = query
+            ? allSections.map(section => {
+                const sectionMatches = section.title.toLowerCase().includes(query) || 
+                                       section.description.toLowerCase().includes(query);
+                const filteredItems = section.items.filter(item =>
+                  item.title.toLowerCase().includes(query) ||
+                  item.description.toLowerCase().includes(query)
+                );
+                if (sectionMatches) return section;
+                if (filteredItems.length > 0) return { ...section, items: filteredItems };
+                return null;
+              }).filter(Boolean)
+            : allSections;
 
-        <Separator />
+          if (query && filteredSections.length === 0) {
+            return (
+              <Card className="p-8 text-center" data-testid="text-no-results">
+                <Search className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">No results found</h3>
+                <p className="text-sm text-muted-foreground">
+                  Try searching for different keywords like "QR code", "offline", or "email"
+                </p>
+              </Card>
+            );
+          }
 
-        <HelpSection
-          title="Drop Management"
-          description="Everything you need to know about logging and managing brochure drops."
-          items={dropFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="AI-Powered Tools"
-          description="Smart features that help you work faster and communicate more effectively."
-          items={aiToolsFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Offline & Mobile"
-          description="BrochureDrop is designed for the field - works offline and installs like a native app."
-          items={offlineFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Merchant Profiles"
-          description="Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood."
-          items={merchantFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Inventory Tracking"
-          description="Keep track of your brochure inventory so you never run out in the field."
-          items={inventoryFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Referral Tracking"
-          description="Log and track referrals from existing merchants to grow your network."
-          items={referralFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Team Activity Feed"
-          description="Stay connected with your team and celebrate wins together."
-          items={activityFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Route Optimizer"
-          description="Plan the most efficient driving routes for your daily pickups."
-          items={routeFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Follow-up Sequences"
-          description="Automate your follow-up process with pre-built email sequences."
-          items={sequenceFeatures}
-          badge="All Users"
-        />
-
-        <Separator />
-
-        <HelpSection
-          title="Smart Location Reminders"
-          description="Get notified when you're near merchants with pending pickups."
-          items={locationReminderFeatures}
-          badge="All Users"
-        />
-
-        {(userRole?.role === "master_admin" || userRole?.role === "relationship_manager") && (
-          <>
-            <Separator />
-            
-            {userRole?.role === "relationship_manager" && (
+          return filteredSections.map((section, index) => (
+            <div key={section!.title}>
+              {index > 0 && <Separator className="my-8" />}
               <HelpSection
-                title="Relationship Manager Tools"
-                description="Monitor and support the agents on your team."
-                items={rmFeatures}
-                badge="Managers"
+                title={section!.title}
+                description={section!.description}
+                items={section!.items}
+                badge={section!.badge}
               />
-            )}
+            </div>
+          ));
+        })()}
 
-            {userRole?.role === "master_admin" && (
+        {!searchQuery && (
+          <>
+            {(userRole?.role === "master_admin" || userRole?.role === "relationship_manager") && (
               <>
-                <HelpSection
-                  title="Admin Tools"
-                  description="Manage your entire organization, team, and view all activity."
-                  items={adminFeatures}
-                  badge="Admins Only"
-                />
-                
                 <Separator />
+                
+                {userRole?.role === "relationship_manager" && (
+                  <HelpSection
+                    title="Relationship Manager Tools"
+                    description="Monitor and support the agents on your team."
+                    items={rmFeatures}
+                    badge="Managers"
+                  />
+                )}
 
-                <HelpSection
-                  title="Manager View"
-                  description="As an admin, you also have access to manager features for team oversight."
-                  items={rmFeatures}
-                  badge="Admins"
-                />
+                {userRole?.role === "master_admin" && (
+                  <>
+                    <HelpSection
+                      title="Admin Tools"
+                      description="Manage your entire organization, team, and view all activity."
+                      items={adminFeatures}
+                      badge="Admins Only"
+                    />
+                    
+                    <Separator />
+
+                    <HelpSection
+                      title="Manager View"
+                      description="As an admin, you also have access to manager features for team oversight."
+                      items={rmFeatures}
+                      badge="Admins"
+                    />
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
 
-        <Separator />
+            <Separator />
 
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
@@ -1013,6 +1016,8 @@ export default function HelpPage() {
             <p>If you're stuck or have questions not covered here, reach out to your manager or admin. They can help with account access, team setup, and troubleshooting.</p>
           </CardContent>
         </Card>
+          </>
+        )}
       </main>
     </div>
   );

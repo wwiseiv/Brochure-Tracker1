@@ -6,15 +6,19 @@ import { X, Camera, SwitchCamera, AlertCircle } from "lucide-react";
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onClose: () => void;
+  continuous?: boolean;
+  title?: string;
 }
 
-export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
+export function QRScanner({ onScanSuccess, onClose, continuous = false, title = "Scan Brochure QR" }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
+  const lastScannedRef = useRef<string>("");
+  const cooldownRef = useRef<boolean>(false);
 
   const startScanner = useCallback(async (cameraId?: string) => {
     if (!containerRef.current) return;
@@ -60,8 +64,21 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
           aspectRatio: 1,
         },
         (decodedText) => {
-          onScanSuccess(decodedText);
-          html5QrCode.stop().catch(() => {});
+          if (continuous) {
+            if (cooldownRef.current || decodedText === lastScannedRef.current) {
+              return;
+            }
+            lastScannedRef.current = decodedText;
+            cooldownRef.current = true;
+            onScanSuccess(decodedText);
+            setTimeout(() => {
+              cooldownRef.current = false;
+              lastScannedRef.current = "";
+            }, 2000);
+          } else {
+            onScanSuccess(decodedText);
+            html5QrCode.stop().catch(() => {});
+          }
         },
         () => {}
       );
@@ -75,7 +92,7 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
           : "Failed to access camera. Please allow camera permissions."
       );
     }
-  }, [onScanSuccess]);
+  }, [onScanSuccess, continuous]);
 
   const switchCamera = useCallback(async () => {
     if (cameras.length <= 1) return;
@@ -99,7 +116,7 @@ export function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
     <div className="fixed inset-0 z-50 bg-black">
       <div className="relative h-full flex flex-col">
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-          <h2 className="text-white font-semibold text-lg">Scan Brochure QR</h2>
+          <h2 className="text-white font-semibold text-lg">{title}</h2>
           <Button
             variant="ghost"
             size="icon"
