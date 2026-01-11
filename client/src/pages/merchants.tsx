@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeIcon";
 import { BottomNav } from "@/components/BottomNav";
+import { ExportDialog } from "@/components/ExportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
@@ -187,9 +188,17 @@ export default function MerchantsPage() {
           </div>
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          {filteredAndSortedMerchants.length}{" "}
-          {filteredAndSortedMerchants.length === 1 ? "merchant" : "merchants"}
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {filteredAndSortedMerchants.length}{" "}
+            {filteredAndSortedMerchants.length === 1 ? "merchant" : "merchants"}
+          </div>
+          <ExportDialog
+            title="Export Merchants"
+            description="Download your merchant contact data as a spreadsheet file."
+            exportEndpoint="/api/merchants/export"
+            buttonLabel="Export"
+          />
         </div>
 
         {isLoading ? (

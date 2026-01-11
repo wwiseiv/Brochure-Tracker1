@@ -32,6 +32,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { BottomNav } from "@/components/BottomNav";
+import { ExportDialog } from "@/components/ExportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1265,7 +1266,13 @@ export default function ReferralsPage() {
           </Card>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <ExportDialog
+            title="Export Referrals"
+            description="Download your referral data as a spreadsheet file."
+            exportEndpoint="/api/referrals/export"
+            buttonLabel="Export"
+          />
           <AddReferralDialog 
             drops={drops || []} 
             onSuccess={() => {}} 

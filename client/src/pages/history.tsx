@@ -7,6 +7,7 @@ import { DropCard } from "@/components/DropCard";
 import { EmptyState } from "@/components/EmptyState";
 import { DropCardSkeleton } from "@/components/LoadingState";
 import { BottomNav } from "@/components/BottomNav";
+import { ExportDialog } from "@/components/ExportDialog";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure } from "@shared/schema";
 
@@ -90,9 +91,17 @@ export default function HistoryPage() {
             <span className="text-muted-foreground">
               {filteredDrops.length} {filteredDrops.length === 1 ? "drop" : "drops"}
             </span>
-            <div className="flex gap-3 text-xs">
-              <span className="text-amber-600">Pending: {pendingCount}</span>
-              <span className="text-emerald-600">Done: {completedCount}</span>
+            <div className="flex items-center gap-3">
+              <ExportDialog
+                title="Export Drops"
+                description="Download your drop/contact data as a spreadsheet file."
+                exportEndpoint="/api/drops/export"
+                buttonLabel="Export"
+              />
+              <div className="flex gap-3 text-xs">
+                <span className="text-amber-600">Pending: {pendingCount}</span>
+                <span className="text-emerald-600">Done: {completedCount}</span>
+              </div>
             </div>
           </div>
 
