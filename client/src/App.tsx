@@ -13,6 +13,7 @@ import HistoryPage from "@/pages/history";
 import ProfilePage from "@/pages/profile";
 import AdminDashboardPage from "@/pages/admin-dashboard";
 import RMDashboardPage from "@/pages/rm-dashboard";
+import TeamManagementPage from "@/pages/team-management";
 import NotFound from "@/pages/not-found";
 
 interface UserRole {
@@ -48,6 +49,29 @@ function AdminRoute() {
   return <AdminDashboardPage />;
 }
 
+function TeamManagementRoute() {
+  const { data: userRole, isLoading } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (userRole?.role !== "master_admin") {
+    return <NotFound />;
+  }
+
+  return <TeamManagementPage />;
+}
+
 function RMRoute() {
   const { data: userRole, isLoading } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
@@ -76,6 +100,7 @@ function AuthenticatedRouter() {
     <Switch>
       <Route path="/" component={DashboardPage} />
       <Route path="/admin" component={AdminRoute} />
+      <Route path="/admin/team" component={TeamManagementRoute} />
       <Route path="/manager" component={RMRoute} />
       <Route path="/scan" component={ScanPage} />
       <Route path="/drops/new" component={NewDropPage} />

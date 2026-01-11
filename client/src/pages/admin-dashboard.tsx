@@ -316,10 +316,17 @@ export default function AdminDashboardPage() {
             </section>
 
             <section>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Team Members
-              </h2>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Team Members
+                </h2>
+                <Link href="/admin/team">
+                  <Button variant="outline" size="sm" data-testid="button-manage-team">
+                    Manage Team
+                  </Button>
+                </Link>
+              </div>
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
