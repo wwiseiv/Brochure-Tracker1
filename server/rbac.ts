@@ -2,6 +2,9 @@ import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { storage } from "./storage";
 import { authStorage } from "./replit_integrations/auth";
 import type { OrganizationMember, Organization, OrgMemberRole } from "@shared/schema";
+import { sendNewMemberNotification } from "./email";
+
+const ADMIN_EMAIL = "wwiseiv@icloud.com";
 
 export interface OrgMembershipInfo extends OrganizationMember {
   organization: Organization;
@@ -41,30 +44,73 @@ export async function bootstrapUserOrganization(userId: string): Promise<OrgMemb
     if (pendingInvitation) {
       const inviteOrg = await storage.getOrganization(pendingInvitation.orgId);
       if (inviteOrg) {
-        const member = await storage.createOrganizationMember({
-          orgId: inviteOrg.id,
-          userId: userId,
-          role: pendingInvitation.role as OrgMemberRole,
-          managerId: null,
-        });
-        
-        await storage.updateInvitationStatus(pendingInvitation.id, "accepted", new Date());
-        
-        return { ...member, organization: inviteOrg };
+        try {
+          const member = await storage.createOrganizationMember({
+            orgId: inviteOrg.id,
+            userId: userId,
+            role: pendingInvitation.role as OrgMemberRole,
+            managerId: null,
+          });
+          
+          await storage.updateInvitationStatus(pendingInvitation.id, "accepted", new Date());
+          
+          sendNewMemberNotification({
+            adminEmail: ADMIN_EMAIL,
+            memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "New User",
+            memberEmail: userEmail,
+            organizationName: inviteOrg.name,
+            role: pendingInvitation.role,
+            joinedVia: "invitation",
+          }).catch(err => console.error("Failed to send new member notification:", err));
+          
+          return { ...member, organization: inviteOrg };
+        } catch (error: any) {
+          if (error?.code === '23505') {
+            const existingMembership = await storage.getUserMembership(userId);
+            if (existingMembership) {
+              return existingMembership;
+            }
+          }
+          throw error;
+        }
       }
     }
   }
 
   const primaryOrg = await storage.getPrimaryOrganization();
   if (primaryOrg) {
-    const member = await storage.createOrganizationMember({
-      orgId: primaryOrg.id,
-      userId: userId,
-      role: "agent",
-      managerId: null,
-    });
+    const isAdminEmail = userEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const role: OrgMemberRole = isAdminEmail ? "master_admin" : "agent";
     
-    return { ...member, organization: primaryOrg };
+    try {
+      const member = await storage.createOrganizationMember({
+        orgId: primaryOrg.id,
+        userId: userId,
+        role: role,
+        managerId: null,
+      });
+      
+      if (!isAdminEmail) {
+        sendNewMemberNotification({
+          adminEmail: ADMIN_EMAIL,
+          memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "New User",
+          memberEmail: userEmail || "Unknown",
+          organizationName: primaryOrg.name,
+          role: role,
+          joinedVia: "self_signup",
+        }).catch(err => console.error("Failed to send new member notification:", err));
+      }
+      
+      return { ...member, organization: primaryOrg };
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        const existingMembership = await storage.getUserMembership(userId);
+        if (existingMembership) {
+          return existingMembership;
+        }
+      }
+      throw error;
+    }
   }
 
   const orgName = user 

@@ -198,3 +198,102 @@ export function generateInviteToken(): string {
   }
   return token;
 }
+
+interface SendNewMemberNotificationParams {
+  adminEmail: string;
+  memberName: string;
+  memberEmail: string;
+  organizationName: string;
+  role: string;
+  joinedVia: "invitation" | "self_signup";
+}
+
+export async function sendNewMemberNotification(params: SendNewMemberNotificationParams): Promise<boolean> {
+  try {
+    const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send new member notification - Resend client not configured");
+      return false;
+    }
+    
+    const roleLabel = params.role === "master_admin" 
+      ? "Admin" 
+      : params.role === "relationship_manager" 
+        ? "Relationship Manager" 
+        : "Agent";
+
+    const joinedViaLabel = params.joinedVia === "invitation" 
+      ? "accepted an invitation" 
+      : "signed up directly";
+
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: params.adminEmail,
+      subject: `New team member joined ${params.organizationName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">New Team Member!</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">${params.organizationName}</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <p style="font-size: 16px; margin: 0 0 20px 0;">
+              Great news! A new team member has joined your organization.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; width: 100px;">Name:</td>
+                  <td style="padding: 8px 0;">${params.memberName || "Not provided"}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Email:</td>
+                  <td style="padding: 8px 0;">${params.memberEmail || "Not provided"}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Role:</td>
+                  <td style="padding: 8px 0;">${roleLabel}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Joined via:</td>
+                  <td style="padding: 8px 0;">${joinedViaLabel}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <p style="font-size: 14px; color: #64748b; margin: 20px 0 0 0;">
+              You can manage team members and their roles from the Team Management page in BrochureDrop.
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+            
+            <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">
+              This is an automated notification from BrochureDrop.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Failed to send new member notification:", error);
+      return false;
+    }
+
+    console.log(`New member notification sent to ${params.adminEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Error sending new member notification:", error?.message || error);
+    return false;
+  }
+}
