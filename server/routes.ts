@@ -279,13 +279,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/drops", isAuthenticated, async (req: any, res) => {
+  app.post("/api/drops", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
-      // Get user's organization membership
-      const membership = await storage.getUserMembership(userId);
-      const orgId = membership?.organization?.id || null;
+      // Get orgId from middleware
+      const orgId = req.orgMembership?.organization?.id || null;
       
       // Handle brochure ID - use provided one or generate a manual entry ID
       let brochureId = req.body.brochureId;
@@ -431,13 +430,12 @@ export async function registerRoutes(
   });
 
   // Offline sync endpoint - create drops that were saved offline
-  app.post("/api/offline/sync", isAuthenticated, async (req: any, res) => {
+  app.post("/api/offline/sync", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
-      // Get user's organization membership
-      const membership = await storage.getUserMembership(userId);
-      const orgId = membership?.organization?.id || null;
+      // Get orgId from middleware
+      const orgId = req.orgMembership?.organization?.id || null;
       
       // Handle brochure ID - use provided one or generate a manual entry ID
       let brochureId = req.body.brochureId;
@@ -504,7 +502,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/drops/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/drops/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const dropId = parseInt(req.params.id);
       if (isNaN(dropId)) {
@@ -719,6 +717,7 @@ export async function registerRoutes(
   app.post(
     "/api/transcribe",
     isAuthenticated,
+    ensureOrgMembership(),
     upload.single("audio"),
     async (req: any, res) => {
       try {
@@ -1288,7 +1287,7 @@ export async function registerRoutes(
   // ============================================
 
   // Submit feedback (authenticated)
-  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+  app.post("/api/feedback", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { type, subject, message } = req.body;
