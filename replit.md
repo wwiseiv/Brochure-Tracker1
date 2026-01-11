@@ -50,6 +50,8 @@ Preferred communication style: Simple, everyday language.
 - **OfflineQueue**: Queue for drops created offline, synced when back online
 - **Invitations**: Email invitations for team onboarding with token validation, expiration, and status tracking
 - **FeedbackSubmissions**: User feedback and feature requests stored with type (suggestion/help/bug)
+- **RoleplaySessions**: AI role-play practice sessions tracking scenario, status, performance score, and AI feedback
+- **RoleplayMessages**: Conversation history for role-play sessions (system prompts, user messages, AI responses)
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -59,6 +61,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
+- **AI Role-Play Coach** (accessible from drop detail page): Conversational AI training tool that simulates business owners for sales practice. Features 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), real-time chat with GPT-5, ElevenLabs text-to-speech for voice playback, and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides from sales training documents.
 - **Email Invitations** (/admin/team): Admins can invite new team members by email with role selection (Agent, RM, Admin). Invitations expire in 7 days with resend/cancel options.
 - **Accept Invite Page** (/accept-invite): Users click email links to join organizations, works for both new and existing users.
 - **Feedback Form** (/help): Feature suggestion and help request form that sends emails to support. Form includes type selector (Feature Suggestion, Help Request, Bug Report).
