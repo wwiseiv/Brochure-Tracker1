@@ -2799,6 +2799,21 @@ Remember: You're helping them practice real sales conversations. Be challenging 
 
       const voiceId = "21m00Tcm4TlvDq8ikWAM";
 
+      // Clean markdown formatting from text for natural TTS
+      const cleanTextForTTS = (input: string): string => {
+        return input
+          .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold**
+          .replace(/\*([^*]+)\*/g, '$1')       // Remove *italic*
+          .replace(/__([^_]+)__/g, '$1')       // Remove __bold__
+          .replace(/_([^_]+)_/g, '$1')         // Remove _italic_
+          .replace(/`([^`]+)`/g, '$1')         // Remove `code`
+          .replace(/#{1,6}\s*/g, '')           // Remove # headers
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove [links](url)
+          .replace(/\n{3,}/g, '\n\n')          // Reduce multiple newlines
+          .trim();
+      };
+
+      const cleanedText = cleanTextForTTS(text);
       console.log(`Calling ElevenLabs TTS API with voice ${voiceId}...`);
       const ttsResponse = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
@@ -2810,7 +2825,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
             "xi-api-key": elevenLabsKey,
           },
           body: JSON.stringify({
-            text,
+            text: cleanedText,
             model_id: "eleven_monolingual_v1",
             voice_settings: {
               stability: 0.5,
