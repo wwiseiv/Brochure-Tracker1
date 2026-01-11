@@ -1495,7 +1495,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // MERCHANTS API (Merchant Profiles)
   // ============================================
   
-  app.get("/api/merchants", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/merchants", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const merchants = await storage.getMerchantsByOrg(membership.organization.id);
@@ -1506,7 +1506,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.get("/api/merchants/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/merchants/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       if (isNaN(merchantId)) {
@@ -1531,7 +1531,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.post("/api/merchants", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/merchants", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const data = { ...req.body, orgId: membership.organization.id };
@@ -1549,7 +1549,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.patch("/api/merchants/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.patch("/api/merchants/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       if (isNaN(merchantId)) {
@@ -1575,7 +1575,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   });
 
   // Get merchant visit history (drops for this merchant)
-  app.get("/api/merchants/:id/visits", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/merchants/:id/visits", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       const merchant = await storage.getMerchant(merchantId);
@@ -1609,7 +1609,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // INVENTORY API (Inventory Tracking)
   // ============================================
   
-  app.get("/api/inventory", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/inventory", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const membership = req.orgMembership;
@@ -1632,7 +1632,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.post("/api/inventory/restock", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/inventory/restock", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const membership = req.orgMembership;
@@ -1681,7 +1681,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.patch("/api/inventory/threshold", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.patch("/api/inventory/threshold", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const membership = req.orgMembership;
@@ -1711,7 +1711,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.get("/api/inventory/logs", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/inventory/logs", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const membership = req.orgMembership;
@@ -1727,7 +1727,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // REFERRALS API (Referral Tracking)
   // ============================================
   
-  app.get("/api/referrals", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/referrals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const referrals = await storage.getReferralsByAgent(userId);
@@ -1749,7 +1749,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.post("/api/referrals", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/referrals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const membership = req.orgMembership;
@@ -1787,7 +1787,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.patch("/api/referrals/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.patch("/api/referrals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const referralId = parseInt(req.params.id);
       if (isNaN(referralId)) {
@@ -1834,7 +1834,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // ACTIVITY FEED API (Team Activity Feed)
   // ============================================
   
-  app.get("/api/activity", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/activity", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const limit = parseInt(req.query.limit as string) || 50;
@@ -1862,7 +1862,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // FOLLOW-UP SEQUENCES API
   // ============================================
   
-  app.get("/api/sequences", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/sequences", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const sequences = await storage.getFollowUpSequencesByOrg(membership.organization.id);
@@ -1873,7 +1873,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.get("/api/sequences/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/sequences/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const sequenceId = parseInt(req.params.id);
       if (isNaN(sequenceId)) {
@@ -1954,7 +1954,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   });
 
   // Start a follow-up sequence for a drop
-  app.post("/api/drops/:id/sequence", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/drops/:id/sequence", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const dropId = parseInt(req.params.id);
       const { sequenceId } = req.body;
@@ -2044,29 +2044,35 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  app.post("/api/drops/:id/summary", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/drops/:id/summary", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const dropId = parseInt(req.params.id);
+      console.log(`[AI Summary] Starting for drop ${dropId}`);
       if (isNaN(dropId)) {
         return res.status(400).json({ error: "Invalid drop ID" });
       }
       
       const drop = await storage.getDrop(dropId);
       if (!drop) {
+        console.log(`[AI Summary] Drop ${dropId} not found`);
         return res.status(404).json({ error: "Drop not found" });
       }
       
       const userId = req.user.claims.sub;
+      console.log(`[AI Summary] User ${userId} requesting summary for drop owned by ${drop.agentId}`);
       if (drop.agentId !== userId) {
+        console.log(`[AI Summary] Access denied: user ${userId} != agent ${drop.agentId}`);
         return res.status(403).json({ error: "Access denied" });
       }
       
       // Check if there's transcript or notes to summarize
       const transcript = drop.voiceTranscript || drop.textNotes;
       if (!transcript) {
+        console.log(`[AI Summary] No transcript or notes for drop ${dropId}`);
         return res.status(400).json({ error: "No transcript or notes to summarize" });
       }
       
+      console.log(`[AI Summary] Calling AI for drop ${dropId} with transcript: "${transcript.substring(0, 50)}..."`);
       const client = getAIIntegrationsClient();
       
       const systemPrompt = `You are an AI assistant analyzing a sales representative's notes or voice transcript from a merchant visit.
@@ -2143,25 +2149,30 @@ Respond in JSON format:
     }
   });
 
-  app.post("/api/drops/:id/score", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/drops/:id/score", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const dropId = parseInt(req.params.id);
+      console.log(`[Lead Score] Starting for drop ${dropId}`);
       if (isNaN(dropId)) {
         return res.status(400).json({ error: "Invalid drop ID" });
       }
       
       const drop = await storage.getDrop(dropId);
       if (!drop) {
+        console.log(`[Lead Score] Drop ${dropId} not found`);
         return res.status(404).json({ error: "Drop not found" });
       }
       
       const userId = req.user.claims.sub;
+      console.log(`[Lead Score] User ${userId} requesting score for drop owned by ${drop.agentId}`);
       if (drop.agentId !== userId) {
+        console.log(`[Lead Score] Access denied: user ${userId} != agent ${drop.agentId}`);
         return res.status(403).json({ error: "Access denied" });
       }
       
       // Check if business is prohibited before calling AI
-      const prohibitedCheck = checkProhibitedBusiness(drop.businessName, drop.textNotes || "");
+      console.log(`[Lead Score] Checking prohibited business for "${drop.businessName}"`);
+      const prohibitedCheck = checkProhibitedBusiness(drop.businessName || "", drop.textNotes || "");
       if (prohibitedCheck.isProhibited) {
         const matchReasons = prohibitedCheck.matches.map(m => m.reason).join("; ");
         const leadScore = await storage.createOrUpdateLeadScore({
@@ -2395,7 +2406,7 @@ Respond in JSON format:
   // OFFLINE SYNC API
   // ============================================
   
-  app.post("/api/offline/sync", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/offline/sync", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { actions } = req.body;
