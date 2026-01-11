@@ -30,6 +30,12 @@ import {
   checkProhibitedBusiness,
 } from "./underwriting";
 import { getEmailPrompt, SIGNAPAY_SALES_SCRIPT } from "./sales-script";
+import {
+  SALES_TRAINING_KNOWLEDGE,
+  getBusinessContextPrompt,
+  getScenarioPrompt,
+} from "./roleplay-knowledge";
+import { insertRoleplaySessionSchema, ROLEPLAY_SCENARIOS } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -2462,6 +2468,354 @@ Respond in JSON format:
     } catch (error) {
       console.error("Error syncing offline data:", error);
       res.status(500).json({ error: "Failed to sync offline data" });
+    }
+  });
+
+  // ============================================
+  // ROLE-PLAY COACH API
+  // ============================================
+
+  app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { dropId, scenario, customObjections } = req.body;
+
+      if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
+        return res.status(400).json({ 
+          error: `Invalid scenario. Must be one of: ${ROLEPLAY_SCENARIOS.join(", ")}` 
+        });
+      }
+
+      let businessContext = "";
+      let drop = null;
+
+      if (dropId) {
+        drop = await storage.getDrop(parseInt(dropId));
+        if (drop) {
+          businessContext = getBusinessContextPrompt(
+            drop.businessType || "other",
+            drop.businessName || "",
+            drop.textNotes || ""
+          );
+        }
+      }
+
+      if (customObjections) {
+        businessContext += `\n\nThe agent wants to practice handling these specific objections: ${customObjections}`;
+      }
+
+      const session = await storage.createRoleplaySession({
+        agentId: userId,
+        dropId: dropId ? parseInt(dropId) : null,
+        scenario,
+        businessContext,
+        status: "active",
+      });
+
+      const scenarioPrompt = getScenarioPrompt(scenario);
+      const systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
+
+${scenarioPrompt}
+
+${businessContext}
+
+IMPORTANT GUIDELINES:
+- Stay in character as the business owner at all times
+- React naturally based on how the agent approaches you
+- If they use good NEPQ questioning techniques (asking about your situation, problems, consequences), open up and share more
+- If they pitch too hard or use pushy tactics, become resistant or skeptical
+- Give realistic responses that a real business owner would give
+- Include natural objections when appropriate for the scenario
+- Keep responses conversational and not too long (1-3 sentences usually)
+- Never break character or acknowledge you're an AI
+- If the agent does well, let them progress; if they struggle, make it harder
+
+Remember: You're helping them practice real sales conversations. Be challenging but fair.`;
+
+      await storage.createRoleplayMessage({
+        sessionId: session.id,
+        role: "system",
+        content: systemMessage,
+      });
+
+      res.status(201).json({
+        sessionId: session.id,
+        scenario,
+        message: "Role-play session started. Begin your approach!",
+      });
+    } catch (error) {
+      console.error("Error creating roleplay session:", error);
+      res.status(500).json({ error: "Failed to create roleplay session" });
+    }
+  });
+
+  app.get("/api/roleplay/sessions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      const session = await storage.getRoleplaySession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const visibleMessages = session.messages.filter(m => m.role !== "system");
+      res.json({ ...session, messages: visibleMessages });
+    } catch (error) {
+      console.error("Error fetching roleplay session:", error);
+      res.status(500).json({ error: "Failed to fetch session" });
+    }
+  });
+
+  app.post("/api/roleplay/sessions/:id/message", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { message } = req.body;
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      const trimmedMessage = message.trim();
+      if (trimmedMessage.length === 0) {
+        return res.status(400).json({ error: "Message cannot be empty" });
+      }
+
+      if (trimmedMessage.length > 2000) {
+        return res.status(400).json({ error: "Message is too long (max 2000 characters)" });
+      }
+
+      const session = await storage.getRoleplaySession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (session.status !== "active") {
+        return res.status(400).json({ error: "Session is no longer active" });
+      }
+
+      await storage.createRoleplayMessage({
+        sessionId,
+        role: "user",
+        content: trimmedMessage,
+      });
+
+      const client = getAIIntegrationsClient();
+
+      const allMessages = await storage.getRoleplayMessages(sessionId);
+      
+      const systemMsg = allMessages.find(m => m.role === "system");
+      const conversationMsgs = allMessages.filter(m => m.role !== "system");
+      
+      const recentMessages = conversationMsgs.slice(-20);
+      
+      const chatMessages: Array<{role: "system" | "user" | "assistant", content: string}> = [];
+      
+      if (systemMsg) {
+        chatMessages.push({ role: "system", content: systemMsg.content });
+      }
+      
+      if (conversationMsgs.length > 20) {
+        const summaryNote = `[Previous conversation context: ${conversationMsgs.length - 20} earlier messages exchanged]`;
+        chatMessages.push({ role: "system", content: summaryNote });
+      }
+      
+      recentMessages.forEach(m => {
+        chatMessages.push({ 
+          role: m.role as "user" | "assistant", 
+          content: m.content 
+        });
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: chatMessages,
+        max_completion_tokens: 500,
+      });
+
+      const aiResponse = response.choices[0]?.message?.content || "I didn't catch that. Could you repeat?";
+
+      const savedMessage = await storage.createRoleplayMessage({
+        sessionId,
+        role: "assistant",
+        content: aiResponse,
+      });
+
+      res.json({
+        response: aiResponse,
+        messageId: savedMessage.id,
+      });
+    } catch (error: any) {
+      const errorMessage = error?.message || "Unknown error";
+      console.error("Error in roleplay conversation:", errorMessage);
+      
+      if (errorMessage.includes("rate limit") || errorMessage.includes("quota")) {
+        return res.status(429).json({ error: "AI service is busy. Please try again in a moment." });
+      }
+      
+      res.status(500).json({ error: "Failed to process message. Please try again." });
+    }
+  });
+
+  app.post("/api/roleplay/sessions/:id/speak", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      const session = await storage.getRoleplaySession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+      if (!elevenLabsKey) {
+        return res.status(500).json({ error: "ElevenLabs not configured" });
+      }
+
+      const voiceId = "21m00Tcm4TlvDq8ikWAM";
+
+      const ttsResponse = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": elevenLabsKey,
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_monolingual_v1",
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        }
+      );
+
+      if (!ttsResponse.ok) {
+        const errorText = await ttsResponse.text();
+        console.error("ElevenLabs error:", errorText);
+        return res.status(500).json({ error: "Failed to generate speech" });
+      }
+
+      const audioBuffer = await ttsResponse.arrayBuffer();
+      const base64Audio = Buffer.from(audioBuffer).toString("base64");
+
+      res.json({
+        audio: base64Audio,
+        format: "audio/mpeg",
+      });
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).json({ error: "Failed to generate speech" });
+    }
+  });
+
+  app.post("/api/roleplay/sessions/:id/end", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      const session = await storage.getRoleplaySession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const client = getAIIntegrationsClient();
+
+      const allMessages = await storage.getRoleplayMessages(sessionId);
+      const conversationText = allMessages
+        .filter(m => m.role !== "system")
+        .map(m => `${m.role === "user" ? "Agent" : "Prospect"}: ${m.content}`)
+        .join("\n");
+
+      const feedbackPrompt = `You are a sales coach reviewing a role-play practice session. Analyze this conversation between a sales agent and a simulated prospect.
+
+CONVERSATION:
+${conversationText}
+
+SALES TRAINING REFERENCE:
+${SALES_TRAINING_KNOWLEDGE.substring(0, 4000)}
+
+Provide constructive feedback in JSON format:
+{
+  "overallScore": <1-100>,
+  "strengths": ["strength 1", "strength 2"],
+  "areasToImprove": ["area 1", "area 2"],
+  "nepqUsage": "Did they use NEPQ questioning techniques? How well?",
+  "objectionHandling": "How did they handle objections?",
+  "rapportBuilding": "Did they build rapport effectively?",
+  "topTip": "One specific actionable tip for their next conversation"
+}`;
+
+      const feedbackResponse = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: "You are an expert sales coach. Provide feedback in valid JSON format only." },
+          { role: "user", content: feedbackPrompt }
+        ],
+        max_completion_tokens: 1000,
+      });
+
+      const feedbackText = feedbackResponse.choices[0]?.message?.content || "{}";
+      
+      let feedback;
+      try {
+        const jsonMatch = feedbackText.match(/\{[\s\S]*\}/);
+        feedback = jsonMatch ? JSON.parse(jsonMatch[0]) : { overallScore: 50, topTip: "Keep practicing!" };
+      } catch {
+        feedback = { overallScore: 50, topTip: "Keep practicing!" };
+      }
+
+      await storage.updateRoleplaySession(sessionId, {
+        status: "completed",
+        endedAt: new Date(),
+        feedback: JSON.stringify(feedback),
+        performanceScore: feedback.overallScore || 50,
+      });
+
+      res.json({
+        status: "completed",
+        feedback,
+      });
+    } catch (error) {
+      console.error("Error ending roleplay session:", error);
+      res.status(500).json({ error: "Failed to end session" });
+    }
+  });
+
+  app.get("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessions = await storage.getRoleplaySessionsByAgent(userId);
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching roleplay sessions:", error);
+      res.status(500).json({ error: "Failed to fetch sessions" });
     }
   });
 

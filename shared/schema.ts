@@ -613,3 +613,60 @@ export const updateUserPreferencesSchema = insertUserPreferencesSchema.partial()
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UpdateUserPreferences = z.infer<typeof updateUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Role-play session types
+export const ROLEPLAY_SCENARIOS = [
+  "cold_approach",
+  "objection_handling", 
+  "closing",
+  "follow_up",
+  "general_practice"
+] as const;
+export type RoleplayScenario = typeof ROLEPLAY_SCENARIOS[number];
+
+// Role-play sessions table (for AI conversation role-play training)
+export const roleplaySessions = pgTable("roleplay_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id").notNull(),
+  dropId: integer("drop_id").references(() => drops.id),
+  scenario: varchar("scenario", { length: 50 }).notNull(),
+  businessContext: text("business_context"),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  feedback: text("feedback"),
+  performanceScore: integer("performance_score"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const insertRoleplaySessionSchema = createInsertSchema(roleplaySessions).omit({
+  id: true,
+  createdAt: true,
+  endedAt: true,
+  feedback: true,
+  performanceScore: true,
+}).extend({
+  scenario: z.enum(ROLEPLAY_SCENARIOS),
+});
+export type InsertRoleplaySession = z.infer<typeof insertRoleplaySessionSchema>;
+export type RoleplaySession = typeof roleplaySessions.$inferSelect;
+
+// Role-play messages table (stores conversation history)
+export const roleplayMessages = pgTable("roleplay_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull().references(() => roleplaySessions.id),
+  role: varchar("role", { length: 20 }).notNull(),
+  content: text("content").notNull(),
+  audioUrl: text("audio_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRoleplayMessageSchema = createInsertSchema(roleplayMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertRoleplayMessage = z.infer<typeof insertRoleplayMessageSchema>;
+export type RoleplayMessage = typeof roleplayMessages.$inferSelect;
+
+export type RoleplaySessionWithMessages = RoleplaySession & {
+  messages: RoleplayMessage[];
+};

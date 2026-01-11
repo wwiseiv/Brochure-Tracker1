@@ -18,6 +18,8 @@ import {
   offlineQueue,
   invitations,
   feedbackSubmissions,
+  roleplaySessions,
+  roleplayMessages,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -58,6 +60,11 @@ import {
   type InsertInvitation,
   type FeedbackSubmission,
   type InsertFeedbackSubmission,
+  type RoleplaySession,
+  type InsertRoleplaySession,
+  type RoleplayMessage,
+  type InsertRoleplayMessage,
+  type RoleplaySessionWithMessages,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -110,6 +117,14 @@ export interface IStorage {
   
   // Feedback
   createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
+  
+  // Roleplay Sessions
+  createRoleplaySession(data: InsertRoleplaySession): Promise<RoleplaySession>;
+  getRoleplaySession(id: number): Promise<RoleplaySessionWithMessages | undefined>;
+  getRoleplaySessionsByAgent(agentId: string): Promise<RoleplaySession[]>;
+  updateRoleplaySession(id: number, data: Partial<RoleplaySession>): Promise<RoleplaySession | undefined>;
+  createRoleplayMessage(data: InsertRoleplayMessage): Promise<RoleplayMessage>;
+  getRoleplayMessages(sessionId: number): Promise<RoleplayMessage[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -686,6 +701,55 @@ export class DatabaseStorage implements IStorage {
   async createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
     const [created] = await db.insert(feedbackSubmissions).values(data).returning();
     return created;
+  }
+
+  // Role-play Sessions
+  async createRoleplaySession(data: InsertRoleplaySession): Promise<RoleplaySession> {
+    const [created] = await db.insert(roleplaySessions).values(data).returning();
+    return created;
+  }
+
+  async getRoleplaySession(id: number): Promise<RoleplaySessionWithMessages | undefined> {
+    const [session] = await db.select().from(roleplaySessions).where(eq(roleplaySessions.id, id));
+    if (!session) return undefined;
+    
+    const messages = await db
+      .select()
+      .from(roleplayMessages)
+      .where(eq(roleplayMessages.sessionId, id))
+      .orderBy(roleplayMessages.createdAt);
+    
+    return { ...session, messages };
+  }
+
+  async getRoleplaySessionsByAgent(agentId: string): Promise<RoleplaySession[]> {
+    return db
+      .select()
+      .from(roleplaySessions)
+      .where(eq(roleplaySessions.agentId, agentId))
+      .orderBy(desc(roleplaySessions.createdAt));
+  }
+
+  async updateRoleplaySession(id: number, data: Partial<RoleplaySession>): Promise<RoleplaySession | undefined> {
+    const [updated] = await db
+      .update(roleplaySessions)
+      .set(data)
+      .where(eq(roleplaySessions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createRoleplayMessage(data: InsertRoleplayMessage): Promise<RoleplayMessage> {
+    const [created] = await db.insert(roleplayMessages).values(data).returning();
+    return created;
+  }
+
+  async getRoleplayMessages(sessionId: number): Promise<RoleplayMessage[]> {
+    return db
+      .select()
+      .from(roleplayMessages)
+      .where(eq(roleplayMessages.sessionId, sessionId))
+      .orderBy(roleplayMessages.createdAt);
   }
 }
 
