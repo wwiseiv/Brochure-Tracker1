@@ -284,7 +284,7 @@ export default function HelpPage() {
   const aiToolsFeatures: HelpItem[] = [
     {
       title: "AI Sales Coach",
-      description: "Access from any drop detail page. Two modes: Get Coaching (ask questions, get sales advice) or Practice Role-Play (simulate conversations with business owners).",
+      description: "Open any drop from the dashboard and tap 'Practice Role-Play'. Choose between Get Coaching (ask questions) or Practice Role-Play (simulate conversations with merchants).",
       link: "/",
       icon: <Users className="w-5 h-5 text-amber-500" />,
     },
@@ -302,13 +302,13 @@ export default function HelpPage() {
     },
     {
       title: "Voice Conversations",
-      description: "Tap the mic button to speak instead of typing. Your voice is transcribed and sent automatically. Toggle Auto-play to hear AI responses spoken aloud.",
+      description: "Tap the mic button to speak instead of typing. Your voice is transcribed and sent automatically. Use the 'Auto-play voice' toggle to hear AI responses spoken aloud.",
       link: "/",
       icon: <Mic className="w-5 h-5 text-amber-500" />,
     },
     {
       title: "Performance Feedback",
-      description: "End your role-play session to get AI-generated feedback. See your score, strengths, areas to improve, and tips for your next real conversation.",
+      description: "Tap 'End & Get Feedback' to finish your role-play session. See your score (0-100), strengths, areas to improve, and a top tip for your next conversation.",
       link: "/",
       icon: <BarChart3 className="w-5 h-5 text-amber-500" />,
     },
