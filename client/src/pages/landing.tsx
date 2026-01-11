@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { QrCode, MapPin, Mic, Bell, CheckCircle2, ArrowRight } from "lucide-react";
+import { QrCode, MapPin, Mic, Bell, CheckCircle2, ArrowRight, Package, GraduationCap, Users, TrendingUp } from "lucide-react";
 
 const features = [
   {
@@ -22,6 +22,29 @@ const features = [
     icon: Bell,
     title: "Smart Reminders",
     description: "Get notified when it's time to pick up brochures and follow up with leads",
+  },
+];
+
+const advancedFeatures = [
+  {
+    icon: Package,
+    title: "Inventory Tracking",
+    description: "Track each brochure by QR code with complete chain of custody from house to field",
+  },
+  {
+    icon: GraduationCap,
+    title: "AI Sales Coach",
+    description: "Practice pitches with AI role-play and get real-time coaching on objection handling",
+  },
+  {
+    icon: Users,
+    title: "Referral Tracking",
+    description: "Log merchant referrals and track their progress from contact to conversion",
+  },
+  {
+    icon: TrendingUp,
+    title: "Lead Scoring",
+    description: "AI-powered hot lead detection identifies your best opportunities automatically",
   },
 ];
 
@@ -73,6 +96,27 @@ export default function LandingPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {features.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <Card key={index} className="p-4 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </div>
+              </Card>
+            );
+          })}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold text-center mb-6">Advanced Features</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {advancedFeatures.map((feature, index) => {
             const Icon = feature.icon;
             return (
               <Card key={index} className="p-4 flex items-start gap-4">
