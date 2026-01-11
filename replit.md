@@ -63,6 +63,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
+- **Data Export** (/history, /merchants, /referrals): Export your data to CSV or Excel (XLSX) format. Available on History page (drops/contacts), Merchants page (merchant profiles), and Referrals page (referral data). Download includes formatted dates, business info, contact details, and all relevant fields for each data type.
 - **Standalone Sales Coach** (/coach): Full-page AI coaching experience accessible from bottom navigation bar. Two tabs: "New Session" for starting coaching/roleplay sessions, and "History" for reviewing past sessions. Session history shows date, mode, scenario, and score with expandable conversation transcripts. Users can delete individual sessions or clear all history. Includes voice input/output and performance feedback scoring.
 - **Improved Back Navigation**: All pages now use browser history for back buttons instead of always going to home. When you press back, you return to wherever you came from (previous page), not always the dashboard.
 - **Bottom Navigation with Coach**: 6-item navigation bar (Home, Scan, Coach, Merchants, History, Profile) optimized for mobile with proper touch targets and spacing.

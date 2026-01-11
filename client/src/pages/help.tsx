@@ -282,6 +282,12 @@ export default function HelpPage() {
       link: "/profile",
       icon: <Bell className="w-5 h-5 text-green-600" />,
     },
+    {
+      title: "Export Drop History",
+      description: "Download all your drops as a CSV or Excel spreadsheet. Export includes business info, dates, addresses, notes, and outcomes.",
+      link: "/history",
+      icon: <Download className="w-5 h-5 text-green-600" />,
+    },
   ];
 
   const aiToolsFeatures: HelpItem[] = [
@@ -465,6 +471,12 @@ export default function HelpPage() {
       link: "/merchants",
       icon: <StickyNote className="w-5 h-5 text-indigo-600" />,
     },
+    {
+      title: "Export Merchant Data",
+      description: "Download your merchant contacts as a CSV or Excel file. Great for importing into other tools or creating reports.",
+      link: "/merchants",
+      icon: <Download className="w-5 h-5 text-indigo-600" />,
+    },
   ];
 
   const inventoryFeatures: HelpItem[] = [
@@ -536,6 +548,12 @@ export default function HelpPage() {
       description: "Get credit for successful referrals. Track which merchants are your best referral sources.",
       link: "/referrals",
       icon: <CheckCircle2 className="w-5 h-5 text-pink-600" />,
+    },
+    {
+      title: "Export Referrals",
+      description: "Download your referral data as a CSV or Excel spreadsheet. Perfect for tracking and reporting.",
+      link: "/referrals",
+      icon: <Download className="w-5 h-5 text-pink-600" />,
     },
   ];
 
