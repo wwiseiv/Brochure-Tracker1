@@ -622,8 +622,22 @@ export async function registerRoutes(
           });
         }
 
-        // Create a temporary file path for the audio
-        const tempFilePath = path.join("/tmp", `${Date.now()}_${req.file.originalname}`);
+        // Determine file extension from MIME type for Whisper compatibility
+        const mimeType = req.file.mimetype || "";
+        let ext = "wav";
+        if (mimeType.includes("mp4") || mimeType.includes("m4a") || mimeType.includes("x-m4a")) {
+          ext = "m4a";
+        } else if (mimeType.includes("webm")) {
+          ext = "webm";
+        } else if (mimeType.includes("mpeg") || mimeType.includes("mp3")) {
+          ext = "mp3";
+        } else if (mimeType.includes("ogg")) {
+          ext = "ogg";
+        }
+        
+        // Create a temporary file path with correct extension
+        const tempFilePath = path.join("/tmp", `${Date.now()}_recording.${ext}`);
+        console.log(`Transcription: received ${req.file.size} bytes, mime: ${mimeType}, saving as ${ext}`);
         
         // Write the file to disk temporarily (required by OpenAI client)
         await new Promise((resolve, reject) => {
