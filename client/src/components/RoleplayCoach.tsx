@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -107,6 +108,14 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
   const [showFeedback, setShowFeedback] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [autoPlayVoice, setAutoPlayVoice] = useState(true);
+  const [lastSpokenMessageId, setLastSpokenMessageId] = useState<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -212,6 +221,112 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
       });
     },
   });
+
+  // Auto-play AI response after receiving it (only once per message)
+  useEffect(() => {
+    if (autoPlayVoice && sessionId && messages.length > 0 && !isPlaying && !speakMutation.isPending) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant" && lastMessage.id !== lastSpokenMessageId) {
+        setLastSpokenMessageId(lastMessage.id);
+        speakMutation.mutate(lastMessage.content);
+      }
+    }
+  }, [messages, autoPlayVoice, sessionId, isPlaying, lastSpokenMessageId]);
+
+  const startRecording = async () => {
+    if (!sessionId) {
+      toast({
+        title: "Start a session first",
+        description: "Please start a coaching or role-play session before using voice input",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+          await transcribeAudio(audioBlob);
+        }
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Transcription failed");
+      }
+      
+      const data = await response.json();
+      if (data.text && data.text.trim()) {
+        // Auto-send the transcribed message
+        const userMessage: Message = {
+          id: Date.now(),
+          role: "user",
+          content: data.text.trim(),
+        };
+        setMessages((prev) => [...prev, userMessage]);
+        sendMessageMutation.mutate(data.text.trim());
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking again",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Could not transcribe your audio. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
 
   const handleSend = () => {
     if (!inputMessage.trim() || !sessionId) return;
@@ -568,10 +683,21 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="p-4 border-t">
-                  <div className="flex gap-2">
+                <div className="p-4 border-t space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Tap mic to speak, or type below</span>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span>Auto-play voice</span>
+                      <Switch
+                        checked={autoPlayVoice}
+                        onCheckedChange={setAutoPlayVoice}
+                        data-testid="switch-autoplay"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex gap-2 items-end">
                     <Textarea
-                      placeholder={mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
+                      placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyDown={(e) => {
@@ -581,16 +707,33 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                         }
                       }}
                       className="min-h-[60px] resize-none"
+                      disabled={isRecording || isTranscribing}
                       data-testid="input-message"
                     />
-                    <Button
-                      onClick={handleSend}
-                      disabled={!inputMessage.trim() || sendMessageMutation.isPending}
-                      className="self-end"
-                      data-testid="button-send"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        size="icon"
+                        variant={isRecording ? "destructive" : "outline"}
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={isTranscribing || sendMessageMutation.isPending}
+                        data-testid="button-mic"
+                        className={isRecording ? "animate-pulse" : ""}
+                      >
+                        {isTranscribing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        onClick={handleSend}
+                        disabled={!inputMessage.trim() || sendMessageMutation.isPending || isRecording || isTranscribing}
+                        data-testid="button-send"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </>
