@@ -22,7 +22,7 @@ import {
   insertFeedbackSubmissionSchema,
   INVITATION_STATUSES,
 } from "@shared/schema";
-import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken } from "./email";
+import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail } from "./email";
 import {
   getBusinessRiskProfile,
   UNDERWRITING_AI_CONTEXT,
@@ -2239,6 +2239,60 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     } catch (error) {
       console.error("Error deleting referral:", error);
       res.status(500).json({ error: "Failed to delete referral" });
+    }
+  });
+
+  app.post("/api/referrals/:id/send-thank-you", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const referralId = parseInt(req.params.id);
+      if (isNaN(referralId)) {
+        return res.status(400).json({ error: "Invalid referral ID" });
+      }
+      
+      const userId = req.user.claims.sub;
+      const referral = await storage.getReferral(referralId);
+      
+      if (!referral) {
+        return res.status(404).json({ error: "Referral not found" });
+      }
+      
+      if (referral.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      if (!referral.referringPartyEmail) {
+        return res.status(400).json({ error: "No referring party email address" });
+      }
+      
+      const { subject, body } = req.body;
+      if (!subject || !body) {
+        return res.status(400).json({ error: "Subject and body are required" });
+      }
+      
+      const senderName = req.user.claims.name || req.user.claims.email || "BrochureDrop Team";
+      const recipientName = referral.referringPartyName || "Valued Partner";
+      
+      const result = await sendThankYouEmail({
+        to: referral.referringPartyEmail,
+        recipientName,
+        subject,
+        body,
+        senderName,
+      });
+      
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+      
+      // Update the referral to mark thank you as sent
+      const updated = await storage.updateReferral(referralId, {
+        thankYouEmailSentAt: new Date(),
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error sending thank you email:", error);
+      res.status(500).json({ error: "Failed to send thank you email" });
     }
   });
 

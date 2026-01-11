@@ -199,6 +199,79 @@ export function generateInviteToken(): string {
   return token;
 }
 
+interface SendThankYouEmailParams {
+  to: string;
+  recipientName: string;
+  subject: string;
+  body: string;
+  senderName: string;
+}
+
+export async function sendThankYouEmail(params: SendThankYouEmailParams): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log(`Sending thank you email to ${params.to}`);
+    const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send thank you email - Resend client not configured");
+      return { success: false, error: "Email service not configured" };
+    }
+
+    // Convert newlines to HTML breaks for proper formatting
+    const formattedBody = params.body.replace(/\n/g, "<br>");
+
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: params.to,
+      subject: params.subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Thank You!</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">We appreciate your support</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <p style="font-size: 16px; margin: 0 0 20px 0;">
+              Dear ${params.recipientName},
+            </p>
+            
+            <div style="font-size: 16px; margin: 0 0 20px 0;">
+              ${formattedBody}
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+            
+            <p style="font-size: 14px; color: #64748b; margin: 0;">
+              Best regards,<br>
+              <strong>${params.senderName}</strong>
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Failed to send thank you email:", error);
+      const errorMessage = error.message || "Failed to send email";
+      return { success: false, error: errorMessage };
+    }
+
+    console.log(`Thank you email sent successfully to ${params.to}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending thank you email:", error?.message || error);
+    return { success: false, error: error?.message || "Failed to send email" };
+  }
+}
+
 interface SendNewMemberNotificationParams {
   adminEmail: string;
   memberName: string;

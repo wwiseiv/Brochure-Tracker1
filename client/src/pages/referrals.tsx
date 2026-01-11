@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -59,6 +60,12 @@ import {
   Loader2,
   Pencil,
   Trash2,
+  Mail,
+  Send,
+  Sparkles,
+  Copy,
+  Check,
+  User,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Referral, DropWithBrochure, ReferralStatus } from "@shared/schema";
@@ -70,6 +77,12 @@ const addReferralSchema = z.object({
   referredContactName: z.string().optional(),
   referredPhone: z.string().optional(),
   notes: z.string().optional(),
+  // Referring party fields
+  referringPartyName: z.string().min(1, "Referring party name is required"),
+  referringPartyEmail: z.string().email().optional().or(z.literal("")),
+  referringPartyPhone: z.string().optional(),
+  referringPartyAddress: z.string().optional(),
+  referringPartyBusinessName: z.string().optional(),
 });
 
 type AddReferralFormData = z.infer<typeof addReferralSchema>;
@@ -115,6 +128,7 @@ function ReferralCard({
   onStatusChange,
   onEdit,
   onDelete,
+  onSendThankYou,
   isDeleting,
 }: { 
   referral: Referral; 
@@ -122,6 +136,7 @@ function ReferralCard({
   onStatusChange: (id: number, status: ReferralStatus) => void;
   onEdit: (referral: Referral) => void;
   onDelete: (id: number) => void;
+  onSendThankYou: (referral: Referral) => void;
   isDeleting: boolean;
 }) {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -132,6 +147,8 @@ function ReferralCard({
     await onStatusChange(referral.id, newStatus as ReferralStatus);
     setIsUpdating(false);
   };
+
+  const hasReferringPartyEmail = !!referral.referringPartyEmail;
 
   return (
     <Card className="p-4" data-testid={`card-referral-${referral.id}`}>
@@ -166,6 +183,31 @@ function ReferralCard({
           </p>
         )}
         
+        {referral.referringPartyName && (
+          <div className="bg-muted/50 rounded-md p-2 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Referring Party</p>
+            <p className="text-sm flex items-center gap-1">
+              <User className="w-3 h-3" />
+              {referral.referringPartyName}
+              {referral.referringPartyBusinessName && (
+                <span className="text-muted-foreground">({referral.referringPartyBusinessName})</span>
+              )}
+            </p>
+            {referral.referringPartyEmail && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Mail className="w-3 h-3" />
+                {referral.referringPartyEmail}
+              </p>
+            )}
+            {referral.thankYouEmailSentAt && (
+              <p className="text-xs text-emerald-600 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Thank you sent {format(new Date(referral.thankYouEmailSentAt), "MMM d")}
+              </p>
+            )}
+          </div>
+        )}
+        
         {referral.notes && (
           <p className="text-sm text-muted-foreground flex items-start gap-1">
             <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
@@ -179,6 +221,18 @@ function ReferralCard({
           </p>
           
           <div className="flex items-center gap-2">
+            {hasReferringPartyEmail && !referral.thankYouEmailSentAt && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onSendThankYou(referral)}
+                data-testid={`button-thank-you-${referral.id}`}
+                title="Send Thank You Email"
+              >
+                <Send className="w-4 h-4 text-primary" />
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
@@ -251,6 +305,237 @@ function ReferralCard({
   );
 }
 
+function ThankYouEmailDialog({ 
+  referral,
+  open,
+  onOpenChange,
+  onSuccess 
+}: { 
+  referral: Referral | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open && referral) {
+      setSubject(`Thank you for your referral, ${referral.referringPartyName}!`);
+      setBody("");
+    }
+  }, [open, referral]);
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      if (!referral) throw new Error("No referral");
+      const res = await apiRequest("POST", "/api/email/generate", {
+        businessName: referral.referringPartyBusinessName || referral.referringPartyName || "",
+        contactName: referral.referringPartyName || "",
+        purpose: "thank-you",
+        keyPoints: `Thank you for referring ${referral.referredBusinessName}. We appreciate your support and trust in our services.`,
+        tone: "friendly",
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setBody(data.email);
+      toast({
+        title: "Email generated",
+        description: "AI has composed a thank you email for you.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const polishMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/email/polish", {
+        draft: body,
+        tone: "friendly",
+        context: "thank you email for a referral",
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setBody(data.polishedEmail);
+      toast({
+        title: "Email polished",
+        description: "Your email has been enhanced by AI.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to polish email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      if (!referral) throw new Error("No referral");
+      const res = await apiRequest("POST", `/api/referrals/${referral.id}/send-thank-you`, {
+        subject,
+        body,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/referrals"] });
+      onOpenChange(false);
+      onSuccess();
+      toast({
+        title: "Email sent!",
+        description: `Thank you email sent to ${referral?.referringPartyEmail}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to send email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+      setCopied(true);
+      toast({ title: "Copied to clipboard!" });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
+  const isLoading = generateMutation.isPending || polishMutation.isPending || sendMutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Send Thank You Email
+          </DialogTitle>
+        </DialogHeader>
+
+        {referral && (
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-md p-3 text-sm">
+              <p className="font-medium">{referral.referringPartyName}</p>
+              <p className="text-muted-foreground">{referral.referringPartyEmail}</p>
+              {referral.referringPartyBusinessName && (
+                <p className="text-muted-foreground">{referral.referringPartyBusinessName}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subject">Subject</Label>
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="min-h-touch"
+                placeholder="Email subject..."
+                data-testid="input-email-subject"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="body">Message</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateMutation.mutate()}
+                    disabled={isLoading}
+                    data-testid="button-generate-email"
+                  >
+                    {generateMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    ) : (
+                      <Sparkles className="w-3 h-3 mr-1" />
+                    )}
+                    Generate
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => polishMutation.mutate()}
+                    disabled={isLoading || !body.trim()}
+                    data-testid="button-polish-email"
+                  >
+                    {polishMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    ) : (
+                      <Sparkles className="w-3 h-3 mr-1" />
+                    )}
+                    Polish
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                id="body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                className="min-h-[200px] resize-none"
+                placeholder="Write your thank you message here, or click 'Generate' to let AI compose one for you..."
+                data-testid="textarea-email-body"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 min-h-touch"
+                onClick={copyToClipboard}
+                disabled={!body.trim()}
+                data-testid="button-copy-email"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 mr-2" />
+                ) : (
+                  <Copy className="w-4 h-4 mr-2" />
+                )}
+                Copy
+              </Button>
+              <Button
+                className="flex-1 min-h-touch"
+                onClick={() => sendMutation.mutate()}
+                disabled={isLoading || !subject.trim() || !body.trim()}
+                data-testid="button-send-email"
+              >
+                {sendMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                Send Email
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function EditReferralDialog({ 
   referral,
   drops,
@@ -274,6 +559,11 @@ function EditReferralDialog({
       referredContactName: "",
       referredPhone: "",
       notes: "",
+      referringPartyName: "",
+      referringPartyEmail: "",
+      referringPartyPhone: "",
+      referringPartyAddress: "",
+      referringPartyBusinessName: "",
     },
   });
 
@@ -286,6 +576,11 @@ function EditReferralDialog({
         referredContactName: referral.referredContactName || "",
         referredPhone: referral.referredPhone || "",
         notes: referral.notes || "",
+        referringPartyName: referral.referringPartyName || "",
+        referringPartyEmail: referral.referringPartyEmail || "",
+        referringPartyPhone: referral.referringPartyPhone || "",
+        referringPartyAddress: referral.referringPartyAddress || "",
+        referringPartyBusinessName: referral.referringPartyBusinessName || "",
       });
     }
   }, [open, referral, form]);
@@ -437,6 +732,109 @@ function EditReferralDialog({
                 </FormItem>
               )}
             />
+
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-medium mb-3">Referring Party</h4>
+              
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="referringPartyName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Enter referring party's name"
+                          data-testid="edit-input-referring-party-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="email"
+                          className="min-h-touch" 
+                          placeholder="email@example.com"
+                          data-testid="edit-input-referring-party-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="tel"
+                          className="min-h-touch" 
+                          placeholder="(555) 555-5555"
+                          data-testid="edit-input-referring-party-phone"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyBusinessName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Business name (if applicable)"
+                          data-testid="edit-input-referring-party-business"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Street address"
+                          data-testid="edit-input-referring-party-address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
             
             <Button 
               type="submit" 
@@ -474,6 +872,11 @@ function AddReferralDialog({
       referredContactName: "",
       referredPhone: "",
       notes: "",
+      referringPartyName: "",
+      referringPartyEmail: "",
+      referringPartyPhone: "",
+      referringPartyAddress: "",
+      referringPartyBusinessName: "",
     },
   });
 
@@ -626,6 +1029,109 @@ function AddReferralDialog({
                 </FormItem>
               )}
             />
+
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-medium mb-3">Referring Party (Who gave you this referral?)</h4>
+              
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="referringPartyName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Enter referring party's name"
+                          data-testid="input-referring-party-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (for thank you email)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="email"
+                          className="min-h-touch" 
+                          placeholder="email@example.com"
+                          data-testid="input-referring-party-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="tel"
+                          className="min-h-touch" 
+                          placeholder="(555) 555-5555"
+                          data-testid="input-referring-party-phone"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyBusinessName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Business name (if applicable)"
+                          data-testid="input-referring-party-business"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="referringPartyAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          className="min-h-touch" 
+                          placeholder="Street address"
+                          data-testid="input-referring-party-address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
             
             <Button 
               type="submit" 
@@ -649,6 +1155,8 @@ export default function ReferralsPage() {
   const { toast } = useToast();
   const [editingReferral, setEditingReferral] = useState<Referral | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [thankYouReferral, setThankYouReferral] = useState<Referral | null>(null);
+  const [isThankYouDialogOpen, setIsThankYouDialogOpen] = useState(false);
 
   const { data: referrals, isLoading: referralsLoading } = useQuery<Referral[]>({
     queryKey: ["/api/referrals"],
@@ -711,6 +1219,11 @@ export default function ReferralsPage() {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id);
+  };
+
+  const handleSendThankYou = (referral: Referral) => {
+    setThankYouReferral(referral);
+    setIsThankYouDialogOpen(true);
   };
 
   const stats = useMemo(() => {
@@ -779,6 +1292,7 @@ export default function ReferralsPage() {
                 onStatusChange={handleStatusChange}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onSendThankYou={handleSendThankYou}
                 isDeleting={deleteMutation.isPending}
               />
             ))}
@@ -804,6 +1318,13 @@ export default function ReferralsPage() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         onSuccess={() => setEditingReferral(null)}
+      />
+
+      <ThankYouEmailDialog
+        referral={thankYouReferral}
+        open={isThankYouDialogOpen}
+        onOpenChange={setIsThankYouDialogOpen}
+        onSuccess={() => setThankYouReferral(null)}
       />
 
       <BottomNav />
