@@ -823,5 +823,119 @@ export async function registerRoutes(
     }
   });
 
+  // RM Dashboard API - Get agents assigned to this RM
+  app.get("/api/rm/agents", isAuthenticated, requireRole("relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const agents = await storage.getAgentsByManager(membership.id);
+      res.json(agents);
+    } catch (error) {
+      console.error("Error fetching RM agents:", error);
+      res.status(500).json({ error: "Failed to fetch agents" });
+    }
+  });
+
+  // RM Dashboard API - Get all drops from agents under this RM
+  app.get("/api/rm/drops", isAuthenticated, requireRole("relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const agents = await storage.getAgentsByManager(membership.id);
+      
+      const agentIds = agents.map(a => a.userId);
+      const allDrops = await storage.getDropsByOrganization(agentIds);
+      
+      res.json(allDrops);
+    } catch (error) {
+      console.error("Error fetching RM drops:", error);
+      res.status(500).json({ error: "Failed to fetch drops" });
+    }
+  });
+
+  // RM Dashboard API - Get stats for RM's team
+  app.get("/api/rm/stats", isAuthenticated, requireRole("relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const agents = await storage.getAgentsByManager(membership.id);
+      
+      const agentIds = agents.map(a => a.userId);
+      const allDrops = await storage.getDropsByOrganization(agentIds);
+      
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+      
+      const pendingDrops = allDrops.filter(d => d.status === "pending");
+      const convertedDrops = allDrops.filter(d => d.status === "converted");
+      const pickedUpDrops = allDrops.filter(d => d.status === "picked_up" || d.status === "converted");
+      
+      const todaysPickups = pendingDrops.filter(d => {
+        if (!d.pickupScheduledFor) return false;
+        const pickup = new Date(d.pickupScheduledFor);
+        return pickup >= startOfToday && pickup < endOfToday;
+      });
+      
+      const overduePickups = pendingDrops.filter(d => {
+        if (!d.pickupScheduledFor) return false;
+        const pickup = new Date(d.pickupScheduledFor);
+        return pickup < startOfToday;
+      });
+      
+      const conversionRate = allDrops.length > 0 
+        ? (convertedDrops.length / allDrops.length) * 100 
+        : 0;
+      
+      const pickupRate = allDrops.length > 0 
+        ? (pickedUpDrops.length / allDrops.length) * 100 
+        : 0;
+      
+      res.json({
+        organization: {
+          id: membership.organization.id,
+          name: membership.organization.name,
+        },
+        team: {
+          totalAgents: agents.length,
+        },
+        drops: {
+          total: allDrops.length,
+          pending: pendingDrops.length,
+          pickedUp: pickedUpDrops.length,
+          converted: convertedDrops.length,
+          todaysPickups: todaysPickups.length,
+          overduePickups: overduePickups.length,
+        },
+        performance: {
+          conversionRate: Math.round(conversionRate * 10) / 10,
+          pickupRate: Math.round(pickupRate * 10) / 10,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching RM stats:", error);
+      res.status(500).json({ error: "Failed to fetch RM stats" });
+    }
+  });
+
+  // RM Dashboard API - Get drops for a specific agent (RM can view their agents' drops)
+  app.get("/api/rm/agents/:agentId/drops", isAuthenticated, requireRole("relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const agentUserId = req.params.agentId;
+      
+      // Verify this agent belongs to this RM
+      const agents = await storage.getAgentsByManager(membership.id);
+      const agent = agents.find(a => a.userId === agentUserId);
+      
+      if (!agent) {
+        return res.status(403).json({ error: "Access denied: Agent is not managed by you" });
+      }
+      
+      const drops = await storage.getDropsByAgent(agentUserId);
+      res.json(drops);
+    } catch (error) {
+      console.error("Error fetching agent drops:", error);
+      res.status(500).json({ error: "Failed to fetch agent drops" });
+    }
+  });
+
   return httpServer;
 }

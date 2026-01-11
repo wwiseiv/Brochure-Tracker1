@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { DashboardSkeleton } from "@/components/LoadingState";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
-import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase } from "lucide-react";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure } from "@shared/schema";
 
@@ -34,6 +34,7 @@ export default function DashboardPage() {
   });
 
   const isAdmin = userRole?.role === "master_admin";
+  const isRM = userRole?.role === "relationship_manager";
 
   const pendingDrops = drops?.filter((d) => d.status === "pending") || [];
   
@@ -85,6 +86,13 @@ export default function DashboardPage() {
               <Link href="/admin">
                 <Button variant="ghost" size="icon" data-testid="button-admin-dashboard">
                   <Shield className="h-5 w-5 text-purple-600" />
+                </Button>
+              </Link>
+            )}
+            {isRM && (
+              <Link href="/manager">
+                <Button variant="ghost" size="icon" data-testid="button-rm-dashboard">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
                 </Button>
               </Link>
             )}
