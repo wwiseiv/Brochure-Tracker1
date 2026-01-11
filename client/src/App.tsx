@@ -24,6 +24,7 @@ import ActivityFeedPage from "@/pages/activity-feed";
 import RoutePlannerPage from "@/pages/route-planner";
 import SequencesPage from "@/pages/sequences";
 import AcceptInvitePage from "@/pages/accept-invite";
+import CoachPage from "@/pages/coach";
 import NotFound from "@/pages/not-found";
 
 interface UserRole {
@@ -124,6 +125,7 @@ function AuthenticatedRouter() {
       <Route path="/activity" component={ActivityFeedPage} />
       <Route path="/route" component={RoutePlannerPage} />
       <Route path="/sequences" component={SequencesPage} />
+      <Route path="/coach" component={CoachPage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/email" component={EmailDrafterPage} />
       <Route component={NotFound} />

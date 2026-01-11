@@ -135,6 +135,8 @@ export interface IStorage {
   updateRoleplaySession(id: number, data: Partial<RoleplaySession>): Promise<RoleplaySession | undefined>;
   createRoleplayMessage(data: InsertRoleplayMessage): Promise<RoleplayMessage>;
   getRoleplayMessages(sessionId: number): Promise<RoleplayMessage[]>;
+  deleteRoleplaySession(id: number): Promise<boolean>;
+  deleteAllRoleplaySessions(agentId: string): Promise<number>;
   
   // Brochure Locations (Individual brochure custody tracking)
   getBrochureLocation(brochureId: string): Promise<BrochureLocation | undefined>;
@@ -798,6 +800,26 @@ export class DatabaseStorage implements IStorage {
       .from(roleplayMessages)
       .where(eq(roleplayMessages.sessionId, sessionId))
       .orderBy(roleplayMessages.createdAt);
+  }
+
+  async deleteRoleplaySession(id: number): Promise<boolean> {
+    await db.delete(roleplayMessages).where(eq(roleplayMessages.sessionId, id));
+    const result = await db.delete(roleplaySessions).where(eq(roleplaySessions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteAllRoleplaySessions(agentId: string): Promise<number> {
+    const sessions = await db.select({ id: roleplaySessions.id })
+      .from(roleplaySessions)
+      .where(eq(roleplaySessions.agentId, agentId));
+    
+    if (sessions.length === 0) return 0;
+    
+    const sessionIds = sessions.map(s => s.id);
+    
+    await db.delete(roleplayMessages).where(inArray(roleplayMessages.sessionId, sessionIds));
+    const result = await db.delete(roleplaySessions).where(eq(roleplaySessions.agentId, agentId));
+    return result.rowCount ?? 0;
   }
 
   // Brochure Locations (Individual brochure custody tracking)

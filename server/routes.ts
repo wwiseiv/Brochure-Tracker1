@@ -3278,5 +3278,37 @@ Provide constructive feedback in JSON format:
     }
   });
 
+  app.delete("/api/roleplay/sessions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      const session = await storage.getRoleplaySession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      if (session.agentId !== userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      
+      const deleted = await storage.deleteRoleplaySession(sessionId);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting roleplay session:", error);
+      res.status(500).json({ error: "Failed to delete session" });
+    }
+  });
+
+  app.delete("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const deletedCount = await storage.deleteAllRoleplaySessions(userId);
+      res.json({ success: true, deletedCount });
+    } catch (error) {
+      console.error("Error deleting roleplay sessions:", error);
+      res.status(500).json({ error: "Failed to delete sessions" });
+    }
+  });
+
   return httpServer;
 }

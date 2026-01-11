@@ -1,0 +1,1015 @@
+import { useState, useRef, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  MessageSquare,
+  Mic,
+  Volume2,
+  Send,
+  Play,
+  Pause,
+  Award,
+  Target,
+  Lightbulb,
+  CheckCircle,
+  Loader2,
+  Users,
+  ArrowLeft,
+  Trash2,
+  ChevronDown,
+  Calendar,
+  History,
+} from "lucide-react";
+import type { RoleplayScenario, RoleplaySession } from "@shared/schema";
+import { format } from "date-fns";
+
+interface Message {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  audioUrl?: string;
+}
+
+interface SessionFeedback {
+  overallScore: number;
+  strengths: string[];
+  areasToImprove: string[];
+  nepqUsage: string;
+  objectionHandling: string;
+  rapportBuilding: string;
+  topTip: string;
+}
+
+interface SessionWithMessages extends RoleplaySession {
+  messages?: { id: number; role: string; content: string }[];
+}
+
+function SessionHistoryCard({ 
+  session, 
+  isExpanded, 
+  onToggle, 
+  onDelete,
+  isDeleting,
+  getScenarioLabel,
+  parseFeedback
+}: { 
+  session: RoleplaySession; 
+  isExpanded: boolean; 
+  onToggle: (expanded: boolean) => void;
+  onDelete: (id: number) => void;
+  isDeleting: boolean;
+  getScenarioLabel: (value: string) => string;
+  parseFeedback: (feedbackStr: string | null) => SessionFeedback | null;
+}) {
+  const { data: sessionDetails } = useQuery<SessionWithMessages>({
+    queryKey: ['/api/roleplay/sessions', session.id],
+    enabled: isExpanded,
+  });
+
+  const sessionFeedback = parseFeedback(session.feedback);
+  const sessionMessages = sessionDetails?.messages || [];
+
+  return (
+    <Collapsible open={isExpanded} onOpenChange={onToggle}>
+      <Card className="overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button
+            className="w-full p-3 text-left flex items-center gap-3 min-h-[72px]"
+            data-testid={`session-card-${session.id}`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <Badge variant={session.mode === "coaching" ? "secondary" : "default"}>
+                  {session.mode === "coaching" ? "Coaching" : "Roleplay"}
+                </Badge>
+                <Badge variant="outline">
+                  {getScenarioLabel(session.scenario)}
+                </Badge>
+                {session.performanceScore && (
+                  <Badge variant="outline" className="bg-primary/10">
+                    Score: {session.performanceScore}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {format(new Date(session.createdAt), "MMM d, yyyy h:mm a")}
+              </div>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-3 pb-3 border-t pt-3 space-y-3">
+            {sessionMessages.length > 0 && (
+              <div className="space-y-2 max-h-[300px] overflow-auto">
+                <div className="text-xs font-medium text-muted-foreground">Conversation:</div>
+                {sessionMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] p-2 rounded-lg text-xs ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sessionFeedback && (
+              <div className="space-y-2">
+                {sessionFeedback.topTip && (
+                  <div className="text-sm">
+                    <span className="font-medium">Top Tip:</span>{" "}
+                    <span className="text-muted-foreground">{sessionFeedback.topTip}</span>
+                  </div>
+                )}
+                {sessionFeedback.strengths && sessionFeedback.strengths.length > 0 && (
+                  <div className="text-sm">
+                    <span className="font-medium text-green-600">Strengths:</span>{" "}
+                    <span className="text-muted-foreground">{sessionFeedback.strengths.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  className="w-full h-11"
+                  data-testid={`button-delete-session-${session.id}`}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Session
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete this coaching/roleplay session and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(session.id)}
+                    data-testid="button-confirm-delete"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+const scenarioOptions: { value: RoleplayScenario; label: string; description: string }[] = [
+  { 
+    value: "cold_approach", 
+    label: "Cold Approach", 
+    description: "Practice your initial approach to a business owner who's never heard of you" 
+  },
+  { 
+    value: "objection_handling", 
+    label: "Objection Handling", 
+    description: "Handle common objections like 'I need to think about it' or 'Too expensive'" 
+  },
+  { 
+    value: "closing", 
+    label: "Closing", 
+    description: "Practice closing techniques with a warm prospect who's almost ready" 
+  },
+  { 
+    value: "follow_up", 
+    label: "Follow-up Visit", 
+    description: "Re-engage a prospect you met last week who said they'd 'think about it'" 
+  },
+  { 
+    value: "general_practice", 
+    label: "General Practice", 
+    description: "Free-form practice with a realistic business owner" 
+  },
+];
+
+type SessionMode = "roleplay" | "coaching";
+
+export default function CoachPage() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState("new");
+  const [mode, setMode] = useState<SessionMode>("coaching");
+  const [scenario, setScenario] = useState<RoleplayScenario>("cold_approach");
+  const [customObjections, setCustomObjections] = useState("");
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [feedback, setFeedback] = useState<SessionFeedback | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [expandedSessionId, setExpandedSessionId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [autoPlayVoice, setAutoPlayVoice] = useState(true);
+  const [lastSpokenMessageId, setLastSpokenMessageId] = useState<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const { data: sessions = [], isLoading: sessionsLoading } = useQuery<RoleplaySession[]>({
+    queryKey: ["/api/roleplay/sessions"],
+  });
+
+  const startSessionMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/roleplay/sessions", {
+        scenario,
+        mode,
+        customObjections: customObjections.trim() || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSessionId(data.sessionId);
+      setMessages([]);
+      toast({
+        title: mode === "coaching" ? "Coaching session started" : "Role-play started",
+        description: mode === "coaching" 
+          ? "Ask me anything about sales techniques or what to say!"
+          : "Begin your approach! The prospect is waiting...",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to start session",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/message`, {
+        message,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const newMessage: Message = {
+        id: data.messageId,
+        role: "assistant",
+        content: data.response,
+      };
+      setMessages((prev) => [...prev, newMessage]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send message",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const speakMutation = useMutation({
+    mutationFn: async (text: string) => {
+      const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/speak`, {
+        text,
+      });
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      if (data.audio && audioRef.current) {
+        try {
+          const audioSrc = `data:${data.format};base64,${data.audio}`;
+          audioRef.current.src = audioSrc;
+          setIsPlaying(true);
+          await audioRef.current.play();
+        } catch (playError) {
+          console.error("Audio play failed:", playError);
+          setIsPlaying(false);
+          toast({
+            title: "Audio playback blocked",
+            description: "Tap the Listen button to hear the response",
+            variant: "default",
+          });
+        }
+      }
+    },
+    onError: (error: Error) => {
+      console.error("Speak mutation error:", error);
+      toast({
+        title: "Failed to generate speech",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const endSessionMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/end`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setFeedback(data.feedback);
+      setShowFeedback(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/roleplay/sessions"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to end session",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/roleplay/sessions/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Session deleted",
+        description: "The session has been removed from your history",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/roleplay/sessions"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete session",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAllSessionsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/roleplay/sessions");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "History cleared",
+        description: `${data.deletedCount} session(s) have been deleted`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/roleplay/sessions"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to clear history",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (autoPlayVoice && sessionId && messages.length > 0 && !isPlaying && !speakMutation.isPending) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant" && lastMessage.id !== lastSpokenMessageId) {
+        setLastSpokenMessageId(lastMessage.id);
+        speakMutation.mutate(lastMessage.content);
+      }
+    }
+  }, [messages, autoPlayVoice, sessionId, isPlaying, lastSpokenMessageId]);
+
+  const startRecording = async () => {
+    if (!sessionId) {
+      toast({
+        title: "Start a session first",
+        description: "Please start a coaching or role-play session before using voice input",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+          await transcribeAudio(audioBlob);
+        }
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      const ext = audioBlob.type.includes("mp4") ? "mp4" : audioBlob.type.includes("webm") ? "webm" : "wav";
+      formData.append("audio", audioBlob, `recording.${ext}`);
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Transcription failed");
+      }
+      
+      const data = await response.json();
+      if (data.text && data.text.trim()) {
+        const userMessage: Message = {
+          id: Date.now(),
+          role: "user",
+          content: data.text.trim(),
+        };
+        setMessages((prev) => [...prev, userMessage]);
+        sendMessageMutation.mutate(data.text.trim());
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking again",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Could not transcribe your audio. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const handleSend = () => {
+    if (!inputMessage.trim() || !sessionId) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user",
+      content: inputMessage.trim(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    sendMessageMutation.mutate(inputMessage.trim());
+    setInputMessage("");
+  };
+
+  const handleSpeak = (text: string) => {
+    if (!sessionId) return;
+    speakMutation.mutate(text);
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+  };
+
+  const handleNewSession = () => {
+    setSessionId(null);
+    setMessages([]);
+    setFeedback(null);
+    setShowFeedback(false);
+    setLastSpokenMessageId(null);
+  };
+
+  const getScenarioLabel = (value: string) => {
+    return scenarioOptions.find(s => s.value === value)?.label || value;
+  };
+
+  const parseFeedback = (feedbackStr: string | null): SessionFeedback | null => {
+    if (!feedbackStr) return null;
+    try {
+      return JSON.parse(feedbackStr);
+    } catch {
+      return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-50 bg-background border-b px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleBack}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-semibold flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Sales Coach
+            </h1>
+          </div>
+          {sessionId && !showFeedback && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => endSessionMutation.mutate()}
+              disabled={endSessionMutation.isPending}
+              data-testid="button-end-session"
+            >
+              {endSessionMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "End Session"
+              )}
+            </Button>
+          )}
+        </div>
+      </header>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="border-b px-4">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="new" data-testid="tab-new-session">
+              <Play className="w-4 h-4 mr-2" />
+              New Session
+            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">
+              <History className="w-4 h-4 mr-2" />
+              History
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="new" className="flex-1 flex flex-col m-0">
+          {!sessionId ? (
+            <div className="p-4 space-y-4 overflow-auto flex-1">
+              <div>
+                <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <button
+                    onClick={() => setMode("coaching")}
+                    className={`p-3 rounded-lg border-2 text-left transition-colors min-h-[88px] ${
+                      mode === "coaching"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    data-testid="mode-coaching"
+                  >
+                    <div className="font-medium flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4" />
+                      Get Coaching
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Ask questions, get advice on what to say
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setMode("roleplay")}
+                    className={`p-3 rounded-lg border-2 text-left transition-colors min-h-[88px] ${
+                      mode === "roleplay"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    data-testid="mode-roleplay"
+                  >
+                    <div className="font-medium flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Practice Role-Play
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Practice on a simulated business owner
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  {mode === "coaching" ? "What topic do you want coaching on?" : "Select Scenario"}
+                </label>
+                <div className="space-y-2">
+                  {scenarioOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setScenario(option.value)}
+                      className={`w-full p-3 rounded-lg border-2 text-left transition-colors min-h-[64px] ${
+                        scenario === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      data-testid={`scenario-${option.value}`}
+                    >
+                      <div className="font-medium">{option.label}</div>
+                      <div className="text-sm text-muted-foreground">{option.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {scenario === "objection_handling" && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Custom Objections (optional)
+                  </label>
+                  <Textarea
+                    placeholder="Enter specific objections you want to practice, e.g., 'I'm happy with my current processor' or 'Your fees are too high'"
+                    value={customObjections}
+                    onChange={(e) => setCustomObjections(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="input-custom-objections"
+                  />
+                </div>
+              )}
+
+              <Button
+                className="w-full h-12"
+                onClick={() => startSessionMutation.mutate()}
+                disabled={startSessionMutation.isPending}
+                data-testid="button-start-session"
+              >
+                {startSessionMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    {mode === "coaching" ? (
+                      <>
+                        <Lightbulb className="w-4 h-4 mr-2" />
+                        Start Coaching Session
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Start Role-Play
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : showFeedback && feedback ? (
+            <div className="p-4 space-y-4 overflow-auto flex-1">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-3">
+                  <Award className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">Session Complete!</h3>
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <span className="text-3xl font-bold">{feedback.overallScore}</span>
+                  <span className="text-muted-foreground">/100</span>
+                </div>
+                <Progress value={feedback.overallScore} className="h-3 mb-4" />
+              </div>
+
+              <div className="grid gap-4">
+                {feedback.strengths && feedback.strengths.length > 0 && (
+                  <Card className="p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="font-medium text-green-700">Strengths</span>
+                    </div>
+                    <ul className="text-sm space-y-1">
+                      {feedback.strengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-green-600">•</span>
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+
+                {feedback.areasToImprove && feedback.areasToImprove.length > 0 && (
+                  <Card className="p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-4 h-4 text-amber-600" />
+                      <span className="font-medium text-amber-700">Areas to Improve</span>
+                    </div>
+                    <ul className="text-sm space-y-1">
+                      {feedback.areasToImprove.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-amber-600">•</span>
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+
+                {feedback.topTip && (
+                  <Card className="p-3 bg-primary/5 border-primary/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lightbulb className="w-4 h-4 text-primary" />
+                      <span className="font-medium">Top Tip</span>
+                    </div>
+                    <p className="text-sm">{feedback.topTip}</p>
+                  </Card>
+                )}
+
+                {feedback.nepqUsage && (
+                  <Card className="p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-4 h-4 text-blue-600" />
+                      <span className="font-medium text-blue-700">NEPQ Technique Usage</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{feedback.nepqUsage}</p>
+                  </Card>
+                )}
+              </div>
+
+              <Button className="w-full h-12" onClick={handleNewSession} data-testid="button-new-session">
+                Practice Again
+              </Button>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-auto p-4 space-y-3">
+                {messages.length === 0 && (
+                  <div className="text-center text-muted-foreground py-8">
+                    {mode === "coaching" ? (
+                      <>
+                        <Lightbulb className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>Ask me anything!</p>
+                        <p className="text-sm mt-1">
+                          Examples: "What should I say when I walk in?" or "How do I handle the 'too expensive' objection?"
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>Start the conversation!</p>
+                        <p className="text-sm mt-1">
+                          Imagine you just walked into this business...
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] p-3 rounded-lg ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      {msg.role === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7 text-xs"
+                          onClick={() => handleSpeak(msg.content)}
+                          disabled={speakMutation.isPending || isPlaying}
+                          data-testid="button-speak"
+                        >
+                          {speakMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                          ) : isPlaying ? (
+                            <Pause className="w-3 h-3 mr-1" />
+                          ) : (
+                            <Volume2 className="w-3 h-3 mr-1" />
+                          )}
+                          {isPlaying ? "Playing..." : "Listen"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {sendMessageMutation.isPending && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="p-4 border-t space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Tap mic to speak, or type below</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span>Auto-play voice</span>
+                    <Switch
+                      checked={autoPlayVoice}
+                      onCheckedChange={setAutoPlayVoice}
+                      data-testid="switch-autoplay"
+                    />
+                  </label>
+                </div>
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    className="min-h-[60px] resize-none"
+                    disabled={isRecording || isTranscribing}
+                    data-testid="input-message"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="icon"
+                      variant={isRecording ? "destructive" : "outline"}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={isTranscribing || sendMessageMutation.isPending}
+                      data-testid="button-mic"
+                      className={isRecording ? "animate-pulse" : ""}
+                    >
+                      {isTranscribing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      onClick={handleSend}
+                      disabled={!inputMessage.trim() || sendMessageMutation.isPending || isRecording || isTranscribing}
+                      data-testid="button-send"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="flex-1 flex flex-col m-0">
+          <div className="p-4 flex-1 overflow-auto">
+            {sessionsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No session history yet</p>
+                <p className="text-sm mt-1">Start a coaching or roleplay session to see it here</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sessions.map((session) => (
+                  <SessionHistoryCard
+                    key={session.id}
+                    session={session}
+                    isExpanded={expandedSessionId === session.id}
+                    onToggle={(open) => setExpandedSessionId(open ? session.id : null)}
+                    onDelete={(id) => deleteSessionMutation.mutate(id)}
+                    isDeleting={deleteSessionMutation.isPending}
+                    getScenarioLabel={getScenarioLabel}
+                    parseFeedback={parseFeedback}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {sessions.length > 0 && (
+            <div className="p-4 border-t">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-12 text-destructive"
+                    disabled={deleteAllSessionsMutation.isPending}
+                    data-testid="button-clear-all-history"
+                  >
+                    {deleteAllSessionsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Clear All History
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear all history?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all {sessions.length} coaching and roleplay sessions. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-clear-all">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteAllSessionsMutation.mutate()}
+                      data-testid="button-confirm-clear-all"
+                    >
+                      Clear All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <audio 
+        ref={audioRef} 
+        onEnded={() => setIsPlaying(false)} 
+        onError={() => setIsPlaying(false)}
+        playsInline 
+        preload="auto" 
+        className="hidden" 
+      />
+    </div>
+  );
+}
