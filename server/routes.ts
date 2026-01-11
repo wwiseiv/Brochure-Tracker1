@@ -38,6 +38,7 @@ const upload = multer({
 
 // OpenAI client will be initialized lazily when needed
 let openai: OpenAI | null = null;
+let openaiAIIntegrations: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
   if (!openai) {
@@ -48,6 +49,18 @@ function getOpenAIClient(): OpenAI {
     openai = new OpenAI({ apiKey });
   }
   return openai;
+}
+
+function getAIIntegrationsClient(): OpenAI {
+  if (!openaiAIIntegrations) {
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    if (!apiKey || !baseURL) {
+      throw new Error("AI Integrations not configured");
+    }
+    openaiAIIntegrations = new OpenAI({ apiKey, baseURL });
+  }
+  return openaiAIIntegrations;
 }
 
 export async function registerRoutes(
@@ -952,6 +965,97 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching agent drops:", error);
       res.status(500).json({ error: "Failed to fetch agent drops" });
+    }
+  });
+
+  // Email Polish API - Uses AI to polish draft emails
+  // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+  app.post("/api/email/polish", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draft, tone, context } = req.body;
+      
+      if (!draft || draft.trim().length === 0) {
+        return res.status(400).json({ error: "Email draft is required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are a professional email writing assistant for sales representatives. 
+Your job is to take a rough draft email and polish it to be professional, clear, and persuasive.
+
+Guidelines:
+- Maintain the original intent and key points
+- Make it professional but friendly
+- Keep it concise and easy to read
+- Use proper grammar and punctuation
+- Include a clear call-to-action when appropriate
+- Tone should be: ${tone || "professional and friendly"}
+${context ? `Context: ${context}` : ""}
+
+Return ONLY the polished email text, no explanations or meta-commentary.`;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Please polish this email draft:\n\n${draft}` }
+        ],
+        max_completion_tokens: 1024,
+      });
+      
+      const polishedEmail = response.choices[0]?.message?.content || draft;
+      
+      res.json({ polishedEmail });
+    } catch (error) {
+      console.error("Error polishing email:", error);
+      res.status(500).json({ error: "Failed to polish email" });
+    }
+  });
+
+  // Generate email from scratch based on context
+  app.post("/api/email/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { businessName, contactName, purpose, keyPoints, tone } = req.body;
+      
+      if (!businessName || !purpose) {
+        return res.status(400).json({ error: "Business name and purpose are required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are a professional email writing assistant for sales representatives in the payment processing industry.
+Generate a professional, persuasive email based on the provided context.
+
+Guidelines:
+- Be professional but friendly
+- Keep it concise (under 200 words)
+- Include a clear call-to-action
+- Personalize when contact name is provided
+- Tone should be: ${tone || "professional and friendly"}
+
+Return ONLY the email text, no subject line, no explanations.`;
+
+      const userPrompt = `Generate an email for:
+Business: ${businessName}
+${contactName ? `Contact: ${contactName}` : ""}
+Purpose: ${purpose}
+${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_completion_tokens: 1024,
+      });
+      
+      const generatedEmail = response.choices[0]?.message?.content || "";
+      
+      res.json({ email: generatedEmail });
+    } catch (error) {
+      console.error("Error generating email:", error);
+      res.status(500).json({ error: "Failed to generate email" });
     }
   });
 

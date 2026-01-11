@@ -19,7 +19,10 @@ import {
   Eye,
   Edit,
   CheckCircle2,
-  HelpCircle
+  HelpCircle,
+  Sparkles,
+  Wand2,
+  Mail
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -215,6 +218,27 @@ export default function HelpPage() {
     },
   ];
 
+  const aiToolsFeatures: HelpItem[] = [
+    {
+      title: "AI Email Drafter",
+      description: "Use AI to draft professional follow-up emails to merchants. Just write your thoughts and the AI will polish it into a professional message.",
+      link: "/email",
+      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Polish Your Draft",
+      description: "Write a rough email in your own words, choose the tone, and AI will transform it into a professional, persuasive message.",
+      link: "/email",
+      icon: <Wand2 className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Generate New Emails",
+      description: "Provide the business name, contact, and purpose - AI will generate a complete email ready to send.",
+      link: "/email",
+      icon: <Mail className="w-5 h-5 text-amber-500" />,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
@@ -252,6 +276,15 @@ export default function HelpPage() {
           title="Drop Management"
           description="Features for logging and managing individual brochure drops."
           items={dropFeatures}
+          badge="All Users"
+        />
+
+        <Separator />
+
+        <HelpSection
+          title="AI Tools"
+          description="AI-powered features to help you communicate more effectively with merchants."
+          items={aiToolsFeatures}
           badge="All Users"
         />
 

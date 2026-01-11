@@ -28,7 +28,8 @@ import {
   HelpCircle,
   Shield,
   Users,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from "lucide-react";
 import { Link } from "wouter";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
@@ -322,6 +323,20 @@ export default function ProfilePage() {
                 </Button>
               </Link>
             )}
+            
+            <Link href="/email">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between min-h-touch"
+                data-testid="link-email-drafter"
+              >
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  <span>AI Email Drafter</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </Link>
             
             <Link href="/help">
               <Button 

@@ -60,6 +60,7 @@ Preferred communication style: Simple, everyday language.
 - Added Relationship Manager Dashboard: view assigned agents, team drops overview, agent performance tracking
 - Implemented agent edit functionality: agents can modify drop records (business info, notes, pickup dates) and manage notification preferences
 - Fixed critical data issues: drops now properly associated with organizations via orgId for accurate team reporting
+- Added AI Email Drafter (/email): AI-powered email composition with polish and generate modes using Replit AI Integrations (gpt-5 model)
 
 ## External Dependencies
 
