@@ -40,6 +40,18 @@ Preferred communication style: Simple, everyday language.
 - **Production**: Vite builds client to `dist/public`, esbuild bundles server to `dist/index.cjs`
 - **Scripts**: `npm run dev` for development, `npm run build` for production, `npm run db:push` for database migrations
 
+## Recent Changes
+
+### January 2026
+- Implemented complete frontend with mobile-first design (48px touch targets)
+- Created QR scanner with html5-qrcode library
+- Built Dashboard with Today's/Upcoming/Overdue pickup categorization  
+- Implemented voice recording with MediaRecorder API
+- Added OpenAI Whisper transcription endpoint (/api/transcribe)
+- Created service worker for PWA offline support
+- Enhanced backend validation with proper Zod enum schemas
+- Verified with end-to-end tests: login, drops, outcomes, profile
+
 ## External Dependencies
 
 ### Database
