@@ -256,6 +256,70 @@ export async function registerRoutes(
         updateData.pickedUpAt = new Date();
       }
       
+      // Handle editable business info fields
+      if (req.body.businessName !== undefined) {
+        if (typeof req.body.businessName !== "string") {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ field: "businessName", message: "Business name must be a string" }]
+          });
+        }
+        updateData.businessName = req.body.businessName;
+      }
+      
+      if (req.body.businessType !== undefined) {
+        const validTypes = ["restaurant", "retail", "service", "convenience", "auto", "medical", "salon", "other"];
+        if (req.body.businessType !== null && !validTypes.includes(req.body.businessType)) {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ field: "businessType", message: `Business type must be one of: ${validTypes.join(", ")}` }]
+          });
+        }
+        updateData.businessType = req.body.businessType;
+      }
+      
+      if (req.body.businessPhone !== undefined) {
+        updateData.businessPhone = req.body.businessPhone;
+      }
+      
+      if (req.body.contactName !== undefined) {
+        updateData.contactName = req.body.contactName;
+      }
+      
+      // Handle location fields
+      if (req.body.address !== undefined) {
+        updateData.address = req.body.address;
+      }
+      
+      if (req.body.latitude !== undefined) {
+        if (req.body.latitude !== null && (typeof req.body.latitude !== "number" || isNaN(req.body.latitude))) {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ field: "latitude", message: "Latitude must be a valid number" }]
+          });
+        }
+        updateData.latitude = req.body.latitude;
+      }
+      
+      if (req.body.longitude !== undefined) {
+        if (req.body.longitude !== null && (typeof req.body.longitude !== "number" || isNaN(req.body.longitude))) {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ field: "longitude", message: "Longitude must be a valid number" }]
+          });
+        }
+        updateData.longitude = req.body.longitude;
+      }
+      
+      // Handle notes fields
+      if (req.body.textNotes !== undefined) {
+        updateData.textNotes = req.body.textNotes;
+      }
+      
+      if (req.body.voiceTranscript !== undefined) {
+        updateData.voiceTranscript = req.body.voiceTranscript;
+      }
+      
       if (req.body.pickupScheduledFor !== undefined) {
         if (req.body.pickupScheduledFor === null) {
           updateData.pickupScheduledFor = null;

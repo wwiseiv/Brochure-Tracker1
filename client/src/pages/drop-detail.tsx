@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -12,6 +16,21 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { StatusBadge } from "@/components/StatusBadge";
 import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeIcon";
 import { DropDetailSkeleton } from "@/components/LoadingState";
@@ -35,9 +54,24 @@ import {
   AlertCircle,
   Building2,
   User,
+  Pencil,
+  Loader2,
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, addDays } from "date-fns";
 import type { DropWithBrochure, BusinessType, OutcomeType } from "@shared/schema";
+import { BUSINESS_TYPES } from "@shared/schema";
+
+const editDropSchema = z.object({
+  businessName: z.string().min(1, "Business name is required"),
+  businessType: z.string().min(1, "Business type is required"),
+  contactName: z.string().optional(),
+  businessPhone: z.string().optional(),
+  address: z.string().optional(),
+  textNotes: z.string().optional(),
+  followUpDays: z.string(),
+});
+
+type EditDropFormData = z.infer<typeof editDropSchema>;
 
 const outcomeOptions: { value: OutcomeType; label: string; icon: typeof CheckCircle2; color: string }[] = [
   { value: "signed", label: "Signed - Converted!", icon: CheckCircle2, color: "text-emerald-600" },
@@ -54,6 +88,7 @@ export default function DropDetailPage() {
   const { toast } = useToast();
   
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<OutcomeType | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState("");
 
@@ -63,6 +98,77 @@ export default function DropDetailPage() {
     queryKey: ["/api/drops", dropId],
     enabled: !!dropId,
   });
+
+  const form = useForm<EditDropFormData>({
+    resolver: zodResolver(editDropSchema),
+    defaultValues: {
+      businessName: "",
+      businessType: "",
+      contactName: "",
+      businessPhone: "",
+      address: "",
+      textNotes: "",
+      followUpDays: "0",
+    },
+  });
+
+  useEffect(() => {
+    if (drop && showEditDialog) {
+      const daysUntilPickup = drop.pickupScheduledFor 
+        ? Math.max(0, Math.ceil((new Date(drop.pickupScheduledFor).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+        : 0;
+      
+      form.reset({
+        businessName: drop.businessName || "",
+        businessType: drop.businessType || "",
+        contactName: drop.contactName || "",
+        businessPhone: drop.businessPhone || "",
+        address: drop.address || "",
+        textNotes: drop.textNotes || "",
+        followUpDays: daysUntilPickup.toString(),
+      });
+    }
+  }, [drop, showEditDialog, form]);
+
+  const editDropMutation = useMutation({
+    mutationFn: async (data: EditDropFormData) => {
+      const followUpDays = parseInt(data.followUpDays);
+      const pickupScheduledFor = followUpDays > 0 
+        ? addDays(new Date(), followUpDays).toISOString() 
+        : null;
+      
+      const response = await apiRequest("PATCH", `/api/drops/${dropId}`, {
+        businessName: data.businessName,
+        businessType: data.businessType,
+        contactName: data.contactName || null,
+        businessPhone: data.businessPhone || null,
+        address: data.address || null,
+        textNotes: data.textNotes || null,
+        pickupScheduledFor,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drops"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drops", dropId] });
+      setShowEditDialog(false);
+      toast({
+        title: "Drop updated!",
+        description: "Your changes have been saved.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditSubmit = (data: EditDropFormData) => {
+    editDropMutation.mutate(data);
+  };
 
   const updateDropMutation = useMutation({
     mutationFn: async (data: { status: string; outcome?: string; outcomeNotes?: string }) => {
@@ -154,16 +260,28 @@ export default function DropDetailPage() {
   return (
     <div className="min-h-screen bg-background pb-32">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <span className="font-semibold">Drop Details</span>
+        <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/")}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <span className="font-semibold">Drop Details</span>
+          </div>
+          {drop.status === "pending" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowEditDialog(true)}
+              data-testid="button-edit"
+            >
+              <Pencil className="w-5 h-5" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -382,6 +500,224 @@ export default function DropDetailPage() {
               {updateDropMutation.isPending ? "Saving..." : "Confirm"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Drop</DialogTitle>
+            <DialogDescription>
+              Update the details for this drop.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="businessName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4" />
+                      Business Name
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter business name" 
+                        className="min-h-touch"
+                        {...field} 
+                        data-testid="input-edit-business-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="businessType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Business Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-touch" data-testid="select-edit-business-type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {BUSINESS_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {businessTypeLabels[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contactName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Contact Name
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Person you spoke with" 
+                        className="min-h-touch"
+                        {...field} 
+                        data-testid="input-edit-contact-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="businessPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      Business Phone
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="tel"
+                        placeholder="(555) 123-4567" 
+                        className="min-h-touch"
+                        {...field} 
+                        data-testid="input-edit-business-phone"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Address
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Business address" 
+                        className="min-h-touch"
+                        {...field} 
+                        data-testid="input-edit-address"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="textNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Notes
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Any notes about this drop..."
+                        className="min-h-[100px] resize-none"
+                        {...field} 
+                        data-testid="textarea-edit-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="followUpDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Reschedule Follow-up
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-touch" data-testid="select-edit-follow-up">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="0">Keep current date</SelectItem>
+                        <SelectItem value="1">1 day from now</SelectItem>
+                        <SelectItem value="2">2 days from now</SelectItem>
+                        <SelectItem value="3">3 days from now</SelectItem>
+                        <SelectItem value="5">5 days from now</SelectItem>
+                        <SelectItem value="7">1 week from now</SelectItem>
+                        <SelectItem value="14">2 weeks from now</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {parseInt(form.watch("followUpDays") || "0") > 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        New pickup date:{" "}
+                        <span className="font-medium text-foreground">
+                          {format(
+                            addDays(new Date(), parseInt(form.watch("followUpDays") || "0")),
+                            "EEEE, MMM d"
+                          )}
+                        </span>
+                      </p>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 min-h-touch"
+                  onClick={() => setShowEditDialog(false)}
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 min-h-touch"
+                  disabled={editDropMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {editDropMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
