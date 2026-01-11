@@ -444,9 +444,22 @@ export default function CoachPage() {
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
-      });
+      
+      // Determine the best supported audio format
+      // Priority: webm (Chrome/Firefox) > mp4 (Safari) > default (let browser decide)
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      } else if (MediaRecorder.isTypeSupported("audio/aac")) {
+        options.mimeType = "audio/aac";
+      }
+      // If no mimeType set, MediaRecorder will use browser default
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -488,7 +501,20 @@ export default function CoachPage() {
     setIsTranscribing(true);
     try {
       const formData = new FormData();
-      const ext = audioBlob.type.includes("mp4") ? "mp4" : audioBlob.type.includes("webm") ? "webm" : "wav";
+      // Determine extension based on blob MIME type
+      let ext = "m4a"; // Default to m4a which works well with Whisper
+      const blobType = audioBlob.type.toLowerCase();
+      if (blobType.includes("webm")) {
+        ext = "webm";
+      } else if (blobType.includes("mp4") || blobType.includes("aac") || blobType.includes("m4a")) {
+        ext = "m4a";
+      } else if (blobType.includes("mpeg") || blobType.includes("mp3")) {
+        ext = "mp3";
+      } else if (blobType.includes("wav")) {
+        ext = "wav";
+      } else if (blobType.includes("ogg")) {
+        ext = "ogg";
+      }
       formData.append("audio", audioBlob, `recording.${ext}`);
       
       const response = await fetch("/api/transcribe", {

@@ -46,7 +46,7 @@ import path from "path";
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    // Only allow audio files (including iOS Safari variants)
+    // Only allow audio files (including iOS Safari variants and fallbacks)
     const allowedMimeTypes = [
       "audio/wav",
       "audio/mpeg",
@@ -59,6 +59,10 @@ const upload = multer({
       "audio/flac",
       "video/webm",
       "video/mp4",
+      "audio/mp4a-latm",      // iOS Safari AAC variant
+      "audio/3gpp",           // Mobile device format
+      "audio/3gpp2",          // Mobile device format
+      "application/octet-stream", // Fallback when browser doesn't set proper MIME
     ];
     if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -746,8 +750,16 @@ export async function registerRoutes(
 
         // Determine file extension from MIME type for Whisper compatibility
         const mimeType = req.file.mimetype || "";
-        let ext = "wav";
-        if (mimeType.includes("mp4") || mimeType.includes("m4a") || mimeType.includes("x-m4a")) {
+        const originalName = req.file.originalname || "";
+        
+        // Try to get extension from original filename first, then fall back to MIME type
+        let ext = "mp3"; // Default to mp3 which Whisper handles well
+        
+        // Check original filename extension first
+        const fileNameExt = originalName.split('.').pop()?.toLowerCase();
+        if (fileNameExt && ["wav", "mp3", "mp4", "m4a", "webm", "ogg", "flac"].includes(fileNameExt)) {
+          ext = fileNameExt === "mp4" ? "m4a" : fileNameExt;
+        } else if (mimeType.includes("mp4") || mimeType.includes("m4a") || mimeType.includes("x-m4a") || mimeType.includes("aac") || mimeType.includes("mp4a-latm")) {
           ext = "m4a";
         } else if (mimeType.includes("webm")) {
           ext = "webm";
@@ -755,6 +767,10 @@ export async function registerRoutes(
           ext = "mp3";
         } else if (mimeType.includes("ogg")) {
           ext = "ogg";
+        } else if (mimeType.includes("wav")) {
+          ext = "wav";
+        } else if (mimeType.includes("3gpp")) {
+          ext = "m4a"; // 3gpp audio is typically AAC-based
         }
         
         // Create a temporary file path with correct extension
