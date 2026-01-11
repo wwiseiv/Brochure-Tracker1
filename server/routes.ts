@@ -802,7 +802,7 @@ export async function registerRoutes(
     }
   });
 
-  // Voice transcription endpoint with OpenAI Whisper
+  // Voice transcription endpoint using Gemini AI
   app.post(
     "/api/transcribe",
     isAuthenticated,
@@ -818,103 +818,62 @@ export async function registerRoutes(
           });
         }
 
-        // Verify OpenAI API key is configured - prefer AI integrations
-        const hasAIIntegrations = process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-        const hasDirectOpenAI = process.env.OPENAI_API_KEY;
+        // Verify Gemini AI integrations is configured
+        const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
         
-        if (!hasAIIntegrations && !hasDirectOpenAI) {
-          console.error("No OpenAI API key configured for transcription");
+        if (!hasGeminiIntegrations) {
+          console.error("No Gemini API key configured for transcription");
           return res.status(500).json({ 
             error: "Audio transcription service is not available",
             details: [{ 
               field: "server", 
-              message: "OpenAI API key is not configured" 
+              message: "Gemini API is not configured" 
             }]
           });
         }
 
-        // Determine file extension from MIME type for Whisper compatibility
-        const mimeType = req.file.mimetype || "";
-        const originalName = req.file.originalname || "";
+        const mimeType = req.file.mimetype || "audio/webm";
+        console.log(`Transcription: received ${req.file.size} bytes, mime: ${mimeType}`);
         
-        // Try to get extension from original filename first, then fall back to MIME type
-        let ext = "mp3"; // Default to mp3 which Whisper handles well
+        // Convert audio buffer to base64
+        const audioBase64 = req.file.buffer.toString("base64");
         
-        // Check original filename extension first
-        const fileNameExt = originalName.split('.').pop()?.toLowerCase();
-        if (fileNameExt && ["wav", "mp3", "mp4", "m4a", "webm", "ogg", "flac"].includes(fileNameExt)) {
-          ext = fileNameExt === "mp4" ? "m4a" : fileNameExt;
-        } else if (mimeType.includes("mp4") || mimeType.includes("m4a") || mimeType.includes("x-m4a") || mimeType.includes("aac") || mimeType.includes("mp4a-latm")) {
-          ext = "m4a";
-        } else if (mimeType.includes("webm")) {
-          ext = "webm";
-        } else if (mimeType.includes("mpeg") || mimeType.includes("mp3")) {
-          ext = "mp3";
-        } else if (mimeType.includes("ogg")) {
-          ext = "ogg";
-        } else if (mimeType.includes("wav")) {
-          ext = "wav";
-        } else if (mimeType.includes("3gpp")) {
-          ext = "m4a"; // 3gpp audio is typically AAC-based
-        }
+        // Use Gemini for audio transcription
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({
+          apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+          httpOptions: {
+            apiVersion: "",
+            baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+          },
+        });
         
-        // Create a temporary file path with correct extension
-        const tempFilePath = path.join("/tmp", `${Date.now()}_recording.${ext}`);
-        console.log(`Transcription: received ${req.file.size} bytes, mime: ${mimeType}, saving as ${ext}`);
-        
-        // Write the file to disk temporarily (required by OpenAI client)
-        await new Promise((resolve, reject) => {
-          fs.writeFile(tempFilePath, req.file.buffer, (err) => {
-            if (err) reject(err);
-            else resolve(null);
-          });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: audioBase64,
+                  },
+                },
+                {
+                  text: "Please transcribe this audio recording. Return ONLY the exact words spoken, without any additional commentary, timestamps, or formatting. If no speech is detected, return an empty string.",
+                },
+              ],
+            },
+          ],
         });
 
-        try {
-          // Use AI integrations client if available, otherwise fall back to direct OpenAI
-          const client = hasAIIntegrations ? getAIIntegrationsClient() : getOpenAIClient();
-          
-          const transcription = await client.audio.transcriptions.create({
-            file: fs.createReadStream(tempFilePath),
-            model: "whisper-1",
-          });
-
-          // Clean up temporary file
-          fs.unlink(tempFilePath, (err) => {
-            if (err) console.error("Error deleting temp file:", err);
-          });
-
-          console.log(`Transcription successful: ${transcription.text?.substring(0, 50)}...`);
-          
-          // Return the transcribed text
-          res.json({
-            text: transcription.text,
-          });
-        } catch (openaiError: any) {
-          // Clean up temporary file on error
-          fs.unlink(tempFilePath, (err) => {
-            if (err) console.error("Error deleting temp file:", err);
-          });
-
-          console.error("OpenAI Whisper API error:", openaiError?.message || openaiError);
-          console.error("Full error details:", JSON.stringify(openaiError, null, 2));
-          
-          // Handle specific OpenAI errors
-          if (openaiError.status === 401) {
-            return res.status(500).json({ 
-              error: "Authentication failed with transcription service",
-              details: [{ field: "server", message: "Invalid API credentials" }]
-            });
-          }
-          if (openaiError.status === 429) {
-            return res.status(429).json({ 
-              error: "Rate limit exceeded",
-              details: [{ field: "server", message: "Too many requests to transcription service" }]
-            });
-          }
-          
-          throw openaiError;
-        }
+        const transcription = response.text || "";
+        console.log(`Transcription successful: ${transcription.substring(0, 50)}...`);
+        
+        res.json({
+          text: transcription.trim(),
+        });
       } catch (error: any) {
         console.error("Error transcribing audio:", error?.message || error);
         res.status(500).json({ 

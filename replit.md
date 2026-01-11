@@ -71,7 +71,7 @@ Preferred communication style: Simple, everyday language.
 - **QR Scan to Register** (/inventory): Scan brochure QR codes directly into inventory using phone camera. Supports continuous scanning mode for rapid entry. "Scan & Assign" feature lets you select a team member first, then scan to register and assign in one step.
 - **CSV Import/Export** (/inventory): Bulk import brochure IDs from CSV files or export inventory to spreadsheets. Holder selection funnel allows choosing House, specific RM, or specific Agent for targeted import/export operations.
 - **Help Page Search** (/help): Search function at top of help page for filtering help topics in real-time. No more scrolling through the whole page to find what you need.
-- **AI Role-Play Coach** (also accessible from drop detail page): Conversational AI training tool with two modes: (1) **Coaching Mode** - ask questions and get advice on sales techniques, what to say, and how to handle objections; (2) **Role-Play Mode** - practice conversations with simulated business owners. Features voice input via microphone (Whisper transcription), auto-play AI voice responses (ElevenLabs TTS), 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides.
+- **AI Role-Play Coach** (also accessible from drop detail page): Conversational AI training tool with two modes: (1) **Coaching Mode** - ask questions and get advice on sales techniques, what to say, and how to handle objections; (2) **Role-Play Mode** - practice conversations with simulated business owners. Features voice input via microphone (Gemini AI transcription), auto-play AI voice responses (ElevenLabs TTS), 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides.
 - **Email Invitations** (/admin/team): Admins can invite new team members by email with role selection (Agent, RM, Admin). Invitations expire in 7 days with resend/cancel options.
 - **Accept Invite Page** (/accept-invite): Users click email links to join organizations, works for both new and existing users.
 - **Feedback Form** (/help): Feature suggestion and help request form that sends emails to support. Form includes type selector (Feature Suggestion, Help Request, Bug Report).
@@ -93,7 +93,7 @@ Preferred communication style: Simple, everyday language.
 - Created QR scanner with html5-qrcode library
 - Built Dashboard with Today's/Upcoming/Overdue pickup categorization  
 - Implemented voice recording with MediaRecorder API
-- Added OpenAI Whisper transcription endpoint (/api/transcribe)
+- Added voice transcription endpoint (/api/transcribe) using Gemini AI
 - Created service worker for PWA offline support
 - Enhanced backend validation with proper Zod enum schemas
 - Verified with end-to-end tests: login, drops, outcomes, profile
