@@ -1424,7 +1424,7 @@ ${context ? `Context: ${context}` : ""}
 Return ONLY the polished email text, no explanations or meta-commentary.`;
 
       const response = await client.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Please polish this email draft:\n\n${draft}` }
@@ -1488,7 +1488,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       console.log("Email generation request:", { businessName, businessType, purpose, hasAgentNotes: !!agentNotes });
       
       const response = await client.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -2120,7 +2120,7 @@ Respond in JSON format:
 }`;
 
       const response = await client.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze this merchant visit notes/transcript:\n\n${transcript}` }
@@ -2260,7 +2260,7 @@ Respond in JSON format:
 }`;
 
       const response = await client.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Score this lead:\n${JSON.stringify(context, null, 2)}` }
@@ -2700,7 +2700,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       // Try up to 2 times if we get empty response
       for (let attempt = 0; attempt < 2; attempt++) {
         const response = await client.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-4.1-mini",
           messages: chatMessages,
           max_completion_tokens: 1500,
           temperature: 0.8,
@@ -2858,7 +2858,7 @@ Provide constructive feedback in JSON format:
 }`;
 
       const feedbackResponse = await client.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: "You are an expert sales coach. Provide feedback in valid JSON format only." },
           { role: "user", content: feedbackPrompt }
