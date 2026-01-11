@@ -57,6 +57,8 @@ import {
   RefreshCw,
   X,
   Clock,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { OrganizationMember, OrgMemberRole } from "@shared/schema";
@@ -76,6 +78,7 @@ interface Invitation {
   email: string;
   role: OrgMemberRole;
   status: string;
+  token: string;
   expiresAt: string;
   createdAt: string;
   managerId: number | null;
@@ -162,6 +165,7 @@ export default function TeamManagementPage() {
   const [selectedMember, setSelectedMember] = useState<OrganizationMember | null>(null);
   const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
   const [isInvitationActionsOpen, setIsInvitationActionsOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [newUserId, setNewUserId] = useState("");
   const [newRole, setNewRole] = useState<OrgMemberRole>("agent");
@@ -972,7 +976,10 @@ export default function TeamManagementPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={isInvitationActionsOpen} onOpenChange={setIsInvitationActionsOpen}>
+      <Dialog open={isInvitationActionsOpen} onOpenChange={(open) => {
+        setIsInvitationActionsOpen(open);
+        if (!open) setLinkCopied(false);
+      }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Invitation Options</DialogTitle>
@@ -1004,6 +1011,33 @@ export default function TeamManagementPage() {
               
               <div className="flex flex-col gap-3 pt-4">
                 <Button
+                  variant="default"
+                  className="w-full min-h-touch gap-2"
+                  onClick={() => {
+                    const inviteLink = `${window.location.origin}/accept-invite?token=${selectedInvitation.token}`;
+                    navigator.clipboard.writeText(inviteLink);
+                    setLinkCopied(true);
+                    toast({
+                      title: "Link copied!",
+                      description: "Send this link to the person you're inviting.",
+                    });
+                    setTimeout(() => setLinkCopied(false), 3000);
+                  }}
+                  data-testid="button-copy-invite-link"
+                >
+                  {linkCopied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy Invite Link
+                    </>
+                  )}
+                </Button>
+                <Button
                   variant="outline"
                   className="w-full min-h-touch gap-2"
                   onClick={() => resendInvitationMutation.mutate(selectedInvitation.id)}
@@ -1011,7 +1045,7 @@ export default function TeamManagementPage() {
                   data-testid="button-resend-invitation"
                 >
                   <RefreshCw className={`h-4 w-4 ${resendInvitationMutation.isPending ? "animate-spin" : ""}`} />
-                  {resendInvitationMutation.isPending ? "Resending..." : "Resend Invitation"}
+                  {resendInvitationMutation.isPending ? "Resending..." : "Resend Email"}
                 </Button>
                 <Button
                   variant="destructive"
