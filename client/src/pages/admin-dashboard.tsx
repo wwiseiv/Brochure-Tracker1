@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,11 @@ import {
   UserCheck,
   Briefcase,
   Shield,
+  ChevronRight,
+  MapPin,
+  X,
 } from "lucide-react";
+import { isToday, isPast, parseISO, startOfDay } from "date-fns";
 import { format, formatDistanceToNow } from "date-fns";
 import type { OrganizationMember, DropWithBrochure, DropStatus } from "@shared/schema";
 
@@ -135,9 +140,12 @@ function AdminDashboardSkeleton() {
   );
 }
 
+type DropsFilter = "todays" | "overdue" | "pending" | null;
+
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const [selectedFilter, setSelectedFilter] = useState<DropsFilter>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
@@ -150,6 +158,39 @@ export default function AdminDashboardPage() {
   const { data: allDrops, isLoading: dropsLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/admin/drops"],
   });
+
+  const getFilteredDrops = (): DropWithBrochure[] => {
+    if (!allDrops) return [];
+    
+    switch (selectedFilter) {
+      case "todays":
+        return allDrops.filter((d) => {
+          if (!d.pickupScheduledFor || d.status !== "pending") return false;
+          const pickupDate = typeof d.pickupScheduledFor === "string" 
+            ? parseISO(d.pickupScheduledFor) 
+            : new Date(d.pickupScheduledFor);
+          return isToday(pickupDate);
+        });
+      case "overdue":
+        return allDrops.filter((d) => {
+          if (!d.pickupScheduledFor || d.status !== "pending") return false;
+          const pickupDate = typeof d.pickupScheduledFor === "string" 
+            ? parseISO(d.pickupScheduledFor) 
+            : new Date(d.pickupScheduledFor);
+          return isPast(pickupDate) && !isToday(pickupDate);
+        });
+      case "pending":
+        return allDrops.filter((d) => d.status === "pending");
+      default:
+        return [];
+    }
+  };
+
+  const filteredDrops = getFilteredDrops();
+  const filterTitle = selectedFilter === "todays" ? "Today's Pickups" 
+    : selectedFilter === "overdue" ? "Overdue Pickups" 
+    : selectedFilter === "pending" ? "All Pending Drops" 
+    : "";
 
   const userInitials = user
     ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
@@ -270,24 +311,33 @@ export default function AdminDashboardPage() {
                 <Calendar className="h-5 w-5 text-primary" />
                 Drops Overview
               </h2>
+              <p className="text-sm text-muted-foreground mb-3">Tap a card to view the drops</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="p-4 border-l-4 border-l-blue-500" data-testid="card-todays-pickups">
+                <Card 
+                  className={`p-4 border-l-4 border-l-blue-500 cursor-pointer hover-elevate ${selectedFilter === "todays" ? "ring-2 ring-blue-500" : ""}`} 
+                  data-testid="card-todays-pickups"
+                  onClick={() => setSelectedFilter(selectedFilter === "todays" ? null : "todays")}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Today's Pickups</p>
                       <p className="text-2xl font-bold">{stats?.drops.todaysPickups || 0}</p>
                     </div>
-                    <Calendar className="h-8 w-8 text-blue-500 opacity-50" />
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-8 w-8 text-blue-500 opacity-50" />
+                      <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${selectedFilter === "todays" ? "rotate-90" : ""}`} />
+                    </div>
                   </div>
                 </Card>
 
                 <Card
-                  className={`p-4 border-l-4 ${
+                  className={`p-4 border-l-4 cursor-pointer hover-elevate ${
                     (stats?.drops.overduePickups || 0) > 0
                       ? "border-l-destructive"
                       : "border-l-muted"
-                  }`}
+                  } ${selectedFilter === "overdue" ? "ring-2 ring-destructive" : ""}`}
                   data-testid="card-overdue-pickups"
+                  onClick={() => setSelectedFilter(selectedFilter === "overdue" ? null : "overdue")}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -300,26 +350,92 @@ export default function AdminDashboardPage() {
                         {stats?.drops.overduePickups || 0}
                       </p>
                     </div>
-                    <AlertTriangle
-                      className={`h-8 w-8 opacity-50 ${
-                        (stats?.drops.overduePickups || 0) > 0
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                      }`}
-                    />
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle
+                        className={`h-8 w-8 opacity-50 ${
+                          (stats?.drops.overduePickups || 0) > 0
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                      <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${selectedFilter === "overdue" ? "rotate-90" : ""}`} />
+                    </div>
                   </div>
                 </Card>
 
-                <Card className="p-4 border-l-4 border-l-amber-500" data-testid="card-pending-total">
+                <Card 
+                  className={`p-4 border-l-4 border-l-amber-500 cursor-pointer hover-elevate ${selectedFilter === "pending" ? "ring-2 ring-amber-500" : ""}`} 
+                  data-testid="card-pending-total"
+                  onClick={() => setSelectedFilter(selectedFilter === "pending" ? null : "pending")}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Pending</p>
                       <p className="text-2xl font-bold">{stats?.drops.pending || 0}</p>
                     </div>
-                    <Package className="h-8 w-8 text-amber-500 opacity-50" />
+                    <div className="flex items-center gap-2">
+                      <Package className="h-8 w-8 text-amber-500 opacity-50" />
+                      <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${selectedFilter === "pending" ? "rotate-90" : ""}`} />
+                    </div>
                   </div>
                 </Card>
               </div>
+
+              {selectedFilter && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold">{filterTitle} ({filteredDrops.length})</h3>
+                    <Button variant="ghost" size="icon" onClick={() => setSelectedFilter(null)} data-testid="button-close-drops">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {filteredDrops.length === 0 ? (
+                    <Card className="p-6 text-center text-muted-foreground">
+                      No drops found in this category
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredDrops.map((drop) => {
+                        const member = members?.find((m) => m.userId === drop.agentId);
+                        return (
+                          <Card 
+                            key={drop.id} 
+                            className="p-4 cursor-pointer hover-elevate"
+                            onClick={() => navigate(`/drops/${drop.id}`)}
+                            data-testid={`card-drop-${drop.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{drop.businessName || "Unknown Business"}</p>
+                                {drop.address && (
+                                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{drop.address}</span>
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  <StatusBadge status={drop.status as DropStatus} />
+                                  {drop.pickupScheduledFor && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Due: {format(typeof drop.pickupScheduledFor === "string" ? parseISO(drop.pickupScheduledFor) : drop.pickupScheduledFor, "MMM d")}
+                                    </span>
+                                  )}
+                                  {member && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Agent: {member.userId.slice(0, 8)}...
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section>
