@@ -48,6 +48,8 @@ Preferred communication style: Simple, everyday language.
 - **AiSummaries**: AI-generated summaries of voice notes with key takeaways and sentiment
 - **LeadScores**: AI-calculated lead quality scores with tier (hot/warm/cold) and factors
 - **OfflineQueue**: Queue for drops created offline, synced when back online
+- **Invitations**: Email invitations for team onboarding with token validation, expiration, and status tracking
+- **FeedbackSubmissions**: User feedback and feature requests stored with type (suggestion/help/bug)
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -57,6 +59,9 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
+- **Email Invitations** (/admin/team): Admins can invite new team members by email with role selection (Agent, RM, Admin). Invitations expire in 7 days with resend/cancel options.
+- **Accept Invite Page** (/accept-invite): Users click email links to join organizations, works for both new and existing users.
+- **Feedback Form** (/help): Feature suggestion and help request form that sends emails to support. Form includes type selector (Feature Suggestion, Help Request, Bug Report).
 - **Pickup Days Selector**: Restricted to 1-5 days (default 3), simplified from previous 1-14 day range
 - **Merchant Profiles** (/merchants): Complete merchant dossier system with visit history, notes, and lead tracking
 - **Inventory Tracking** (/inventory): Track brochures on hand, restock functionality, and low-stock alerts

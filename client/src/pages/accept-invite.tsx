@@ -28,6 +28,13 @@ export default function AcceptInvitePage() {
 
   const { data: invitation, isLoading, error } = useQuery<InvitationDetails>({
     queryKey: ["/api/invitations/accept", token],
+    queryFn: async () => {
+      const res = await fetch(`/api/invitations/accept/${token}`);
+      if (!res.ok) {
+        throw new Error("Invitation not found");
+      }
+      return res.json();
+    },
     enabled: !!token,
   });
 
