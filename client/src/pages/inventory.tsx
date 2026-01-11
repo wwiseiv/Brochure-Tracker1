@@ -1251,14 +1251,24 @@ export default function InventoryPage() {
                                     data-testid={`team-brochure-${brochure.id}`}
                                   >
                                     <span className="text-sm font-medium truncate">{brochure.id}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openHistoryDialog(brochure.id)}
-                                      data-testid={`button-team-history-${brochure.id}`}
-                                    >
-                                      <History className="h-3 w-3" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => openHistoryDialog(brochure.id)}
+                                        data-testid={`button-team-history-${brochure.id}`}
+                                      >
+                                        <History className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => openAssignDialog(brochure.id)}
+                                        data-testid={`button-reassign-${brochure.id}`}
+                                      >
+                                        <Send className="h-3 w-3" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 ))}
                               </CollapsibleContent>
