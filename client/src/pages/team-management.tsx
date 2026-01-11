@@ -160,6 +160,8 @@ export default function TeamManagementPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<OrganizationMember | null>(null);
+  const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
+  const [isInvitationActionsOpen, setIsInvitationActionsOpen] = useState(false);
 
   const [newUserId, setNewUserId] = useState("");
   const [newRole, setNewRole] = useState<OrgMemberRole>("agent");
@@ -289,6 +291,8 @@ export default function TeamManagementPage() {
         title: "Invitation resent",
         description: "The invitation email has been resent.",
       });
+      setIsInvitationActionsOpen(false);
+      setSelectedInvitation(null);
     },
     onError: (error: Error) => {
       toast({
@@ -309,6 +313,8 @@ export default function TeamManagementPage() {
         title: "Invitation cancelled",
         description: "The invitation has been cancelled.",
       });
+      setIsInvitationActionsOpen(false);
+      setSelectedInvitation(null);
     },
     onError: (error: Error) => {
       toast({
@@ -799,15 +805,12 @@ export default function TeamManagementPage() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
-                        <TableHead className="hidden md:table-cell">Expires</TableHead>
-                        <TableHead className="hidden md:table-cell">Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {invitationsLoading ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="py-8">
+                          <TableCell colSpan={2} className="py-8">
                             <div className="flex justify-center">
                               <Skeleton className="h-8 w-48" />
                             </div>
@@ -815,7 +818,7 @@ export default function TeamManagementPage() {
                         </TableRow>
                       ) : !pendingInvitations || pendingInvitations.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
                             No pending invitations
                           </TableCell>
                         </TableRow>
@@ -826,7 +829,15 @@ export default function TeamManagementPage() {
                           const isExpired = expiresAt < new Date();
 
                           return (
-                            <TableRow key={invitation.id} data-testid={`row-invitation-${invitation.id}`}>
+                            <TableRow 
+                              key={invitation.id} 
+                              data-testid={`row-invitation-${invitation.id}`}
+                              className="cursor-pointer hover-elevate"
+                              onClick={() => {
+                                setSelectedInvitation(invitation);
+                                setIsInvitationActionsOpen(true);
+                              }}
+                            >
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <Mail className="h-4 w-4 text-muted-foreground" />
@@ -842,44 +853,6 @@ export default function TeamManagementPage() {
                                   <RoleIcon className="h-3 w-3 mr-1" />
                                   {getRoleLabel(invitation.role)}
                                 </Badge>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                <div className="flex items-center gap-1 text-sm">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <span className={isExpired ? "text-destructive" : ""}>
-                                    {format(expiresAt, "MMM d, yyyy")}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                <Badge
-                                  variant="default"
-                                  className={getStatusBadgeClassName(isExpired ? "expired" : invitation.status)}
-                                >
-                                  {isExpired ? "Expired" : invitation.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => resendInvitationMutation.mutate(invitation.id)}
-                                    disabled={resendInvitationMutation.isPending}
-                                    data-testid={`button-resend-invitation-${invitation.id}`}
-                                  >
-                                    <RefreshCw className={`h-4 w-4 ${resendInvitationMutation.isPending ? "animate-spin" : ""}`} />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => cancelInvitationMutation.mutate(invitation.id)}
-                                    disabled={cancelInvitationMutation.isPending}
-                                    data-testid={`button-cancel-invitation-${invitation.id}`}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -998,6 +971,63 @@ export default function TeamManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isInvitationActionsOpen} onOpenChange={setIsInvitationActionsOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Invitation Options</DialogTitle>
+            <DialogDescription>
+              Manage this pending invitation
+            </DialogDescription>
+          </DialogHeader>
+          {selectedInvitation && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Email</Label>
+                <p className="font-medium">{selectedInvitation.email}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Role</Label>
+                <Badge
+                  variant="default"
+                  className={getRoleBadgeClassName(selectedInvitation.role)}
+                >
+                  {getRoleLabel(selectedInvitation.role)}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Expires</Label>
+                <p className="text-sm">
+                  {format(new Date(selectedInvitation.expiresAt), "MMM d, yyyy 'at' h:mm a")}
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="w-full min-h-touch gap-2"
+                  onClick={() => resendInvitationMutation.mutate(selectedInvitation.id)}
+                  disabled={resendInvitationMutation.isPending}
+                  data-testid="button-resend-invitation"
+                >
+                  <RefreshCw className={`h-4 w-4 ${resendInvitationMutation.isPending ? "animate-spin" : ""}`} />
+                  {resendInvitationMutation.isPending ? "Resending..." : "Resend Invitation"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full min-h-touch gap-2"
+                  onClick={() => cancelInvitationMutation.mutate(selectedInvitation.id)}
+                  disabled={cancelInvitationMutation.isPending}
+                  data-testid="button-delete-invitation"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {cancelInvitationMutation.isPending ? "Deleting..." : "Delete Invitation"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
