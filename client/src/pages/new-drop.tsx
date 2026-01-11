@@ -45,7 +45,7 @@ import { BUSINESS_TYPES, type BusinessType } from "@shared/schema";
 import { businessTypeLabels } from "@/components/BusinessTypeIcon";
 
 const dropFormSchema = z.object({
-  brochureId: z.string().min(1, "Brochure ID is required"),
+  brochureId: z.string().optional(),
   businessName: z.string().min(1, "Business name is required"),
   businessType: z.string().min(1, "Business type is required"),
   contactName: z.string().optional(),

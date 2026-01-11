@@ -146,8 +146,16 @@ export async function registerRoutes(
       const membership = await storage.getUserMembership(userId);
       const orgId = membership?.organization?.id || null;
       
+      // Handle brochure ID - use provided one or generate a manual entry ID
+      let brochureId = req.body.brochureId;
+      if (!brochureId || brochureId.trim() === "") {
+        // Generate a unique ID for manual entries without QR code
+        const timestamp = Date.now().toString(36);
+        const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+        brochureId = `MANUAL-${timestamp}-${randomPart}`;
+      }
+      
       // Check if brochure exists, create if not
-      const brochureId = req.body.brochureId;
       let brochure = await storage.getBrochure(brochureId);
       
       if (!brochure) {
@@ -165,6 +173,7 @@ export async function registerRoutes(
       // Create the drop with validation
       const dropData = {
         ...req.body,
+        brochureId: brochureId,
         agentId: userId,
         orgId: orgId,
         status: req.body.status || "pending",

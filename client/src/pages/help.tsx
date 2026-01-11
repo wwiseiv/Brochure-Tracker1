@@ -98,7 +98,7 @@ export default function HelpPage() {
     },
     {
       title: "Scan QR Code",
-      description: "Use your phone's camera to scan the QR code on a video brochure. This captures the brochure ID and starts the drop logging process.",
+      description: "Use your phone's camera to scan the QR code on a video brochure. If the QR code is missing or damaged, you can enter the ID manually or skip it entirely.",
       link: "/scan",
       icon: <QrCode className="w-5 h-5 text-primary" />,
     },
