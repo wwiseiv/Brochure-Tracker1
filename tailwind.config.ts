@@ -83,9 +83,13 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
+        sans: ["Inter", "var(--font-sans)", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+      },
+      minHeight: {
+        "touch": "48px",
+        "touch-lg": "64px",
       },
       keyframes: {
         "accordion-down": {

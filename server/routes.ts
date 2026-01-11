@@ -1,16 +1,428 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { insertDropSchema, insertBrochureSchema, insertReminderSchema } from "@shared/schema";
+import { z } from "zod";
+import multer from "multer";
+import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
+
+// Configure multer for file uploads (in-memory storage for audio files)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    // Only allow audio files
+    const allowedMimeTypes = [
+      "audio/wav",
+      "audio/mpeg",
+      "audio/mp4",
+      "audio/webm",
+      "audio/m4a",
+      "audio/ogg",
+      "audio/flac"
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}. Allowed types: ${allowedMimeTypes.join(", ")}`));
+    }
+  },
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB limit (OpenAI Whisper limit)
+  },
+});
+
+// OpenAI client will be initialized lazily when needed
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OpenAI API key not configured");
+    }
+    openai = new OpenAI({ apiKey });
+  }
+  return openai;
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Setup authentication first
+  await setupAuth(app);
+  registerAuthRoutes(app);
+  
+  // Setup object storage routes
+  registerObjectStorageRoutes(app);
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Brochures API
+  app.post("/api/brochures", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = insertBrochureSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const brochure = await storage.createBrochure(parsed.data);
+      res.status(201).json(brochure);
+    } catch (error) {
+      console.error("Error creating brochure:", error);
+      res.status(500).json({ error: "Failed to create brochure" });
+    }
+  });
+
+  app.get("/api/brochures/:id", isAuthenticated, async (req, res) => {
+    try {
+      const brochure = await storage.getBrochure(req.params.id);
+      if (!brochure) {
+        return res.status(404).json({ error: "Brochure not found" });
+      }
+      res.json(brochure);
+    } catch (error) {
+      console.error("Error fetching brochure:", error);
+      res.status(500).json({ error: "Failed to fetch brochure" });
+    }
+  });
+
+  // Drops API
+  app.get("/api/drops", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const drops = await storage.getDropsByAgent(userId);
+      res.json(drops);
+    } catch (error) {
+      console.error("Error fetching drops:", error);
+      res.status(500).json({ error: "Failed to fetch drops" });
+    }
+  });
+
+  app.get("/api/drops/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const drop = await storage.getDrop(dropId);
+      if (!drop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      // Ensure user owns this drop
+      const userId = req.user.claims.sub;
+      if (drop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(drop);
+    } catch (error) {
+      console.error("Error fetching drop:", error);
+      res.status(500).json({ error: "Failed to fetch drop" });
+    }
+  });
+
+  app.post("/api/drops", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if brochure exists, create if not
+      const brochureId = req.body.brochureId;
+      let brochure = await storage.getBrochure(brochureId);
+      
+      if (!brochure) {
+        // Auto-create brochure if it doesn't exist
+        brochure = await storage.createBrochure({
+          id: brochureId,
+          status: "deployed",
+        });
+      } else {
+        // Update brochure status to deployed
+        await storage.updateBrochureStatus(brochureId, "deployed");
+      }
+      
+      // Create the drop with validation
+      const dropData = {
+        ...req.body,
+        agentId: userId,
+        status: req.body.status || "pending",
+      };
+      
+      const parsed = insertDropSchema.safeParse(dropData);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+      
+      const drop = await storage.createDrop(parsed.data);
+      
+      // Create a reminder for the pickup
+      if (drop.pickupScheduledFor) {
+        await storage.createReminder({
+          dropId: drop.id,
+          agentId: userId,
+          remindAt: new Date(drop.pickupScheduledFor),
+          method: "push",
+        });
+      }
+      
+      res.status(201).json(drop);
+    } catch (error) {
+      console.error("Error creating drop:", error);
+      res.status(500).json({ error: "Failed to create drop" });
+    }
+  });
+
+  app.patch("/api/drops/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const existingDrop = await storage.getDrop(dropId);
+      if (!existingDrop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      // Ensure user owns this drop
+      const userId = req.user.claims.sub;
+      if (existingDrop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const updateData: Record<string, any> = {};
+      
+      // Validate status if provided
+      if (req.body.status !== undefined) {
+        const statusValidation = z.enum(["pending", "picked_up", "converted", "lost"]).safeParse(req.body.status);
+        if (!statusValidation.success) {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ 
+              field: "status", 
+              message: "Status must be one of: pending, picked_up, converted, lost" 
+            }]
+          });
+        }
+        updateData.status = req.body.status;
+      }
+      
+      // Validate outcome if provided
+      if (req.body.outcome !== undefined) {
+        const outcomeValidation = z.enum([
+          "signed",
+          "interested_appointment",
+          "interested_later",
+          "not_interested",
+          "closed",
+          "not_found"
+        ]).optional().nullable().safeParse(req.body.outcome);
+        if (!outcomeValidation.success) {
+          return res.status(400).json({ 
+            error: "Validation failed",
+            details: [{ 
+              field: "outcome", 
+              message: "Outcome must be one of: signed, interested_appointment, interested_later, not_interested, closed, not_found" 
+            }]
+          });
+        }
+        updateData.outcome = req.body.outcome;
+      }
+      
+      if (req.body.outcomeNotes !== undefined) {
+        updateData.outcomeNotes = req.body.outcomeNotes;
+      }
+      
+      if (req.body.status === "picked_up" || req.body.status === "converted") {
+        updateData.pickedUpAt = new Date();
+      }
+      
+      if (req.body.pickupScheduledFor !== undefined) {
+        if (req.body.pickupScheduledFor === null) {
+          updateData.pickupScheduledFor = null;
+        } else {
+          const dateValidation = z.union([z.date(), z.string()]).pipe(
+            z.coerce.date().refine(
+              (date) => date > new Date(),
+              { message: "Pickup date must be in the future" }
+            )
+          ).safeParse(req.body.pickupScheduledFor);
+          if (!dateValidation.success) {
+            return res.status(400).json({ 
+              error: "Validation failed",
+              details: [{ 
+                field: "pickupScheduledFor", 
+                message: "Pickup date must be a valid future date" 
+              }]
+            });
+          }
+          updateData.pickupScheduledFor = dateValidation.data;
+        }
+      }
+      
+      const updated = await storage.updateDrop(dropId, updateData);
+      
+      // Update brochure status if drop is picked up
+      if (updateData.status === "picked_up" || updateData.status === "converted") {
+        await storage.updateBrochureStatus(existingDrop.brochureId, "returned");
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating drop:", error);
+      res.status(500).json({ error: "Failed to update drop" });
+    }
+  });
+
+  // Reminders API
+  app.get("/api/drops/:dropId/reminders", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.dropId);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const reminders = await storage.getRemindersByDrop(dropId);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Error fetching reminders:", error);
+      res.status(500).json({ error: "Failed to fetch reminders" });
+    }
+  });
+
+  app.post("/api/drops/:dropId/reminders", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.dropId);
+      const userId = req.user.claims.sub;
+      
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const reminderData = {
+        ...req.body,
+        dropId,
+        agentId: userId,
+        remindAt: new Date(req.body.remindAt),
+      };
+      
+      const parsed = insertReminderSchema.safeParse(reminderData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const reminder = await storage.createReminder(parsed.data);
+      res.status(201).json(reminder);
+    } catch (error) {
+      console.error("Error creating reminder:", error);
+      res.status(500).json({ error: "Failed to create reminder" });
+    }
+  });
+
+  // Voice transcription endpoint with OpenAI Whisper
+  app.post(
+    "/api/transcribe",
+    isAuthenticated,
+    upload.single("audio"),
+    async (req: any, res) => {
+      try {
+        // Verify file was uploaded
+        if (!req.file) {
+          return res.status(400).json({ 
+            error: "No audio file provided",
+            details: [{ field: "audio", message: "Audio file is required" }]
+          });
+        }
+
+        // Verify OpenAI API key is configured
+        if (!process.env.OPENAI_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+          console.error("OpenAI API key not configured");
+          return res.status(500).json({ 
+            error: "Audio transcription service is not available",
+            details: [{ 
+              field: "server", 
+              message: "OpenAI API key is not configured" 
+            }]
+          });
+        }
+
+        // Create a temporary file path for the audio
+        const tempFilePath = path.join("/tmp", `${Date.now()}_${req.file.originalname}`);
+        
+        // Write the file to disk temporarily (required by OpenAI client)
+        await new Promise((resolve, reject) => {
+          fs.writeFile(tempFilePath, req.file.buffer, (err) => {
+            if (err) reject(err);
+            else resolve(null);
+          });
+        });
+
+        try {
+          // Call OpenAI Whisper API for transcription
+          // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+          const client = getOpenAIClient();
+          const transcription = await client.audio.transcriptions.create({
+            file: fs.createReadStream(tempFilePath),
+            model: "whisper-1",
+          });
+
+          // Clean up temporary file
+          fs.unlink(tempFilePath, (err) => {
+            if (err) console.error("Error deleting temp file:", err);
+          });
+
+          // Return the transcribed text
+          res.json({
+            text: transcription.text,
+            duration: transcription.duration || 0,
+          });
+        } catch (openaiError: any) {
+          // Clean up temporary file on error
+          fs.unlink(tempFilePath, (err) => {
+            if (err) console.error("Error deleting temp file:", err);
+          });
+
+          console.error("OpenAI Whisper API error:", openaiError);
+          
+          // Handle specific OpenAI errors
+          if (openaiError.status === 401) {
+            return res.status(500).json({ 
+              error: "Authentication failed with OpenAI API",
+              details: [{ field: "server", message: "Invalid API credentials" }]
+            });
+          }
+          if (openaiError.status === 429) {
+            return res.status(429).json({ 
+              error: "Rate limit exceeded",
+              details: [{ field: "server", message: "Too many requests to transcription service" }]
+            });
+          }
+          
+          throw openaiError;
+        }
+      } catch (error) {
+        console.error("Error transcribing audio:", error);
+        res.status(500).json({ 
+          error: "Failed to transcribe audio",
+          details: [{ 
+            field: "audio", 
+            message: error instanceof Error ? error.message : "Unknown error occurred during transcription" 
+          }]
+        });
+      }
+    }
+  );
 
   return httpServer;
 }

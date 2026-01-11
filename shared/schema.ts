@@ -1,18 +1,156 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { sql, relations } from "drizzle-orm";
+import { pgTable, text, varchar, real, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+// Re-export auth models
+export * from "./models/auth";
+
+// Business type enum values
+export const BUSINESS_TYPES = [
+  "restaurant",
+  "retail",
+  "service",
+  "convenience",
+  "auto",
+  "medical",
+  "salon",
+  "other"
+] as const;
+
+export type BusinessType = typeof BUSINESS_TYPES[number];
+
+// Drop status enum values
+export const DROP_STATUSES = ["pending", "picked_up", "converted", "lost"] as const;
+export type DropStatus = typeof DROP_STATUSES[number];
+
+// Outcome enum values
+export const OUTCOME_TYPES = [
+  "signed",
+  "interested_appointment",
+  "interested_later",
+  "not_interested",
+  "closed",
+  "not_found"
+] as const;
+export type OutcomeType = typeof OUTCOME_TYPES[number];
+
+// Brochure status enum values
+export const BROCHURE_STATUSES = ["available", "deployed", "returned", "lost"] as const;
+export type BrochureStatus = typeof BROCHURE_STATUSES[number];
+
+// Brochures table
+export const brochures = pgTable("brochures", {
+  id: varchar("id", { length: 50 }).primaryKey(),
+  batch: varchar("batch", { length: 100 }),
+  status: varchar("status", { length: 20 }).default("available").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const brochuresRelations = relations(brochures, ({ many }) => ({
+  drops: many(drops),
+}));
+
+export const insertBrochureSchema = createInsertSchema(brochures).omit({
+  createdAt: true,
+});
+export type InsertBrochure = z.infer<typeof insertBrochureSchema>;
+export type Brochure = typeof brochures.$inferSelect;
+
+// Drops table
+export const drops = pgTable("drops", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  brochureId: varchar("brochure_id", { length: 50 }).notNull().references(() => brochures.id),
+  agentId: varchar("agent_id").notNull(),
+  
+  // Location data
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  address: text("address"),
+  
+  // Business data
+  businessName: text("business_name"),
+  businessType: varchar("business_type", { length: 50 }),
+  businessPhone: varchar("business_phone", { length: 30 }),
+  contactName: varchar("contact_name", { length: 100 }),
+  
+  // Notes
+  textNotes: text("text_notes"),
+  voiceNoteUrl: text("voice_note_url"),
+  voiceTranscript: text("voice_transcript"),
+  
+  // Timing
+  droppedAt: timestamp("dropped_at").defaultNow().notNull(),
+  pickupScheduledFor: timestamp("pickup_scheduled_for"),
+  pickupReminderSent: boolean("pickup_reminder_sent").default(false),
+  
+  // Status tracking
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  outcome: varchar("outcome", { length: 30 }),
+  outcomeNotes: text("outcome_notes"),
+  pickedUpAt: timestamp("picked_up_at"),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export const dropsRelations = relations(drops, ({ one, many }) => ({
+  brochure: one(brochures, {
+    fields: [drops.brochureId],
+    references: [brochures.id],
+  }),
+  reminders: many(reminders),
+}));
+
+export const insertDropSchema = createInsertSchema(drops).omit({
+  id: true,
+  droppedAt: true,
+  pickupReminderSent: true,
+  pickedUpAt: true,
+}).extend({
+  status: z.enum(DROP_STATUSES, {
+    errorMap: () => ({ message: `Status must be one of: ${DROP_STATUSES.join(", ")}` })
+  }).optional(),
+  outcome: z.enum(OUTCOME_TYPES, {
+    errorMap: () => ({ message: `Outcome must be one of: ${OUTCOME_TYPES.join(", ")}` })
+  }).optional().nullable(),
+  businessType: z.enum(BUSINESS_TYPES, {
+    errorMap: () => ({ message: `Business type must be one of: ${BUSINESS_TYPES.join(", ")}` })
+  }).optional().nullable(),
+  pickupScheduledFor: z.union([z.date(), z.string()]).pipe(
+    z.coerce.date().refine(
+      (date) => date > new Date(),
+      { message: "Pickup date must be in the future" }
+    )
+  ).optional().nullable(),
+});
+export type InsertDrop = z.infer<typeof insertDropSchema>;
+export type Drop = typeof drops.$inferSelect;
+
+// Reminders table
+export const reminders = pgTable("reminders", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dropId: integer("drop_id").notNull().references(() => drops.id),
+  agentId: varchar("agent_id").notNull(),
+  remindAt: timestamp("remind_at").notNull(),
+  sent: boolean("sent").default(false),
+  sentAt: timestamp("sent_at"),
+  method: varchar("method", { length: 20 }),
+});
+
+export const remindersRelations = relations(reminders, ({ one }) => ({
+  drop: one(drops, {
+    fields: [reminders.dropId],
+    references: [drops.id],
+  }),
+}));
+
+export const insertReminderSchema = createInsertSchema(reminders).omit({
+  id: true,
+  sent: true,
+  sentAt: true,
+});
+export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type Reminder = typeof reminders.$inferSelect;
+
+// Extended drop type with brochure info for frontend
+export type DropWithBrochure = Drop & {
+  brochure?: Brochure;
+};

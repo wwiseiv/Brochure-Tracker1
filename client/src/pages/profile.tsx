@@ -1,0 +1,133 @@
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BottomNav } from "@/components/BottomNav";
+import { useAuth } from "@/hooks/use-auth";
+import { 
+  LogOut, 
+  Package, 
+  CheckCircle2, 
+  Clock, 
+  TrendingUp,
+  ChevronRight 
+} from "lucide-react";
+import type { DropWithBrochure } from "@shared/schema";
+
+export default function ProfilePage() {
+  const { user, logout, isLoggingOut } = useAuth();
+  
+  const { data: drops } = useQuery<DropWithBrochure[]>({
+    queryKey: ["/api/drops"],
+  });
+
+  const stats = {
+    total: drops?.length || 0,
+    pending: drops?.filter((d) => d.status === "pending").length || 0,
+    completed: drops?.filter((d) => d.status !== "pending").length || 0,
+    converted: drops?.filter((d) => d.outcome === "signed").length || 0,
+  };
+
+  const conversionRate = stats.completed > 0 
+    ? Math.round((stats.converted / stats.completed) * 100) 
+    : 0;
+
+  const userInitials = user 
+    ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
+    : "U";
+
+  const userName = user 
+    ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User"
+    : "User";
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-40 bg-card border-b border-border">
+        <div className="container max-w-md mx-auto px-4 h-14 flex items-center">
+          <span className="font-semibold">Profile</span>
+        </div>
+      </header>
+
+      <main className="container max-w-md mx-auto px-4 py-6 space-y-6">
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <Avatar className="w-16 h-16" data-testid="avatar-profile">
+              <AvatarImage src={user?.profileImageUrl || undefined} />
+              <AvatarFallback className="text-xl">{userInitials}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold" data-testid="text-user-name">
+                {userName}
+              </h2>
+              {user?.email && (
+                <p className="text-sm text-muted-foreground" data-testid="text-user-email">
+                  {user.email}
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="p-4 text-center">
+            <Package className="w-6 h-6 mx-auto text-primary mb-2" />
+            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-xs text-muted-foreground">Total Drops</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <Clock className="w-6 h-6 mx-auto text-amber-500 mb-2" />
+            <p className="text-2xl font-bold">{stats.pending}</p>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-2" />
+            <p className="text-2xl font-bold">{stats.completed}</p>
+            <p className="text-xs text-muted-foreground">Completed</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <TrendingUp className="w-6 h-6 mx-auto text-blue-500 mb-2" />
+            <p className="text-2xl font-bold">{conversionRate}%</p>
+            <p className="text-xs text-muted-foreground">Conversion</p>
+          </Card>
+        </div>
+
+        <Card className="p-4">
+          <h3 className="font-semibold mb-3">Performance</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Signed Deals</span>
+              <span className="font-semibold">{stats.converted}</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-emerald-500 rounded-full transition-all"
+                style={{ width: `${stats.completed > 0 ? (stats.converted / stats.completed) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.converted} out of {stats.completed} completed pickups resulted in signed deals
+            </p>
+          </div>
+        </Card>
+
+        <div className="pt-4">
+          <Button
+            variant="outline"
+            className="w-full min-h-touch gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => logout()}
+            disabled={isLoggingOut}
+            data-testid="button-logout"
+          >
+            <LogOut className="w-5 h-5" />
+            {isLoggingOut ? "Logging out..." : "Log Out"}
+          </Button>
+        </div>
+      </main>
+
+      <BottomNav />
+    </div>
+  );
+}
