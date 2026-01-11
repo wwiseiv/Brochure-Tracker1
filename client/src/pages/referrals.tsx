@@ -216,7 +216,7 @@ function AddReferralDialog({
     mutationFn: async (data: AddReferralFormData) => {
       const payload = {
         ...data,
-        sourceDropId: data.sourceDropId ? parseInt(data.sourceDropId) : null,
+        sourceDropId: data.sourceDropId && data.sourceDropId !== "none" ? parseInt(data.sourceDropId) : null,
       };
       const response = await apiRequest("POST", "/api/referrals", payload);
       return response.json();
@@ -271,7 +271,7 @@ function AddReferralDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No linked drop</SelectItem>
+                      <SelectItem value="none">No linked drop</SelectItem>
                       {drops.map((drop) => (
                         <SelectItem key={drop.id} value={drop.id.toString()}>
                           {drop.businessName || `Drop #${drop.id}`}
