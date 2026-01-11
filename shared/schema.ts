@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, real, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, boolean, timestamp, integer, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -39,16 +39,83 @@ export type OutcomeType = typeof OUTCOME_TYPES[number];
 export const BROCHURE_STATUSES = ["available", "deployed", "returned", "lost"] as const;
 export type BrochureStatus = typeof BROCHURE_STATUSES[number];
 
+// Organization member role enum values
+export const ORG_MEMBER_ROLES = ["master_admin", "relationship_manager", "agent"] as const;
+export type OrgMemberRole = typeof ORG_MEMBER_ROLES[number];
+
+// Organizations table
+export const organizations = pgTable("organizations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  brochures: many(brochures),
+  drops: many(drops),
+}));
+
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+export type Organization = typeof organizations.$inferSelect;
+
+// Organization members table
+export const organizationMembers = pgTable("organization_members", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull(),
+  role: varchar("role", { length: 30 }).notNull(),
+  managerId: integer("manager_id").references(() => organizationMembers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("org_user_unique").on(table.orgId, table.userId),
+]);
+
+export const organizationMembersRelations = relations(organizationMembers, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [organizationMembers.orgId],
+    references: [organizations.id],
+  }),
+  manager: one(organizationMembers, {
+    fields: [organizationMembers.managerId],
+    references: [organizationMembers.id],
+    relationName: "managerAgents",
+  }),
+  agents: many(organizationMembers, {
+    relationName: "managerAgents",
+  }),
+}));
+
+export const insertOrganizationMemberSchema = createInsertSchema(organizationMembers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  role: z.enum(ORG_MEMBER_ROLES, {
+    errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
+  }),
+});
+export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+
 // Brochures table
 export const brochures = pgTable("brochures", {
   id: varchar("id", { length: 50 }).primaryKey(),
   batch: varchar("batch", { length: 100 }),
   status: varchar("status", { length: 20 }).default("available").notNull(),
+  orgId: integer("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const brochuresRelations = relations(brochures, ({ many }) => ({
+export const brochuresRelations = relations(brochures, ({ one, many }) => ({
   drops: many(drops),
+  organization: one(organizations, {
+    fields: [brochures.orgId],
+    references: [organizations.id],
+  }),
 }));
 
 export const insertBrochureSchema = createInsertSchema(brochures).omit({
@@ -89,6 +156,9 @@ export const drops = pgTable("drops", {
   outcome: varchar("outcome", { length: 30 }),
   outcomeNotes: text("outcome_notes"),
   pickedUpAt: timestamp("picked_up_at"),
+  
+  // Organization (for reporting)
+  orgId: integer("org_id").references(() => organizations.id),
 });
 
 export const dropsRelations = relations(drops, ({ one, many }) => ({
@@ -97,6 +167,10 @@ export const dropsRelations = relations(drops, ({ one, many }) => ({
     references: [brochures.id],
   }),
   reminders: many(reminders),
+  organization: one(organizations, {
+    fields: [drops.orgId],
+    references: [organizations.id],
+  }),
 }));
 
 export const insertDropSchema = createInsertSchema(drops).omit({

@@ -3,6 +3,8 @@ import {
   drops, 
   reminders,
   userPreferences,
+  organizations,
+  organizationMembers,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -12,6 +14,11 @@ import {
   type DropWithBrochure,
   type UserPreferences,
   type UpdateUserPreferences,
+  type Organization,
+  type InsertOrganization,
+  type OrganizationMember,
+  type InsertOrganizationMember,
+  type OrgMemberRole,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -41,6 +48,15 @@ export interface IStorage {
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createUserPreferences(userId: string): Promise<UserPreferences>;
   updateUserPreferences(userId: string, data: UpdateUserPreferences): Promise<UserPreferences | undefined>;
+  
+  // Organizations
+  getOrganization(id: number): Promise<Organization | undefined>;
+  createOrganization(data: InsertOrganization): Promise<Organization>;
+  getOrganizationMember(orgId: number, userId: string): Promise<OrganizationMember | undefined>;
+  getOrganizationMembers(orgId: number): Promise<OrganizationMember[]>;
+  createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
+  updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined>;
+  getAgentsByManager(managerId: number): Promise<OrganizationMember[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -234,6 +250,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userPreferences.userId, userId))
       .returning();
     return updated;
+  }
+
+  // Organizations
+  async getOrganization(id: number): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async createOrganization(data: InsertOrganization): Promise<Organization> {
+    const [created] = await db.insert(organizations).values(data).returning();
+    return created;
+  }
+
+  async getOrganizationMember(orgId: number, userId: string): Promise<OrganizationMember | undefined> {
+    const [member] = await db
+      .select()
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    return member;
+  }
+
+  async getOrganizationMembers(orgId: number): Promise<OrganizationMember[]> {
+    return db.select().from(organizationMembers).where(eq(organizationMembers.orgId, orgId));
+  }
+
+  async createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember> {
+    const [created] = await db.insert(organizationMembers).values(data).returning();
+    return created;
+  }
+
+  async updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined> {
+    const [updated] = await db
+      .update(organizationMembers)
+      .set({ role })
+      .where(eq(organizationMembers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getAgentsByManager(managerId: number): Promise<OrganizationMember[]> {
+    return db.select().from(organizationMembers).where(eq(organizationMembers.managerId, managerId));
   }
 }
 
