@@ -1,0 +1,33 @@
+You are an expert web developer building a static website for SignaPay, LTD., a United States-based company providing payment processing and fintech services in 2026. The site primarily targets users in the US (including California) and globally. The domain is signapay.com.
+
+Create a folder called "legal" and generate the following separate HTML files inside it. Each file should be a complete, standalone HTML5 page with:
+
+- A clean, professional structure (use <header>, <main>, <footer>).
+- A simple responsive design (basic CSS in a <style> tag: sans-serif font, max-width 800px centered, mobile-friendly).
+- Company name "SignaPay, LTD." prominently in the header.
+- Current year "2026" in copyright footer.
+- Last updated date: "January 11, 2026".
+- Generic, placeholder legal text that is professional and compliance-oriented (primarily referencing CCPA/CPRA for California users, with mentions of GDPR where relevant for international users, and general US best practices), but clearly marked as a template requiring legal review.
+- At the bottom of each page, include a footer with links to all other legal pages (e.g., <a href="privacy-policy.html">Privacy Policy</a> | <a href="terms-of-service.html">Terms of Service</a> etc.) followed by the exact disclosure text:
+  "Copyright SignaPay, LTD. All Rights Reserved ©2026<br>
+  SignaPay is a registered ISO of Chesapeake Bank, Kilmarnock, VA; Commercial Bank of California, Irvine, CA; Esquire Bank, Jericho, NY; Synovus Bank, Columbus, GA."
+
+Generate these exact files with generic but realistic content tailored to a US-based payment processing company that collects personal data (names, emails, payment details, IP addresses), uses cookies/trackers, and processes transactions:
+
+1. privacy-policy.html - Comprehensive privacy policy covering data collection, processing, storage, sharing (including with payment partners and sponsoring banks), user rights (access, deletion, opt-out, do-not-sell under CCPA/CPRA), security measures, and international transfers (with brief GDPR mention for global users).
+
+2. terms-of-service.html - Terms of Service / Terms and Conditions covering user eligibility, account rules, prohibited activities, payment terms, liability limitations, dispute resolution (binding arbitration and governing law: laws of the State of Delaware, United States), and intellectual property.
+
+3. cookie-policy.html - Detailed cookie policy explaining types of cookies (essential, performance/functionality, analytics/customization, advertising, social networking, unclassified), purposes, third-party trackers (e.g., Google Analytics), consent management (mention that preferences are saved in local storage and managed via the site's consent tool), and how users can manage/opt-out (including CCPA options).
+
+4. accessibility-statement.html - Accessibility statement describing commitment to WCAG 2.1 AA (and ADA compliance), current features (e.g., alt text, keyboard navigation), contact for feedback, and ongoing improvements.
+
+5. copyright-dmca.html - Copyright notice with DMCA takedown policy, including designated agent contact details (use placeholders like "dmca@signapay.com").
+
+6. refunds-policy.html - Refund and cancellation policy for payment services/subscriptions (generic for US fintech: generally no refunds on processed transactions, with exceptions for errors or as required by applicable law).
+
+Also create a simple index.html in the root folder with a welcome message for "SignaPay, LTD." and links to the legal folder pages. Include the same full disclosure footer text on index.html.
+
+Add clear comments in each file: <!-- This is a generic template. Customize and have it reviewed by a qualified lawyer before publishing. -->
+
+Use clear, neutral language. Do not include any real legal advice or specific clauses that could be binding. Make the content readable and sectioned with headings.

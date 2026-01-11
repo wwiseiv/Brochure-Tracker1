@@ -110,7 +110,7 @@ export async function registerRoutes(
   registerObjectStorageRoutes(app);
 
   // Brochures API
-  app.post("/api/brochures", isAuthenticated, async (req: any, res) => {
+  app.post("/api/brochures", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const parsed = insertBrochureSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -789,7 +789,6 @@ export async function registerRoutes(
           // Return the transcribed text
           res.json({
             text: transcription.text,
-            duration: transcription.duration || 0,
           });
         } catch (openaiError: any) {
           // Clean up temporary file on error
@@ -2876,6 +2875,7 @@ Respond in JSON format:
         agentId: userId,
         dropId: dropId ? parseInt(dropId) : null,
         scenario,
+        mode: mode || "roleplay",
         businessContext,
         status: "active",
       });

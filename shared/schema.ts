@@ -70,11 +70,9 @@ export const organizationMembers = pgTable("organization_members", {
   orgId: integer("org_id").notNull().references(() => organizations.id),
   userId: varchar("user_id").notNull(),
   role: varchar("role", { length: 30 }).notNull(),
-  managerId: integer("manager_id").references(() => organizationMembers.id),
+  managerId: integer("manager_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => [
-  unique("org_user_unique").on(table.orgId, table.userId),
-]);
+});
 
 export const organizationMembersRelations = relations(organizationMembers, ({ one, many }) => ({
   organization: one(organizations, {
@@ -91,13 +89,13 @@ export const organizationMembersRelations = relations(organizationMembers, ({ on
   }),
 }));
 
-export const insertOrganizationMemberSchema = createInsertSchema(organizationMembers).omit({
-  id: true,
-  createdAt: true,
-}).extend({
+export const insertOrganizationMemberSchema = z.object({
+  orgId: z.number(),
+  userId: z.string(),
   role: z.enum(ORG_MEMBER_ROLES, {
     errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
   }),
+  managerId: z.number().nullable().optional(),
 });
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
@@ -280,9 +278,7 @@ export const agentInventory = pgTable("agent_inventory", {
   lowStockThreshold: integer("low_stock_threshold").default(10).notNull(),
   lastRestockAt: timestamp("last_restock_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => [
-  unique("org_agent_inventory_unique").on(table.orgId, table.agentId),
-]);
+});
 
 export const insertAgentInventorySchema = createInsertSchema(agentInventory).omit({
   id: true,
@@ -449,11 +445,16 @@ export const ACTIVITY_EVENT_TYPES = [
 ] as const;
 export type ActivityEventType = typeof ACTIVITY_EVENT_TYPES[number];
 
-export const insertActivityEventSchema = createInsertSchema(activityEvents).omit({
-  id: true,
-  createdAt: true,
-}).extend({
+export const insertActivityEventSchema = z.object({
+  orgId: z.number(),
+  agentId: z.string(),
+  agentName: z.string().nullable().optional(),
   eventType: z.enum(ACTIVITY_EVENT_TYPES),
+  entityType: z.string().nullable().optional(),
+  entityId: z.number().nullable().optional(),
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  metadata: z.string().nullable().optional(),
 });
 export type InsertActivityEvent = z.infer<typeof insertActivityEventSchema>;
 export type ActivityEvent = typeof activityEvents.$inferSelect;
@@ -492,11 +493,12 @@ export const leadScores = pgTable("lead_scores", {
 export const LEAD_TIERS = ["hot", "warm", "cold"] as const;
 export type LeadTier = typeof LEAD_TIERS[number];
 
-export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({
-  id: true,
-  calculatedAt: true,
-}).extend({
+export const insertLeadScoreSchema = z.object({
+  dropId: z.number(),
+  score: z.number(),
   tier: z.enum(LEAD_TIERS),
+  factors: z.string().nullable().optional(),
+  predictedConversion: z.number().nullable().optional(),
 });
 export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
 export type LeadScore = typeof leadScores.$inferSelect;
@@ -625,12 +627,17 @@ export const ROLEPLAY_SCENARIOS = [
 ] as const;
 export type RoleplayScenario = typeof ROLEPLAY_SCENARIOS[number];
 
+// Role-play modes
+export const ROLEPLAY_MODES = ["roleplay", "coaching"] as const;
+export type RoleplayMode = typeof ROLEPLAY_MODES[number];
+
 // Role-play sessions table (for AI conversation role-play training)
 export const roleplaySessions = pgTable("roleplay_sessions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   agentId: varchar("agent_id").notNull(),
   dropId: integer("drop_id").references(() => drops.id),
   scenario: varchar("scenario", { length: 50 }).notNull(),
+  mode: varchar("mode", { length: 20 }).default("roleplay").notNull(),
   businessContext: text("business_context"),
   status: varchar("status", { length: 20 }).default("active").notNull(),
   feedback: text("feedback"),
@@ -639,14 +646,13 @@ export const roleplaySessions = pgTable("roleplay_sessions", {
   endedAt: timestamp("ended_at"),
 });
 
-export const insertRoleplaySessionSchema = createInsertSchema(roleplaySessions).omit({
-  id: true,
-  createdAt: true,
-  endedAt: true,
-  feedback: true,
-  performanceScore: true,
-}).extend({
+export const insertRoleplaySessionSchema = z.object({
+  agentId: z.string(),
+  dropId: z.number().nullable().optional(),
   scenario: z.enum(ROLEPLAY_SCENARIOS),
+  mode: z.enum(ROLEPLAY_MODES).optional(),
+  businessContext: z.string().nullable().optional(),
+  status: z.string().optional(),
 });
 export type InsertRoleplaySession = z.infer<typeof insertRoleplaySessionSchema>;
 export type RoleplaySession = typeof roleplaySessions.$inferSelect;
