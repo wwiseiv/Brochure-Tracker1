@@ -159,6 +159,7 @@ function App() {
         <Toaster />
         <Switch>
           <Route path="/accept-invite" component={AcceptInvitePage} />
+          <Route path="/help" component={HelpPage} />
           <Route component={AppContent} />
         </Switch>
       </TooltipProvider>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Statement | SignaPay, LTD.</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background: #fff; }
+        header { text-align: center; padding: 40px 0; border-bottom: 1px solid #eee; }
+        h1 { font-size: 2.5em; margin: 0; }
+        h2 { font-size: 1.8em; margin-top: 40px; }
+        main { padding: 20px 0; }
+        footer { text-align: center; padding: 20px 0; border-top: 1px solid #eee; font-size: 0.9em; color: #666; }
+        a { color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        @media (max-width: 768px) { body { padding: 10px; } h1 { font-size: 2em; } }
+    </style>
+</head>
+<body>
+    <!-- This is a generic template. Customize and have it reviewed by a qualified lawyer before publishing. -->
+
+    <header>
+        <h1>SignaPay, LTD.</h1>
+    </header>
+
+    <main>
+        <h2>Accessibility Statement</h2>
+        <p><strong>Last Updated: January 11, 2026</strong></p>
+
+        <p>SignaPay, LTD. is committed to ensuring digital accessibility for people with disabilities. We strive to conform to WCAG 2.1 Level AA guidelines and comply with the Americans with Disabilities Act (ADA).</p>
+
+        <h2>Current Features</h2>
+        <ul>
+            <li>Alternative text for images</li>
+            <li>Keyboard navigation support</li>
+            <li>Compatible with common screen readers</li>
+        </ul>
+
+        <h2>Ongoing Efforts</h2>
+        <p>We continue to improve accessibility and welcome feedback.</p>
+
+        <h2>Contact Us</h2>
+        <p>If you encounter accessibility issues, please contact us at accessibility@signapay.com.</p>
+    </main>
+
+    <footer>
+        <p>
+            <a href="privacy-policy.html">Privacy Policy</a> |
+            <a href="terms-of-service.html">Terms of Service</a> |
+            <a href="cookie-policy.html">Cookie Policy</a> |
+            <a href="accessibility-statement.html">Accessibility Statement</a> |
+            <a href="copyright-dmca.html">Copyright & DMCA</a> |
+            <a href="refunds-policy.html">Refunds Policy</a>
+        </p>
+        <p>
+            Copyright SignaPay, LTD. All Rights Reserved ©2026<br>
+            SignaPay is a registered ISO of Chesapeake Bank, Kilmarnock, VA; Commercial Bank of California, Irvine, CA; Esquire Bank, Jericho, NY; Synovus Bank, Columbus, GA.
+        </p>
+    </footer>
+</body>
+</html>
