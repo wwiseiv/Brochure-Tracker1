@@ -2,6 +2,7 @@ import {
   brochures, 
   drops, 
   reminders,
+  userPreferences,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -9,6 +10,8 @@ import {
   type Reminder,
   type InsertReminder,
   type DropWithBrochure,
+  type UserPreferences,
+  type UpdateUserPreferences,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -33,6 +36,11 @@ export interface IStorage {
   
   // Demo data
   seedDemoData(agentId: string): Promise<void>;
+  
+  // User Preferences
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createUserPreferences(userId: string): Promise<UserPreferences>;
+  updateUserPreferences(userId: string, data: UpdateUserPreferences): Promise<UserPreferences | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -200,6 +208,32 @@ export class DatabaseStorage implements IStorage {
         console.error(`Error seeding demo data for ${demo.businessName}:`, error);
       }
     }
+  }
+
+  // User Preferences
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createUserPreferences(userId: string): Promise<UserPreferences> {
+    const [created] = await db.insert(userPreferences).values({
+      userId,
+      notificationsEnabled: true,
+      reminderHoursBefore: 24,
+      emailNotifications: true,
+      pushNotifications: true,
+    }).returning();
+    return created;
+  }
+
+  async updateUserPreferences(userId: string, data: UpdateUserPreferences): Promise<UserPreferences | undefined> {
+    const [updated] = await db
+      .update(userPreferences)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userPreferences.userId, userId))
+      .returning();
+    return updated;
   }
 }
 

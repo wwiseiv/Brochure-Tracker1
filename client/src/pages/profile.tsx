@@ -1,25 +1,80 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   LogOut, 
   Package, 
   CheckCircle2, 
   Clock, 
   TrendingUp,
-  ChevronRight 
+  Bell,
+  Mail,
+  Smartphone,
+  Settings
 } from "lucide-react";
-import type { DropWithBrochure } from "@shared/schema";
+import type { DropWithBrochure, UserPreferences } from "@shared/schema";
+
+const REMINDER_OPTIONS = [
+  { value: "6", label: "6 hours before" },
+  { value: "12", label: "12 hours before" },
+  { value: "24", label: "24 hours before" },
+  { value: "48", label: "48 hours before" },
+];
 
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
+  const { toast } = useToast();
   
   const { data: drops } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
   });
+
+  const { data: preferences, isLoading: preferencesLoading } = useQuery<UserPreferences>({
+    queryKey: ["/api/preferences"],
+  });
+
+  const updatePreferences = useMutation({
+    mutationFn: async (data: Partial<UserPreferences>) => {
+      const res = await apiRequest("PATCH", "/api/preferences", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      toast({
+        title: "Settings saved",
+        description: "Your notification preferences have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggle = (field: keyof UserPreferences, value: boolean) => {
+    updatePreferences.mutate({ [field]: value });
+  };
+
+  const handleReminderChange = (value: string) => {
+    updatePreferences.mutate({ reminderHoursBefore: parseInt(value) });
+  };
 
   const stats = {
     total: drops?.length || 0,
@@ -110,6 +165,93 @@ export default function ProfilePage() {
             <p className="text-xs text-muted-foreground">
               {stats.converted} out of {stats.completed} completed pickups resulted in signed deals
             </p>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings className="w-5 h-5 text-muted-foreground" />
+            <h3 className="font-semibold">Notification Settings</h3>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <Bell className="w-5 h-5 text-muted-foreground" />
+                <Label htmlFor="notifications-enabled" className="text-sm font-medium cursor-pointer">
+                  Enable Notifications
+                </Label>
+              </div>
+              <Switch
+                id="notifications-enabled"
+                checked={preferences?.notificationsEnabled ?? true}
+                onCheckedChange={(checked) => handleToggle("notificationsEnabled", checked)}
+                disabled={preferencesLoading || updatePreferences.isPending}
+                data-testid="switch-notifications-enabled"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reminder-timing" className="text-sm font-medium">
+                Remind me before pickup
+              </Label>
+              <Select
+                value={String(preferences?.reminderHoursBefore ?? 24)}
+                onValueChange={handleReminderChange}
+                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+              >
+                <SelectTrigger 
+                  id="reminder-timing" 
+                  className="w-full min-h-[48px]"
+                  data-testid="select-reminder-timing"
+                >
+                  <SelectValue placeholder="Select timing" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map((option) => (
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value}
+                      data-testid={`option-reminder-${option.value}`}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <Mail className="w-5 h-5 text-muted-foreground" />
+                <Label htmlFor="email-notifications" className="text-sm font-medium cursor-pointer">
+                  Email Notifications
+                </Label>
+              </div>
+              <Switch
+                id="email-notifications"
+                checked={preferences?.emailNotifications ?? true}
+                onCheckedChange={(checked) => handleToggle("emailNotifications", checked)}
+                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+                data-testid="switch-email-notifications"
+              />
+            </div>
+
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <Smartphone className="w-5 h-5 text-muted-foreground" />
+                <Label htmlFor="push-notifications" className="text-sm font-medium cursor-pointer">
+                  Push Notifications
+                </Label>
+              </div>
+              <Switch
+                id="push-notifications"
+                checked={preferences?.pushNotifications ?? true}
+                onCheckedChange={(checked) => handleToggle("pushNotifications", checked)}
+                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+                data-testid="switch-push-notifications"
+              />
+            </div>
           </div>
         </Card>
 

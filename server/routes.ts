@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { insertDropSchema, insertBrochureSchema, insertReminderSchema } from "@shared/schema";
+import { insertDropSchema, insertBrochureSchema, insertReminderSchema, updateUserPreferencesSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -495,6 +495,52 @@ export async function registerRoutes(
       }
     }
   );
+
+  // User Preferences API
+  app.get("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let preferences = await storage.getUserPreferences(userId);
+      
+      if (!preferences) {
+        preferences = await storage.createUserPreferences(userId);
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  app.patch("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const parsed = updateUserPreferencesSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+      
+      let preferences = await storage.getUserPreferences(userId);
+      if (!preferences) {
+        preferences = await storage.createUserPreferences(userId);
+      }
+      
+      const updated = await storage.updateUserPreferences(userId, parsed.data);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating preferences:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
 
   return httpServer;
 }

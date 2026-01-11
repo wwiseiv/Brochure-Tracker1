@@ -154,3 +154,29 @@ export type Reminder = typeof reminders.$inferSelect;
 export type DropWithBrochure = Drop & {
   brochure?: Brochure;
 };
+
+// Reminder hours options
+export const REMINDER_HOURS_OPTIONS = [6, 12, 24, 48] as const;
+export type ReminderHours = typeof REMINDER_HOURS_OPTIONS[number];
+
+// User preferences table
+export const userPreferences = pgTable("user_preferences", {
+  userId: varchar("user_id").primaryKey(),
+  notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
+  reminderHoursBefore: integer("reminder_hours_before").default(24).notNull(),
+  emailNotifications: boolean("email_notifications").default(true).notNull(),
+  pushNotifications: boolean("push_notifications").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateUserPreferencesSchema = insertUserPreferencesSchema.partial().omit({
+  userId: true,
+});
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UpdateUserPreferences = z.infer<typeof updateUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;
