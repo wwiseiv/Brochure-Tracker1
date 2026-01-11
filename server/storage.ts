@@ -30,6 +30,9 @@ export interface IStorage {
   getRemindersByDrop(dropId: number): Promise<Reminder[]>;
   createReminder(reminder: InsertReminder): Promise<Reminder>;
   updateReminder(id: number, data: Partial<Reminder>): Promise<Reminder | undefined>;
+  
+  // Demo data
+  seedDemoData(agentId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -117,6 +120,86 @@ export class DatabaseStorage implements IStorage {
       .where(eq(reminders.id, id))
       .returning();
     return updated;
+  }
+
+  async seedDemoData(agentId: string): Promise<void> {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const demoData = [
+      {
+        brochureId: `DEMO-${agentId.slice(0, 8)}-001`,
+        businessName: "Golden Gate Bistro",
+        businessType: "restaurant",
+        businessPhone: "(415) 555-0123",
+        contactName: "Maria Santos",
+        address: "123 Market Street, San Francisco, CA 94102",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        textNotes: "Owner was very interested in payment processing solutions. High foot traffic location near Union Square. Best time to follow up is after lunch rush around 2pm.",
+        pickupScheduledFor: tomorrow,
+        status: "pending",
+      },
+      {
+        brochureId: `DEMO-${agentId.slice(0, 8)}-002`,
+        businessName: "Tech Auto Repair",
+        businessType: "auto",
+        businessPhone: "(415) 555-0456",
+        contactName: "James Chen",
+        address: "789 Mission Street, San Francisco, CA 94103",
+        latitude: 37.7851,
+        longitude: -122.4056,
+        textNotes: "Busy auto shop with 3 service bays. Currently using outdated payment terminal. Manager interested in modern POS system.",
+        pickupScheduledFor: nextWeek,
+        status: "pending",
+      },
+      {
+        brochureId: `DEMO-${agentId.slice(0, 8)}-003`,
+        businessName: "Sunset Nail Spa",
+        businessType: "salon",
+        businessPhone: "(415) 555-0789",
+        contactName: "Lisa Nguyen",
+        address: "456 Irving Street, San Francisco, CA 94122",
+        latitude: 37.7642,
+        longitude: -122.4621,
+        textNotes: "Popular nail salon in Sunset district. Owner mentioned they need better tip handling for employees.",
+        pickupScheduledFor: yesterday,
+        status: "pending",
+      },
+    ];
+
+    for (const demo of demoData) {
+      try {
+        const existingBrochure = await this.getBrochure(demo.brochureId);
+        if (!existingBrochure) {
+          await this.createBrochure({
+            id: demo.brochureId,
+            batch: "Demo Batch",
+            status: "deployed",
+          });
+        }
+
+        // Insert directly to bypass schema validation for demo data
+        await db.insert(drops).values({
+          brochureId: demo.brochureId,
+          agentId: agentId,
+          businessName: demo.businessName,
+          businessType: demo.businessType,
+          businessPhone: demo.businessPhone,
+          contactName: demo.contactName,
+          address: demo.address,
+          latitude: demo.latitude,
+          longitude: demo.longitude,
+          textNotes: demo.textNotes,
+          pickupScheduledFor: demo.pickupScheduledFor,
+          status: demo.status,
+        });
+      } catch (error) {
+        console.error(`Error seeding demo data for ${demo.businessName}:`, error);
+      }
+    }
   }
 }
 

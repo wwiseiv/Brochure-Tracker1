@@ -93,7 +93,15 @@ export async function registerRoutes(
   app.get("/api/drops", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const drops = await storage.getDropsByAgent(userId);
+      let drops = await storage.getDropsByAgent(userId);
+      
+      // Seed demo data for new users with no drops
+      if (drops.length === 0) {
+        console.log(`Seeding demo data for new user: ${userId}`);
+        await storage.seedDemoData(userId);
+        drops = await storage.getDropsByAgent(userId);
+      }
+      
       res.json(drops);
     } catch (error) {
       console.error("Error fetching drops:", error);
