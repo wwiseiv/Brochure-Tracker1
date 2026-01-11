@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { insertDropSchema, insertBrochureSchema, insertReminderSchema, updateUserPreferencesSchema } from "@shared/schema";
+import { requireRole, requireOrgAccess, ensureOrgMembership, bootstrapUserOrganization } from "./rbac";
+import { insertDropSchema, insertBrochureSchema, insertReminderSchema, updateUserPreferencesSchema, ORG_MEMBER_ROLES, insertOrganizationMemberSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -539,6 +540,199 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating preferences:", error);
       res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  // User Role API - Get current user's role and org info
+  app.get("/api/me/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let membership = await storage.getUserMembership(userId);
+      
+      if (!membership) {
+        membership = await bootstrapUserOrganization(userId);
+      }
+      
+      res.json({
+        role: membership.role,
+        memberId: membership.id,
+        organization: {
+          id: membership.organization.id,
+          name: membership.organization.name,
+        },
+        managerId: membership.managerId,
+      });
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      res.status(500).json({ error: "Failed to fetch user role" });
+    }
+  });
+
+  // Organization API - Get current user's organization info
+  app.get("/api/organization", isAuthenticated, requireOrgAccess(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      res.json({
+        id: membership.organization.id,
+        name: membership.organization.name,
+        createdAt: membership.organization.createdAt,
+        userRole: membership.role,
+        userMemberId: membership.id,
+      });
+    } catch (error) {
+      console.error("Error fetching organization:", error);
+      res.status(500).json({ error: "Failed to fetch organization" });
+    }
+  });
+
+  // Organization Members API - Get all members (admin/RM only)
+  app.get("/api/organization/members", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching organization members:", error);
+      res.status(500).json({ error: "Failed to fetch organization members" });
+    }
+  });
+
+  // Organization Members API - Add a new member (admin only)
+  app.post("/api/organization/members", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      
+      const memberSchema = z.object({
+        userId: z.string().min(1, "User ID is required"),
+        role: z.enum(ORG_MEMBER_ROLES, {
+          errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
+        }),
+        managerId: z.number().optional().nullable(),
+      });
+      
+      const parsed = memberSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+      
+      const existingMember = await storage.getOrganizationMember(membership.organization.id, parsed.data.userId);
+      if (existingMember) {
+        return res.status(409).json({ error: "User is already a member of this organization" });
+      }
+      
+      const newMember = await storage.createOrganizationMember({
+        orgId: membership.organization.id,
+        userId: parsed.data.userId,
+        role: parsed.data.role,
+        managerId: parsed.data.managerId ?? null,
+      });
+      
+      res.status(201).json(newMember);
+    } catch (error) {
+      console.error("Error adding organization member:", error);
+      res.status(500).json({ error: "Failed to add organization member" });
+    }
+  });
+
+  // Organization Members API - Update member role/manager (admin only)
+  app.patch("/api/organization/members/:id", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const memberId = parseInt(req.params.id);
+      
+      if (isNaN(memberId)) {
+        return res.status(400).json({ error: "Invalid member ID" });
+      }
+      
+      const updateSchema = z.object({
+        role: z.enum(ORG_MEMBER_ROLES, {
+          errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
+        }).optional(),
+        managerId: z.number().nullable().optional(),
+      });
+      
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+      
+      if (Object.keys(parsed.data).length === 0) {
+        return res.status(400).json({ error: "No update data provided" });
+      }
+      
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      const targetMember = members.find(m => m.id === memberId);
+      
+      if (!targetMember) {
+        return res.status(404).json({ error: "Member not found in this organization" });
+      }
+      
+      if (targetMember.id === membership.id && parsed.data.role && parsed.data.role !== "master_admin") {
+        const adminCount = members.filter(m => m.role === "master_admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Cannot change role: Organization must have at least one master admin" });
+        }
+      }
+      
+      const updated = await storage.updateOrganizationMember(memberId, parsed.data);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating organization member:", error);
+      res.status(500).json({ error: "Failed to update organization member" });
+    }
+  });
+
+  // Organization Members API - Remove member (admin only)
+  app.delete("/api/organization/members/:id", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const memberId = parseInt(req.params.id);
+      
+      if (isNaN(memberId)) {
+        return res.status(400).json({ error: "Invalid member ID" });
+      }
+      
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      const targetMember = members.find(m => m.id === memberId);
+      
+      if (!targetMember) {
+        return res.status(404).json({ error: "Member not found in this organization" });
+      }
+      
+      if (targetMember.id === membership.id) {
+        return res.status(400).json({ error: "Cannot remove yourself from the organization" });
+      }
+      
+      if (targetMember.role === "master_admin") {
+        const adminCount = members.filter(m => m.role === "master_admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Cannot remove: Organization must have at least one master admin" });
+        }
+      }
+      
+      const deleted = await storage.deleteOrganizationMember(memberId);
+      if (deleted) {
+        res.status(204).send();
+      } else {
+        res.status(500).json({ error: "Failed to delete member" });
+      }
+    } catch (error) {
+      console.error("Error removing organization member:", error);
+      res.status(500).json({ error: "Failed to remove organization member" });
     }
   });
 

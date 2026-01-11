@@ -53,9 +53,12 @@ export interface IStorage {
   getOrganization(id: number): Promise<Organization | undefined>;
   createOrganization(data: InsertOrganization): Promise<Organization>;
   getOrganizationMember(orgId: number, userId: string): Promise<OrganizationMember | undefined>;
+  getUserMembership(userId: string): Promise<(OrganizationMember & { organization: Organization }) | undefined>;
   getOrganizationMembers(orgId: number): Promise<OrganizationMember[]>;
   createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
+  updateOrganizationMember(id: number, data: Partial<Pick<OrganizationMember, 'role' | 'managerId'>>): Promise<OrganizationMember | undefined>;
   updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined>;
+  deleteOrganizationMember(id: number): Promise<boolean>;
   getAgentsByManager(managerId: number): Promise<OrganizationMember[]>;
 }
 
@@ -280,6 +283,28 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getUserMembership(userId: string): Promise<(OrganizationMember & { organization: Organization }) | undefined> {
+    const result = await db
+      .select()
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizationMembers.orgId, organizations.id))
+      .where(eq(organizationMembers.userId, userId));
+    
+    if (result.length === 0) return undefined;
+    
+    const { organization_members: member, organizations: org } = result[0];
+    return { ...member, organization: org };
+  }
+
+  async updateOrganizationMember(id: number, data: Partial<Pick<OrganizationMember, 'role' | 'managerId'>>): Promise<OrganizationMember | undefined> {
+    const [updated] = await db
+      .update(organizationMembers)
+      .set(data)
+      .where(eq(organizationMembers.id, id))
+      .returning();
+    return updated;
+  }
+
   async updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined> {
     const [updated] = await db
       .update(organizationMembers)
@@ -287,6 +312,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(organizationMembers.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteOrganizationMember(id: number): Promise<boolean> {
+    const result = await db
+      .delete(organizationMembers)
+      .where(eq(organizationMembers.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async getAgentsByManager(managerId: number): Promise<OrganizationMember[]> {
