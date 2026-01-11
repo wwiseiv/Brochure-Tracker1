@@ -283,7 +283,9 @@ export async function registerRoutes(
         
         if (scope === "company") {
           // Export all drops for the organization
-          drops = await storage.getDropsByOrganization(orgId);
+          const allMembers = await storage.getOrganizationMembers(orgId);
+          const allAgentIds = allMembers.map(m => m.userId);
+          drops = await storage.getDropsByOrganization(allAgentIds);
         } else if (scope === "rm" && rmId) {
           // Export drops for an RM and their team
           const allMembers = await storage.getOrganizationMembers(orgId);
