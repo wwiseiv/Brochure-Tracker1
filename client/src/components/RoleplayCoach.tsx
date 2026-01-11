@@ -91,9 +91,12 @@ const scenarioOptions: { value: RoleplayScenario; label: string; description: st
   },
 ];
 
+type SessionMode = "roleplay" | "coaching";
+
 export function RoleplayCoach({ dropId, businessName, businessType, onClose }: RoleplayCoachProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<SessionMode>("coaching");
   const [scenario, setScenario] = useState<RoleplayScenario>("cold_approach");
   const [customObjections, setCustomObjections] = useState("");
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -118,6 +121,7 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
       const res = await apiRequest("POST", "/api/roleplay/sessions", {
         dropId,
         scenario,
+        mode,
         customObjections: customObjections.trim() || undefined,
       });
       return res.json();
@@ -126,8 +130,10 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
       setSessionId(data.sessionId);
       setMessages([]);
       toast({
-        title: "Role-play started",
-        description: "Begin your approach! The prospect is waiting...",
+        title: mode === "coaching" ? "Coaching session started" : "Role-play started",
+        description: mode === "coaching" 
+          ? "Ask me anything about sales techniques or what to say!"
+          : "Begin your approach! The prospect is waiting...",
       });
     },
     onError: (error: Error) => {
@@ -296,7 +302,49 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
             {!sessionId ? (
               <div className="p-4 space-y-4 overflow-auto">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Select Scenario</label>
+                  <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <button
+                      onClick={() => setMode("coaching")}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        mode === "coaching"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      data-testid="mode-coaching"
+                    >
+                      <div className="font-medium flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4" />
+                        Get Coaching
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Ask questions, get advice on what to say
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setMode("roleplay")}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        mode === "roleplay"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      data-testid="mode-roleplay"
+                    >
+                      <div className="font-medium flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Practice Role-Play
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Practice on a simulated business owner
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    {mode === "coaching" ? "What topic do you want coaching on?" : "Select Scenario"}
+                  </label>
                   <div className="space-y-2">
                     {scenarioOptions.map((option) => (
                       <button
@@ -336,8 +384,10 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                     <p className="text-sm">
                       <span className="font-medium">Context:</span> You're about to visit{" "}
                       <span className="font-semibold">{businessName}</span>
-                      {businessType && ` (${businessType})`}. The AI will role-play as this
-                      business owner based on typical challenges for their industry.
+                      {businessType && ` (${businessType})`}. 
+                      {mode === "coaching" 
+                        ? " The AI coach will give advice tailored to this type of business."
+                        : " The AI will role-play as this business owner based on typical challenges for their industry."}
                     </p>
                   </Card>
                 )}
@@ -355,8 +405,17 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                     </>
                   ) : (
                     <>
-                      <Play className="w-4 h-4 mr-2" />
-                      Start Role-Play
+                      {mode === "coaching" ? (
+                        <>
+                          <Lightbulb className="w-4 h-4 mr-2" />
+                          Start Coaching Session
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Start Role-Play
+                        </>
+                      )}
                     </>
                   )}
                 </Button>
@@ -445,11 +504,23 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                 <div className="flex-1 overflow-auto p-4 space-y-3">
                   {messages.length === 0 && (
                     <div className="text-center text-muted-foreground py-8">
-                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p>Start the conversation!</p>
-                      <p className="text-sm mt-1">
-                        Imagine you just walked into this business...
-                      </p>
+                      {mode === "coaching" ? (
+                        <>
+                          <Lightbulb className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>Ask me anything!</p>
+                          <p className="text-sm mt-1">
+                            Examples: "What should I say when I walk in?" or "How do I handle the 'too expensive' objection?"
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>Start the conversation!</p>
+                          <p className="text-sm mt-1">
+                            Imagine you just walked into this business...
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                   {messages.map((msg) => (
@@ -500,7 +571,7 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                 <div className="p-4 border-t">
                   <div className="flex gap-2">
                     <Textarea
-                      placeholder="Type your response..."
+                      placeholder={mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyDown={(e) => {

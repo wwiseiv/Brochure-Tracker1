@@ -2478,13 +2478,15 @@ Respond in JSON format:
   app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { dropId, scenario, customObjections } = req.body;
+      const { dropId, scenario, customObjections, mode = "roleplay" } = req.body;
 
       if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
         return res.status(400).json({ 
           error: `Invalid scenario. Must be one of: ${ROLEPLAY_SCENARIOS.join(", ")}` 
         });
       }
+
+      const isCoachingMode = mode === "coaching";
 
       let businessContext = "";
       let drop = null;
@@ -2512,8 +2514,30 @@ Respond in JSON format:
         status: "active",
       });
 
-      const scenarioPrompt = getScenarioPrompt(scenario);
-      const systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
+      let systemMessage: string;
+
+      if (isCoachingMode) {
+        systemMessage = `You are an expert sales coach helping a SignaPay sales agent prepare for their merchant visits. You have deep knowledge of:
+
+${SALES_TRAINING_KNOWLEDGE.substring(0, 8000)}
+
+BUSINESS CONTEXT:
+${businessContext}
+
+YOUR ROLE AS COACH:
+- Answer the agent's questions about what to say, how to approach situations, and how to handle objections
+- Give specific, actionable advice based on the NEPQ methodology
+- Provide example scripts and phrases they can use
+- Explain WHY certain approaches work better than others
+- Be encouraging but also give honest, constructive feedback
+- Reference specific techniques from the training materials when helpful
+- Keep responses focused and practical (2-4 sentences usually, more if they ask for detailed examples)
+- If they describe a situation, help them understand what to say and do
+
+You're their personal sales coach. Help them succeed!`;
+      } else {
+        const scenarioPrompt = getScenarioPrompt(scenario);
+        systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
 
 ${scenarioPrompt}
 
@@ -2531,6 +2555,7 @@ IMPORTANT GUIDELINES:
 - If the agent does well, let them progress; if they struggle, make it harder
 
 Remember: You're helping them practice real sales conversations. Be challenging but fair.`;
+      }
 
       await storage.createRoleplayMessage({
         sessionId: session.id,
@@ -2541,7 +2566,10 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       res.status(201).json({
         sessionId: session.id,
         scenario,
-        message: "Role-play session started. Begin your approach!",
+        mode: isCoachingMode ? "coaching" : "roleplay",
+        message: isCoachingMode 
+          ? "Coaching session started. Ask me anything about sales techniques, what to say, or how to handle situations!"
+          : "Role-play session started. Begin your approach!",
       });
     } catch (error) {
       console.error("Error creating roleplay session:", error);
@@ -2636,12 +2664,10 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         });
       });
 
-      console.log("Sending to AI:", JSON.stringify(chatMessages.slice(0, 2), null, 2));
-      
       const response = await client.chat.completions.create({
         model: "gpt-5",
         messages: chatMessages,
-        max_completion_tokens: 500,
+        max_completion_tokens: 1500,
       });
 
       console.log("AI response received:", JSON.stringify(response.choices[0], null, 2));
