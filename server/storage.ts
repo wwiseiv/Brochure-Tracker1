@@ -43,7 +43,7 @@ export interface IStorage {
   updateReminder(id: number, data: Partial<Reminder>): Promise<Reminder | undefined>;
   
   // Demo data
-  seedDemoData(agentId: string): Promise<void>;
+  seedDemoData(agentId: string, orgId?: number | null): Promise<void>;
   
   // User Preferences
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
@@ -166,7 +166,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async seedDemoData(agentId: string): Promise<void> {
+  async seedDemoData(agentId: string, orgId?: number | null): Promise<void> {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -229,6 +229,7 @@ export class DatabaseStorage implements IStorage {
         await db.insert(drops).values({
           brochureId: demo.brochureId,
           agentId: agentId,
+          orgId: orgId ?? null,
           businessName: demo.businessName,
           businessType: demo.businessType,
           businessPhone: demo.businessPhone,

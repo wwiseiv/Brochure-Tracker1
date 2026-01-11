@@ -31,8 +31,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Data Models
 - **Brochures**: Track individual video brochures with status (available, deployed, returned, lost)
-- **Drops**: Log each brochure deployment with location, business info, voice notes, and pickup scheduling
+- **Drops**: Log each brochure deployment with location, business info, voice notes, and pickup scheduling (includes orgId for team reporting)
 - **Reminders**: Follow-up notifications linked to drops
+- **Organizations**: Company/team containers for multi-tenant support
+- **OrganizationMembers**: User memberships with roles (master_admin, relationship_manager, agent) and optional managerId for hierarchy
+- **UserPreferences**: Notification settings per user
 - **Users/Sessions**: Authentication tables managed by Replit Auth integration
 
 ### Build System
@@ -51,6 +54,12 @@ Preferred communication style: Simple, everyday language.
 - Created service worker for PWA offline support
 - Enhanced backend validation with proper Zod enum schemas
 - Verified with end-to-end tests: login, drops, outcomes, profile
+- Implemented automatic demo data seeding (3 sample drops created on first login for testing without QR codes)
+- Built complete management hierarchy: organizations and organization_members tables with role-based relationships, RBAC middleware for access control
+- Created Admin Dashboard: org-wide stats, team performance metrics, member management with add/edit/delete functionality
+- Added Relationship Manager Dashboard: view assigned agents, team drops overview, agent performance tracking
+- Implemented agent edit functionality: agents can modify drop records (business info, notes, pickup dates) and manage notification preferences
+- Fixed critical data issues: drops now properly associated with organizations via orgId for accurate team reporting
 
 ## External Dependencies
 
