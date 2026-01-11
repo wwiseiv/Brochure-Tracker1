@@ -78,12 +78,12 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
-          <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <span className="font-semibold">BrochureDrop</span>
             <div className="w-8 h-8 rounded-full bg-muted" />
           </div>
         </header>
-        <main className="container max-w-md mx-auto px-4 py-6">
+        <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6">
           <DashboardSkeleton />
         </main>
         <BottomNav />
@@ -94,7 +94,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-2">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <span className="font-semibold">BrochureDrop</span>
           <div className="flex items-center gap-2">
             <Link href="/activity">
@@ -126,7 +126,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-6 space-y-6">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
         {(!isOnline || pendingCount > 0) && (
           <Card className={`p-4 ${!isOnline ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'}`} data-testid="card-offline-status">
             <div className="flex items-center justify-between gap-3">
@@ -184,42 +184,65 @@ export default function DashboardPage() {
           </Button>
         </Link>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Today's Pickups</h2>
-            <div className="flex items-center gap-2">
-              <Link href="/route">
-                <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
-                  <Route className="w-4 h-4" />
-                  Plan Route
-                </Button>
-              </Link>
-              <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                {todaysPickups.length}
-              </span>
-            </div>
-          </div>
-          
-          {todaysPickups.length > 0 ? (
-            <div className="space-y-3">
-              {todaysPickups.slice(0, 3).map((drop) => (
-                <DropCard key={drop.id} drop={drop} variant="urgent" />
-              ))}
-              {todaysPickups.length > 3 && (
-                <Link href="/history?filter=today">
-                  <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
-                    View all {todaysPickups.length} pickups
-                    <ChevronRight className="w-4 h-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <section>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h2 className="text-lg font-semibold">Today's Pickups</h2>
+              <div className="flex items-center gap-2">
+                <Link href="/route">
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
+                    <Route className="w-4 h-4" />
+                    Plan Route
                   </Button>
                 </Link>
-              )}
+                <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  {todaysPickups.length}
+                </span>
+              </div>
             </div>
-          ) : (
-            <EmptyState type="today" />
-          )}
-        </section>
+            
+            {todaysPickups.length > 0 ? (
+              <div className="space-y-3">
+                {todaysPickups.slice(0, 3).map((drop) => (
+                  <DropCard key={drop.id} drop={drop} variant="urgent" />
+                ))}
+                {todaysPickups.length > 3 && (
+                  <Link href="/history?filter=today">
+                    <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
+                      View all {todaysPickups.length} pickups
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <EmptyState type="today" />
+            )}
+          </section>
 
-        <div className="grid grid-cols-2 gap-4">
+          <section className="md:block hidden">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Coming Up</h2>
+              <Link href="/history?filter=upcoming">
+                <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-upcoming-grid">
+                  View all
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+            {upcomingPickups.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingPickups.slice(0, 3).map((drop) => (
+                  <DropCard key={drop.id} drop={drop} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState type="upcoming" />
+            )}
+          </section>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link href="/history?filter=upcoming">
             <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-upcoming">
               <div className="flex items-center gap-2 mb-2">
@@ -247,7 +270,7 @@ export default function DashboardPage() {
         </div>
 
         {upcomingPickups.length > 0 && (
-          <section>
+          <section className="md:hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Coming Up</h2>
               <Link href="/history?filter=upcoming">

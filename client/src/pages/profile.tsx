@@ -119,12 +119,12 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center">
           <span className="font-semibold">Profile</span>
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-6 space-y-6">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <Avatar className="w-16 h-16" data-testid="avatar-profile">
@@ -144,7 +144,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4 text-center">
             <Package className="w-6 h-6 mx-auto text-primary mb-2" />
             <p className="text-2xl font-bold">{stats.total}</p>

@@ -29,7 +29,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-lg border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <QrCode className="w-5 h-5 text-primary-foreground" />
@@ -44,7 +44,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-8">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-8">
         <section className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
             <CheckCircle2 className="w-4 h-4" />
@@ -68,9 +68,10 @@ export default function LandingPage() {
           </a>
         </section>
 
-        <section className="space-y-4 mb-12">
+        <section className="mb-12">
           <h2 className="text-lg font-semibold text-center mb-6">How It Works</h2>
           
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
@@ -85,6 +86,7 @@ export default function LandingPage() {
               </Card>
             );
           })}
+          </div>
         </section>
 
         <section className="text-center py-8 border-t border-border">
@@ -101,7 +103,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-border py-6 mt-8">
-        <div className="container max-w-md mx-auto px-4 text-center">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 text-center">
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground mb-4">
             <a href="/legal/privacy-policy.html" className="hover:text-foreground">Privacy Policy</a>
             <a href="/legal/terms-of-service.html" className="hover:text-foreground">Terms of Service</a>
