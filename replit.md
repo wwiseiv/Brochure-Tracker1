@@ -61,7 +61,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
-- **AI Role-Play Coach** (accessible from drop detail page): Conversational AI training tool that simulates business owners for sales practice. Features 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), real-time chat with GPT-5, ElevenLabs text-to-speech for voice playback, and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides from sales training documents.
+- **AI Role-Play Coach** (accessible from drop detail page): Conversational AI training tool with two modes: (1) **Coaching Mode** - ask questions and get advice on sales techniques, what to say, and how to handle objections; (2) **Role-Play Mode** - practice conversations with simulated business owners. Features voice input via microphone (Whisper transcription), auto-play AI voice responses (ElevenLabs TTS), 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides.
 - **Email Invitations** (/admin/team): Admins can invite new team members by email with role selection (Agent, RM, Admin). Invitations expire in 7 days with resend/cancel options.
 - **Accept Invite Page** (/accept-invite): Users click email links to join organizations, works for both new and existing users.
 - **Feedback Form** (/help): Feature suggestion and help request form that sends emails to support. Form includes type selector (Feature Suggestion, Help Request, Bug Report).
