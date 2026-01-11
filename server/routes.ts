@@ -2636,13 +2636,22 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         });
       });
 
+      console.log("Sending to AI:", JSON.stringify(chatMessages.slice(0, 2), null, 2));
+      
       const response = await client.chat.completions.create({
         model: "gpt-5",
         messages: chatMessages,
         max_completion_tokens: 500,
       });
 
-      const aiResponse = response.choices[0]?.message?.content || "I didn't catch that. Could you repeat?";
+      console.log("AI response received:", JSON.stringify(response.choices[0], null, 2));
+      
+      const aiResponse = response.choices[0]?.message?.content;
+      
+      if (!aiResponse || aiResponse.trim() === "") {
+        console.error("AI returned empty response. Full response object:", JSON.stringify(response, null, 2));
+        return res.status(500).json({ error: "AI returned empty response. Please try again." });
+      }
 
       const savedMessage = await storage.createRoleplayMessage({
         sessionId,
