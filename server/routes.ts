@@ -2216,6 +2216,32 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
+  app.delete("/api/referrals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const referralId = parseInt(req.params.id);
+      if (isNaN(referralId)) {
+        return res.status(400).json({ error: "Invalid referral ID" });
+      }
+      
+      const userId = req.user.claims.sub;
+      const referral = await storage.getReferral(referralId);
+      
+      if (!referral) {
+        return res.status(404).json({ error: "Referral not found" });
+      }
+      
+      if (referral.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteReferral(referralId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting referral:", error);
+      res.status(500).json({ error: "Failed to delete referral" });
+    }
+  });
+
   // ============================================
   // ACTIVITY FEED API (Team Activity Feed)
   // ============================================

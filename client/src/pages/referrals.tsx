@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,6 +35,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Users,
   Phone,
@@ -46,6 +57,8 @@ import {
   XCircle,
   UserCheck,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Referral, DropWithBrochure, ReferralStatus } from "@shared/schema";
@@ -99,11 +112,17 @@ function StatusBadge({ status }: { status: ReferralStatus }) {
 function ReferralCard({ 
   referral, 
   drops,
-  onStatusChange 
+  onStatusChange,
+  onEdit,
+  onDelete,
+  isDeleting,
 }: { 
   referral: Referral; 
   drops: DropWithBrochure[];
   onStatusChange: (id: number, status: ReferralStatus) => void;
+  onEdit: (referral: Referral) => void;
+  onDelete: (id: number) => void;
+  isDeleting: boolean;
 }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const sourceDrop = drops.find(d => d.id === referral.sourceDropId);
@@ -154,40 +173,286 @@ function ReferralCard({
           </p>
         )}
         
-        <div className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="flex items-center justify-between pt-2 border-t border-border gap-2">
           <p className="text-xs text-muted-foreground">
             {format(new Date(referral.createdAt), "MMM d, yyyy")}
           </p>
           
-          <Select
-            value={referral.status}
-            onValueChange={handleStatusChange}
-            disabled={isUpdating}
-          >
-            <SelectTrigger 
-              className="w-[140px] min-h-touch text-xs"
-              data-testid={`select-status-${referral.id}`}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(referral)}
+              data-testid={`button-edit-${referral.id}`}
             >
-              {isUpdating ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <>
-                  <SelectValue />
-                  <ChevronDown className="w-3 h-3" />
-                </>
-              )}
-            </SelectTrigger>
-            <SelectContent>
-              {REFERRAL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {statusConfig[s].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Pencil className="w-4 h-4" />
+            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid={`button-delete-${referral.id}`}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Referral?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the referral for "{referral.referredBusinessName}". This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(referral.id)}
+                    disabled={isDeleting}
+                    data-testid="button-confirm-delete"
+                  >
+                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            
+            <Select
+              value={referral.status}
+              onValueChange={handleStatusChange}
+              disabled={isUpdating}
+            >
+              <SelectTrigger 
+                className="w-[120px] min-h-touch text-xs"
+                data-testid={`select-status-${referral.id}`}
+              >
+                {isUpdating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <>
+                    <SelectValue />
+                    <ChevronDown className="w-3 h-3" />
+                  </>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {REFERRAL_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {statusConfig[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+function EditReferralDialog({ 
+  referral,
+  drops,
+  open,
+  onOpenChange,
+  onSuccess 
+}: { 
+  referral: Referral | null;
+  drops: DropWithBrochure[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+
+  const form = useForm<AddReferralFormData>({
+    resolver: zodResolver(addReferralSchema),
+    defaultValues: {
+      sourceDropId: "",
+      referredBusinessName: "",
+      referredContactName: "",
+      referredPhone: "",
+      notes: "",
+    },
+  });
+
+  // Update form when dialog opens with a referral
+  useEffect(() => {
+    if (open && referral) {
+      form.reset({
+        sourceDropId: referral.sourceDropId?.toString() || "none",
+        referredBusinessName: referral.referredBusinessName,
+        referredContactName: referral.referredContactName || "",
+        referredPhone: referral.referredPhone || "",
+        notes: referral.notes || "",
+      });
+    }
+  }, [open, referral, form]);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    onOpenChange(newOpen);
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: AddReferralFormData) => {
+      if (!referral) throw new Error("No referral to update");
+      const payload = {
+        ...data,
+        sourceDropId: data.sourceDropId && data.sourceDropId !== "none" ? parseInt(data.sourceDropId) : null,
+      };
+      const response = await apiRequest("PATCH", `/api/referrals/${referral.id}`, payload);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/referrals"] });
+      onOpenChange(false);
+      onSuccess();
+      toast({
+        title: "Referral updated",
+        description: "The referral has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update referral",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (data: AddReferralFormData) => {
+    updateMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Referral</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="sourceDropId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Source Drop (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="min-h-touch" data-testid="edit-select-source-drop">
+                        <SelectValue placeholder="Select a drop..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No linked drop</SelectItem>
+                      {drops.map((drop) => (
+                        <SelectItem key={drop.id} value={drop.id.toString()}>
+                          {drop.businessName || `Drop #${drop.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="referredBusinessName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referred Business Name *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      className="min-h-touch" 
+                      placeholder="Enter business name"
+                      data-testid="edit-input-business-name"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="referredContactName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contact Name</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      className="min-h-touch" 
+                      placeholder="Enter contact name"
+                      data-testid="edit-input-contact-name"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="referredPhone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="tel"
+                      className="min-h-touch" 
+                      placeholder="(555) 555-5555"
+                      data-testid="edit-input-phone"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      {...field} 
+                      placeholder="Any additional notes..."
+                      className="resize-none"
+                      rows={3}
+                      data-testid="edit-textarea-notes"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Button 
+              type="submit" 
+              className="w-full min-h-touch"
+              disabled={updateMutation.isPending}
+              data-testid="button-save-referral"
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Save Changes
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -382,6 +647,8 @@ function AddReferralDialog({
 
 export default function ReferralsPage() {
   const { toast } = useToast();
+  const [editingReferral, setEditingReferral] = useState<Referral | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: referrals, isLoading: referralsLoading } = useQuery<Referral[]>({
     queryKey: ["/api/referrals"],
@@ -412,8 +679,38 @@ export default function ReferralsPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/referrals/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/referrals"] });
+      toast({
+        title: "Referral deleted",
+        description: "The referral has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete referral",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (id: number, status: ReferralStatus) => {
     updateStatusMutation.mutate({ id, status });
+  };
+
+  const handleEdit = (referral: Referral) => {
+    setEditingReferral(referral);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id);
   };
 
   const stats = useMemo(() => {
@@ -480,6 +777,9 @@ export default function ReferralsPage() {
                 referral={referral}
                 drops={drops || []}
                 onStatusChange={handleStatusChange}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                isDeleting={deleteMutation.isPending}
               />
             ))}
           </div>
@@ -497,6 +797,14 @@ export default function ReferralsPage() {
           </div>
         )}
       </main>
+
+      <EditReferralDialog
+        referral={editingReferral}
+        drops={drops || []}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSuccess={() => setEditingReferral(null)}
+      />
 
       <BottomNav />
     </div>

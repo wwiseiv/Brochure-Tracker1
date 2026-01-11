@@ -542,6 +542,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteReferral(id: number): Promise<void> {
+    await db.delete(referrals).where(eq(referrals.id, id));
+  }
+
   // Follow-up Sequences
   async getFollowUpSequence(id: number): Promise<FollowUpSequence | undefined> {
     const [seq] = await db.select().from(followUpSequences).where(eq(followUpSequences.id, id));
