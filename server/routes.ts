@@ -653,7 +653,6 @@ export async function registerRoutes(
         try {
           // Use AI integrations client if available, otherwise fall back to direct OpenAI
           const client = hasAIIntegrations ? getAIIntegrationsClient() : getOpenAIClient();
-          console.log(`Transcription: using ${hasAIIntegrations ? 'AI Integrations' : 'Direct OpenAI'} client`);
           
           const transcription = await client.audio.transcriptions.create({
             file: fs.createReadStream(tempFilePath),
