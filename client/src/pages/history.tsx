@@ -21,6 +21,12 @@ export default function HistoryPage() {
   const { data: drops, isLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
   });
+  
+  const { data: userRole } = useQuery<{ role: string }>({
+    queryKey: ["/api/me/role"],
+  });
+  
+  const isAdmin = userRole?.role === "master_admin";
 
   const filterDrops = (drops: DropWithBrochure[], filter: FilterType) => {
     switch (filter) {
@@ -97,6 +103,8 @@ export default function HistoryPage() {
                 description="Download your drop/contact data as a spreadsheet file."
                 exportEndpoint="/api/drops/export"
                 buttonLabel="Export"
+                showScopeFunnel={true}
+                isAdmin={isAdmin}
               />
               <div className="flex gap-3 text-xs">
                 <span className="text-amber-600">Pending: {pendingCount}</span>

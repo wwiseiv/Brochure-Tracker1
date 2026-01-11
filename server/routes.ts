@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { requireRole, requireOrgAccess, ensureOrgMembership, bootstrapUserOrganization } from "./rbac";
+import { requireRole, requireOrgAccess, ensureOrgMembership, bootstrapUserOrganization, OrgMembershipInfo } from "./rbac";
 import { 
   insertDropSchema, 
   insertBrochureSchema, 
@@ -265,12 +265,60 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const format = (req.query.format as ExportFormat) || "csv";
       const status = req.query.status as string | undefined;
+      const scope = req.query.scope as string | undefined; // company, rm, agent
+      const rmId = req.query.rmId as string | undefined;
+      const agentId = req.query.agentId as string | undefined;
       
       if (!["csv", "xlsx"].includes(format)) {
         return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
       }
       
-      let drops = await storage.getDropsByAgent(userId);
+      let drops: any[] = [];
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const isAdmin = membership.role === "master_admin";
+      
+      // Handle different export scopes (admin only)
+      if (scope && isAdmin) {
+        const orgId = membership.organization.id;
+        
+        if (scope === "company") {
+          // Export all drops for the organization
+          drops = await storage.getDropsByOrganization(orgId);
+        } else if (scope === "rm" && rmId) {
+          // Export drops for an RM and their team
+          const allMembers = await storage.getOrganizationMembers(orgId);
+          const rmMember = allMembers.find(m => m.userId === rmId);
+          if (!rmMember) {
+            return res.status(404).json({ error: "RM not found" });
+          }
+          // Verify the selected member is actually an RM or admin
+          if (rmMember.role !== "relationship_manager" && rmMember.role !== "master_admin") {
+            return res.status(400).json({ error: "Selected user is not a Relationship Manager" });
+          }
+          // Get RM's own drops
+          const rmDrops = await storage.getDropsByAgent(rmId);
+          // Get all agents managed by this RM
+          const managedAgents = allMembers.filter(m => m.managerId === rmMember.id);
+          // Get drops from all managed agents
+          const agentDropsArrays = await Promise.all(
+            managedAgents.map(agent => storage.getDropsByAgent(agent.userId))
+          );
+          drops = [...rmDrops, ...agentDropsArrays.flat()];
+        } else if (scope === "agent" && agentId) {
+          // Export drops for a specific agent - verify they're in this org
+          const allMembers = await storage.getOrganizationMembers(orgId);
+          const agentMember = allMembers.find(m => m.userId === agentId);
+          if (!agentMember) {
+            return res.status(404).json({ error: "Agent not found in organization" });
+          }
+          drops = await storage.getDropsByAgent(agentId);
+        } else {
+          return res.status(400).json({ error: "Invalid scope or missing parameters" });
+        }
+      } else {
+        // Default: export current user's drops only
+        drops = await storage.getDropsByAgent(userId);
+      }
       
       if (status && status !== "all") {
         drops = drops.filter(d => d.status === status);
