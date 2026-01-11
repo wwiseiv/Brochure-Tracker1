@@ -2737,9 +2737,14 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     } catch (error: any) {
       const errorMessage = error?.message || "Unknown error";
       console.error("Error in roleplay conversation:", errorMessage);
+      console.error("Full error:", error);
       
       if (errorMessage.includes("rate limit") || errorMessage.includes("quota")) {
         return res.status(429).json({ error: "AI service is busy. Please try again in a moment." });
+      }
+      
+      if (errorMessage.includes("not configured")) {
+        return res.status(500).json({ error: "AI service is not available. Please contact support." });
       }
       
       res.status(500).json({ error: "Failed to process message. Please try again." });
