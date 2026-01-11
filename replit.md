@@ -52,6 +52,8 @@ Preferred communication style: Simple, everyday language.
 - **FeedbackSubmissions**: User feedback and feature requests stored with type (suggestion/help/bug)
 - **RoleplaySessions**: AI role-play practice sessions tracking scenario, status, performance score, and AI feedback
 - **RoleplayMessages**: Conversation history for role-play sessions (system prompts, user messages, AI responses)
+- **BrochureLocations**: Track current custody of individual brochures by QR code (house, relationship_manager, agent)
+- **BrochureLocationHistory**: Complete chain of custody history with transfer records (register, assign, return, deploy)
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -61,6 +63,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
+- **Individual Brochure Tracking** (/inventory): Track each brochure by QR code with complete chain of custody. Three holder types: house inventory (unassigned), relationship manager, and agent. Features include: single/bulk registration, assignment dialogs for transferring brochures between team members, return to house functionality, and full transfer history. Integrated with drop creation - automatically updates custody when brochures are deployed.
 - **AI Role-Play Coach** (accessible from drop detail page): Conversational AI training tool with two modes: (1) **Coaching Mode** - ask questions and get advice on sales techniques, what to say, and how to handle objections; (2) **Role-Play Mode** - practice conversations with simulated business owners. Features voice input via microphone (Whisper transcription), auto-play AI voice responses (ElevenLabs TTS), 5 scenario types (cold approach, objection handling, closing, follow-up, general practice), and AI-generated performance feedback with scoring. Knowledge base includes NEPQ methodology, SignaPay scripts, and objection handling guides.
 - **Email Invitations** (/admin/team): Admins can invite new team members by email with role selection (Agent, RM, Admin). Invitations expire in 7 days with resend/cancel options.
 - **Accept Invite Page** (/accept-invite): Users click email links to join organizations, works for both new and existing users.
