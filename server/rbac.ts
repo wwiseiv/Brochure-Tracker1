@@ -34,11 +34,44 @@ export async function bootstrapUserOrganization(userId: string): Promise<OrgMemb
   }
 
   const user = await authStorage.getUser(userId);
+  const userEmail = user?.email?.toLowerCase();
+  
+  if (userEmail) {
+    const pendingInvitation = await storage.getPendingInvitationByEmail(userEmail);
+    if (pendingInvitation) {
+      const inviteOrg = await storage.getOrganization(pendingInvitation.orgId);
+      if (inviteOrg) {
+        const member = await storage.createOrganizationMember({
+          orgId: inviteOrg.id,
+          userId: userId,
+          role: pendingInvitation.role as OrgMemberRole,
+          managerId: null,
+        });
+        
+        await storage.updateInvitationStatus(pendingInvitation.id, "accepted", new Date());
+        
+        return { ...member, organization: inviteOrg };
+      }
+    }
+  }
+
+  const primaryOrg = await storage.getPrimaryOrganization();
+  if (primaryOrg) {
+    const member = await storage.createOrganizationMember({
+      orgId: primaryOrg.id,
+      userId: userId,
+      role: "agent",
+      managerId: null,
+    });
+    
+    return { ...member, organization: primaryOrg };
+  }
+
   const orgName = user 
     ? `${user.firstName || 'User'} ${user.lastName || ''}'s Organization`.trim()
     : `Organization ${userId.slice(0, 8)}`;
 
-  const organization = await storage.createOrganization({ name: orgName });
+  const organization = await storage.createOrganization({ name: orgName, isPrimary: true });
   
   const member = await storage.createOrganizationMember({
     orgId: organization.id,

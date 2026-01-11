@@ -47,6 +47,7 @@ export type OrgMemberRole = typeof ORG_MEMBER_ROLES[number];
 export const organizations = pgTable("organizations", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: varchar("name", { length: 255 }).notNull(),
+  isPrimary: boolean("is_primary").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -106,6 +106,7 @@ export interface IStorage {
   
   // Organizations
   getOrganization(id: number): Promise<Organization | undefined>;
+  getPrimaryOrganization(): Promise<Organization | undefined>;
   createOrganization(data: InsertOrganization): Promise<Organization>;
   getOrganizationMember(orgId: number, userId: string): Promise<OrganizationMember | undefined>;
   getUserMembership(userId: string): Promise<(OrganizationMember & { organization: Organization }) | undefined>;
@@ -119,6 +120,7 @@ export interface IStorage {
   // Invitations
   createInvitation(data: InsertInvitation): Promise<Invitation>;
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
+  getPendingInvitationByEmail(email: string): Promise<Invitation | undefined>;
   getInvitationsByOrg(orgId: number): Promise<Invitation[]>;
   updateInvitationStatus(id: number, status: string, acceptedAt?: Date): Promise<Invitation | undefined>;
   cancelInvitation(id: number): Promise<void>;
@@ -367,6 +369,11 @@ export class DatabaseStorage implements IStorage {
   // Organizations
   async getOrganization(id: number): Promise<Organization | undefined> {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async getPrimaryOrganization(): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.isPrimary, true)).limit(1);
     return org;
   }
 
@@ -704,6 +711,20 @@ export class DatabaseStorage implements IStorage {
 
   async getInvitationByToken(token: string): Promise<Invitation | undefined> {
     const [invitation] = await db.select().from(invitations).where(eq(invitations.token, token));
+    return invitation;
+  }
+
+  async getPendingInvitationByEmail(email: string): Promise<Invitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.email, email.toLowerCase()),
+          eq(invitations.status, "pending")
+        )
+      )
+      .limit(1);
     return invitation;
   }
 
