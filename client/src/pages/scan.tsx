@@ -29,6 +29,14 @@ export default function ScanPage() {
     navigate(`/drops/new`);
   };
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
   if (showScanner) {
     return (
       <QRScanner
@@ -45,7 +53,7 @@ export default function ScanPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/")}
+            onClick={handleBack}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />

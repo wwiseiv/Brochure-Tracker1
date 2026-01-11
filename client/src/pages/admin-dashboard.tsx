@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -137,6 +137,7 @@ function AdminDashboardSkeleton() {
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
@@ -174,16 +175,22 @@ export default function AdminDashboardPage() {
 
   const recentDrops = (allDrops || []).slice(0, 10);
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back-home">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-home">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
               <span className="font-semibold text-lg hidden sm:inline">Admin Dashboard</span>

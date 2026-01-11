@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
@@ -63,6 +64,7 @@ function EmptyRouteState() {
 export default function RoutePlannerPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [, navigate] = useLocation();
   
   const isSelectedToday = isToday(selectedDate);
   const dateParam = isSelectedToday ? "today" : format(selectedDate, "yyyy-MM-dd");
@@ -114,6 +116,14 @@ export default function RoutePlannerPage() {
     return format(d, "h:mm a");
   };
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
   const getDateLabel = () => {
     if (isToday(selectedDate)) return "Today";
     if (isTomorrow(selectedDate)) return "Tomorrow";
@@ -124,11 +134,9 @@ export default function RoutePlannerPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
           <span className="font-semibold">Route Planner</span>
         </div>
       </header>

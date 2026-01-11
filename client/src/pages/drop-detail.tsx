@@ -320,12 +320,20 @@ export default function DropDetailPage() {
     window.location.href = `tel:${drop.businessPhone}`;
   };
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <Button variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <span className="font-semibold">Drop Details</span>
@@ -344,7 +352,7 @@ export default function DropDetailPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <Button variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <span className="font-semibold">Drop Not Found</span>
@@ -369,7 +377,7 @@ export default function DropDetailPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/")}
+              onClick={handleBack}
               data-testid="button-back"
             >
               <ArrowLeft className="w-5 h-5" />

@@ -840,15 +840,21 @@ export default function InventoryPage() {
 
   const isLoading = inventoryLoading || logsLoading;
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      window.location.href = "/";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <span className="font-semibold">Inventory</span>
         </div>
       </header>

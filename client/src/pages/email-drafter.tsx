@@ -152,6 +152,14 @@ export default function EmailDrafterPage() {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
@@ -159,7 +167,7 @@ export default function EmailDrafterPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/")}
+            onClick={handleBack}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />
