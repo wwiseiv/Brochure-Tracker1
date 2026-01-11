@@ -670,3 +670,84 @@ export type RoleplayMessage = typeof roleplayMessages.$inferSelect;
 export type RoleplaySessionWithMessages = RoleplaySession & {
   messages: RoleplayMessage[];
 };
+
+// Brochure holder types for custody tracking
+export const HOLDER_TYPES = ["house", "relationship_manager", "agent"] as const;
+export type HolderType = typeof HOLDER_TYPES[number];
+
+// Brochure Locations table (tracks current holder of each brochure)
+export const brochureLocations = pgTable("brochure_locations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  brochureId: varchar("brochure_id", { length: 50 }).notNull().references(() => brochures.id).unique(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  holderType: varchar("holder_type", { length: 30 }).notNull(), // house, relationship_manager, agent
+  holderId: varchar("holder_id"), // userId for RM/agent, null for house
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  assignedBy: varchar("assigned_by"), // userId who made the assignment
+  notes: text("notes"),
+});
+
+export const brochureLocationsRelations = relations(brochureLocations, ({ one }) => ({
+  brochure: one(brochures, {
+    fields: [brochureLocations.brochureId],
+    references: [brochures.id],
+  }),
+  organization: one(organizations, {
+    fields: [brochureLocations.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertBrochureLocationSchema = createInsertSchema(brochureLocations).omit({
+  id: true,
+  assignedAt: true,
+}).extend({
+  holderType: z.enum(HOLDER_TYPES),
+});
+export type InsertBrochureLocation = z.infer<typeof insertBrochureLocationSchema>;
+export type BrochureLocation = typeof brochureLocations.$inferSelect;
+
+// Brochure Location History table (tracks transfers between holders)
+export const brochureLocationHistory = pgTable("brochure_location_history", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  brochureId: varchar("brochure_id", { length: 50 }).notNull().references(() => brochures.id),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  fromHolderType: varchar("from_holder_type", { length: 30 }), // null if initial registration
+  fromHolderId: varchar("from_holder_id"),
+  toHolderType: varchar("to_holder_type", { length: 30 }).notNull(),
+  toHolderId: varchar("to_holder_id"),
+  transferredBy: varchar("transferred_by").notNull(), // userId who made the transfer
+  transferType: varchar("transfer_type", { length: 30 }).notNull(), // register, assign, return, deploy, lost
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const brochureLocationHistoryRelations = relations(brochureLocationHistory, ({ one }) => ({
+  brochure: one(brochures, {
+    fields: [brochureLocationHistory.brochureId],
+    references: [brochures.id],
+  }),
+  organization: one(organizations, {
+    fields: [brochureLocationHistory.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const TRANSFER_TYPES = ["register", "assign", "return", "deploy", "lost"] as const;
+export type TransferType = typeof TRANSFER_TYPES[number];
+
+export const insertBrochureLocationHistorySchema = createInsertSchema(brochureLocationHistory).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  toHolderType: z.enum(HOLDER_TYPES),
+  fromHolderType: z.enum(HOLDER_TYPES).optional().nullable(),
+  transferType: z.enum(TRANSFER_TYPES),
+});
+export type InsertBrochureLocationHistory = z.infer<typeof insertBrochureLocationHistorySchema>;
+export type BrochureLocationHistory = typeof brochureLocationHistory.$inferSelect;
+
+// Extended brochure type with location info
+export type BrochureWithLocation = Brochure & {
+  location?: BrochureLocation;
+};

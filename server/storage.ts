@@ -20,6 +20,8 @@ import {
   feedbackSubmissions,
   roleplaySessions,
   roleplayMessages,
+  brochureLocations,
+  brochureLocationHistory,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -65,6 +67,12 @@ import {
   type RoleplayMessage,
   type InsertRoleplayMessage,
   type RoleplaySessionWithMessages,
+  type BrochureLocation,
+  type InsertBrochureLocation,
+  type BrochureLocationHistory,
+  type InsertBrochureLocationHistory,
+  type BrochureWithLocation,
+  type HolderType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -125,6 +133,25 @@ export interface IStorage {
   updateRoleplaySession(id: number, data: Partial<RoleplaySession>): Promise<RoleplaySession | undefined>;
   createRoleplayMessage(data: InsertRoleplayMessage): Promise<RoleplayMessage>;
   getRoleplayMessages(sessionId: number): Promise<RoleplayMessage[]>;
+  
+  // Brochure Locations (Individual brochure custody tracking)
+  getBrochureLocation(brochureId: string): Promise<BrochureLocation | undefined>;
+  getBrochuresByHolder(orgId: number, holderType: HolderType, holderId?: string): Promise<BrochureWithLocation[]>;
+  getHouseInventory(orgId: number): Promise<BrochureWithLocation[]>;
+  createBrochureLocation(data: InsertBrochureLocation): Promise<BrochureLocation>;
+  updateBrochureLocation(brochureId: string, data: Partial<BrochureLocation>): Promise<BrochureLocation | undefined>;
+  transferBrochure(
+    brochureId: string, 
+    toHolderType: HolderType, 
+    toHolderId: string | null, 
+    transferredBy: string,
+    transferType: string,
+    notes?: string
+  ): Promise<BrochureLocation>;
+  getBrochureHistory(brochureId: string): Promise<BrochureLocationHistory[]>;
+  createBrochureLocationHistory(data: InsertBrochureLocationHistory): Promise<BrochureLocationHistory>;
+  registerBrochure(brochureId: string, orgId: number, registeredBy: string, notes?: string): Promise<BrochureWithLocation>;
+  getBrochuresWithLocations(orgId: number): Promise<BrochureWithLocation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -750,6 +777,162 @@ export class DatabaseStorage implements IStorage {
       .from(roleplayMessages)
       .where(eq(roleplayMessages.sessionId, sessionId))
       .orderBy(roleplayMessages.createdAt);
+  }
+
+  // Brochure Locations (Individual brochure custody tracking)
+  async getBrochureLocation(brochureId: string): Promise<BrochureLocation | undefined> {
+    const [location] = await db.select().from(brochureLocations).where(eq(brochureLocations.brochureId, brochureId));
+    return location;
+  }
+
+  async getBrochuresByHolder(orgId: number, holderType: HolderType, holderId?: string): Promise<BrochureWithLocation[]> {
+    const conditions = [
+      eq(brochureLocations.orgId, orgId),
+      eq(brochureLocations.holderType, holderType),
+    ];
+    
+    if (holderId) {
+      conditions.push(eq(brochureLocations.holderId, holderId));
+    }
+    
+    const result = await db
+      .select()
+      .from(brochureLocations)
+      .innerJoin(brochures, eq(brochureLocations.brochureId, brochures.id))
+      .where(and(...conditions))
+      .orderBy(desc(brochureLocations.assignedAt));
+    
+    return result.map(({ brochures: brochure, brochure_locations: location }) => ({
+      ...brochure,
+      location,
+    }));
+  }
+
+  async getHouseInventory(orgId: number): Promise<BrochureWithLocation[]> {
+    return this.getBrochuresByHolder(orgId, "house");
+  }
+
+  async createBrochureLocation(data: InsertBrochureLocation): Promise<BrochureLocation> {
+    const [created] = await db.insert(brochureLocations).values(data).returning();
+    return created;
+  }
+
+  async updateBrochureLocation(brochureId: string, data: Partial<BrochureLocation>): Promise<BrochureLocation | undefined> {
+    const [updated] = await db
+      .update(brochureLocations)
+      .set(data)
+      .where(eq(brochureLocations.brochureId, brochureId))
+      .returning();
+    return updated;
+  }
+
+  async transferBrochure(
+    brochureId: string,
+    toHolderType: HolderType,
+    toHolderId: string | null,
+    transferredBy: string,
+    transferType: string,
+    notes?: string
+  ): Promise<BrochureLocation> {
+    const currentLocation = await this.getBrochureLocation(brochureId);
+    
+    if (!currentLocation) {
+      throw new Error(`Brochure ${brochureId} not found in location tracking`);
+    }
+    
+    // Record history
+    await this.createBrochureLocationHistory({
+      brochureId,
+      orgId: currentLocation.orgId,
+      fromHolderType: currentLocation.holderType as HolderType,
+      fromHolderId: currentLocation.holderId,
+      toHolderType,
+      toHolderId,
+      transferredBy,
+      transferType: transferType as any,
+      notes,
+    });
+    
+    // Update current location
+    const updated = await this.updateBrochureLocation(brochureId, {
+      holderType: toHolderType,
+      holderId: toHolderId,
+      assignedBy: transferredBy,
+      assignedAt: new Date(),
+      notes,
+    });
+    
+    return updated!;
+  }
+
+  async getBrochureHistory(brochureId: string): Promise<BrochureLocationHistory[]> {
+    return db
+      .select()
+      .from(brochureLocationHistory)
+      .where(eq(brochureLocationHistory.brochureId, brochureId))
+      .orderBy(desc(brochureLocationHistory.createdAt));
+  }
+
+  async createBrochureLocationHistory(data: InsertBrochureLocationHistory): Promise<BrochureLocationHistory> {
+    const [created] = await db.insert(brochureLocationHistory).values(data).returning();
+    return created;
+  }
+
+  async registerBrochure(brochureId: string, orgId: number, registeredBy: string, notes?: string): Promise<BrochureWithLocation> {
+    // Create or get the brochure record
+    let brochure = await this.getBrochure(brochureId);
+    if (!brochure) {
+      brochure = await this.createBrochure({
+        id: brochureId,
+        status: "available",
+        orgId,
+      });
+    }
+    
+    // Check if already tracked
+    const existingLocation = await this.getBrochureLocation(brochureId);
+    if (existingLocation) {
+      return { ...brochure, location: existingLocation };
+    }
+    
+    // Create location record (starts in house inventory)
+    const location = await this.createBrochureLocation({
+      brochureId,
+      orgId,
+      holderType: "house",
+      holderId: null,
+      assignedBy: registeredBy,
+      notes,
+    });
+    
+    // Record history
+    await this.createBrochureLocationHistory({
+      brochureId,
+      orgId,
+      fromHolderType: null,
+      fromHolderId: null,
+      toHolderType: "house",
+      toHolderId: null,
+      transferredBy: registeredBy,
+      transferType: "register",
+      notes: notes || "Initial registration to house inventory",
+    });
+    
+    return { ...brochure, location };
+  }
+
+  async getBrochuresWithLocations(orgId: number): Promise<BrochureWithLocation[]> {
+    const result = await db
+      .select()
+      .from(brochures)
+      .leftJoin(brochureLocations, eq(brochures.id, brochureLocations.brochureId))
+      .where(eq(brochures.orgId, orgId))
+      .orderBy(desc(brochureLocations.assignedAt));
+    
+    return result.map(({ brochures: brochure, brochure_locations: location }) => ({
+      ...brochure,
+      location: location || undefined,
+    }));
   }
 }
 

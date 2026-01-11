@@ -125,6 +125,73 @@ export async function registerRoutes(
     }
   });
 
+  // IMPORTANT: Specific brochure routes must come BEFORE /api/brochures/:id
+  // Get house inventory (unassigned brochures)
+  app.get("/api/brochures/house", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const brochures = await storage.getHouseInventory(membership.organization.id);
+      res.json(brochures);
+    } catch (error) {
+      console.error("Error fetching house inventory:", error);
+      res.status(500).json({ error: "Failed to fetch house inventory" });
+    }
+  });
+
+  // Get all brochures with locations for the organization
+  app.get("/api/brochures/locations", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const brochures = await storage.getBrochuresWithLocations(membership.organization.id);
+      res.json(brochures);
+    } catch (error) {
+      console.error("Error fetching brochure locations:", error);
+      res.status(500).json({ error: "Failed to fetch brochure locations" });
+    }
+  });
+
+  // Get my brochures (for current user)
+  app.get("/api/brochures/my-inventory", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const role = membership.role;
+      
+      const holderType = role === "relationship_manager" ? "relationship_manager" : "agent";
+      const brochures = await storage.getBrochuresByHolder(
+        membership.organization.id,
+        holderType,
+        userId
+      );
+      res.json(brochures);
+    } catch (error) {
+      console.error("Error fetching my brochures:", error);
+      res.status(500).json({ error: "Failed to fetch your brochures" });
+    }
+  });
+
+  // Get team members for assignment dropdown
+  app.get("/api/brochures/assignees", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      
+      // Filter to RMs and agents only
+      const assignees = members
+        .filter(m => ["relationship_manager", "agent"].includes(m.role))
+        .map(m => ({
+          id: m.userId,
+          memberId: m.id,
+          role: m.role,
+        }));
+      
+      res.json(assignees);
+    } catch (error) {
+      console.error("Error fetching assignees:", error);
+      res.status(500).json({ error: "Failed to fetch assignees" });
+    }
+  });
+
   app.get("/api/brochures/:id", isAuthenticated, async (req, res) => {
     try {
       const brochure = await storage.getBrochure(req.params.id);
@@ -244,6 +311,54 @@ export async function registerRoutes(
         await storage.updateBrochureStatus(brochureId, "deployed");
       }
       
+      // Check brochure custody - warn if not assigned to this agent
+      let custodyWarning: { message: string; currentHolder?: string } | null = null;
+      const brochureLocation = await storage.getBrochureLocation(brochureId);
+      
+      if (brochureLocation) {
+        // Brochure is tracked - verify custody
+        if (brochureLocation.holderType === "house") {
+          custodyWarning = {
+            message: "This brochure is in house inventory and not assigned to you. It has been marked as deployed.",
+            currentHolder: "House Inventory"
+          };
+        } else if (brochureLocation.holderId !== userId) {
+          custodyWarning = {
+            message: "This brochure is assigned to someone else. It has been marked as deployed under your name.",
+            currentHolder: brochureLocation.holderType === "relationship_manager" ? "A Relationship Manager" : "Another Agent"
+          };
+        }
+        
+        // Update custody to reflect deployment
+        try {
+          await storage.transferBrochure(
+            brochureId,
+            "agent",
+            userId,
+            userId,
+            "deploy",
+            `Deployed to merchant: ${req.body.businessName || 'Unknown'}`
+          );
+        } catch (e) {
+          console.log("Could not update brochure custody:", e);
+        }
+      } else if (orgId) {
+        // Brochure not tracked yet - auto-register and assign to agent
+        try {
+          await storage.registerBrochure(brochureId, orgId, userId, "Auto-registered during deployment");
+          await storage.transferBrochure(
+            brochureId,
+            "agent",
+            userId,
+            userId,
+            "deploy",
+            `Deployed to merchant: ${req.body.businessName || 'Unknown'}`
+          );
+        } catch (e) {
+          console.log("Could not auto-register brochure:", e);
+        }
+      }
+      
       // Check for prohibited business types
       const businessName = req.body.businessName || "";
       const textNotes = req.body.textNotes || "";
@@ -291,7 +406,7 @@ export async function registerRoutes(
         });
       }
       
-      // Include warning flag if business needs additional review
+      // Include warning flags if needed
       const response: any = { ...drop };
       if (prohibitedCheck.isWarning) {
         response.warning = {
@@ -301,6 +416,11 @@ export async function registerRoutes(
             reason: m.reason,
           })),
         };
+      }
+      
+      // Include custody warning if brochure was not properly assigned
+      if (custodyWarning) {
+        response.custodyWarning = custodyWarning;
       }
       
       res.status(201).json(response);
@@ -1760,6 +1880,218 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     } catch (error) {
       console.error("Error fetching inventory logs:", error);
       res.status(500).json({ error: "Failed to fetch inventory logs" });
+    }
+  });
+
+  // ============================================
+  // BROCHURE CUSTODY API (Individual Brochure Tracking)
+  // ============================================
+  // NOTE: GET routes for /house, /locations, /my-inventory, /assignees are defined earlier
+  // to avoid conflict with /api/brochures/:id route
+
+  // Get brochures by holder type and optional holderId
+  app.get("/api/brochures/holder/:holderType/:holderId?", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const { holderType, holderId } = req.params;
+      
+      if (!["house", "relationship_manager", "agent"].includes(holderType)) {
+        return res.status(400).json({ error: "Invalid holder type" });
+      }
+      
+      const brochures = await storage.getBrochuresByHolder(
+        membership.organization.id, 
+        holderType as any, 
+        holderId || undefined
+      );
+      res.json(brochures);
+    } catch (error) {
+      console.error("Error fetching brochures by holder:", error);
+      res.status(500).json({ error: "Failed to fetch brochures" });
+    }
+  });
+
+  // Get brochure location and details
+  app.get("/api/brochures/:id/location", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const brochureId = req.params.id;
+      const location = await storage.getBrochureLocation(brochureId);
+      
+      if (!location) {
+        return res.status(404).json({ error: "Brochure not found in custody tracking" });
+      }
+      
+      const brochure = await storage.getBrochure(brochureId);
+      res.json({ ...brochure, location });
+    } catch (error) {
+      console.error("Error fetching brochure location:", error);
+      res.status(500).json({ error: "Failed to fetch brochure location" });
+    }
+  });
+
+  // Get brochure history
+  app.get("/api/brochures/:id/history", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const brochureId = req.params.id;
+      const history = await storage.getBrochureHistory(brochureId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching brochure history:", error);
+      res.status(500).json({ error: "Failed to fetch brochure history" });
+    }
+  });
+
+  // Register a new brochure to house inventory
+  app.post("/api/brochures/register", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const { brochureId, notes } = req.body;
+      
+      if (!brochureId || typeof brochureId !== "string") {
+        return res.status(400).json({ error: "Brochure ID is required" });
+      }
+      
+      const result = await storage.registerBrochure(
+        brochureId.trim(),
+        membership.organization.id,
+        userId,
+        notes
+      );
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error registering brochure:", error);
+      res.status(500).json({ error: "Failed to register brochure" });
+    }
+  });
+
+  // Bulk register brochures
+  app.post("/api/brochures/register-bulk", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const { brochureIds, notes } = req.body;
+      
+      if (!Array.isArray(brochureIds) || brochureIds.length === 0) {
+        return res.status(400).json({ error: "Brochure IDs array is required" });
+      }
+      
+      const results = [];
+      const errors = [];
+      
+      for (const id of brochureIds) {
+        try {
+          const result = await storage.registerBrochure(
+            id.trim(),
+            membership.organization.id,
+            userId,
+            notes
+          );
+          results.push(result);
+        } catch (error: any) {
+          errors.push({ brochureId: id, error: error.message });
+        }
+      }
+      
+      res.status(201).json({ registered: results, errors });
+    } catch (error) {
+      console.error("Error bulk registering brochures:", error);
+      res.status(500).json({ error: "Failed to register brochures" });
+    }
+  });
+
+  // Transfer brochure to another holder
+  app.post("/api/brochures/:id/transfer", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const brochureId = req.params.id;
+      const { toHolderType, toHolderId, notes } = req.body;
+      
+      if (!["house", "relationship_manager", "agent"].includes(toHolderType)) {
+        return res.status(400).json({ error: "Invalid holder type" });
+      }
+      
+      // Check role permissions
+      const role = membership.role;
+      const currentLocation = await storage.getBrochureLocation(brochureId);
+      
+      if (!currentLocation) {
+        return res.status(404).json({ error: "Brochure not found in custody tracking" });
+      }
+      
+      // Validate transfer permissions
+      if (role === "agent") {
+        // Agents can only return brochures they hold
+        if (currentLocation.holderId !== userId) {
+          return res.status(403).json({ error: "You can only transfer brochures you currently hold" });
+        }
+        if (toHolderType !== "house") {
+          return res.status(403).json({ error: "Agents can only return brochures to house inventory" });
+        }
+      }
+      
+      // Determine transfer type
+      let transferType = "assign";
+      if (toHolderType === "house") {
+        transferType = "return";
+      }
+      
+      const result = await storage.transferBrochure(
+        brochureId,
+        toHolderType as any,
+        toHolderId || null,
+        userId,
+        transferType,
+        notes
+      );
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error transferring brochure:", error);
+      res.status(500).json({ error: error.message || "Failed to transfer brochure" });
+    }
+  });
+
+  // Bulk transfer brochures
+  app.post("/api/brochures/transfer-bulk", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { brochureIds, toHolderType, toHolderId, notes } = req.body;
+      
+      if (!Array.isArray(brochureIds) || brochureIds.length === 0) {
+        return res.status(400).json({ error: "Brochure IDs array is required" });
+      }
+      
+      if (!["house", "relationship_manager", "agent"].includes(toHolderType)) {
+        return res.status(400).json({ error: "Invalid holder type" });
+      }
+      
+      const transferType = toHolderType === "house" ? "return" : "assign";
+      const results = [];
+      const errors = [];
+      
+      for (const id of brochureIds) {
+        try {
+          const result = await storage.transferBrochure(
+            id,
+            toHolderType as any,
+            toHolderId || null,
+            userId,
+            transferType,
+            notes
+          );
+          results.push(result);
+        } catch (error: any) {
+          errors.push({ brochureId: id, error: error.message });
+        }
+      }
+      
+      res.json({ transferred: results, errors });
+    } catch (error) {
+      console.error("Error bulk transferring brochures:", error);
+      res.status(500).json({ error: "Failed to transfer brochures" });
     }
   });
 
