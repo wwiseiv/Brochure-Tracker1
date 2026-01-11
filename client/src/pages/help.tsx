@@ -283,6 +283,36 @@ export default function HelpPage() {
 
   const aiToolsFeatures: HelpItem[] = [
     {
+      title: "AI Sales Coach",
+      description: "Access from any drop detail page. Two modes: Get Coaching (ask questions, get sales advice) or Practice Role-Play (simulate conversations with business owners).",
+      link: "/",
+      icon: <Users className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Coaching Mode",
+      description: "Ask questions like 'What should I say when they object to the price?' or 'How do I approach a busy restaurant?' Get advice based on NEPQ methodology and SignaPay training.",
+      link: "/",
+      icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Role-Play Mode",
+      description: "Practice conversations with AI-simulated business owners. Choose scenarios: Cold Approach, Objection Handling, Closing, Follow-up, or General Practice.",
+      link: "/",
+      icon: <Target className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Voice Conversations",
+      description: "Tap the mic button to speak instead of typing. Your voice is transcribed and sent automatically. Toggle Auto-play to hear AI responses spoken aloud.",
+      link: "/",
+      icon: <Mic className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Performance Feedback",
+      description: "End your role-play session to get AI-generated feedback. See your score, strengths, areas to improve, and tips for your next real conversation.",
+      link: "/",
+      icon: <BarChart3 className="w-5 h-5 text-amber-500" />,
+    },
+    {
       title: "AI Email Drafter",
       description: "Access from your Profile. Two modes: polish your rough draft or generate a complete email from scratch. Choose tone and purpose for best results.",
       link: "/email",
