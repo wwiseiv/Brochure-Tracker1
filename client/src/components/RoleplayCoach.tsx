@@ -185,17 +185,26 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
       });
       return res.json();
     },
-    onSuccess: (data) => {
-      if (data.audio) {
-        const audioSrc = `data:${data.format};base64,${data.audio}`;
-        if (audioRef.current) {
+    onSuccess: async (data) => {
+      if (data.audio && audioRef.current) {
+        try {
+          const audioSrc = `data:${data.format};base64,${data.audio}`;
           audioRef.current.src = audioSrc;
-          audioRef.current.play();
           setIsPlaying(true);
+          await audioRef.current.play();
+        } catch (playError) {
+          console.error("Audio play failed:", playError);
+          setIsPlaying(false);
+          toast({
+            title: "Audio playback blocked",
+            description: "Tap the Listen button to hear the response",
+            variant: "default",
+          });
         }
       }
     },
     onError: (error: Error) => {
+      console.error("Speak mutation error:", error);
       toast({
         title: "Failed to generate speech",
         description: error.message,
@@ -289,15 +298,20 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
     setIsTranscribing(true);
     try {
       const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.webm");
+      // Use correct file extension based on actual MIME type
+      const ext = audioBlob.type.includes("mp4") ? "mp4" : audioBlob.type.includes("webm") ? "webm" : "wav";
+      formData.append("audio", audioBlob, `recording.${ext}`);
       
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
       
       if (!response.ok) {
-        throw new Error("Transcription failed");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Transcription error:", errorData);
+        throw new Error(errorData.error || "Transcription failed");
       }
       
       const data = await response.json();
@@ -740,7 +754,7 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
             )}
           </div>
 
-          <audio ref={audioRef} onEnded={handleAudioEnded} className="hidden" />
+          <audio ref={audioRef} onEnded={handleAudioEnded} playsInline preload="auto" className="hidden" />
         </DialogContent>
       </Dialog>
     </>

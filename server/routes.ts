@@ -46,15 +46,19 @@ import path from "path";
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    // Only allow audio files
+    // Only allow audio files (including iOS Safari variants)
     const allowedMimeTypes = [
       "audio/wav",
       "audio/mpeg",
       "audio/mp4",
       "audio/webm",
       "audio/m4a",
+      "audio/x-m4a",
+      "audio/aac",
       "audio/ogg",
-      "audio/flac"
+      "audio/flac",
+      "video/webm",
+      "video/mp4",
     ];
     if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
