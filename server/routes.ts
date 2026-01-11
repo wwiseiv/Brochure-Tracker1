@@ -610,9 +610,12 @@ export async function registerRoutes(
           });
         }
 
-        // Verify OpenAI API key is configured
-        if (!process.env.OPENAI_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-          console.error("OpenAI API key not configured");
+        // Verify OpenAI API key is configured - prefer AI integrations
+        const hasAIIntegrations = process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+        const hasDirectOpenAI = process.env.OPENAI_API_KEY;
+        
+        if (!hasAIIntegrations && !hasDirectOpenAI) {
+          console.error("No OpenAI API key configured for transcription");
           return res.status(500).json({ 
             error: "Audio transcription service is not available",
             details: [{ 
@@ -648,9 +651,10 @@ export async function registerRoutes(
         });
 
         try {
-          // Call OpenAI Whisper API for transcription
-          // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-          const client = getOpenAIClient();
+          // Use AI integrations client if available, otherwise fall back to direct OpenAI
+          const client = hasAIIntegrations ? getAIIntegrationsClient() : getOpenAIClient();
+          console.log(`Transcription: using ${hasAIIntegrations ? 'AI Integrations' : 'Direct OpenAI'} client`);
+          
           const transcription = await client.audio.transcriptions.create({
             file: fs.createReadStream(tempFilePath),
             model: "whisper-1",
@@ -661,6 +665,8 @@ export async function registerRoutes(
             if (err) console.error("Error deleting temp file:", err);
           });
 
+          console.log(`Transcription successful: ${transcription.text?.substring(0, 50)}...`);
+          
           // Return the transcribed text
           res.json({
             text: transcription.text,
@@ -672,12 +678,13 @@ export async function registerRoutes(
             if (err) console.error("Error deleting temp file:", err);
           });
 
-          console.error("OpenAI Whisper API error:", openaiError);
+          console.error("OpenAI Whisper API error:", openaiError?.message || openaiError);
+          console.error("Full error details:", JSON.stringify(openaiError, null, 2));
           
           // Handle specific OpenAI errors
           if (openaiError.status === 401) {
             return res.status(500).json({ 
-              error: "Authentication failed with OpenAI API",
+              error: "Authentication failed with transcription service",
               details: [{ field: "server", message: "Invalid API credentials" }]
             });
           }
@@ -690,8 +697,8 @@ export async function registerRoutes(
           
           throw openaiError;
         }
-      } catch (error) {
-        console.error("Error transcribing audio:", error);
+      } catch (error: any) {
+        console.error("Error transcribing audio:", error?.message || error);
         res.status(500).json({ 
           error: "Failed to transcribe audio",
           details: [{ 
@@ -982,8 +989,14 @@ export async function registerRoutes(
       const invitation = await storage.createInvitation(parsed.data);
 
       // Send invitation email
-      const inviteLink = `${process.env.REPL_URL || 'https://brochuredrop.replit.app'}/accept-invite?token=${invitation.token}`;
-      await sendInvitationEmail({
+      const replUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
+        : 'https://brochuredrop.replit.app';
+      const inviteLink = `${replUrl}/accept-invite?token=${invitation.token}`;
+      
+      console.log(`Sending invitation email to ${email} with link: ${inviteLink}`);
+      
+      const emailSent = await sendInvitationEmail({
         to: email,
         inviterName: req.user.claims.name || req.user.claims.email,
         organizationName: membership.organization.name,
@@ -992,7 +1005,11 @@ export async function registerRoutes(
         expiresIn: "7 days",
       });
 
-      res.status(201).json(invitation);
+      if (!emailSent) {
+        console.warn(`Invitation created but email failed to send to ${email}`);
+      }
+
+      res.status(201).json({ ...invitation, emailSent });
     } catch (error) {
       console.error("Error creating invitation:", error);
       res.status(500).json({ error: "Failed to create invitation" });
@@ -2757,6 +2774,8 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       const userId = req.user.claims.sub;
       const { text } = req.body;
 
+      console.log(`TTS request: session ${sessionId}, text length: ${text?.length || 0}`);
+
       if (!text) {
         return res.status(400).json({ error: "Text is required" });
       }
@@ -2772,11 +2791,15 @@ Remember: You're helping them practice real sales conversations. Be challenging 
 
       const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
       if (!elevenLabsKey) {
+        console.error("ELEVENLABS_API_KEY is not configured");
         return res.status(500).json({ error: "ElevenLabs not configured" });
       }
+      
+      console.log(`ElevenLabs API key present: ${elevenLabsKey.length > 0}, key length: ${elevenLabsKey.length}`);
 
       const voiceId = "21m00Tcm4TlvDq8ikWAM";
 
+      console.log(`Calling ElevenLabs TTS API with voice ${voiceId}...`);
       const ttsResponse = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
         {
@@ -2797,21 +2820,27 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         }
       );
 
+      console.log(`ElevenLabs response status: ${ttsResponse.status}`);
+
       if (!ttsResponse.ok) {
         const errorText = await ttsResponse.text();
-        console.error("ElevenLabs error:", errorText);
-        return res.status(500).json({ error: "Failed to generate speech" });
+        console.error("ElevenLabs API error status:", ttsResponse.status);
+        console.error("ElevenLabs error response:", errorText);
+        return res.status(500).json({ error: "Failed to generate speech", details: errorText });
       }
 
       const audioBuffer = await ttsResponse.arrayBuffer();
       const base64Audio = Buffer.from(audioBuffer).toString("base64");
 
+      console.log(`TTS successful: generated ${audioBuffer.byteLength} bytes of audio`);
+
       res.json({
         audio: base64Audio,
         format: "audio/mpeg",
       });
-    } catch (error) {
-      console.error("Error generating speech:", error);
+    } catch (error: any) {
+      console.error("Error generating speech:", error?.message || error);
+      console.error("Full TTS error:", error);
       res.status(500).json({ error: "Failed to generate speech" });
     }
   });

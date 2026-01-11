@@ -27,6 +27,7 @@ interface SendInvitationParams {
 
 export async function sendInvitationEmail(params: SendInvitationParams): Promise<boolean> {
   try {
+    console.log(`Sending invitation email to ${params.to} for org ${params.organizationName}`);
     const client = getResendClient();
     
     const roleLabel = params.role === "master_admin" 
@@ -88,12 +89,15 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
 
     if (error) {
       console.error("Failed to send invitation email:", error);
+      console.error("Email error details:", JSON.stringify(error, null, 2));
       return false;
     }
 
+    console.log(`Invitation email sent successfully to ${params.to}`);
     return true;
-  } catch (error) {
-    console.error("Error sending invitation email:", error);
+  } catch (error: any) {
+    console.error("Error sending invitation email:", error?.message || error);
+    console.error("Full error:", JSON.stringify(error, null, 2));
     return false;
   }
 }
