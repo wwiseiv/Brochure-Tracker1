@@ -14,6 +14,7 @@ import ProfilePage from "@/pages/profile";
 import AdminDashboardPage from "@/pages/admin-dashboard";
 import RMDashboardPage from "@/pages/rm-dashboard";
 import TeamManagementPage from "@/pages/team-management";
+import HelpPage from "@/pages/help";
 import NotFound from "@/pages/not-found";
 
 interface UserRole {
@@ -107,6 +108,7 @@ function AuthenticatedRouter() {
       <Route path="/drops/:id" component={DropDetailPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/help" component={HelpPage} />
       <Route component={NotFound} />
     </Switch>
   );

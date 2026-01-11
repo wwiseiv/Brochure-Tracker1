@@ -24,9 +24,24 @@ import {
   Bell,
   Mail,
   Smartphone,
-  Settings
+  Settings,
+  HelpCircle,
+  Shield,
+  Users,
+  ChevronRight
 } from "lucide-react";
+import { Link } from "wouter";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
+
+interface UserRole {
+  role: string;
+  memberId: number;
+  organization: {
+    id: number;
+    name: string;
+  };
+  managerId: number | null;
+}
 
 const REMINDER_OPTIONS = [
   { value: "6", label: "6 hours before" },
@@ -45,6 +60,10 @@ export default function ProfilePage() {
 
   const { data: preferences, isLoading: preferencesLoading } = useQuery<UserPreferences>({
     queryKey: ["/api/preferences"],
+  });
+
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
   });
 
   const updatePreferences = useMutation({
@@ -252,6 +271,71 @@ export default function ProfilePage() {
                 data-testid="switch-push-notifications"
               />
             </div>
+          </div>
+        </Card>
+
+        <Card className="p-2">
+          <div className="space-y-1">
+            {userRole?.role === "master_admin" && (
+              <>
+                <Link href="/admin">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-between min-h-touch"
+                    data-testid="link-admin-dashboard"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-blue-600" />
+                      <span>Admin Dashboard</span>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                </Link>
+                <Link href="/admin/team">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-between min-h-touch"
+                    data-testid="link-team-management"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <span>Team Management</span>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                </Link>
+              </>
+            )}
+            
+            {userRole?.role === "relationship_manager" && (
+              <Link href="/manager">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between min-h-touch"
+                  data-testid="link-manager-dashboard"
+                >
+                  <div className="flex items-center gap-3">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <span>Manager Dashboard</span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </Button>
+              </Link>
+            )}
+            
+            <Link href="/help">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between min-h-touch"
+                data-testid="link-help"
+              >
+                <div className="flex items-center gap-3">
+                  <HelpCircle className="w-5 h-5 text-primary" />
+                  <span>Help & Guide</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </Link>
           </div>
         </Card>
 
