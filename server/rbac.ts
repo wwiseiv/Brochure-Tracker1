@@ -106,23 +106,27 @@ export function requireOrgAccess(): RequestHandler {
   };
 }
 
-export const ensureOrgMembership: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = req.user as any;
-    if (!user?.claims?.sub) {
-      return next();
-    }
+export function ensureOrgMembership(): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user as any;
+      if (!user?.claims?.sub) {
+        return next();
+      }
 
-    const userId = user.claims.sub;
-    const membership = await storage.getUserMembership(userId);
-    
-    if (!membership) {
-      await bootstrapUserOrganization(userId);
-    }
+      const userId = user.claims.sub;
+      let membership = await storage.getUserMembership(userId);
+      
+      if (!membership) {
+        membership = await bootstrapUserOrganization(userId);
+      }
+      
+      req.orgMembership = membership;
 
-    next();
-  } catch (error) {
-    console.error("Error in ensureOrgMembership middleware:", error);
-    next();
-  }
-};
+      next();
+    } catch (error) {
+      console.error("Error in ensureOrgMembership middleware:", error);
+      next();
+    }
+  };
+}

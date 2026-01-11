@@ -954,7 +954,7 @@ export async function registerRoutes(
   // ============================================
 
   // Create a new invitation (admin only)
-  app.post("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const { email, role, managerId } = req.body;
@@ -1017,7 +1017,7 @@ export async function registerRoutes(
   });
 
   // Get all invitations for user's organization (admin only)
-  app.get("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership, async (req: any, res) => {
+  app.get("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const invitations = await storage.getInvitationsByOrg(membership.organization.id);
@@ -1029,7 +1029,7 @@ export async function registerRoutes(
   });
 
   // Resend invitation email (admin only)
-  app.post("/api/invitations/:id/resend", isAuthenticated, requireRole("master_admin"), ensureOrgMembership, async (req: any, res) => {
+  app.post("/api/invitations/:id/resend", isAuthenticated, requireRole("master_admin"), ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const invitationId = parseInt(req.params.id);
@@ -1064,7 +1064,7 @@ export async function registerRoutes(
   });
 
   // Cancel an invitation (admin only)
-  app.delete("/api/invitations/:id", isAuthenticated, requireRole("master_admin"), ensureOrgMembership, async (req: any, res) => {
+  app.delete("/api/invitations/:id", isAuthenticated, requireRole("master_admin"), ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
       const invitationId = parseInt(req.params.id);
