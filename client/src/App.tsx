@@ -23,6 +23,7 @@ import ReferralsPage from "@/pages/referrals";
 import ActivityFeedPage from "@/pages/activity-feed";
 import RoutePlannerPage from "@/pages/route-planner";
 import SequencesPage from "@/pages/sequences";
+import AcceptInvitePage from "@/pages/accept-invite";
 import NotFound from "@/pages/not-found";
 
 interface UserRole {
@@ -156,7 +157,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <AppContent />
+        <Switch>
+          <Route path="/accept-invite" component={AcceptInvitePage} />
+          <Route component={AppContent} />
+        </Switch>
       </TooltipProvider>
     </QueryClientProvider>
   );

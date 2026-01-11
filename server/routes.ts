@@ -18,7 +18,11 @@ import {
   insertActivityEventSchema,
   REFERRAL_STATUSES,
   LEAD_TIERS,
+  insertInvitationSchema,
+  insertFeedbackSubmissionSchema,
+  INVITATION_STATUSES,
 } from "@shared/schema";
+import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken } from "./email";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -852,6 +856,260 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error removing organization member:", error);
       res.status(500).json({ error: "Failed to remove organization member" });
+    }
+  });
+
+  // ============================================
+  // INVITATIONS API
+  // ============================================
+
+  // Create a new invitation (admin only)
+  app.post("/api/invitations", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const { email, role, managerId } = req.body;
+
+      // Validate input
+      if (!email || !role) {
+        return res.status(400).json({ error: "Email and role are required" });
+      }
+
+      const parsed = insertInvitationSchema.safeParse({
+        orgId: membership.organization.id,
+        email,
+        role,
+        token: generateInviteToken(),
+        status: "pending",
+        invitedBy: req.user.claims.sub,
+        managerId: managerId || null,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({
+          error: "Validation failed",
+          details: errors,
+        });
+      }
+
+      const invitation = await storage.createInvitation(parsed.data);
+
+      // Send invitation email
+      const inviteLink = `${process.env.REPL_URL || 'https://brochuredrop.replit.app'}/accept-invite?token=${invitation.token}`;
+      await sendInvitationEmail({
+        to: email,
+        inviterName: req.user.claims.name || req.user.claims.email,
+        organizationName: membership.organization.name,
+        role: role,
+        inviteLink,
+        expiresIn: "7 days",
+      });
+
+      res.status(201).json(invitation);
+    } catch (error) {
+      console.error("Error creating invitation:", error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  // Get all invitations for user's organization (admin only)
+  app.get("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const invitations = await storage.getInvitationsByOrg(membership.organization.id);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  // Resend invitation email (admin only)
+  app.post("/api/invitations/:id/resend", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const invitationId = parseInt(req.params.id);
+
+      if (isNaN(invitationId)) {
+        return res.status(400).json({ error: "Invalid invitation ID" });
+      }
+
+      const allInvitations = await storage.getInvitationsByOrg(membership.organization.id);
+      const targetInvitation = allInvitations.find(i => i.id === invitationId);
+
+      if (!targetInvitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      // Resend the email
+      const inviteLink = `${process.env.REPL_URL || 'https://brochuredrop.replit.app'}/accept-invite?token=${targetInvitation.token}`;
+      await sendInvitationEmail({
+        to: targetInvitation.email,
+        inviterName: req.user.claims.name || req.user.claims.email,
+        organizationName: membership.organization.name,
+        role: targetInvitation.role,
+        inviteLink,
+        expiresIn: "7 days",
+      });
+
+      res.json(targetInvitation);
+    } catch (error) {
+      console.error("Error resending invitation:", error);
+      res.status(500).json({ error: "Failed to resend invitation" });
+    }
+  });
+
+  // Cancel an invitation (admin only)
+  app.delete("/api/invitations/:id", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const invitationId = parseInt(req.params.id);
+
+      if (isNaN(invitationId)) {
+        return res.status(400).json({ error: "Invalid invitation ID" });
+      }
+
+      const allInvitations = await storage.getInvitationsByOrg(membership.organization.id);
+      const targetInvitation = allInvitations.find(i => i.id === invitationId);
+
+      if (!targetInvitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await storage.cancelInvitation(invitationId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error cancelling invitation:", error);
+      res.status(500).json({ error: "Failed to cancel invitation" });
+    }
+  });
+
+  // Validate invitation token (public, no auth required)
+  app.get("/api/invitations/accept/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      const invitation = await storage.getInvitationByToken(token);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation is no longer valid" });
+      }
+
+      if (new Date() > invitation.expiresAt) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      const organization = await storage.getOrganization(invitation.orgId);
+
+      res.json({
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
+        organizationName: organization?.name,
+        expiresAt: invitation.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error validating invitation:", error);
+      res.status(500).json({ error: "Failed to validate invitation" });
+    }
+  });
+
+  // Accept invitation (public, no auth required)
+  app.post("/api/invitations/accept/:token", async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      const invitation = await storage.getInvitationByToken(token);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation is no longer valid" });
+      }
+
+      if (new Date() > invitation.expiresAt) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      // Create organization member
+      const member = await storage.createOrganizationMember({
+        orgId: invitation.orgId,
+        userId: userId,
+        role: invitation.role as any,
+        managerId: invitation.managerId,
+      });
+
+      // Update invitation status to accepted
+      await storage.updateInvitationStatus(invitation.id, "accepted", new Date());
+
+      res.json({
+        success: true,
+        member: member,
+      });
+    } catch (error) {
+      console.error("Error accepting invitation:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  // ============================================
+  // FEEDBACK API
+  // ============================================
+
+  // Submit feedback (authenticated)
+  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type, subject, message } = req.body;
+
+      const parsed = insertFeedbackSubmissionSchema.safeParse({
+        userId,
+        userName: req.user.claims.name || req.user.claims.email,
+        userEmail: req.user.claims.email,
+        type,
+        subject,
+        message,
+      });
+
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({
+          error: "Validation failed",
+          details: errors,
+        });
+      }
+
+      const feedback = await storage.createFeedbackSubmission(parsed.data);
+
+      // Send feedback email to support
+      await sendFeedbackEmail({
+        userName: req.user.claims.name || req.user.claims.email,
+        userEmail: req.user.claims.email,
+        type,
+        subject,
+        message,
+      });
+
+      res.status(201).json(feedback);
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
     }
   });
 

@@ -16,6 +16,8 @@ import {
   aiSummaries,
   leadScores,
   offlineQueue,
+  invitations,
+  feedbackSubmissions,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -52,6 +54,10 @@ import {
   type InsertLeadScore,
   type OfflineQueue,
   type InsertOfflineQueue,
+  type Invitation,
+  type InsertInvitation,
+  type FeedbackSubmission,
+  type InsertFeedbackSubmission,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -94,6 +100,16 @@ export interface IStorage {
   updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined>;
   deleteOrganizationMember(id: number): Promise<boolean>;
   getAgentsByManager(managerId: number): Promise<OrganizationMember[]>;
+  
+  // Invitations
+  createInvitation(data: InsertInvitation): Promise<Invitation>;
+  getInvitationByToken(token: string): Promise<Invitation | undefined>;
+  getInvitationsByOrg(orgId: number): Promise<Invitation[]>;
+  updateInvitationStatus(id: number, status: string, acceptedAt?: Date): Promise<Invitation | undefined>;
+  cancelInvitation(id: number): Promise<void>;
+  
+  // Feedback
+  createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -636,6 +652,40 @@ export class DatabaseStorage implements IStorage {
       ...drop,
       brochure: brochure || undefined,
     }));
+  }
+
+  // Invitations
+  async createInvitation(data: InsertInvitation): Promise<Invitation> {
+    const [created] = await db.insert(invitations).values(data).returning();
+    return created;
+  }
+
+  async getInvitationByToken(token: string): Promise<Invitation | undefined> {
+    const [invitation] = await db.select().from(invitations).where(eq(invitations.token, token));
+    return invitation;
+  }
+
+  async getInvitationsByOrg(orgId: number): Promise<Invitation[]> {
+    return db.select().from(invitations).where(eq(invitations.orgId, orgId)).orderBy(desc(invitations.createdAt));
+  }
+
+  async updateInvitationStatus(id: number, status: string, acceptedAt?: Date): Promise<Invitation | undefined> {
+    const [updated] = await db
+      .update(invitations)
+      .set({ status, acceptedAt: acceptedAt ?? null })
+      .where(eq(invitations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async cancelInvitation(id: number): Promise<void> {
+    await db.update(invitations).set({ status: "cancelled" }).where(eq(invitations.id, id));
+  }
+
+  // Feedback
+  async createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
+    const [created] = await db.insert(feedbackSubmissions).values(data).returning();
+    return created;
   }
 }
 

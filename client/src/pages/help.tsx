@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
   Home, 
@@ -47,7 +50,9 @@ import {
   Route,
   MapPinned,
   StickyNote,
-  Repeat
+  Repeat,
+  Lightbulb,
+  Send
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +64,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface UserRole {
   role: string;
@@ -119,9 +134,53 @@ function HelpSection({
 }
 
 export default function HelpPage() {
+  const { toast } = useToast();
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+
+  const [feedbackType, setFeedbackType] = useState<string>("feature_suggestion");
+  const [feedbackSubject, setFeedbackSubject] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const feedbackMutation = useMutation({
+    mutationFn: async (data: { type: string; subject: string; message: string }) => {
+      await apiRequest("POST", "/api/feedback", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Thanks for your feedback!",
+        description: "We'll get back to you soon.",
+      });
+      setFeedbackType("feature_suggestion");
+      setFeedbackSubject("");
+      setFeedbackMessage("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to submit feedback",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFeedbackSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in both subject and message.",
+        variant: "destructive",
+      });
+      return;
+    }
+    feedbackMutation.mutate({
+      type: feedbackType,
+      subject: feedbackSubject,
+      message: feedbackMessage,
+    });
+  };
 
   const gettingStartedItems: HelpItem[] = [
     {
@@ -841,6 +900,78 @@ export default function HelpPage() {
               <span className="text-primary font-bold">5.</span>
               <p><strong>End of day:</strong> Review overdue pickups and reschedule as needed.</p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-primary" />
+              Feature Suggestions & Help
+            </CardTitle>
+            <CardDescription>
+              Have a feature idea or need help? Let us know!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="feedback-type">Type</Label>
+                <Select value={feedbackType} onValueChange={setFeedbackType}>
+                  <SelectTrigger id="feedback-type" data-testid="select-feedback-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feature_suggestion">Feature Suggestion</SelectItem>
+                    <SelectItem value="help_request">Help Request</SelectItem>
+                    <SelectItem value="bug_report">Bug Report</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="feedback-subject">Subject</Label>
+                <Input
+                  id="feedback-subject"
+                  placeholder="Brief summary of your feedback"
+                  value={feedbackSubject}
+                  onChange={(e) => setFeedbackSubject(e.target.value)}
+                  required
+                  data-testid="input-feedback-subject"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="feedback-message">Message</Label>
+                <Textarea
+                  id="feedback-message"
+                  placeholder="Describe your feature idea, question, or issue..."
+                  value={feedbackMessage}
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  required
+                  className="min-h-[120px]"
+                  data-testid="textarea-feedback-message"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={feedbackMutation.isPending}
+                className="w-full"
+                data-testid="button-submit-feedback"
+              >
+                {feedbackMutation.isPending ? (
+                  "Submitting..."
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Submit Feedback
+                  </>
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

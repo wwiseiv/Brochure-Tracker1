@@ -525,6 +525,73 @@ export type OfflineQueue = typeof offlineQueue.$inferSelect;
 export const REMINDER_HOURS_OPTIONS = [6, 12, 24, 48] as const;
 export type ReminderHours = typeof REMINDER_HOURS_OPTIONS[number];
 
+// Invitation status enum values
+export const INVITATION_STATUSES = ["pending", "accepted", "expired", "cancelled"] as const;
+export type InvitationStatus = typeof INVITATION_STATUSES[number];
+
+// Invitations table (for email invites to join organization)
+export const invitations = pgTable("invitations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: varchar("role", { length: 30 }).notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  invitedBy: varchar("invited_by").notNull(),
+  managerId: integer("manager_id").references(() => organizationMembers.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [invitations.orgId],
+    references: [organizations.id],
+  }),
+  manager: one(organizationMembers, {
+    fields: [invitations.managerId],
+    references: [organizationMembers.id],
+  }),
+}));
+
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+  acceptedAt: true,
+}).extend({
+  role: z.enum(ORG_MEMBER_ROLES),
+  status: z.enum(INVITATION_STATUSES).optional(),
+});
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+export type Invitation = typeof invitations.$inferSelect;
+
+// Feedback submissions table (for feature suggestions and help requests)
+export const feedbackSubmissions = pgTable("feedback_submissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id"),
+  userName: varchar("user_name", { length: 100 }),
+  userEmail: varchar("user_email", { length: 255 }),
+  type: varchar("type", { length: 30 }).notNull(), // feature_suggestion, help_request, bug_report
+  subject: varchar("subject", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).default("new").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const FEEDBACK_TYPES = ["feature_suggestion", "help_request", "bug_report"] as const;
+export type FeedbackType = typeof FEEDBACK_TYPES[number];
+
+export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  type: z.enum(FEEDBACK_TYPES),
+});
+export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+
 // User preferences table
 export const userPreferences = pgTable("user_preferences", {
   userId: varchar("user_id").primaryKey(),

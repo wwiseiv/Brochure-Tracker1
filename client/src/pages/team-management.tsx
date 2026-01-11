@@ -53,7 +53,12 @@ import {
   Shield,
   Briefcase,
   UserCheck,
+  Mail,
+  RefreshCw,
+  X,
+  Clock,
 } from "lucide-react";
+import { format } from "date-fns";
 import type { OrganizationMember, OrgMemberRole } from "@shared/schema";
 
 interface UserRole {
@@ -63,6 +68,16 @@ interface UserRole {
     id: number;
     name: string;
   };
+  managerId: number | null;
+}
+
+interface Invitation {
+  id: number;
+  email: string;
+  role: OrgMemberRole;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
   managerId: number | null;
 }
 
@@ -105,6 +120,19 @@ function getRoleIcon(role: string) {
   }
 }
 
+function getStatusBadgeClassName(status: string): string {
+  switch (status) {
+    case "pending":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    case "accepted":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "expired":
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    default:
+      return "";
+  }
+}
+
 function TeamManagementSkeleton() {
   return (
     <div className="space-y-6">
@@ -130,6 +158,7 @@ export default function TeamManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<OrganizationMember | null>(null);
 
   const [newUserId, setNewUserId] = useState("");
@@ -139,12 +168,20 @@ export default function TeamManagementPage() {
   const [editRole, setEditRole] = useState<OrgMemberRole>("agent");
   const [editManagerId, setEditManagerId] = useState<string>("");
 
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<OrgMemberRole>("agent");
+  const [inviteManagerId, setInviteManagerId] = useState<string>("");
+
   const { data: userRole, isLoading: userRoleLoading } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
 
   const { data: members, isLoading: membersLoading } = useQuery<OrganizationMember[]>({
     queryKey: ["/api/organization/members"],
+  });
+
+  const { data: invitations, isLoading: invitationsLoading } = useQuery<Invitation[]>({
+    queryKey: ["/api/invitations"],
   });
 
   const addMemberMutation = useMutation({
@@ -218,10 +255,80 @@ export default function TeamManagementPage() {
     },
   });
 
+  const createInvitationMutation = useMutation({
+    mutationFn: async (data: { email: string; role: OrgMemberRole; managerId: number | null }) => {
+      const res = await apiRequest("POST", "/api/invitations", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations"] });
+      toast({
+        title: "Invitation sent",
+        description: "An invitation email has been sent to the recipient.",
+      });
+      setIsInviteDialogOpen(false);
+      resetInviteForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send invitation",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/invitations/${id}/resend`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations"] });
+      toast({
+        title: "Invitation resent",
+        description: "The invitation email has been resent.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to resend invitation",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelInvitationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/invitations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations"] });
+      toast({
+        title: "Invitation cancelled",
+        description: "The invitation has been cancelled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to cancel invitation",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetAddForm = () => {
     setNewUserId("");
     setNewRole("agent");
     setNewManagerId("");
+  };
+
+  const resetInviteForm = () => {
+    setInviteEmail("");
+    setInviteRole("agent");
+    setInviteManagerId("");
   };
 
   const handleAddMember = () => {
@@ -286,6 +393,47 @@ export default function TeamManagementPage() {
     deleteMemberMutation.mutate(selectedMember.id);
   };
 
+  const handleSendInvitation = () => {
+    if (!inviteEmail.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Email is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail.trim())) {
+      toast({
+        title: "Validation error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const managerId = inviteRole === "agent" && inviteManagerId ? parseInt(inviteManagerId) : null;
+    
+    if (inviteRole === "agent" && inviteManagerId) {
+      const manager = members?.find(m => m.id === parseInt(inviteManagerId));
+      if (!manager || manager.role !== "relationship_manager") {
+        toast({
+          title: "Validation error",
+          description: "Selected manager is not a valid Relationship Manager",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    createInvitationMutation.mutate({
+      email: inviteEmail.trim(),
+      role: inviteRole,
+      managerId,
+    });
+  };
+
   const openEditDialog = (member: OrganizationMember) => {
     setSelectedMember(member);
     setEditRole(member.role as OrgMemberRole);
@@ -300,6 +448,7 @@ export default function TeamManagementPage() {
 
   const relationshipManagers = members?.filter(m => m.role === "relationship_manager") || [];
   const isLoading = userRoleLoading || membersLoading;
+  const pendingInvitations = invitations?.filter(inv => inv.status === "pending") || [];
 
   const canDeleteMember = (member: OrganizationMember): boolean => {
     if (member.id === userRole?.memberId) return false;
@@ -343,105 +492,205 @@ export default function TeamManagementPage() {
                   Manage your organization's team members and their roles.
                 </p>
               </div>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-add-member">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add Team Member</DialogTitle>
-                    <DialogDescription>
-                      Add a new member to your organization. They will be able to log in with their Replit account.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="user-id">User ID</Label>
-                      <Input
-                        id="user-id"
-                        placeholder="Enter Replit user ID"
-                        value={newUserId}
-                        onChange={(e) => setNewUserId(e.target.value)}
-                        data-testid="input-user-id"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        The Replit user ID they will use to log in.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="role">Role</Label>
-                      <Select
-                        value={newRole}
-                        onValueChange={(value: OrgMemberRole) => {
-                          setNewRole(value);
-                          if (value !== "agent") {
-                            setNewManagerId("");
-                          }
-                        }}
-                      >
-                        <SelectTrigger id="role" data-testid="select-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="master_admin" data-testid="option-master-admin">
-                            Master Admin
-                          </SelectItem>
-                          <SelectItem value="relationship_manager" data-testid="option-relationship-manager">
-                            Relationship Manager
-                          </SelectItem>
-                          <SelectItem value="agent" data-testid="option-agent">
-                            Agent
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {newRole === "agent" && (
+              <div className="flex items-center gap-2">
+                <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" data-testid="button-invite-email">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Invite by Email
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Invite by Email</DialogTitle>
+                      <DialogDescription>
+                        Send an email invitation to join your organization. They will receive a link to sign up.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="manager">Manager (optional)</Label>
-                        <Select value={newManagerId} onValueChange={setNewManagerId}>
-                          <SelectTrigger id="manager" data-testid="select-manager">
-                            <SelectValue placeholder="Select a manager" />
+                        <Label htmlFor="invite-email">Email Address</Label>
+                        <Input
+                          id="invite-email"
+                          type="email"
+                          placeholder="Enter email address"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          data-testid="input-invite-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-role">Role</Label>
+                        <Select
+                          value={inviteRole}
+                          onValueChange={(value: OrgMemberRole) => {
+                            setInviteRole(value);
+                            if (value !== "agent") {
+                              setInviteManagerId("");
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="invite-role" data-testid="select-invite-role">
+                            <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">No manager</SelectItem>
-                            {relationshipManagers.map((rm) => (
-                              <SelectItem
-                                key={rm.id}
-                                value={rm.id.toString()}
-                                data-testid={`option-manager-${rm.id}`}
-                              >
-                                {rm.userId.slice(0, 12)}... (ID: {rm.id})
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="master_admin" data-testid="option-invite-master-admin">
+                              Admin
+                            </SelectItem>
+                            <SelectItem value="relationship_manager" data-testid="option-invite-relationship-manager">
+                              Relationship Manager
+                            </SelectItem>
+                            <SelectItem value="agent" data-testid="option-invite-agent">
+                              Agent
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsAddDialogOpen(false);
-                        resetAddForm();
-                      }}
-                      data-testid="button-cancel-add"
-                    >
-                      Cancel
+                      {inviteRole === "agent" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="invite-manager">Manager (optional)</Label>
+                          <Select value={inviteManagerId} onValueChange={setInviteManagerId}>
+                            <SelectTrigger id="invite-manager" data-testid="select-invite-manager">
+                              <SelectValue placeholder="Select a manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No manager</SelectItem>
+                              {relationshipManagers.map((rm) => (
+                                <SelectItem
+                                  key={rm.id}
+                                  value={rm.id.toString()}
+                                  data-testid={`option-invite-manager-${rm.id}`}
+                                >
+                                  {rm.userId.slice(0, 12)}... (ID: {rm.id})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsInviteDialogOpen(false);
+                          resetInviteForm();
+                        }}
+                        data-testid="button-cancel-invite"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSendInvitation}
+                        disabled={createInvitationMutation.isPending}
+                        data-testid="button-send-invitation"
+                      >
+                        {createInvitationMutation.isPending ? "Sending..." : "Send Invitation"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-member">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Member
                     </Button>
-                    <Button
-                      onClick={handleAddMember}
-                      disabled={addMemberMutation.isPending}
-                      data-testid="button-save-member"
-                    >
-                      {addMemberMutation.isPending ? "Adding..." : "Add Member"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Add Team Member</DialogTitle>
+                      <DialogDescription>
+                        Add a new member to your organization. They will be able to log in with their Replit account.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="user-id">User ID</Label>
+                        <Input
+                          id="user-id"
+                          placeholder="Enter Replit user ID"
+                          value={newUserId}
+                          onChange={(e) => setNewUserId(e.target.value)}
+                          data-testid="input-user-id"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The Replit user ID they will use to log in.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="role">Role</Label>
+                        <Select
+                          value={newRole}
+                          onValueChange={(value: OrgMemberRole) => {
+                            setNewRole(value);
+                            if (value !== "agent") {
+                              setNewManagerId("");
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="role" data-testid="select-role">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="master_admin" data-testid="option-master-admin">
+                              Master Admin
+                            </SelectItem>
+                            <SelectItem value="relationship_manager" data-testid="option-relationship-manager">
+                              Relationship Manager
+                            </SelectItem>
+                            <SelectItem value="agent" data-testid="option-agent">
+                              Agent
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {newRole === "agent" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="manager">Manager (optional)</Label>
+                          <Select value={newManagerId} onValueChange={setNewManagerId}>
+                            <SelectTrigger id="manager" data-testid="select-manager">
+                              <SelectValue placeholder="Select a manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No manager</SelectItem>
+                              {relationshipManagers.map((rm) => (
+                                <SelectItem
+                                  key={rm.id}
+                                  value={rm.id.toString()}
+                                  data-testid={`option-manager-${rm.id}`}
+                                >
+                                  {rm.userId.slice(0, 12)}... (ID: {rm.id})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsAddDialogOpen(false);
+                          resetAddForm();
+                        }}
+                        data-testid="button-cancel-add"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleAddMember}
+                        disabled={addMemberMutation.isPending}
+                        data-testid="button-save-member"
+                      >
+                        {addMemberMutation.isPending ? "Adding..." : "Add Member"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
             <Card className="overflow-hidden">
@@ -534,6 +783,113 @@ export default function TeamManagementPage() {
                 </Table>
               </div>
             </Card>
+
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold">Pending Invitations</h2>
+                <p className="text-sm text-muted-foreground">
+                  Email invitations that have been sent but not yet accepted.
+                </p>
+              </div>
+
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead className="hidden md:table-cell">Expires</TableHead>
+                        <TableHead className="hidden md:table-cell">Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invitationsLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-8">
+                            <div className="flex justify-center">
+                              <Skeleton className="h-8 w-48" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : !pendingInvitations || pendingInvitations.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No pending invitations
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        pendingInvitations.map((invitation) => {
+                          const RoleIcon = getRoleIcon(invitation.role);
+                          const expiresAt = new Date(invitation.expiresAt);
+                          const isExpired = expiresAt < new Date();
+
+                          return (
+                            <TableRow key={invitation.id} data-testid={`row-invitation-${invitation.id}`}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Mail className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{invitation.email}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="default"
+                                  className={getRoleBadgeClassName(invitation.role)}
+                                  data-testid={`badge-invitation-role-${invitation.id}`}
+                                >
+                                  <RoleIcon className="h-3 w-3 mr-1" />
+                                  {getRoleLabel(invitation.role)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  <span className={isExpired ? "text-destructive" : ""}>
+                                    {format(expiresAt, "MMM d, yyyy")}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <Badge
+                                  variant="default"
+                                  className={getStatusBadgeClassName(isExpired ? "expired" : invitation.status)}
+                                >
+                                  {isExpired ? "Expired" : invitation.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => resendInvitationMutation.mutate(invitation.id)}
+                                    disabled={resendInvitationMutation.isPending}
+                                    data-testid={`button-resend-invitation-${invitation.id}`}
+                                  >
+                                    <RefreshCw className={`h-4 w-4 ${resendInvitationMutation.isPending ? "animate-spin" : ""}`} />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => cancelInvitationMutation.mutate(invitation.id)}
+                                    disabled={cancelInvitationMutation.isPending}
+                                    data-testid={`button-cancel-invitation-${invitation.id}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </div>
           </>
         )}
       </main>
