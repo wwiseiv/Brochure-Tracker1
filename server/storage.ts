@@ -21,7 +21,7 @@ import {
   type OrgMemberRole,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Brochures
@@ -32,6 +32,7 @@ export interface IStorage {
   // Drops
   getDrop(id: number): Promise<DropWithBrochure | undefined>;
   getDropsByAgent(agentId: string): Promise<DropWithBrochure[]>;
+  getDropsByOrganization(agentIds: string[]): Promise<DropWithBrochure[]>;
   createDrop(drop: InsertDrop): Promise<Drop>;
   updateDrop(id: number, data: Partial<Drop>): Promise<Drop | undefined>;
   
@@ -103,6 +104,22 @@ export class DatabaseStorage implements IStorage {
       .from(drops)
       .leftJoin(brochures, eq(drops.brochureId, brochures.id))
       .where(eq(drops.agentId, agentId))
+      .orderBy(desc(drops.droppedAt));
+    
+    return result.map(({ drops: drop, brochures: brochure }) => ({
+      ...drop,
+      brochure: brochure || undefined,
+    }));
+  }
+
+  async getDropsByOrganization(agentIds: string[]): Promise<DropWithBrochure[]> {
+    if (agentIds.length === 0) return [];
+    
+    const result = await db
+      .select()
+      .from(drops)
+      .leftJoin(brochures, eq(drops.brochureId, brochures.id))
+      .where(inArray(drops.agentId, agentIds))
       .orderBy(desc(drops.droppedAt));
     
     return result.map(({ drops: drop, brochures: brochure }) => ({

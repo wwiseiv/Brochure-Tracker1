@@ -736,5 +736,92 @@ export async function registerRoutes(
     }
   });
 
+  // Admin Dashboard API - Get org-wide stats (master_admin only)
+  app.get("/api/admin/stats", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      
+      const agentIds = members.map(m => m.userId);
+      const allDrops = await storage.getDropsByOrganization(agentIds);
+      
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+      
+      const pendingDrops = allDrops.filter(d => d.status === "pending");
+      const convertedDrops = allDrops.filter(d => d.status === "converted");
+      const pickedUpDrops = allDrops.filter(d => d.status === "picked_up" || d.status === "converted");
+      
+      const todaysPickups = pendingDrops.filter(d => {
+        if (!d.pickupScheduledFor) return false;
+        const pickup = new Date(d.pickupScheduledFor);
+        return pickup >= startOfToday && pickup < endOfToday;
+      });
+      
+      const overduePickups = pendingDrops.filter(d => {
+        if (!d.pickupScheduledFor) return false;
+        const pickup = new Date(d.pickupScheduledFor);
+        return pickup < startOfToday;
+      });
+      
+      const rmCount = members.filter(m => m.role === "relationship_manager").length;
+      const agentCount = members.filter(m => m.role === "agent").length;
+      const adminCount = members.filter(m => m.role === "master_admin").length;
+      
+      const conversionRate = allDrops.length > 0 
+        ? (convertedDrops.length / allDrops.length) * 100 
+        : 0;
+      
+      const pickupRate = allDrops.length > 0 
+        ? (pickedUpDrops.length / allDrops.length) * 100 
+        : 0;
+      
+      res.json({
+        organization: {
+          id: membership.organization.id,
+          name: membership.organization.name,
+        },
+        team: {
+          totalMembers: members.length,
+          admins: adminCount,
+          rms: rmCount,
+          agents: agentCount,
+        },
+        drops: {
+          total: allDrops.length,
+          pending: pendingDrops.length,
+          pickedUp: pickedUpDrops.length,
+          converted: convertedDrops.length,
+          todaysPickups: todaysPickups.length,
+          overduePickups: overduePickups.length,
+        },
+        performance: {
+          conversionRate: Math.round(conversionRate * 10) / 10,
+          pickupRate: Math.round(pickupRate * 10) / 10,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+  });
+
+  // Admin Dashboard API - Get all drops in organization (master_admin only)
+  app.get("/api/admin/drops", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      
+      const agentIds = members.map(m => m.userId);
+      const allDrops = await storage.getDropsByOrganization(agentIds);
+      
+      res.json(allDrops);
+    } catch (error) {
+      console.error("Error fetching admin drops:", error);
+      res.status(500).json({ error: "Failed to fetch admin drops" });
+    }
+  });
+
   return httpServer;
 }

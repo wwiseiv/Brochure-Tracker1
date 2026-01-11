@@ -8,9 +8,19 @@ import { EmptyState } from "@/components/EmptyState";
 import { DashboardSkeleton } from "@/components/LoadingState";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
-import { QrCode, ChevronRight, AlertTriangle, Calendar } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield } from "lucide-react";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure } from "@shared/schema";
+
+interface UserRole {
+  role: string;
+  memberId: number;
+  organization: {
+    id: number;
+    name: string;
+  };
+  managerId: number | null;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -18,6 +28,12 @@ export default function DashboardPage() {
   const { data: drops, isLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
   });
+
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
+
+  const isAdmin = userRole?.role === "master_admin";
 
   const pendingDrops = drops?.filter((d) => d.status === "pending") || [];
   
@@ -62,14 +78,23 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <span className="font-semibold">BrochureDrop</span>
-          <Link href="/profile">
-            <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-user">
-              <AvatarImage src={user?.profileImageUrl || undefined} />
-              <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
-            </Avatar>
-          </Link>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="ghost" size="icon" data-testid="button-admin-dashboard">
+                  <Shield className="h-5 w-5 text-purple-600" />
+                </Button>
+              </Link>
+            )}
+            <Link href="/profile">
+              <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-user">
+                <AvatarImage src={user?.profileImageUrl || undefined} />
+                <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
+              </Avatar>
+            </Link>
+          </div>
         </div>
       </header>
 
