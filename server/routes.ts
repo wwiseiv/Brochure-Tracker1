@@ -2681,19 +2681,33 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         });
       });
 
-      const response = await client.chat.completions.create({
-        model: "gpt-5",
-        messages: chatMessages,
-        max_completion_tokens: 1500,
-      });
+      let aiResponse: string | null = null;
+      
+      // Try up to 2 times if we get empty response
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await client.chat.completions.create({
+          model: "gpt-5",
+          messages: chatMessages,
+          max_completion_tokens: 1500,
+          temperature: 0.8,
+        });
 
-      console.log("AI response received:", JSON.stringify(response.choices[0], null, 2));
+        aiResponse = response.choices[0]?.message?.content?.trim() || null;
+        
+        if (aiResponse) {
+          break;
+        }
+        
+        console.log(`AI returned empty response on attempt ${attempt + 1}, retrying...`);
+      }
       
-      const aiResponse = response.choices[0]?.message?.content;
-      
-      if (!aiResponse || aiResponse.trim() === "") {
-        console.error("AI returned empty response. Full response object:", JSON.stringify(response, null, 2));
-        return res.status(500).json({ error: "AI returned empty response. Please try again." });
+      // If still empty after retries, provide a fallback response based on mode
+      if (!aiResponse) {
+        console.error("AI returned empty response after retries");
+        const isCoachingMode = session.mode === "coaching";
+        aiResponse = isCoachingMode
+          ? "I understand what you're asking. Could you rephrase that slightly so I can give you the best advice?"
+          : "Hmm, let me think about that for a second... Actually, can you run that by me again?";
       }
 
       const savedMessage = await storage.createRoleplayMessage({
