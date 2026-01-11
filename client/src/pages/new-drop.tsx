@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -10,6 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -42,11 +53,23 @@ import {
   Phone,
   FileText,
   Calendar,
-  WifiOff
+  WifiOff,
+  AlertTriangle,
+  ShieldAlert,
 } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { BUSINESS_TYPES, type BusinessType } from "@shared/schema";
 import { businessTypeLabels } from "@/components/BusinessTypeIcon";
+
+interface BusinessCheckResult {
+  isProhibited: boolean;
+  isWarning: boolean;
+  matches: Array<{
+    name: string;
+    reason: string;
+    warningOnly?: boolean;
+  }>;
+}
 
 const dropFormSchema = z.object({
   brochureId: z.string().optional(),
@@ -75,6 +98,10 @@ export default function NewDropPage() {
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
   const [voiceDuration, setVoiceDuration] = useState(0);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [businessCheck, setBusinessCheck] = useState<BusinessCheckResult | null>(null);
+  const [isCheckingBusiness, setIsCheckingBusiness] = useState(false);
+  const [showProhibitedDialog, setShowProhibitedDialog] = useState(false);
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const form = useForm<DropFormData>({
     resolver: zodResolver(dropFormSchema),
@@ -89,6 +116,51 @@ export default function NewDropPage() {
     },
   });
 
+  const checkBusinessType = useCallback(async (businessName: string, notes: string) => {
+    if (!businessName.trim() || !isOnline) {
+      setBusinessCheck(null);
+      return;
+    }
+    
+    setIsCheckingBusiness(true);
+    try {
+      const response = await apiRequest("POST", "/api/check-business", {
+        businessName,
+        notes,
+      });
+      const result: BusinessCheckResult = await response.json();
+      setBusinessCheck(result);
+      
+      if (result.isProhibited) {
+        setShowProhibitedDialog(true);
+      }
+    } catch (error) {
+      console.error("Error checking business:", error);
+      setBusinessCheck(null);
+    } finally {
+      setIsCheckingBusiness(false);
+    }
+  }, [isOnline]);
+
+  const watchedBusinessName = form.watch("businessName");
+  const watchedNotes = form.watch("textNotes");
+  
+  useEffect(() => {
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
+    }
+    
+    checkTimeoutRef.current = setTimeout(() => {
+      checkBusinessType(watchedBusinessName || "", watchedNotes || "");
+    }, 500);
+    
+    return () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+    };
+  }, [watchedBusinessName, watchedNotes, checkBusinessType]);
+
   const createDropMutation = useMutation({
     mutationFn: async (data: DropFormData & { 
       latitude?: number; 
@@ -98,22 +170,50 @@ export default function NewDropPage() {
       pickupScheduledFor?: string;
     }) => {
       const response = await apiRequest("POST", "/api/drops", data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.prohibited) {
+          const err = new Error(errorData.error) as any;
+          err.prohibited = true;
+          err.reason = errorData.reason;
+          err.businessType = errorData.businessType;
+          throw err;
+        }
+        throw new Error(errorData.error || "Failed to create drop");
+      }
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/drops"] });
-      toast({
-        title: "Drop logged successfully!",
-        description: `Follow-up scheduled for ${format(new Date(data.pickupScheduledFor), "MMM d, yyyy")}`,
-      });
+      
+      if (data.warning) {
+        toast({
+          title: "Drop logged with notice",
+          description: data.warning.message,
+        });
+      } else {
+        toast({
+          title: "Drop logged successfully!",
+          description: `Follow-up scheduled for ${format(new Date(data.pickupScheduledFor), "MMM d, yyyy")}`,
+        });
+      }
       navigate(`/drops/${data.id}`);
     },
-    onError: (error) => {
-      toast({
-        title: "Failed to log drop",
-        description: error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      if (error.prohibited) {
+        setShowProhibitedDialog(true);
+        toast({
+          title: "Prohibited business type",
+          description: `${error.businessType}: ${error.reason}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to log drop",
+          description: error instanceof Error ? error.message : "Please try again",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -342,6 +442,9 @@ export default function NewDropPage() {
                     <FormLabel className="flex items-center gap-2">
                       <Building2 className="w-4 h-4" />
                       Business Name
+                      {isCheckingBusiness && (
+                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                      )}
                     </FormLabel>
                     <FormControl>
                       <Input 
@@ -355,6 +458,36 @@ export default function NewDropPage() {
                   </FormItem>
                 )}
               />
+
+              {businessCheck?.isProhibited && (
+                <Alert variant="destructive" data-testid="alert-prohibited-business">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>Prohibited Business Type</AlertTitle>
+                  <AlertDescription>
+                    {businessCheck.matches.map((match, idx) => (
+                      <div key={idx} className="mt-1">
+                        <span className="font-medium">{match.name}:</span>{" "}
+                        {match.reason}
+                      </div>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {businessCheck?.isWarning && !businessCheck?.isProhibited && (
+                <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20" data-testid="alert-warning-business">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                  <AlertTitle className="text-amber-800 dark:text-amber-200">Additional Requirements</AlertTitle>
+                  <AlertDescription className="text-amber-700 dark:text-amber-300">
+                    {businessCheck.matches.map((match, idx) => (
+                      <div key={idx} className="mt-1">
+                        <span className="font-medium">{match.name}:</span>{" "}
+                        {match.reason}
+                      </div>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <FormField
                 control={form.control}
@@ -519,6 +652,46 @@ export default function NewDropPage() {
       </main>
 
       <BottomNav />
+
+      <AlertDialog open={showProhibitedDialog} onOpenChange={setShowProhibitedDialog}>
+        <AlertDialogContent data-testid="dialog-prohibited-business">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="w-5 h-5" />
+              Prohibited Business Type
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This business type is prohibited under SignaPay underwriting guidelines and cannot be processed.
+              </p>
+              {businessCheck?.matches.map((match, idx) => (
+                <div key={idx} className="p-3 bg-destructive/10 rounded-md">
+                  <p className="font-medium text-foreground">{match.name}</p>
+                  <p className="text-sm mt-1">{match.reason}</p>
+                </div>
+              ))}
+              <p className="text-sm">
+                Please clear the business name and try a different merchant, or contact your manager if you believe this is an error.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                setShowProhibitedDialog(false);
+                form.setValue("businessName", "");
+                setBusinessCheck(null);
+              }}
+              data-testid="button-clear-business"
+            >
+              Clear Business Name
+            </AlertDialogAction>
+            <AlertDialogCancel data-testid="button-dismiss-dialog">
+              Dismiss
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

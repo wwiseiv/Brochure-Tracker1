@@ -46,6 +46,17 @@ const PURPOSE_OPTIONS = [
   { value: "appointment", label: "Schedule appointment" },
 ];
 
+const BUSINESS_TYPE_OPTIONS = [
+  { value: "restaurant", label: "Restaurant" },
+  { value: "retail", label: "Retail" },
+  { value: "service", label: "Service" },
+  { value: "salon", label: "Salon / Beauty" },
+  { value: "auto", label: "Auto / Repair" },
+  { value: "medical", label: "Medical / Healthcare" },
+  { value: "convenience", label: "Convenience Store" },
+  { value: "other", label: "Other" },
+];
+
 export default function EmailDrafterPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -61,6 +72,8 @@ export default function EmailDrafterPage() {
   const [purpose, setPurpose] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
   const [generatedEmail, setGeneratedEmail] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [agentNotes, setAgentNotes] = useState("");
 
   const polishMutation = useMutation({
     mutationFn: async (data: { draft: string; tone: string; context: string }) => {
@@ -84,7 +97,7 @@ export default function EmailDrafterPage() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async (data: { businessName: string; contactName: string; purpose: string; keyPoints: string; tone: string }) => {
+    mutationFn: async (data: { businessName: string; contactName: string; purpose: string; keyPoints: string; tone: string; businessType?: string; agentNotes?: string }) => {
       const res = await apiRequest("POST", "/api/email/generate", data);
       return res.json();
     },
@@ -125,7 +138,7 @@ export default function EmailDrafterPage() {
       });
       return;
     }
-    generateMutation.mutate({ businessName, contactName, purpose, keyPoints, tone });
+    generateMutation.mutate({ businessName, contactName, purpose, keyPoints, tone, businessType: businessType || undefined, agentNotes: agentNotes || undefined });
   };
 
   const copyToClipboard = async (text: string) => {
@@ -313,24 +326,54 @@ export default function EmailDrafterPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="purpose">Email Purpose *</Label>
-                  <Select value={purpose} onValueChange={setPurpose}>
-                    <SelectTrigger id="purpose" data-testid="select-purpose">
-                      <SelectValue placeholder="Select purpose" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURPOSE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="businessType">Business Type</Label>
+                    <Select value={businessType} onValueChange={setBusinessType}>
+                      <SelectTrigger id="businessType" data-testid="select-business-type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BUSINESS_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="purpose">Email Purpose *</Label>
+                    <Select value={purpose} onValueChange={setPurpose}>
+                      <SelectTrigger id="purpose" data-testid="select-purpose">
+                        <SelectValue placeholder="Select purpose" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PURPOSE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="keyPoints">Key Points (optional)</Label>
+                  <Label htmlFor="agentNotes">Agent Notes from Visit</Label>
+                  <Textarea
+                    id="agentNotes"
+                    placeholder="Paste your notes from the drop here... e.g., Owner mentioned high processing fees, busy during lunch rush, interested in dual pricing..."
+                    value={agentNotes}
+                    onChange={(e) => setAgentNotes(e.target.value)}
+                    className="min-h-[100px]"
+                    data-testid="input-agent-notes"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="keyPoints">Additional Key Points (optional)</Label>
                   <Textarea
                     id="keyPoints"
                     placeholder="Mention the video brochure, discuss competitive rates, schedule a demo..."

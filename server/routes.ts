@@ -23,6 +23,13 @@ import {
   INVITATION_STATUSES,
 } from "@shared/schema";
 import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken } from "./email";
+import {
+  getBusinessRiskProfile,
+  UNDERWRITING_AI_CONTEXT,
+  generateAgentSuggestions,
+  checkProhibitedBusiness,
+} from "./underwriting";
+import { getEmailPrompt, SIGNAPAY_SALES_SCRIPT } from "./sales-script";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -121,6 +128,32 @@ export async function registerRoutes(
     }
   });
 
+  // Check business for prohibited types endpoint
+  app.post("/api/check-business", isAuthenticated, async (req: any, res) => {
+    try {
+      const { businessName, notes } = req.body;
+      
+      if (!businessName || typeof businessName !== "string") {
+        return res.status(400).json({ error: "businessName is required" });
+      }
+      
+      const result = checkProhibitedBusiness(businessName, notes || "");
+      
+      res.json({
+        isProhibited: result.isProhibited,
+        isWarning: result.isWarning,
+        matches: result.matches.map(m => ({
+          name: m.name,
+          reason: m.reason,
+          warningOnly: (m as any).warningOnly || false,
+        })),
+      });
+    } catch (error) {
+      console.error("Error checking business:", error);
+      res.status(500).json({ error: "Failed to check business" });
+    }
+  });
+
   // Drops API
   app.get("/api/drops", isAuthenticated, async (req: any, res) => {
     try {
@@ -201,6 +234,20 @@ export async function registerRoutes(
         await storage.updateBrochureStatus(brochureId, "deployed");
       }
       
+      // Check for prohibited business types
+      const businessName = req.body.businessName || "";
+      const textNotes = req.body.textNotes || "";
+      const prohibitedCheck = checkProhibitedBusiness(businessName, textNotes);
+      
+      if (prohibitedCheck.isProhibited) {
+        return res.status(400).json({
+          error: "Prohibited business type",
+          prohibited: true,
+          reason: prohibitedCheck.matches[0].reason,
+          businessType: prohibitedCheck.matches[0].name,
+        });
+      }
+      
       // Create the drop with validation
       const dropData = {
         ...req.body,
@@ -234,7 +281,19 @@ export async function registerRoutes(
         });
       }
       
-      res.status(201).json(drop);
+      // Include warning flag if business needs additional review
+      const response: any = { ...drop };
+      if (prohibitedCheck.isWarning) {
+        response.warning = {
+          message: "This business type requires additional documentation and review",
+          matches: prohibitedCheck.matches.map(m => ({
+            name: m.name,
+            reason: m.reason,
+          })),
+        };
+      }
+      
+      res.status(201).json(response);
     } catch (error) {
       console.error("Error creating drop:", error);
       res.status(500).json({ error: "Failed to create drop" });
@@ -1361,7 +1420,7 @@ Return ONLY the polished email text, no explanations or meta-commentary.`;
   // Generate email from scratch based on context
   app.post("/api/email/generate", isAuthenticated, async (req: any, res) => {
     try {
-      const { businessName, contactName, purpose, keyPoints, tone } = req.body;
+      const { businessName, contactName, purpose, keyPoints, tone, businessType, agentNotes } = req.body;
       
       if (!businessName || !purpose) {
         return res.status(400).json({ error: "Business name and purpose are required" });
@@ -1369,7 +1428,21 @@ Return ONLY the polished email text, no explanations or meta-commentary.`;
       
       const client = getAIIntegrationsClient();
       
-      const systemPrompt = `You are a professional email writing assistant for sales representatives in the payment processing industry.
+      let systemPrompt: string;
+      let userPrompt: string;
+      
+      if (businessType && agentNotes) {
+        systemPrompt = getEmailPrompt(
+          businessName,
+          contactName || "",
+          businessType,
+          agentNotes,
+          purpose,
+          tone || "professional"
+        );
+        userPrompt = "Generate the email based on the context provided above.";
+      } else {
+        systemPrompt = `You are a professional email writing assistant for sales representatives in the payment processing industry.
 Generate a professional, persuasive email based on the provided context.
 
 Guidelines:
@@ -1381,11 +1454,12 @@ Guidelines:
 
 Return ONLY the email text, no subject line, no explanations.`;
 
-      const userPrompt = `Generate an email for:
+        userPrompt = `Generate an email for:
 Business: ${businessName}
 ${contactName ? `Contact: ${contactName}` : ""}
 Purpose: ${purpose}
 ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
+      }
 
       const response = await client.chat.completions.create({
         model: "gpt-5",
@@ -2074,6 +2148,30 @@ Respond in JSON format:
         return res.status(403).json({ error: "Access denied" });
       }
       
+      // Check if business is prohibited before calling AI
+      const prohibitedCheck = checkProhibitedBusiness(drop.businessName, drop.textNotes || "");
+      if (prohibitedCheck.isProhibited) {
+        const matchReasons = prohibitedCheck.matches.map(m => m.reason).join("; ");
+        const leadScore = await storage.createOrUpdateLeadScore({
+          dropId,
+          score: 0,
+          tier: "cold",
+          factors: JSON.stringify([`PROHIBITED: ${matchReasons}`]),
+          predictedConversion: 0,
+        });
+        
+        return res.status(201).json({
+          ...leadScore,
+          factors: [`PROHIBITED: ${matchReasons}`],
+          suggestions: ["This business type is prohibited under SignaPay underwriting guidelines"],
+          riskLevel: "prohibited",
+          isProhibited: true,
+        });
+      }
+      
+      // Get risk profile for the business type
+      const riskProfile = getBusinessRiskProfile(drop.businessType || "other");
+      
       const client = getAIIntegrationsClient();
       
       // Build context for scoring
@@ -2084,10 +2182,14 @@ Respond in JSON format:
         hasNotes: !!(drop.textNotes || drop.voiceTranscript),
         hasVoiceNote: !!drop.voiceNoteUrl,
         daysSinceDropped: Math.floor((Date.now() - new Date(drop.droppedAt).getTime()) / (1000 * 60 * 60 * 24)),
+        notes: drop.textNotes || "",
+        voiceTranscript: drop.voiceTranscript || "",
       };
       
-      const systemPrompt = `You are a lead scoring AI for a payment processing sales team.
-Score this merchant lead based on the available information.
+      const systemPrompt = `You are a lead scoring AI for SignaPay payment processing sales team.
+Score this merchant lead based on the available information and SignaPay underwriting guidelines.
+
+${UNDERWRITING_AI_CONTEXT}
 
 Score from 0-100 where:
 - 80-100: Hot lead (high conversion probability)
@@ -2095,10 +2197,12 @@ Score from 0-100 where:
 - 0-49: Cold lead (low priority)
 
 Consider:
-- Business type (restaurants and retail score higher)
+- Business type and underwriting risk level
 - Contact info availability
 - Notes/voice notes presence (more info = better)
 - Time since drop (fresher = better)
+- PayLo dual pricing potential
+- Tip handling needs
 
 Respond in JSON format:
 {
@@ -2126,15 +2230,52 @@ Respond in JSON format:
         return res.status(500).json({ error: "Failed to parse AI response" });
       }
       
+      // Apply score boost from risk profile
+      const baseScore = parsed.score || 50;
+      const adjustedScore = Math.max(0, Math.min(100, baseScore + riskProfile.scoreBoost));
+      
+      // Determine tier based on adjusted score
+      let tier: "hot" | "warm" | "cold";
+      if (adjustedScore >= 80) {
+        tier = "hot";
+      } else if (adjustedScore >= 50) {
+        tier = "warm";
+      } else {
+        tier = "cold";
+      }
+      
+      const factors = parsed.factors || [];
+      
+      // Generate agent suggestions based on business type, score, and factors
+      const suggestions = generateAgentSuggestions(
+        drop.businessType || "other",
+        adjustedScore,
+        tier,
+        factors
+      );
+      
+      // Add warning if business is flagged (but not prohibited)
+      if (prohibitedCheck.isWarning) {
+        prohibitedCheck.matches.forEach(m => {
+          factors.unshift(`WARNING: ${m.name} - ${m.reason}`);
+        });
+      }
+      
       const leadScore = await storage.createOrUpdateLeadScore({
         dropId,
-        score: parsed.score || 50,
-        tier: parsed.tier || "warm",
-        factors: JSON.stringify(parsed.factors || []),
+        score: adjustedScore,
+        tier,
+        factors: JSON.stringify(factors),
         predictedConversion: parsed.predictedConversion,
       });
       
-      res.status(201).json(leadScore);
+      res.status(201).json({
+        ...leadScore,
+        factors,
+        suggestions,
+        riskLevel: riskProfile.level,
+        isProhibited: false,
+      });
     } catch (error) {
       console.error("Error calculating lead score:", error);
       res.status(500).json({ error: "Failed to calculate lead score" });
