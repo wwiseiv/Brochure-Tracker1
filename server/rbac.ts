@@ -126,7 +126,7 @@ export function ensureOrgMembership(): RequestHandler {
       next();
     } catch (error) {
       console.error("Error in ensureOrgMembership middleware:", error);
-      next();
+      res.status(500).json({ error: "Failed to verify organization membership" });
     }
   };
 }
