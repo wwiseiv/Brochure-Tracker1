@@ -320,6 +320,13 @@ export const referrals = pgTable("referrals", {
   agentId: varchar("agent_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   convertedAt: timestamp("converted_at"),
+  // Referring party info (the person who gave the referral)
+  referringPartyName: varchar("referring_party_name", { length: 100 }),
+  referringPartyEmail: varchar("referring_party_email", { length: 255 }),
+  referringPartyPhone: varchar("referring_party_phone", { length: 30 }),
+  referringPartyAddress: text("referring_party_address"),
+  referringPartyBusinessName: varchar("referring_party_business_name", { length: 200 }),
+  thankYouEmailSentAt: timestamp("thank_you_email_sent_at"),
 });
 
 export const referralsRelations = relations(referrals, ({ one }) => ({
