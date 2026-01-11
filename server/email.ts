@@ -2,11 +2,12 @@ import { Resend } from "resend";
 
 let resend: Resend | null = null;
 
-function getResendClient(): Resend {
+function getResendClient(): Resend | null {
   if (!resend) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      throw new Error("RESEND_API_KEY not configured");
+      console.error("RESEND_API_KEY is not configured");
+      return null;
     }
     resend = new Resend(apiKey);
   }
@@ -29,6 +30,11 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
   try {
     console.log(`Sending invitation email to ${params.to} for org ${params.organizationName}`);
     const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send invitation email - Resend client not configured");
+      return false;
+    }
     
     const roleLabel = params.role === "master_admin" 
       ? "Admin" 
@@ -113,6 +119,11 @@ interface SendFeedbackParams {
 export async function sendFeedbackEmail(params: SendFeedbackParams): Promise<boolean> {
   try {
     const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send feedback email - Resend client not configured");
+      return false;
+    }
     
     const typeLabel = params.type === "feature_suggestion" 
       ? "Feature Suggestion" 
