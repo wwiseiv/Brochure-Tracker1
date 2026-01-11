@@ -23,6 +23,7 @@ import {
   INVITATION_STATUSES,
 } from "@shared/schema";
 import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail } from "./email";
+import { exportReferrals, exportDrops, exportMerchants, ExportFormat } from "./export";
 import {
   getBusinessRiskProfile,
   UNDERWRITING_AI_CONTEXT,
@@ -2293,6 +2294,104 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     } catch (error) {
       console.error("Error sending thank you email:", error);
       res.status(500).json({ error: "Failed to send thank you email" });
+    }
+  });
+
+  // ============================================
+  // EXPORT API (Data Export to CSV/Excel)
+  // ============================================
+
+  app.get("/api/referrals/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const format = (req.query.format as ExportFormat) || "csv";
+      const status = req.query.status as string | undefined;
+      
+      if (!["csv", "xlsx"].includes(format)) {
+        return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
+      }
+      
+      let referrals = await storage.getReferralsByAgent(userId);
+      
+      if (status && status !== "all") {
+        referrals = referrals.filter(r => r.status === status);
+      }
+      
+      const filename = `referrals_export_${new Date().toISOString().split("T")[0]}`;
+      const buffer = await exportReferrals(referrals, { format, filename });
+      
+      const contentType = format === "csv" 
+        ? "text/csv; charset=utf-8"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      const extension = format === "csv" ? "csv" : "xlsx";
+      
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}.${extension}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting referrals:", error);
+      res.status(500).json({ error: "Failed to export referrals" });
+    }
+  });
+
+  app.get("/api/drops/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const format = (req.query.format as ExportFormat) || "csv";
+      const status = req.query.status as string | undefined;
+      
+      if (!["csv", "xlsx"].includes(format)) {
+        return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
+      }
+      
+      let drops = await storage.getDropsByAgent(userId);
+      
+      if (status && status !== "all") {
+        drops = drops.filter(d => d.status === status);
+      }
+      
+      const filename = `drops_export_${new Date().toISOString().split("T")[0]}`;
+      const buffer = await exportDrops(drops, { format, filename });
+      
+      const contentType = format === "csv" 
+        ? "text/csv; charset=utf-8"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      const extension = format === "csv" ? "csv" : "xlsx";
+      
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}.${extension}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting drops:", error);
+      res.status(500).json({ error: "Failed to export drops" });
+    }
+  });
+
+  app.get("/api/merchants/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const format = (req.query.format as ExportFormat) || "csv";
+      
+      if (!["csv", "xlsx"].includes(format)) {
+        return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
+      }
+      
+      const merchants = await storage.getMerchantsByOrg(membership.organization.id);
+      
+      const filename = `merchants_export_${new Date().toISOString().split("T")[0]}`;
+      const buffer = await exportMerchants(merchants, { format, filename });
+      
+      const contentType = format === "csv" 
+        ? "text/csv; charset=utf-8"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      const extension = format === "csv" ? "csv" : "xlsx";
+      
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}.${extension}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting merchants:", error);
+      res.status(500).json({ error: "Failed to export merchants" });
     }
   });
 
