@@ -99,7 +99,10 @@ export async function registerRoutes(
       // Seed demo data for new users with no drops
       if (drops.length === 0) {
         console.log(`Seeding demo data for new user: ${userId}`);
-        await storage.seedDemoData(userId);
+        // Get or create user's organization membership for demo data
+        let membership = await storage.getUserMembership(userId);
+        const orgId = membership?.organization?.id || null;
+        await storage.seedDemoData(userId, orgId);
         drops = await storage.getDropsByAgent(userId);
       }
       
@@ -139,6 +142,10 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       
+      // Get user's organization membership
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+      
       // Check if brochure exists, create if not
       const brochureId = req.body.brochureId;
       let brochure = await storage.getBrochure(brochureId);
@@ -148,6 +155,7 @@ export async function registerRoutes(
         brochure = await storage.createBrochure({
           id: brochureId,
           status: "deployed",
+          orgId: orgId,
         });
       } else {
         // Update brochure status to deployed
@@ -158,6 +166,7 @@ export async function registerRoutes(
       const dropData = {
         ...req.body,
         agentId: userId,
+        orgId: orgId,
         status: req.body.status || "pending",
       };
       
