@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,8 @@ import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
+import { useOfflineSync } from "@/hooks/use-offline-sync";
+import { saveOfflineDrop } from "@/lib/offlineStore";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   ArrowLeft, 
@@ -38,7 +41,8 @@ import {
   User,
   Phone,
   FileText,
-  Calendar
+  Calendar,
+  WifiOff
 } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { BUSINESS_TYPES, type BusinessType } from "@shared/schema";
@@ -63,12 +67,14 @@ export default function NewDropPage() {
   
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
+  const { isOnline, refreshPendingDrops } = useOfflineSync();
   
   const [isLocating, setIsLocating] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
   const [voiceDuration, setVoiceDuration] = useState(0);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
 
   const form = useForm<DropFormData>({
     resolver: zodResolver(dropFormSchema),
@@ -176,6 +182,43 @@ export default function NewDropPage() {
   };
 
   const onSubmit = async (data: DropFormData) => {
+    const followUpDays = parseInt(data.followUpDays) || 3;
+    const pickupScheduledFor = addDays(new Date(), followUpDays).toISOString();
+
+    if (!isOnline) {
+      setIsSavingOffline(true);
+      try {
+        await saveOfflineDrop({
+          brochureId: data.brochureId,
+          businessName: data.businessName,
+          businessType: data.businessType,
+          contactName: data.contactName,
+          businessPhone: data.businessPhone,
+          textNotes: data.textNotes,
+          followUpDays: data.followUpDays,
+          latitude: location?.lat,
+          longitude: location?.lng,
+          address,
+          pickupScheduledFor,
+        });
+        await refreshPendingDrops();
+        toast({
+          title: "Saved Offline",
+          description: "This drop will sync automatically when you're back online.",
+        });
+        navigate("/");
+      } catch (error) {
+        toast({
+          title: "Failed to save offline",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSavingOffline(false);
+      }
+      return;
+    }
+
     let voiceNoteUrl: string | undefined;
     
     if (voiceBlob) {
@@ -184,9 +227,6 @@ export default function NewDropPage() {
         voiceNoteUrl = uploadResult.objectPath;
       }
     }
-    
-    const followUpDays = parseInt(data.followUpDays) || 3;
-    const pickupScheduledFor = addDays(new Date(), followUpDays).toISOString();
     
     createDropMutation.mutate({
       ...data,
@@ -198,7 +238,7 @@ export default function NewDropPage() {
     });
   };
 
-  const isSubmitting = createDropMutation.isPending || isUploading;
+  const isSubmitting = createDropMutation.isPending || isUploading || isSavingOffline;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -213,6 +253,12 @@ export default function NewDropPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <span className="font-semibold">New Drop</span>
+          {!isOnline && (
+            <Badge variant="secondary" className="ml-auto gap-1" data-testid="badge-offline">
+              <WifiOff className="w-3 h-3" />
+              Offline
+            </Badge>
+          )}
         </div>
       </header>
 
@@ -432,10 +478,9 @@ export default function NewDropPage() {
                     <SelectContent>
                       <SelectItem value="1">1 day</SelectItem>
                       <SelectItem value="2">2 days</SelectItem>
-                      <SelectItem value="3">3 days (recommended)</SelectItem>
+                      <SelectItem value="3">3 days (default)</SelectItem>
+                      <SelectItem value="4">4 days</SelectItem>
                       <SelectItem value="5">5 days</SelectItem>
-                      <SelectItem value="7">1 week</SelectItem>
-                      <SelectItem value="14">2 weeks</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground mt-1">

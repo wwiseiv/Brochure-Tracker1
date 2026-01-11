@@ -4,7 +4,21 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { requireRole, requireOrgAccess, ensureOrgMembership, bootstrapUserOrganization } from "./rbac";
-import { insertDropSchema, insertBrochureSchema, insertReminderSchema, updateUserPreferencesSchema, ORG_MEMBER_ROLES, insertOrganizationMemberSchema } from "@shared/schema";
+import { 
+  insertDropSchema, 
+  insertBrochureSchema, 
+  insertReminderSchema, 
+  updateUserPreferencesSchema, 
+  ORG_MEMBER_ROLES, 
+  insertOrganizationMemberSchema,
+  insertMerchantSchema,
+  insertReferralSchema,
+  insertFollowUpSequenceSchema,
+  insertFollowUpStepSchema,
+  insertActivityEventSchema,
+  REFERRAL_STATUSES,
+  LEAD_TIERS,
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -220,6 +234,80 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating drop:", error);
       res.status(500).json({ error: "Failed to create drop" });
+    }
+  });
+
+  // Offline sync endpoint - create drops that were saved offline
+  app.post("/api/offline/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get user's organization membership
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+      
+      // Handle brochure ID - use provided one or generate a manual entry ID
+      let brochureId = req.body.brochureId;
+      if (!brochureId || brochureId.trim() === "") {
+        const timestamp = Date.now().toString(36);
+        const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+        brochureId = `OFFLINE-${timestamp}-${randomPart}`;
+      }
+      
+      // Check if brochure exists, create if not
+      let brochure = await storage.getBrochure(brochureId);
+      
+      if (!brochure) {
+        brochure = await storage.createBrochure({
+          id: brochureId,
+          status: "deployed",
+          orgId: orgId,
+        });
+      } else {
+        await storage.updateBrochureStatus(brochureId, "deployed");
+      }
+      
+      // Create the drop with validation
+      const dropData = {
+        ...req.body,
+        brochureId: brochureId,
+        agentId: userId,
+        orgId: orgId,
+        status: req.body.status || "pending",
+      };
+      
+      const parsed = insertDropSchema.safeParse(dropData);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+      
+      const drop = await storage.createDrop(parsed.data);
+      
+      // Create a reminder for the pickup
+      if (drop.pickupScheduledFor) {
+        await storage.createReminder({
+          dropId: drop.id,
+          agentId: userId,
+          remindAt: new Date(drop.pickupScheduledFor),
+          method: "push",
+        });
+      }
+      
+      res.status(201).json({ 
+        success: true, 
+        drop,
+        syncedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error syncing offline drop:", error);
+      res.status(500).json({ error: "Failed to sync offline drop" });
     }
   });
 
@@ -1056,6 +1144,902 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     } catch (error) {
       console.error("Error generating email:", error);
       res.status(500).json({ error: "Failed to generate email" });
+    }
+  });
+
+  // ============================================
+  // MERCHANTS API (Merchant Profiles)
+  // ============================================
+  
+  app.get("/api/merchants", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const merchants = await storage.getMerchantsByOrg(membership.organization.id);
+      res.json(merchants);
+    } catch (error) {
+      console.error("Error fetching merchants:", error);
+      res.status(500).json({ error: "Failed to fetch merchants" });
+    }
+  });
+
+  app.get("/api/merchants/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      // Verify merchant belongs to user's org
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(merchant);
+    } catch (error) {
+      console.error("Error fetching merchant:", error);
+      res.status(500).json({ error: "Failed to fetch merchant" });
+    }
+  });
+
+  app.post("/api/merchants", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const data = { ...req.body, orgId: membership.organization.id };
+      
+      const parsed = insertMerchantSchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const merchant = await storage.createMerchant(parsed.data);
+      res.status(201).json(merchant);
+    } catch (error) {
+      console.error("Error creating merchant:", error);
+      res.status(500).json({ error: "Failed to create merchant" });
+    }
+  });
+
+  app.patch("/api/merchants/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const updated = await storage.updateMerchant(merchantId, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating merchant:", error);
+      res.status(500).json({ error: "Failed to update merchant" });
+    }
+  });
+
+  // Get merchant visit history (drops for this merchant)
+  app.get("/api/merchants/:id/visits", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Get all members of org to fetch their drops
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      const agentIds = members.map(m => m.userId);
+      const allDrops = await storage.getDropsByOrganization(agentIds);
+      
+      // Filter drops that match this merchant's business name
+      const visits = allDrops.filter(d => 
+        d.businessName?.toLowerCase() === merchant.businessName.toLowerCase()
+      );
+      
+      res.json(visits);
+    } catch (error) {
+      console.error("Error fetching merchant visits:", error);
+      res.status(500).json({ error: "Failed to fetch merchant visits" });
+    }
+  });
+
+  // ============================================
+  // INVENTORY API (Inventory Tracking)
+  // ============================================
+  
+  app.get("/api/inventory", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const inventory = await storage.getAgentInventory(membership.organization.id, userId);
+      res.json(inventory || { brochuresOnHand: 0, brochuresDeployed: 0, lowStockThreshold: 10 });
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
+  app.get("/api/inventory/all", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const allInventory = await storage.getAllAgentInventory(membership.organization.id);
+      res.json(allInventory);
+    } catch (error) {
+      console.error("Error fetching all inventory:", error);
+      res.status(500).json({ error: "Failed to fetch all inventory" });
+    }
+  });
+
+  app.post("/api/inventory/restock", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const { quantity, notes } = req.body;
+      
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ error: "Quantity must be positive" });
+      }
+      
+      // Get current inventory or create new
+      let inventory = await storage.getAgentInventory(membership.organization.id, userId);
+      const newOnHand = (inventory?.brochuresOnHand || 0) + quantity;
+      
+      inventory = await storage.createOrUpdateAgentInventory({
+        orgId: membership.organization.id,
+        agentId: userId,
+        brochuresOnHand: newOnHand,
+        brochuresDeployed: inventory?.brochuresDeployed || 0,
+        lowStockThreshold: inventory?.lowStockThreshold || 10,
+        lastRestockAt: new Date(),
+      });
+      
+      // Log the restock
+      await storage.createInventoryLog({
+        orgId: membership.organization.id,
+        agentId: userId,
+        changeType: "restock",
+        quantity,
+        notes,
+      });
+      
+      // Create activity event
+      await storage.createActivityEvent({
+        orgId: membership.organization.id,
+        agentId: userId,
+        agentName: req.user.claims.name || req.user.claims.email,
+        eventType: "inventory_restock",
+        title: `Restocked ${quantity} brochures`,
+        description: notes,
+      });
+      
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error restocking inventory:", error);
+      res.status(500).json({ error: "Failed to restock inventory" });
+    }
+  });
+
+  app.patch("/api/inventory/threshold", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const { threshold } = req.body;
+      
+      if (threshold === undefined || threshold < 0) {
+        return res.status(400).json({ error: "Threshold must be a positive number" });
+      }
+      
+      let inventory = await storage.getAgentInventory(membership.organization.id, userId);
+      if (!inventory) {
+        inventory = await storage.createOrUpdateAgentInventory({
+          orgId: membership.organization.id,
+          agentId: userId,
+          brochuresOnHand: 0,
+          brochuresDeployed: 0,
+          lowStockThreshold: threshold,
+        });
+      } else {
+        inventory = await storage.updateAgentInventory(inventory.id, { lowStockThreshold: threshold });
+      }
+      
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error updating threshold:", error);
+      res.status(500).json({ error: "Failed to update threshold" });
+    }
+  });
+
+  app.get("/api/inventory/logs", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      const logs = await storage.getInventoryLogs(membership.organization.id, userId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching inventory logs:", error);
+      res.status(500).json({ error: "Failed to fetch inventory logs" });
+    }
+  });
+
+  // ============================================
+  // REFERRALS API (Referral Tracking)
+  // ============================================
+  
+  app.get("/api/referrals", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const referrals = await storage.getReferralsByAgent(userId);
+      res.json(referrals);
+    } catch (error) {
+      console.error("Error fetching referrals:", error);
+      res.status(500).json({ error: "Failed to fetch referrals" });
+    }
+  });
+
+  app.get("/api/referrals/all", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const referrals = await storage.getReferralsByOrg(membership.organization.id);
+      res.json(referrals);
+    } catch (error) {
+      console.error("Error fetching all referrals:", error);
+      res.status(500).json({ error: "Failed to fetch all referrals" });
+    }
+  });
+
+  app.post("/api/referrals", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      
+      const data = {
+        ...req.body,
+        orgId: membership.organization.id,
+        agentId: userId,
+        status: req.body.status || "pending",
+      };
+      
+      const parsed = insertReferralSchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const referral = await storage.createReferral(parsed.data);
+      
+      // Create activity event
+      await storage.createActivityEvent({
+        orgId: membership.organization.id,
+        agentId: userId,
+        agentName: req.user.claims.name || req.user.claims.email,
+        eventType: "referral_added",
+        entityType: "referral",
+        entityId: referral.id,
+        title: `New referral: ${referral.referredBusinessName}`,
+        description: `Referred by drop #${referral.sourceDropId}`,
+      });
+      
+      res.status(201).json(referral);
+    } catch (error) {
+      console.error("Error creating referral:", error);
+      res.status(500).json({ error: "Failed to create referral" });
+    }
+  });
+
+  app.patch("/api/referrals/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const referralId = parseInt(req.params.id);
+      if (isNaN(referralId)) {
+        return res.status(400).json({ error: "Invalid referral ID" });
+      }
+      
+      const userId = req.user.claims.sub;
+      const referral = await storage.getReferral(referralId);
+      
+      if (!referral) {
+        return res.status(404).json({ error: "Referral not found" });
+      }
+      
+      if (referral.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const updateData = { ...req.body };
+      if (req.body.status === "converted" && !referral.convertedAt) {
+        updateData.convertedAt = new Date();
+        
+        // Create activity event for conversion
+        const membership = req.orgMembership;
+        await storage.createActivityEvent({
+          orgId: membership.organization.id,
+          agentId: userId,
+          agentName: req.user.claims.name || req.user.claims.email,
+          eventType: "referral_converted",
+          entityType: "referral",
+          entityId: referral.id,
+          title: `Referral converted: ${referral.referredBusinessName}`,
+        });
+      }
+      
+      const updated = await storage.updateReferral(referralId, updateData);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating referral:", error);
+      res.status(500).json({ error: "Failed to update referral" });
+    }
+  });
+
+  // ============================================
+  // ACTIVITY FEED API (Team Activity Feed)
+  // ============================================
+  
+  app.get("/api/activity", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const events = await storage.getActivityEventsByOrg(membership.organization.id, limit);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching activity feed:", error);
+      res.status(500).json({ error: "Failed to fetch activity feed" });
+    }
+  });
+
+  app.get("/api/activity/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const events = await storage.getActivityEventsByAgent(userId, limit);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching my activity:", error);
+      res.status(500).json({ error: "Failed to fetch my activity" });
+    }
+  });
+
+  // ============================================
+  // FOLLOW-UP SEQUENCES API
+  // ============================================
+  
+  app.get("/api/sequences", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const sequences = await storage.getFollowUpSequencesByOrg(membership.organization.id);
+      res.json(sequences);
+    } catch (error) {
+      console.error("Error fetching sequences:", error);
+      res.status(500).json({ error: "Failed to fetch sequences" });
+    }
+  });
+
+  app.get("/api/sequences/:id", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const sequenceId = parseInt(req.params.id);
+      if (isNaN(sequenceId)) {
+        return res.status(400).json({ error: "Invalid sequence ID" });
+      }
+      
+      const sequence = await storage.getFollowUpSequence(sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (sequence.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const steps = await storage.getFollowUpSteps(sequenceId);
+      res.json({ ...sequence, steps });
+    } catch (error) {
+      console.error("Error fetching sequence:", error);
+      res.status(500).json({ error: "Failed to fetch sequence" });
+    }
+  });
+
+  app.post("/api/sequences", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership;
+      
+      const data = {
+        ...req.body,
+        orgId: membership.organization.id,
+        createdBy: userId,
+      };
+      
+      const parsed = insertFollowUpSequenceSchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const sequence = await storage.createFollowUpSequence(parsed.data);
+      res.status(201).json(sequence);
+    } catch (error) {
+      console.error("Error creating sequence:", error);
+      res.status(500).json({ error: "Failed to create sequence" });
+    }
+  });
+
+  app.post("/api/sequences/:id/steps", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const sequenceId = parseInt(req.params.id);
+      if (isNaN(sequenceId)) {
+        return res.status(400).json({ error: "Invalid sequence ID" });
+      }
+      
+      const sequence = await storage.getFollowUpSequence(sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (sequence.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const data = { ...req.body, sequenceId };
+      const parsed = insertFollowUpStepSchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const step = await storage.createFollowUpStep(parsed.data);
+      res.status(201).json(step);
+    } catch (error) {
+      console.error("Error creating step:", error);
+      res.status(500).json({ error: "Failed to create step" });
+    }
+  });
+
+  // Start a follow-up sequence for a drop
+  app.post("/api/drops/:id/sequence", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      const { sequenceId } = req.body;
+      
+      if (isNaN(dropId) || !sequenceId) {
+        return res.status(400).json({ error: "Drop ID and sequence ID are required" });
+      }
+      
+      const drop = await storage.getDrop(dropId);
+      if (!drop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      const userId = req.user.claims.sub;
+      if (drop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const sequence = await storage.getFollowUpSequence(sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
+      const steps = await storage.getFollowUpSteps(sequenceId);
+      if (steps.length === 0) {
+        return res.status(400).json({ error: "Sequence has no steps" });
+      }
+      
+      // Calculate next execution time based on first step
+      const nextExecutionAt = new Date();
+      nextExecutionAt.setDate(nextExecutionAt.getDate() + steps[0].delayDays);
+      
+      const execution = await storage.createFollowUpExecution({
+        dropId,
+        sequenceId,
+        currentStep: 1,
+        status: "active",
+        nextExecutionAt,
+      });
+      
+      // Create activity event
+      const membership = req.orgMembership;
+      await storage.createActivityEvent({
+        orgId: membership.organization.id,
+        agentId: userId,
+        agentName: req.user.claims.name || req.user.claims.email,
+        eventType: "sequence_started",
+        entityType: "drop",
+        entityId: dropId,
+        title: `Started "${sequence.name}" sequence`,
+        description: `For ${drop.businessName}`,
+      });
+      
+      res.status(201).json(execution);
+    } catch (error) {
+      console.error("Error starting sequence:", error);
+      res.status(500).json({ error: "Failed to start sequence" });
+    }
+  });
+
+  // ============================================
+  // AI SUMMARIES API (AI Call/Visit Summaries)
+  // ============================================
+  
+  app.get("/api/drops/:id/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const drop = await storage.getDrop(dropId);
+      if (!drop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      const userId = req.user.claims.sub;
+      if (drop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const summary = await storage.getAiSummary(dropId);
+      res.json(summary || null);
+    } catch (error) {
+      console.error("Error fetching AI summary:", error);
+      res.status(500).json({ error: "Failed to fetch AI summary" });
+    }
+  });
+
+  app.post("/api/drops/:id/summary", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const drop = await storage.getDrop(dropId);
+      if (!drop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      const userId = req.user.claims.sub;
+      if (drop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Check if there's transcript or notes to summarize
+      const transcript = drop.voiceTranscript || drop.textNotes;
+      if (!transcript) {
+        return res.status(400).json({ error: "No transcript or notes to summarize" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are an AI assistant analyzing a sales representative's notes or voice transcript from a merchant visit.
+
+Extract and provide:
+1. A brief summary (2-3 sentences)
+2. Key takeaways (bullet points)
+3. Any objections or concerns mentioned
+4. Recommended next steps
+5. Overall sentiment (positive, neutral, or negative)
+6. Whether this seems like a "hot lead" (likely to convert)
+
+Respond in JSON format:
+{
+  "summary": "...",
+  "keyTakeaways": ["..."],
+  "objections": ["..."],
+  "nextSteps": ["..."],
+  "sentiment": "positive|neutral|negative",
+  "hotLead": true|false
+}`;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Analyze this merchant visit notes/transcript:\n\n${transcript}` }
+        ],
+        max_completion_tokens: 1024,
+        response_format: { type: "json_object" }
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      let parsed;
+      try {
+        parsed = JSON.parse(content || "{}");
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+      
+      const summary = await storage.createAiSummary({
+        dropId,
+        summary: parsed.summary,
+        keyTakeaways: JSON.stringify(parsed.keyTakeaways || []),
+        objections: JSON.stringify(parsed.objections || []),
+        nextSteps: JSON.stringify(parsed.nextSteps || []),
+        sentiment: parsed.sentiment,
+        hotLead: parsed.hotLead || false,
+      });
+      
+      res.status(201).json(summary);
+    } catch (error) {
+      console.error("Error generating AI summary:", error);
+      res.status(500).json({ error: "Failed to generate AI summary" });
+    }
+  });
+
+  // ============================================
+  // LEAD SCORING API
+  // ============================================
+  
+  app.get("/api/drops/:id/score", isAuthenticated, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const score = await storage.getLeadScore(dropId);
+      res.json(score || null);
+    } catch (error) {
+      console.error("Error fetching lead score:", error);
+      res.status(500).json({ error: "Failed to fetch lead score" });
+    }
+  });
+
+  app.post("/api/drops/:id/score", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const drop = await storage.getDrop(dropId);
+      if (!drop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      const userId = req.user.claims.sub;
+      if (drop.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      // Build context for scoring
+      const context = {
+        businessType: drop.businessType,
+        businessName: drop.businessName,
+        hasContactInfo: !!(drop.contactName || drop.businessPhone),
+        hasNotes: !!(drop.textNotes || drop.voiceTranscript),
+        hasVoiceNote: !!drop.voiceNoteUrl,
+        daysSinceDropped: Math.floor((Date.now() - new Date(drop.droppedAt).getTime()) / (1000 * 60 * 60 * 24)),
+      };
+      
+      const systemPrompt = `You are a lead scoring AI for a payment processing sales team.
+Score this merchant lead based on the available information.
+
+Score from 0-100 where:
+- 80-100: Hot lead (high conversion probability)
+- 50-79: Warm lead (moderate interest)
+- 0-49: Cold lead (low priority)
+
+Consider:
+- Business type (restaurants and retail score higher)
+- Contact info availability
+- Notes/voice notes presence (more info = better)
+- Time since drop (fresher = better)
+
+Respond in JSON format:
+{
+  "score": <number 0-100>,
+  "tier": "hot|warm|cold",
+  "factors": ["reason1", "reason2", ...],
+  "predictedConversion": <number 0-1>
+}`;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Score this lead:\n${JSON.stringify(context, null, 2)}` }
+        ],
+        max_completion_tokens: 512,
+        response_format: { type: "json_object" }
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      let parsed;
+      try {
+        parsed = JSON.parse(content || "{}");
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+      
+      const leadScore = await storage.createOrUpdateLeadScore({
+        dropId,
+        score: parsed.score || 50,
+        tier: parsed.tier || "warm",
+        factors: JSON.stringify(parsed.factors || []),
+        predictedConversion: parsed.predictedConversion,
+      });
+      
+      res.status(201).json(leadScore);
+    } catch (error) {
+      console.error("Error calculating lead score:", error);
+      res.status(500).json({ error: "Failed to calculate lead score" });
+    }
+  });
+
+  // ============================================
+  // ROUTE OPTIMIZER API
+  // ============================================
+  
+  app.get("/api/route/today", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const today = new Date();
+      
+      const drops = await storage.getDropsForRoute(userId, today);
+      
+      // If we have drops with locations, optimize the route
+      const dropsWithLocation = drops.filter(d => d.latitude && d.longitude);
+      
+      if (dropsWithLocation.length <= 1) {
+        // No optimization needed
+        return res.json({
+          optimized: false,
+          drops: dropsWithLocation,
+          totalDistance: null,
+          estimatedTime: null,
+        });
+      }
+      
+      // Simple nearest-neighbor algorithm for route optimization
+      const optimizeRoute = (locations: typeof dropsWithLocation) => {
+        if (locations.length === 0) return [];
+        
+        const result = [locations[0]];
+        const remaining = [...locations.slice(1)];
+        
+        while (remaining.length > 0) {
+          const current = result[result.length - 1];
+          let nearestIdx = 0;
+          let nearestDist = Infinity;
+          
+          for (let i = 0; i < remaining.length; i++) {
+            const dist = Math.sqrt(
+              Math.pow(remaining[i].latitude! - current.latitude!, 2) +
+              Math.pow(remaining[i].longitude! - current.longitude!, 2)
+            );
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              nearestIdx = i;
+            }
+          }
+          
+          result.push(remaining[nearestIdx]);
+          remaining.splice(nearestIdx, 1);
+        }
+        
+        return result;
+      };
+      
+      const optimizedDrops = optimizeRoute(dropsWithLocation);
+      
+      // Estimate total distance (rough approximation using lat/lng)
+      let totalDistance = 0;
+      for (let i = 1; i < optimizedDrops.length; i++) {
+        const prev = optimizedDrops[i - 1];
+        const curr = optimizedDrops[i];
+        // Approximate distance in km using Haversine-like simplification
+        const latDiff = Math.abs(curr.latitude! - prev.latitude!) * 111;
+        const lngDiff = Math.abs(curr.longitude! - prev.longitude!) * 85;
+        totalDistance += Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      }
+      
+      res.json({
+        optimized: true,
+        drops: optimizedDrops,
+        totalDistance: Math.round(totalDistance * 10) / 10,
+        estimatedTime: Math.round(optimizedDrops.length * 15 + totalDistance * 2), // rough estimate in minutes
+      });
+    } catch (error) {
+      console.error("Error optimizing route:", error);
+      res.status(500).json({ error: "Failed to optimize route" });
+    }
+  });
+
+  // Get route for a specific date
+  app.get("/api/route/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = new Date(req.params.date);
+      
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ error: "Invalid date" });
+      }
+      
+      const drops = await storage.getDropsForRoute(userId, date);
+      res.json(drops);
+    } catch (error) {
+      console.error("Error fetching route drops:", error);
+      res.status(500).json({ error: "Failed to fetch route drops" });
+    }
+  });
+
+  // ============================================
+  // OFFLINE SYNC API
+  // ============================================
+  
+  app.post("/api/offline/sync", isAuthenticated, ensureOrgMembership, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { actions } = req.body;
+      
+      if (!Array.isArray(actions)) {
+        return res.status(400).json({ error: "Actions must be an array" });
+      }
+      
+      const results = [];
+      
+      for (const action of actions) {
+        try {
+          if (action.type === "create_drop") {
+            // Create the drop
+            const membership = req.orgMembership;
+            let brochureId = action.payload.brochureId;
+            if (!brochureId || brochureId.trim() === "") {
+              const timestamp = Date.now().toString(36);
+              const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+              brochureId = `MANUAL-${timestamp}-${randomPart}`;
+            }
+            
+            let brochure = await storage.getBrochure(brochureId);
+            if (!brochure) {
+              brochure = await storage.createBrochure({
+                id: brochureId,
+                status: "deployed",
+                orgId: membership.organization.id,
+              });
+            }
+            
+            const dropData = {
+              ...action.payload,
+              brochureId,
+              agentId: userId,
+              orgId: membership.organization.id,
+              status: "pending",
+            };
+            
+            const drop = await storage.createDrop(dropData);
+            results.push({ localId: action.localId, serverId: drop.id, success: true });
+          } else if (action.type === "update_drop") {
+            const updated = await storage.updateDrop(action.dropId, action.payload);
+            results.push({ localId: action.localId, success: !!updated });
+          }
+        } catch (err) {
+          console.error("Error processing offline action:", err);
+          results.push({ localId: action.localId, success: false, error: (err as Error).message });
+        }
+      }
+      
+      res.json({ results });
+    } catch (error) {
+      console.error("Error syncing offline data:", error);
+      res.status(500).json({ error: "Failed to sync offline data" });
     }
   });
 

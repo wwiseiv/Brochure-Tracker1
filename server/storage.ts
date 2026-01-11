@@ -5,6 +5,17 @@ import {
   userPreferences,
   organizations,
   organizationMembers,
+  merchants,
+  agentInventory,
+  inventoryLogs,
+  referrals,
+  followUpSequences,
+  followUpSteps,
+  followUpExecutions,
+  activityEvents,
+  aiSummaries,
+  leadScores,
+  offlineQueue,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -19,9 +30,31 @@ import {
   type OrganizationMember,
   type InsertOrganizationMember,
   type OrgMemberRole,
+  type Merchant,
+  type InsertMerchant,
+  type AgentInventory,
+  type InsertAgentInventory,
+  type InventoryLog,
+  type InsertInventoryLog,
+  type Referral,
+  type InsertReferral,
+  type FollowUpSequence,
+  type InsertFollowUpSequence,
+  type FollowUpStep,
+  type InsertFollowUpStep,
+  type FollowUpExecution,
+  type InsertFollowUpExecution,
+  type ActivityEvent,
+  type InsertActivityEvent,
+  type AiSummary,
+  type InsertAiSummary,
+  type LeadScore,
+  type InsertLeadScore,
+  type OfflineQueue,
+  type InsertOfflineQueue,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // Brochures
@@ -342,6 +375,267 @@ export class DatabaseStorage implements IStorage {
 
   async getAgentsByManager(managerId: number): Promise<OrganizationMember[]> {
     return db.select().from(organizationMembers).where(eq(organizationMembers.managerId, managerId));
+  }
+
+  // Merchants
+  async getMerchant(id: number): Promise<Merchant | undefined> {
+    const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id));
+    return merchant;
+  }
+
+  async getMerchantsByOrg(orgId: number): Promise<Merchant[]> {
+    return db.select().from(merchants).where(eq(merchants.orgId, orgId)).orderBy(desc(merchants.lastVisitAt));
+  }
+
+  async getMerchantByBusinessName(orgId: number, businessName: string): Promise<Merchant | undefined> {
+    const [merchant] = await db.select().from(merchants)
+      .where(and(eq(merchants.orgId, orgId), eq(merchants.businessName, businessName)));
+    return merchant;
+  }
+
+  async createMerchant(data: InsertMerchant): Promise<Merchant> {
+    const [created] = await db.insert(merchants).values(data).returning();
+    return created;
+  }
+
+  async updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined> {
+    const [updated] = await db.update(merchants).set({ ...data, updatedAt: new Date() }).where(eq(merchants.id, id)).returning();
+    return updated;
+  }
+
+  // Agent Inventory
+  async getAgentInventory(orgId: number, agentId: string): Promise<AgentInventory | undefined> {
+    const [inv] = await db.select().from(agentInventory)
+      .where(and(eq(agentInventory.orgId, orgId), eq(agentInventory.agentId, agentId)));
+    return inv;
+  }
+
+  async getAllAgentInventory(orgId: number): Promise<AgentInventory[]> {
+    return db.select().from(agentInventory).where(eq(agentInventory.orgId, orgId));
+  }
+
+  async createOrUpdateAgentInventory(data: InsertAgentInventory): Promise<AgentInventory> {
+    const existing = await this.getAgentInventory(data.orgId, data.agentId);
+    if (existing) {
+      const [updated] = await db.update(agentInventory)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(agentInventory.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(agentInventory).values(data).returning();
+    return created;
+  }
+
+  async updateAgentInventory(id: number, data: Partial<AgentInventory>): Promise<AgentInventory | undefined> {
+    const [updated] = await db.update(agentInventory)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(agentInventory.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createInventoryLog(data: InsertInventoryLog): Promise<InventoryLog> {
+    const [created] = await db.insert(inventoryLogs).values(data).returning();
+    return created;
+  }
+
+  async getInventoryLogs(orgId: number, agentId?: string): Promise<InventoryLog[]> {
+    if (agentId) {
+      return db.select().from(inventoryLogs)
+        .where(and(eq(inventoryLogs.orgId, orgId), eq(inventoryLogs.agentId, agentId)))
+        .orderBy(desc(inventoryLogs.createdAt));
+    }
+    return db.select().from(inventoryLogs)
+      .where(eq(inventoryLogs.orgId, orgId))
+      .orderBy(desc(inventoryLogs.createdAt));
+  }
+
+  // Referrals
+  async getReferral(id: number): Promise<Referral | undefined> {
+    const [ref] = await db.select().from(referrals).where(eq(referrals.id, id));
+    return ref;
+  }
+
+  async getReferralsByOrg(orgId: number): Promise<Referral[]> {
+    return db.select().from(referrals).where(eq(referrals.orgId, orgId)).orderBy(desc(referrals.createdAt));
+  }
+
+  async getReferralsByAgent(agentId: string): Promise<Referral[]> {
+    return db.select().from(referrals).where(eq(referrals.agentId, agentId)).orderBy(desc(referrals.createdAt));
+  }
+
+  async createReferral(data: InsertReferral): Promise<Referral> {
+    const [created] = await db.insert(referrals).values(data).returning();
+    return created;
+  }
+
+  async updateReferral(id: number, data: Partial<Referral>): Promise<Referral | undefined> {
+    const [updated] = await db.update(referrals).set(data).where(eq(referrals.id, id)).returning();
+    return updated;
+  }
+
+  // Follow-up Sequences
+  async getFollowUpSequence(id: number): Promise<FollowUpSequence | undefined> {
+    const [seq] = await db.select().from(followUpSequences).where(eq(followUpSequences.id, id));
+    return seq;
+  }
+
+  async getFollowUpSequencesByOrg(orgId: number): Promise<FollowUpSequence[]> {
+    return db.select().from(followUpSequences).where(eq(followUpSequences.orgId, orgId));
+  }
+
+  async createFollowUpSequence(data: InsertFollowUpSequence): Promise<FollowUpSequence> {
+    const [created] = await db.insert(followUpSequences).values(data).returning();
+    return created;
+  }
+
+  async updateFollowUpSequence(id: number, data: Partial<FollowUpSequence>): Promise<FollowUpSequence | undefined> {
+    const [updated] = await db.update(followUpSequences).set(data).where(eq(followUpSequences.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFollowUpSequence(id: number): Promise<boolean> {
+    const result = await db.delete(followUpSequences).where(eq(followUpSequences.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Follow-up Steps
+  async getFollowUpSteps(sequenceId: number): Promise<FollowUpStep[]> {
+    return db.select().from(followUpSteps).where(eq(followUpSteps.sequenceId, sequenceId)).orderBy(followUpSteps.stepNumber);
+  }
+
+  async createFollowUpStep(data: InsertFollowUpStep): Promise<FollowUpStep> {
+    const [created] = await db.insert(followUpSteps).values(data).returning();
+    return created;
+  }
+
+  async updateFollowUpStep(id: number, data: Partial<FollowUpStep>): Promise<FollowUpStep | undefined> {
+    const [updated] = await db.update(followUpSteps).set(data).where(eq(followUpSteps.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFollowUpStep(id: number): Promise<boolean> {
+    const result = await db.delete(followUpSteps).where(eq(followUpSteps.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Follow-up Executions
+  async getFollowUpExecution(id: number): Promise<FollowUpExecution | undefined> {
+    const [exec] = await db.select().from(followUpExecutions).where(eq(followUpExecutions.id, id));
+    return exec;
+  }
+
+  async getActiveExecutionsForDrop(dropId: number): Promise<FollowUpExecution[]> {
+    return db.select().from(followUpExecutions)
+      .where(and(eq(followUpExecutions.dropId, dropId), eq(followUpExecutions.status, "active")));
+  }
+
+  async createFollowUpExecution(data: InsertFollowUpExecution): Promise<FollowUpExecution> {
+    const [created] = await db.insert(followUpExecutions).values(data).returning();
+    return created;
+  }
+
+  async updateFollowUpExecution(id: number, data: Partial<FollowUpExecution>): Promise<FollowUpExecution | undefined> {
+    const [updated] = await db.update(followUpExecutions).set(data).where(eq(followUpExecutions.id, id)).returning();
+    return updated;
+  }
+
+  // Activity Events
+  async createActivityEvent(data: InsertActivityEvent): Promise<ActivityEvent> {
+    const [created] = await db.insert(activityEvents).values(data).returning();
+    return created;
+  }
+
+  async getActivityEventsByOrg(orgId: number, limit: number = 50): Promise<ActivityEvent[]> {
+    return db.select().from(activityEvents)
+      .where(eq(activityEvents.orgId, orgId))
+      .orderBy(desc(activityEvents.createdAt))
+      .limit(limit);
+  }
+
+  async getActivityEventsByAgent(agentId: string, limit: number = 50): Promise<ActivityEvent[]> {
+    return db.select().from(activityEvents)
+      .where(eq(activityEvents.agentId, agentId))
+      .orderBy(desc(activityEvents.createdAt))
+      .limit(limit);
+  }
+
+  // AI Summaries
+  async getAiSummary(dropId: number): Promise<AiSummary | undefined> {
+    const [summary] = await db.select().from(aiSummaries).where(eq(aiSummaries.dropId, dropId));
+    return summary;
+  }
+
+  async createAiSummary(data: InsertAiSummary): Promise<AiSummary> {
+    const [created] = await db.insert(aiSummaries).values(data).returning();
+    return created;
+  }
+
+  async updateAiSummary(id: number, data: Partial<AiSummary>): Promise<AiSummary | undefined> {
+    const [updated] = await db.update(aiSummaries).set(data).where(eq(aiSummaries.id, id)).returning();
+    return updated;
+  }
+
+  // Lead Scores
+  async getLeadScore(dropId: number): Promise<LeadScore | undefined> {
+    const [score] = await db.select().from(leadScores).where(eq(leadScores.dropId, dropId));
+    return score;
+  }
+
+  async createOrUpdateLeadScore(data: InsertLeadScore): Promise<LeadScore> {
+    const existing = await this.getLeadScore(data.dropId);
+    if (existing) {
+      const [updated] = await db.update(leadScores)
+        .set({ ...data, calculatedAt: new Date() })
+        .where(eq(leadScores.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(leadScores).values(data).returning();
+    return created;
+  }
+
+  // Offline Queue
+  async createOfflineQueueItem(data: InsertOfflineQueue): Promise<OfflineQueue> {
+    const [created] = await db.insert(offlineQueue).values(data).returning();
+    return created;
+  }
+
+  async getPendingOfflineItems(agentId: string): Promise<OfflineQueue[]> {
+    return db.select().from(offlineQueue)
+      .where(and(eq(offlineQueue.agentId, agentId), eq(offlineQueue.status, "pending")))
+      .orderBy(offlineQueue.createdAt);
+  }
+
+  async updateOfflineQueueItem(id: number, data: Partial<OfflineQueue>): Promise<OfflineQueue | undefined> {
+    const [updated] = await db.update(offlineQueue).set(data).where(eq(offlineQueue.id, id)).returning();
+    return updated;
+  }
+
+  // Get drops with lead scores for a date range (for route optimization)
+  async getDropsForRoute(agentId: string, date: Date): Promise<DropWithBrochure[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const result = await db
+      .select()
+      .from(drops)
+      .leftJoin(brochures, eq(drops.brochureId, brochures.id))
+      .where(and(
+        eq(drops.agentId, agentId),
+        eq(drops.status, "pending"),
+        gte(drops.pickupScheduledFor, startOfDay),
+        lte(drops.pickupScheduledFor, endOfDay)
+      ))
+      .orderBy(drops.pickupScheduledFor);
+    
+    return result.map(({ drops: drop, brochures: brochure }) => ({
+      ...drop,
+      brochure: brochure || undefined,
+    }));
   }
 }
 

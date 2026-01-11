@@ -37,6 +37,17 @@ Preferred communication style: Simple, everyday language.
 - **OrganizationMembers**: User memberships with roles (master_admin, relationship_manager, agent) and optional managerId for hierarchy
 - **UserPreferences**: Notification settings per user
 - **Users/Sessions**: Authentication tables managed by Replit Auth integration
+- **Merchants**: Business profiles with visit history, lead scores, and conversion tracking
+- **AgentInventory**: Track brochures on hand, deployed counts, and low-stock thresholds per agent
+- **InventoryLogs**: History of inventory changes (restock, deploy, return, adjustment)
+- **Referrals**: Track merchant referrals with status (pending, contacted, converted, lost)
+- **FollowUpSequences**: Multi-step automated follow-up campaigns
+- **FollowUpSteps**: Individual steps in a sequence with delay, action type, and content
+- **FollowUpExecutions**: Track sequence execution progress per drop
+- **ActivityEvents**: Team activity feed (drops, conversions, referrals, restocks, milestones)
+- **AiSummaries**: AI-generated summaries of voice notes with key takeaways and sentiment
+- **LeadScores**: AI-calculated lead quality scores with tier (hot/warm/cold) and factors
+- **OfflineQueue**: Queue for drops created offline, synced when back online
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -45,7 +56,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### January 2026
+### January 2026 (Advanced Features Release)
+- **Pickup Days Selector**: Restricted to 1-5 days (default 3), simplified from previous 1-14 day range
+- **Merchant Profiles** (/merchants): Complete merchant dossier system with visit history, notes, and lead tracking
+- **Inventory Tracking** (/inventory): Track brochures on hand, restock functionality, and low-stock alerts
+- **Referral Tracking** (/referrals): Log and track merchant referrals with status management (pending/contacted/converted/lost)
+- **Team Activity Feed** (/activity): Real-time team activity timeline with event filtering and celebratory UI for wins
+- **Route Optimizer** (/route): Optimized daily driving routes with Google Maps integration
+- **Follow-up Sequences** (/sequences): Multi-step automated follow-up campaigns with customizable steps
+- **AI Call Summaries**: Auto-generate summaries from voice notes with key takeaways, sentiment analysis, and hot lead detection
+- **Lead Scoring**: AI-calculated lead quality scores (0-100) with hot/warm/cold tier classification
+- **Smart Location Reminders**: Geofencing-based notifications when near pending pickup locations
+- **Enhanced Offline Mode**: IndexedDB storage for offline drops with automatic sync when back online
+- **Updated Help Page**: Comprehensive documentation for all new features
+
+### January 2026 (Initial Release)
 - Implemented complete frontend with mobile-first design (48px touch targets)
 - Created QR scanner with html5-qrcode library
 - Built Dashboard with Today's/Upcoming/Overdue pickup categorization  

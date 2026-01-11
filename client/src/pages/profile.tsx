@@ -29,7 +29,8 @@ import {
   Shield,
   Users,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  UserPlus
 } from "lucide-react";
 import { Link } from "wouter";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
@@ -333,6 +334,34 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                   <Sparkles className="w-5 h-5 text-amber-500" />
                   <span>AI Email Drafter</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </Link>
+            
+            <Link href="/inventory">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between min-h-touch"
+                data-testid="link-inventory"
+              >
+                <div className="flex items-center gap-3">
+                  <Package className="w-5 h-5 text-emerald-600" />
+                  <span>Inventory Tracking</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </Link>
+            
+            <Link href="/referrals">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between min-h-touch"
+                data-testid="link-referrals"
+              >
+                <div className="flex items-center gap-3">
+                  <UserPlus className="w-5 h-5 text-purple-600" />
+                  <span>Referral Tracking</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Button>

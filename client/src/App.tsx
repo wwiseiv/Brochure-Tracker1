@@ -16,6 +16,13 @@ import RMDashboardPage from "@/pages/rm-dashboard";
 import TeamManagementPage from "@/pages/team-management";
 import HelpPage from "@/pages/help";
 import EmailDrafterPage from "@/pages/email-drafter";
+import MerchantsPage from "@/pages/merchants";
+import MerchantDetailPage from "@/pages/merchant-detail";
+import InventoryPage from "@/pages/inventory";
+import ReferralsPage from "@/pages/referrals";
+import ActivityFeedPage from "@/pages/activity-feed";
+import RoutePlannerPage from "@/pages/route-planner";
+import SequencesPage from "@/pages/sequences";
 import NotFound from "@/pages/not-found";
 
 interface UserRole {
@@ -108,7 +115,14 @@ function AuthenticatedRouter() {
       <Route path="/drops/new" component={NewDropPage} />
       <Route path="/drops/:id" component={DropDetailPage} />
       <Route path="/history" component={HistoryPage} />
+      <Route path="/merchants" component={MerchantsPage} />
+      <Route path="/merchants/:id" component={MerchantDetailPage} />
+      <Route path="/referrals" component={ReferralsPage} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/inventory" component={InventoryPage} />
+      <Route path="/activity" component={ActivityFeedPage} />
+      <Route path="/route" component={RoutePlannerPage} />
+      <Route path="/sequences" component={SequencesPage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/email" component={EmailDrafterPage} />
       <Route component={NotFound} />

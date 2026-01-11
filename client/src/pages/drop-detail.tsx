@@ -9,6 +9,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -56,9 +62,22 @@ import {
   User,
   Pencil,
   Loader2,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  Flame,
+  Snowflake,
+  ThermometerSun,
+  Lightbulb,
+  AlertTriangle,
+  ListChecks,
+  Zap,
+  Mail,
+  MessageSquare,
 } from "lucide-react";
 import { format, formatDistanceToNow, addDays } from "date-fns";
-import type { DropWithBrochure, BusinessType, OutcomeType } from "@shared/schema";
+import type { DropWithBrochure, BusinessType, OutcomeType, AiSummary, LeadScore, FollowUpSequence, FollowUpStep, FollowUpActionType } from "@shared/schema";
 import { BUSINESS_TYPES } from "@shared/schema";
 
 const editDropSchema = z.object({
@@ -89,14 +108,98 @@ export default function DropDetailPage() {
   
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showSequenceDialog, setShowSequenceDialog] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<OutcomeType | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState("");
+  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
+  const [isScoreOpen, setIsScoreOpen] = useState(true);
+
+  interface SequenceWithSteps extends FollowUpSequence {
+    steps?: FollowUpStep[];
+  }
 
   const dropId = params?.id;
 
   const { data: drop, isLoading } = useQuery<DropWithBrochure>({
     queryKey: ["/api/drops", dropId],
     enabled: !!dropId,
+  });
+
+  const { data: aiSummary, isLoading: isSummaryLoading } = useQuery<AiSummary | null>({
+    queryKey: ["/api/drops", dropId, "summary"],
+    enabled: !!dropId,
+  });
+
+  const { data: leadScore, isLoading: isScoreLoading } = useQuery<LeadScore | null>({
+    queryKey: ["/api/drops", dropId, "score"],
+    enabled: !!dropId,
+  });
+
+  const { data: sequences } = useQuery<SequenceWithSteps[]>({
+    queryKey: ["/api/sequences"],
+  });
+
+  const startSequenceMutation = useMutation({
+    mutationFn: async (sequenceId: number) => {
+      const response = await apiRequest("POST", `/api/drops/${dropId}/sequence`, { sequenceId });
+      return response.json();
+    },
+    onSuccess: () => {
+      setShowSequenceDialog(false);
+      toast({
+        title: "Sequence started!",
+        description: "Follow-up sequence is now active for this drop.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to start sequence",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generateSummaryMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/drops/${dropId}/summary`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drops", dropId, "summary"] });
+      toast({
+        title: "Summary generated!",
+        description: "AI analysis is now available.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate summary",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const calculateScoreMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/drops/${dropId}/score`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drops", dropId, "score"] });
+      toast({
+        title: "Lead score calculated!",
+        description: "Score and factors are now available.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to calculate score",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
   });
 
   const form = useForm<EditDropFormData>({
@@ -401,6 +504,241 @@ export default function DropDetailPage() {
           </Card>
         )}
 
+        <Card className="p-4">
+          <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
+            <CollapsibleTrigger className="w-full" data-testid="button-toggle-summary">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  AI Summary
+                  {aiSummary?.hotLead && (
+                    <Badge variant="destructive" className="ml-2 gap-1" data-testid="badge-hot-lead">
+                      <Flame className="w-3 h-3" />
+                      Hot Lead
+                    </Badge>
+                  )}
+                </h3>
+                {isSummaryOpen ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-4">
+              {isSummaryLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : aiSummary ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge 
+                      variant={
+                        aiSummary.sentiment === "positive" ? "default" :
+                        aiSummary.sentiment === "negative" ? "destructive" : "secondary"
+                      }
+                      className={
+                        aiSummary.sentiment === "positive" ? "bg-emerald-600 hover:bg-emerald-700" :
+                        aiSummary.sentiment === "neutral" ? "bg-gray-500 hover:bg-gray-600" : ""
+                      }
+                      data-testid="badge-sentiment"
+                    >
+                      {aiSummary.sentiment === "positive" ? "Positive" : 
+                       aiSummary.sentiment === "negative" ? "Negative" : "Neutral"}
+                    </Badge>
+                  </div>
+
+                  {aiSummary.summary && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Summary</p>
+                      <p className="text-sm" data-testid="text-ai-summary">{aiSummary.summary}</p>
+                    </div>
+                  )}
+
+                  {aiSummary.keyTakeaways && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                        <Lightbulb className="w-3 h-3" />
+                        Key Takeaways
+                      </p>
+                      <div className="flex flex-wrap gap-2" data-testid="list-takeaways">
+                        {(JSON.parse(aiSummary.keyTakeaways) as string[]).map((item, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiSummary.objections && JSON.parse(aiSummary.objections).length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Objections
+                      </p>
+                      <div className="flex flex-wrap gap-2" data-testid="list-objections">
+                        {(JSON.parse(aiSummary.objections) as string[]).map((item, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs border-amber-500 text-amber-700 dark:text-amber-400">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiSummary.nextSteps && JSON.parse(aiSummary.nextSteps).length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                        <ListChecks className="w-3 h-3" />
+                        Next Steps
+                      </p>
+                      <ul className="text-sm space-y-1" data-testid="list-next-steps">
+                        {(JSON.parse(aiSummary.nextSteps) as string[]).map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-primary mt-0.5">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {(drop.textNotes || drop.voiceTranscript) 
+                      ? "Generate an AI-powered summary of your notes"
+                      : "Add notes or a voice recording to generate a summary"
+                    }
+                  </p>
+                  <Button
+                    onClick={() => generateSummaryMutation.mutate()}
+                    disabled={generateSummaryMutation.isPending || (!drop.textNotes && !drop.voiceTranscript)}
+                    className="min-h-touch"
+                    data-testid="button-generate-summary"
+                  >
+                    {generateSummaryMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate AI Summary
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        <Card className="p-4">
+          <Collapsible open={isScoreOpen} onOpenChange={setIsScoreOpen}>
+            <CollapsibleTrigger className="w-full" data-testid="button-toggle-score">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Lead Score
+                  {leadScore && (
+                    <Badge 
+                      variant={leadScore.tier === "hot" ? "destructive" : "secondary"}
+                      className={
+                        leadScore.tier === "hot" ? "gap-1" :
+                        leadScore.tier === "warm" ? "bg-amber-500 hover:bg-amber-600 gap-1" :
+                        "bg-blue-500 hover:bg-blue-600 gap-1"
+                      }
+                      data-testid="badge-tier"
+                    >
+                      {leadScore.tier === "hot" && <Flame className="w-3 h-3" />}
+                      {leadScore.tier === "warm" && <ThermometerSun className="w-3 h-3" />}
+                      {leadScore.tier === "cold" && <Snowflake className="w-3 h-3" />}
+                      {leadScore.tier.charAt(0).toUpperCase() + leadScore.tier.slice(1)}
+                    </Badge>
+                  )}
+                </h3>
+                {isScoreOpen ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-4">
+              {isScoreLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : leadScore ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium" data-testid="text-score-value">
+                        Score: {leadScore.score}/100
+                      </span>
+                      {leadScore.predictedConversion && (
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round(leadScore.predictedConversion * 100)}% conversion probability
+                        </span>
+                      )}
+                    </div>
+                    <Progress 
+                      value={leadScore.score} 
+                      className={
+                        leadScore.tier === "hot" ? "[&>div]:bg-red-500" :
+                        leadScore.tier === "warm" ? "[&>div]:bg-amber-500" :
+                        "[&>div]:bg-blue-500"
+                      }
+                      data-testid="progress-score"
+                    />
+                  </div>
+
+                  {leadScore.factors && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Scoring Factors</p>
+                      <div className="flex flex-wrap gap-2" data-testid="list-factors">
+                        {(JSON.parse(leadScore.factors) as string[]).map((factor, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {factor}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Calculate an AI-powered lead score for this merchant
+                  </p>
+                  <Button
+                    onClick={() => calculateScoreMutation.mutate()}
+                    disabled={calculateScoreMutation.isPending}
+                    className="min-h-touch"
+                    data-testid="button-calculate-score"
+                  >
+                    {calculateScoreMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Calculating...
+                      </>
+                    ) : (
+                      <>
+                        <Target className="w-4 h-4 mr-2" />
+                        Calculate Lead Score
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
         {drop.textNotes && (
           <Card className="p-4">
             <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -426,7 +764,7 @@ export default function DropDetailPage() {
 
       {drop.status === "pending" && (
         <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
-          <div className="container max-w-md mx-auto">
+          <div className="container max-w-md mx-auto space-y-2">
             <Button
               className="w-full min-h-touch-lg text-lg font-semibold"
               onClick={() => setShowOutcomeDialog(true)}
@@ -435,6 +773,17 @@ export default function DropDetailPage() {
               <CheckCircle2 className="w-5 h-5 mr-2" />
               Log Pickup Outcome
             </Button>
+            {sequences && sequences.length > 0 && (
+              <Button
+                variant="outline"
+                className="w-full min-h-touch"
+                onClick={() => setShowSequenceDialog(true)}
+                data-testid="button-start-sequence"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Start Follow-up Sequence
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -670,9 +1019,8 @@ export default function DropDetailPage() {
                         <SelectItem value="1">1 day from now</SelectItem>
                         <SelectItem value="2">2 days from now</SelectItem>
                         <SelectItem value="3">3 days from now</SelectItem>
+                        <SelectItem value="4">4 days from now</SelectItem>
                         <SelectItem value="5">5 days from now</SelectItem>
-                        <SelectItem value="7">1 week from now</SelectItem>
-                        <SelectItem value="14">2 weeks from now</SelectItem>
                       </SelectContent>
                     </Select>
                     {parseInt(form.watch("followUpDays") || "0") > 0 && (
@@ -718,6 +1066,70 @@ export default function DropDetailPage() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSequenceDialog} onOpenChange={setShowSequenceDialog}>
+        <DialogContent className="max-w-md mx-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              Start Follow-up Sequence
+            </DialogTitle>
+            <DialogDescription>
+              Choose an automated sequence to start for this drop.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto">
+            {sequences?.filter(s => s.isActive).map((sequence) => (
+              <button
+                key={sequence.id}
+                onClick={() => startSequenceMutation.mutate(sequence.id)}
+                disabled={startSequenceMutation.isPending}
+                className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/50 text-left transition-colors hover-elevate"
+                data-testid={`sequence-option-${sequence.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold">{sequence.name}</h4>
+                    {sequence.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {sequence.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {(!sequences || sequences.filter(s => s.isActive).length === 0) && (
+              <div className="text-center py-8">
+                <Zap className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No active sequences available</p>
+              </div>
+            )}
+          </div>
+
+          {startSequenceMutation.isPending && (
+            <div className="flex items-center justify-center py-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+              <span className="text-sm text-muted-foreground">Starting sequence...</span>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowSequenceDialog(false)}
+              data-testid="button-cancel-sequence"
+            >
+              Cancel
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

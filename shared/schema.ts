@@ -229,6 +229,298 @@ export type DropWithBrochure = Drop & {
   brochure?: Brochure;
 };
 
+// Merchants table (for Merchant Profiles)
+export const merchants = pgTable("merchants", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  businessName: text("business_name").notNull(),
+  businessType: varchar("business_type", { length: 50 }),
+  businessPhone: varchar("business_phone", { length: 30 }),
+  contactName: varchar("contact_name", { length: 100 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  notes: text("notes"),
+  totalDrops: integer("total_drops").default(0),
+  totalConversions: integer("total_conversions").default(0),
+  leadScore: integer("lead_score"),
+  lastVisitAt: timestamp("last_visit_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const merchantsRelations = relations(merchants, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [merchants.orgId],
+    references: [organizations.id],
+  }),
+  referralsGiven: many(referrals, { relationName: "sourceMerchant" }),
+  referralsReceived: many(referrals, { relationName: "referredMerchant" }),
+}));
+
+export const insertMerchantSchema = createInsertSchema(merchants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  totalDrops: true,
+  totalConversions: true,
+});
+export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
+export type Merchant = typeof merchants.$inferSelect;
+
+// Agent Inventory table (for Inventory Tracking)
+export const agentInventory = pgTable("agent_inventory", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  agentId: varchar("agent_id").notNull(),
+  brochuresOnHand: integer("brochures_on_hand").default(0).notNull(),
+  brochuresDeployed: integer("brochures_deployed").default(0).notNull(),
+  lowStockThreshold: integer("low_stock_threshold").default(10).notNull(),
+  lastRestockAt: timestamp("last_restock_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("org_agent_inventory_unique").on(table.orgId, table.agentId),
+]);
+
+export const insertAgentInventorySchema = createInsertSchema(agentInventory).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertAgentInventory = z.infer<typeof insertAgentInventorySchema>;
+export type AgentInventory = typeof agentInventory.$inferSelect;
+
+// Inventory Log table (for tracking inventory changes)
+export const inventoryLogs = pgTable("inventory_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  agentId: varchar("agent_id").notNull(),
+  changeType: varchar("change_type", { length: 30 }).notNull(), // restock, deploy, return, adjustment
+  quantity: integer("quantity").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+export type InventoryLog = typeof inventoryLogs.$inferSelect;
+
+// Referrals table (for Referral Tracking)
+export const referrals = pgTable("referrals", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  sourceDropId: integer("source_drop_id").references(() => drops.id),
+  sourceMerchantId: integer("source_merchant_id").references(() => merchants.id),
+  referredMerchantId: integer("referred_merchant_id").references(() => merchants.id),
+  referredBusinessName: text("referred_business_name").notNull(),
+  referredContactName: varchar("referred_contact_name", { length: 100 }),
+  referredPhone: varchar("referred_phone", { length: 30 }),
+  status: varchar("status", { length: 30 }).default("pending").notNull(), // pending, contacted, converted, lost
+  notes: text("notes"),
+  agentId: varchar("agent_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  convertedAt: timestamp("converted_at"),
+});
+
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [referrals.orgId],
+    references: [organizations.id],
+  }),
+  sourceDrop: one(drops, {
+    fields: [referrals.sourceDropId],
+    references: [drops.id],
+  }),
+  sourceMerchant: one(merchants, {
+    fields: [referrals.sourceMerchantId],
+    references: [merchants.id],
+    relationName: "sourceMerchant",
+  }),
+  referredMerchant: one(merchants, {
+    fields: [referrals.referredMerchantId],
+    references: [merchants.id],
+    relationName: "referredMerchant",
+  }),
+}));
+
+export const REFERRAL_STATUSES = ["pending", "contacted", "converted", "lost"] as const;
+export type ReferralStatus = typeof REFERRAL_STATUSES[number];
+
+export const insertReferralSchema = createInsertSchema(referrals).omit({
+  id: true,
+  createdAt: true,
+  convertedAt: true,
+}).extend({
+  status: z.enum(REFERRAL_STATUSES).optional(),
+});
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Referral = typeof referrals.$inferSelect;
+
+// Follow-up Sequences table
+export const followUpSequences = pgTable("follow_up_sequences", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFollowUpSequenceSchema = createInsertSchema(followUpSequences).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertFollowUpSequence = z.infer<typeof insertFollowUpSequenceSchema>;
+export type FollowUpSequence = typeof followUpSequences.$inferSelect;
+
+// Follow-up Steps table
+export const followUpSteps = pgTable("follow_up_steps", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sequenceId: integer("sequence_id").notNull().references(() => followUpSequences.id),
+  stepNumber: integer("step_number").notNull(),
+  delayDays: integer("delay_days").notNull(), // days after drop to execute
+  actionType: varchar("action_type", { length: 30 }).notNull(), // email, call_reminder, sms
+  subject: varchar("subject", { length: 200 }),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const FOLLOW_UP_ACTION_TYPES = ["email", "call_reminder", "sms"] as const;
+export type FollowUpActionType = typeof FOLLOW_UP_ACTION_TYPES[number];
+
+export const insertFollowUpStepSchema = createInsertSchema(followUpSteps).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  actionType: z.enum(FOLLOW_UP_ACTION_TYPES),
+});
+export type InsertFollowUpStep = z.infer<typeof insertFollowUpStepSchema>;
+export type FollowUpStep = typeof followUpSteps.$inferSelect;
+
+// Follow-up Executions table (tracks active sequences for drops)
+export const followUpExecutions = pgTable("follow_up_executions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dropId: integer("drop_id").notNull().references(() => drops.id),
+  sequenceId: integer("sequence_id").notNull().references(() => followUpSequences.id),
+  currentStep: integer("current_step").default(1).notNull(),
+  status: varchar("status", { length: 30 }).default("active").notNull(), // active, completed, cancelled
+  nextExecutionAt: timestamp("next_execution_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFollowUpExecutionSchema = createInsertSchema(followUpExecutions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+export type InsertFollowUpExecution = z.infer<typeof insertFollowUpExecutionSchema>;
+export type FollowUpExecution = typeof followUpExecutions.$inferSelect;
+
+// Activity Events table (for Team Activity Feed)
+export const activityEvents = pgTable("activity_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  agentId: varchar("agent_id").notNull(),
+  agentName: varchar("agent_name", { length: 100 }),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // drop_created, pickup_completed, deal_signed, referral_added, etc.
+  entityType: varchar("entity_type", { length: 30 }), // drop, merchant, referral
+  entityId: integer("entity_id"),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const ACTIVITY_EVENT_TYPES = [
+  "drop_created",
+  "pickup_completed",
+  "deal_signed",
+  "referral_added",
+  "referral_converted",
+  "inventory_restock",
+  "sequence_started",
+  "milestone_reached"
+] as const;
+export type ActivityEventType = typeof ACTIVITY_EVENT_TYPES[number];
+
+export const insertActivityEventSchema = createInsertSchema(activityEvents).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  eventType: z.enum(ACTIVITY_EVENT_TYPES),
+});
+export type InsertActivityEvent = z.infer<typeof insertActivityEventSchema>;
+export type ActivityEvent = typeof activityEvents.$inferSelect;
+
+// AI Summaries table (for AI Call/Visit Summaries)
+export const aiSummaries = pgTable("ai_summaries", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dropId: integer("drop_id").notNull().references(() => drops.id),
+  summary: text("summary"),
+  keyTakeaways: text("key_takeaways"), // JSON array
+  objections: text("objections"), // JSON array
+  nextSteps: text("next_steps"), // JSON array
+  sentiment: varchar("sentiment", { length: 20 }), // positive, neutral, negative
+  hotLead: boolean("hot_lead").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiSummarySchema = createInsertSchema(aiSummaries).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAiSummary = z.infer<typeof insertAiSummarySchema>;
+export type AiSummary = typeof aiSummaries.$inferSelect;
+
+// Lead Scores table (for Lead Scoring)
+export const leadScores = pgTable("lead_scores", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dropId: integer("drop_id").notNull().references(() => drops.id).unique(),
+  score: integer("score").notNull(), // 0-100
+  tier: varchar("tier", { length: 20 }).notNull(), // hot, warm, cold
+  factors: text("factors"), // JSON array of scoring factors
+  predictedConversion: real("predicted_conversion"), // 0-1 probability
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+});
+
+export const LEAD_TIERS = ["hot", "warm", "cold"] as const;
+export type LeadTier = typeof LEAD_TIERS[number];
+
+export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({
+  id: true,
+  calculatedAt: true,
+}).extend({
+  tier: z.enum(LEAD_TIERS),
+});
+export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
+export type LeadScore = typeof leadScores.$inferSelect;
+
+// Offline Queue table (for Better Offline Mode)
+export const offlineQueue = pgTable("offline_queue", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id").notNull(),
+  actionType: varchar("action_type", { length: 30 }).notNull(), // create_drop, update_drop, log_outcome
+  payload: text("payload").notNull(), // JSON payload
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, synced, failed
+  attempts: integer("attempts").default(0).notNull(),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  syncedAt: timestamp("synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOfflineQueueSchema = createInsertSchema(offlineQueue).omit({
+  id: true,
+  createdAt: true,
+  syncedAt: true,
+});
+export type InsertOfflineQueue = z.infer<typeof insertOfflineQueueSchema>;
+export type OfflineQueue = typeof offlineQueue.$inferSelect;
+
 // Reminder hours options
 export const REMINDER_HOURS_OPTIONS = [6, 12, 24, 48] as const;
 export type ReminderHours = typeof REMINDER_HOURS_OPTIONS[number];

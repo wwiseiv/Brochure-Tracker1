@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Home, QrCode, History, User } from "lucide-react";
+import { Home, QrCode, History, User, Store } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: Home, label: "Home" },
   { path: "/scan", icon: QrCode, label: "Scan" },
+  { path: "/merchants", icon: Store, label: "Merchants" },
   { path: "/history", icon: History, label: "History" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
