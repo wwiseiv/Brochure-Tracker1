@@ -99,6 +99,23 @@ export default function LandingPage() {
           </a>
         </section>
       </main>
+
+      <footer className="border-t border-border py-6 mt-8">
+        <div className="container max-w-md mx-auto px-4 text-center">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground mb-4">
+            <a href="/legal/privacy-policy.html" className="hover:text-foreground">Privacy Policy</a>
+            <a href="/legal/terms-of-service.html" className="hover:text-foreground">Terms of Service</a>
+            <a href="/legal/cookie-policy.html" className="hover:text-foreground">Cookie Policy</a>
+            <a href="/legal/accessibility-statement.html" className="hover:text-foreground">Accessibility</a>
+            <a href="/legal/copyright-dmca.html" className="hover:text-foreground">Copyright & DMCA</a>
+            <a href="/legal/refunds-policy.html" className="hover:text-foreground">Refunds Policy</a>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Copyright SignaPay, LTD. All Rights Reserved &copy;2026<br />
+            <span className="text-[10px]">SignaPay is a registered ISO of Chesapeake Bank, Kilmarnock, VA; Commercial Bank of California, Irvine, CA; Esquire Bank, Jericho, NY; Synovus Bank, Columbus, GA.</span>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
