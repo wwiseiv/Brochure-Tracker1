@@ -3198,8 +3198,8 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         return res.status(400).json({ error: "Message cannot be empty" });
       }
 
-      if (trimmedMessage.length > 2000) {
-        return res.status(400).json({ error: "Message is too long (max 2000 characters)" });
+      if (trimmedMessage.length > 4950) {
+        return res.status(400).json({ error: "Message is too long (max 4950 characters)" });
       }
 
       const session = await storage.getRoleplaySession(sessionId);
