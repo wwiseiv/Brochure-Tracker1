@@ -913,20 +913,26 @@ export default function CoachPage() {
                   </label>
                 </div>
                 <div className="flex gap-2 items-end">
-                  <Textarea
-                    placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    className="min-h-[60px] resize-none"
-                    disabled={isRecording || isTranscribing}
-                    data-testid="input-message"
-                  />
+                  <div className="flex-1 space-y-1">
+                    <Textarea
+                      placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : mode === "coaching" ? "Ask a question or describe a situation..." : "Type your response..."}
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      maxLength={4950}
+                      className="min-h-[60px] resize-none"
+                      disabled={isRecording || isTranscribing}
+                      data-testid="input-message"
+                    />
+                    <div className={`text-xs text-right ${inputMessage.length > 4800 ? "text-destructive" : "text-muted-foreground"}`}>
+                      {inputMessage.length.toLocaleString()} / 4,950
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-2">
                     <Button
                       size="icon"
