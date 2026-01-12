@@ -809,12 +809,13 @@ export default function TeamManagementPage() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {invitationsLoading ? (
                         <TableRow>
-                          <TableCell colSpan={2} className="py-8">
+                          <TableCell colSpan={3} className="py-8">
                             <div className="flex justify-center">
                               <Skeleton className="h-8 w-48" />
                             </div>
@@ -822,7 +823,7 @@ export default function TeamManagementPage() {
                         </TableRow>
                       ) : !pendingInvitations || pendingInvitations.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                             No pending invitations
                           </TableCell>
                         </TableRow>
@@ -857,6 +858,25 @@ export default function TeamManagementPage() {
                                   <RoleIcon className="h-3 w-3 mr-1" />
                                   {getRoleLabel(invitation.role)}
                                 </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const inviteLink = `${window.location.origin}/accept-invite?token=${invitation.token}`;
+                                    navigator.clipboard.writeText(inviteLink);
+                                    toast({
+                                      title: "Link copied!",
+                                      description: "Send this link to the person you're inviting.",
+                                    });
+                                  }}
+                                  data-testid={`button-copy-link-${invitation.id}`}
+                                >
+                                  <Copy className="h-4 w-4 mr-1" />
+                                  Copy Link
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );
