@@ -36,10 +36,15 @@ import {
   AlertCircle,
   CalendarPlus,
   RefreshCw,
+  Mic,
+  Play,
+  Download,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
-import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus } from "@shared/schema";
+import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus, MeetingRecording } from "@shared/schema";
 
 const outcomeIcons: Record<OutcomeType, typeof CheckCircle2> = {
   signed: CheckCircle2,
@@ -140,6 +145,13 @@ export default function MerchantDetailPage() {
     queryKey: ["/api/merchants", merchantId, "visits"],
     enabled: !!merchantId,
   });
+
+  const { data: recordings, isLoading: recordingsLoading } = useQuery<MeetingRecording[]>({
+    queryKey: ["/api/merchants", merchantId, "recordings"],
+    enabled: !!merchantId,
+  });
+
+  const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (data: Partial<Merchant>) => {
@@ -412,6 +424,156 @@ export default function MerchantDetailPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">Record Meeting</h2>
           <MeetingRecorder merchant={merchant} />
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Past Recordings</h2>
+          {recordingsLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 rounded-lg" />
+            </div>
+          ) : recordings && recordings.length > 0 ? (
+            <div className="space-y-3">
+              {recordings.map((recording) => {
+                const isExpanded = expandedRecording === recording.id;
+                const durationMin = recording.durationSeconds 
+                  ? Math.floor(recording.durationSeconds / 60) 
+                  : 0;
+                const durationSec = recording.durationSeconds 
+                  ? recording.durationSeconds % 60 
+                  : 0;
+                const durationFormatted = `${durationMin}:${durationSec.toString().padStart(2, "0")}`;
+                
+                const sentimentColor = recording.sentiment === "positive" 
+                  ? "text-emerald-600" 
+                  : recording.sentiment === "negative" 
+                    ? "text-red-600" 
+                    : "text-muted-foreground";
+
+                const isCompleted = recording.status === "completed";
+                const isProcessing = recording.status === "processing";
+                const isFailed = recording.status === "failed";
+
+                return (
+                  <Card key={recording.id} className="overflow-visible" data-testid={`card-recording-${recording.id}`}>
+                    <button
+                      className="w-full p-4 text-left hover-elevate active-elevate-2"
+                      onClick={() => setExpandedRecording(isExpanded ? null : recording.id)}
+                      data-testid={`button-toggle-recording-${recording.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isProcessing ? "bg-amber-100 dark:bg-amber-900/30" :
+                          isFailed ? "bg-red-100 dark:bg-red-900/30" :
+                          "bg-purple-100 dark:bg-purple-900/30"
+                        }`}>
+                          {isProcessing ? (
+                            <Loader2 className="w-5 h-5 text-amber-600 animate-spin" />
+                          ) : (
+                            <Mic className={`w-5 h-5 ${isFailed ? "text-red-600" : "text-purple-600"}`} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm flex items-center gap-2">
+                            {format(new Date(recording.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            {isProcessing && (
+                              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                Processing
+                              </Badge>
+                            )}
+                            {isFailed && (
+                              <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                                Failed
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-2">
+                            <span>{durationFormatted}</span>
+                            {recording.sentiment && isCompleted && (
+                              <span className={sentimentColor}>
+                                {recording.sentiment.charAt(0).toUpperCase() + recording.sentiment.slice(1)}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                        {recording.aiSummary && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2">AI Summary</h4>
+                            <p className="text-sm text-muted-foreground">{recording.aiSummary}</p>
+                          </div>
+                        )}
+                        
+                        {recording.keyTakeaways && recording.keyTakeaways.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2">Key Takeaways</h4>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {recording.keyTakeaways.map((takeaway, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-primary mt-1">•</span>
+                                  <span>{takeaway}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {recording.recordingUrl && (
+                          <div className="flex gap-2">
+                            <a
+                              href={recording.recordingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button 
+                                variant="outline" 
+                                className="w-full gap-2 min-h-touch"
+                                data-testid={`button-listen-recording-${recording.id}`}
+                              >
+                                <Play className="w-4 h-4" />
+                                Listen
+                              </Button>
+                            </a>
+                            <a
+                              href={recording.recordingUrl}
+                              download
+                              className="flex-1"
+                            >
+                              <Button 
+                                variant="outline" 
+                                className="w-full gap-2 min-h-touch"
+                                data-testid={`button-download-recording-${recording.id}`}
+                              >
+                                <Download className="w-4 h-4" />
+                                Download
+                              </Button>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="p-6 text-center">
+              <Mic className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No recordings yet. Tap "Record Meeting" above to start.
+              </p>
+            </Card>
+          )}
         </section>
 
         <section>

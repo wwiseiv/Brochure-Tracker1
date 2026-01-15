@@ -1024,12 +1024,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(meetingRecordings)
-      .where(
-        and(
-          eq(meetingRecordings.merchantId, merchantId),
-          eq(meetingRecordings.status, "completed")
-        )
-      )
+      .where(eq(meetingRecordings.merchantId, merchantId))
       .orderBy(desc(meetingRecordings.createdAt));
   }
 
