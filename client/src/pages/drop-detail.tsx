@@ -276,7 +276,7 @@ export default function DropDetailPage() {
   };
 
   const updateDropMutation = useMutation({
-    mutationFn: async (data: { status: string; outcome?: string; outcomeNotes?: string }) => {
+    mutationFn: async (data: { status: string; outcome?: string | null; outcomeNotes?: string | null }) => {
       const response = await apiRequest("PATCH", `/api/drops/${dropId}`, data);
       return response.json();
     },
@@ -802,38 +802,60 @@ export default function DropDetailPage() {
         )}
       </main>
 
-      {drop.status === "pending" && (
-        <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
-          <div className="container max-w-md mx-auto space-y-2">
-            <Button
-              className="w-full min-h-touch-lg text-lg font-semibold"
-              onClick={() => setShowOutcomeDialog(true)}
-              data-testid="button-log-outcome"
-            >
-              <CheckCircle2 className="w-5 h-5 mr-2" />
-              Log Pickup Outcome
-            </Button>
-            {sequences && sequences.length > 0 && (
+      <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
+        <div className="container max-w-md mx-auto space-y-2">
+          {drop.status === "pending" ? (
+            <>
               <Button
-                variant="outline"
-                className="w-full min-h-touch"
-                onClick={() => setShowSequenceDialog(true)}
-                data-testid="button-start-sequence"
+                className="w-full min-h-touch-lg text-lg font-semibold"
+                onClick={() => {
+                  setSelectedOutcome(null);
+                  setOutcomeNotes("");
+                  setShowOutcomeDialog(true);
+                }}
+                data-testid="button-log-outcome"
               >
-                <Zap className="w-4 h-4 mr-2" />
-                Start Follow-up Sequence
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                Log Pickup Outcome
               </Button>
-            )}
-          </div>
+              {sequences && sequences.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="w-full min-h-touch"
+                  onClick={() => setShowSequenceDialog(true)}
+                  data-testid="button-start-sequence"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Start Follow-up Sequence
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full min-h-touch-lg text-lg font-semibold"
+              onClick={() => {
+                setSelectedOutcome(drop.outcome as OutcomeType || null);
+                setOutcomeNotes(drop.outcomeNotes || "");
+                setShowOutcomeDialog(true);
+              }}
+              data-testid="button-update-outcome"
+            >
+              <Pencil className="w-5 h-5 mr-2" />
+              Update Outcome
+            </Button>
+          )}
         </div>
-      )}
+      </div>
 
       <Dialog open={showOutcomeDialog} onOpenChange={setShowOutcomeDialog}>
         <DialogContent className="max-w-md mx-4">
           <DialogHeader>
-            <DialogTitle>Log Pickup Outcome</DialogTitle>
+            <DialogTitle>{drop.status === "pending" ? "Log Pickup Outcome" : "Update Outcome"}</DialogTitle>
             <DialogDescription>
-              What happened when you followed up on this brochure?
+              {drop.status === "pending" 
+                ? "What happened when you followed up on this brochure?"
+                : "Change the outcome for this drop, or reopen it to schedule another visit."}
             </DialogDescription>
           </DialogHeader>
 
@@ -871,23 +893,43 @@ export default function DropDetailPage() {
             />
           </div>
 
-          <div className="flex gap-3 mt-4">
-            <Button
-              variant="outline"
-              className="flex-1 min-h-touch"
-              onClick={() => setShowOutcomeDialog(false)}
-              data-testid="button-cancel-outcome"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="flex-1 min-h-touch"
-              onClick={handleLogOutcome}
-              disabled={!selectedOutcome || updateDropMutation.isPending}
-              data-testid="button-confirm-outcome"
-            >
-              {updateDropMutation.isPending ? "Saving..." : "Confirm"}
-            </Button>
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 min-h-touch"
+                onClick={() => setShowOutcomeDialog(false)}
+                data-testid="button-cancel-outcome"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 min-h-touch"
+                onClick={handleLogOutcome}
+                disabled={!selectedOutcome || updateDropMutation.isPending}
+                data-testid="button-confirm-outcome"
+              >
+                {updateDropMutation.isPending ? "Saving..." : "Confirm"}
+              </Button>
+            </div>
+            {drop.status !== "pending" && (
+              <Button
+                variant="ghost"
+                className="w-full min-h-touch text-muted-foreground"
+                onClick={() => {
+                  updateDropMutation.mutate({
+                    status: "pending",
+                    outcome: null,
+                    outcomeNotes: null,
+                  });
+                }}
+                disabled={updateDropMutation.isPending}
+                data-testid="button-reopen-drop"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reopen Drop (Set Back to Pending)
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
