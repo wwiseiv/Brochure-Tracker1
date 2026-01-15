@@ -545,8 +545,7 @@ export default function MerchantDetailPage() {
                               </Button>
                             </a>
                             <a
-                              href={recording.recordingUrl}
-                              download
+                              href={`${recording.recordingUrl}${recording.recordingUrl?.includes('?') ? '&' : '?'}response-content-disposition=attachment%3B%20filename%3D%22meeting-recording.webm%22`}
                               className="flex-1"
                             >
                               <Button 
