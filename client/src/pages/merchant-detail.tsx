@@ -142,7 +142,7 @@ export default function MerchantDetailPage() {
   });
 
   const { data: visits, isLoading: visitsLoading } = useQuery<DropWithBrochure[]>({
-    queryKey: ["/api/merchants", merchantId, "visits"],
+    queryKey: ["/api/merchants", merchantId, "drops"],
     enabled: !!merchantId,
   });
 
@@ -300,7 +300,22 @@ export default function MerchantDetailPage() {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold">{merchant.businessName}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-semibold">{merchant.businessName}</h1>
+              {merchant.status === "converted" ? (
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  Converted
+                </Badge>
+              ) : merchant.status === "lost" ? (
+                <Badge variant="outline" className="text-muted-foreground">
+                  Lost
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+                  Prospect
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               {merchant.businessType
                 ? businessTypeLabels[merchant.businessType as BusinessType]

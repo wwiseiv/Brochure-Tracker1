@@ -796,7 +796,7 @@ export async function registerRoutes(
           if (existingMerchant) {
             // Update existing merchant with conversion info
             await storage.updateMerchant(existingMerchant.id, {
-              totalDrops: (existingMerchant.totalDrops || 0) + 1,
+              status: "converted",
               totalConversions: (existingMerchant.totalConversions || 0) + 1,
               lastVisitAt: new Date(),
               contactName: updated.contactName || existingMerchant.contactName,
@@ -806,7 +806,7 @@ export async function registerRoutes(
               longitude: updated.longitude || existingMerchant.longitude,
             });
           } else {
-            // Create new merchant from drop data
+            // Create new merchant from drop data (already converted)
             await storage.createMerchant({
               orgId: existingDrop.orgId,
               businessName: updated.businessName || existingDrop.businessName || "Unknown Business",
@@ -817,6 +817,7 @@ export async function registerRoutes(
               latitude: updated.latitude || existingDrop.latitude || null,
               longitude: updated.longitude || existingDrop.longitude || null,
               notes: updated.textNotes || existingDrop.textNotes || null,
+              status: "converted",
               lastVisitAt: new Date(),
             });
           }
@@ -2138,7 +2139,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const drops = await storage.getDropsByMerchant(merchantId);
+      const drops = await storage.getDropsByMerchant(merchantId, membership.organization.id);
       res.json(drops);
     } catch (error) {
       console.error("Error fetching merchant drops:", error);

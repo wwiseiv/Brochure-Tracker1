@@ -90,7 +90,7 @@ export interface IStorage {
   getDrop(id: number): Promise<DropWithBrochure | undefined>;
   getDropsByAgent(agentId: string): Promise<DropWithBrochure[]>;
   getDropsByOrganization(agentIds: string[]): Promise<DropWithBrochure[]>;
-  getDropsByMerchant(merchantId: number): Promise<Drop[]>;
+  getDropsByMerchant(merchantId: number, orgId: number): Promise<Drop[]>;
   createDrop(drop: InsertDrop): Promise<Drop>;
   updateDrop(id: number, data: Partial<Drop>): Promise<Drop | undefined>;
   
@@ -482,8 +482,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getDropsByMerchant(merchantId: number): Promise<Drop[]> {
-    return db.select().from(drops).where(eq(drops.merchantId, merchantId)).orderBy(desc(drops.droppedAt));
+  async getDropsByMerchant(merchantId: number, orgId: number): Promise<Drop[]> {
+    return db.select().from(drops).where(
+      and(eq(drops.merchantId, merchantId), eq(drops.orgId, orgId))
+    ).orderBy(desc(drops.droppedAt));
   }
 
   // Agent Inventory
