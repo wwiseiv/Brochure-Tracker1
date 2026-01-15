@@ -16,6 +16,9 @@ function getResendClient(): Resend | null {
 
 const FROM_EMAIL = "BrochureDrop <onboarding@resend.dev>";
 const FEEDBACK_RECIPIENT = "wwiseiv@icloud.com";
+const APP_URL = process.env.REPLIT_DEV_DOMAIN 
+  ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+  : process.env.APP_URL || "https://brochuredrop.com";
 
 interface SendInvitationParams {
   to: string;
@@ -380,6 +383,7 @@ interface SendMeetingRecordingParams {
   contactName?: string;
   businessPhone?: string;
   recordingUrl: string;
+  recordingId: number;
   durationFormatted: string;
   aiSummary?: string;
   keyTakeaways?: string[];
@@ -495,7 +499,7 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
               <a href="${params.recordingUrl}" style="background: #7C3AED; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; margin-right: 10px;">
                 Listen to Recording
               </a>
-              <a href="${params.recordingUrl}${params.recordingUrl.includes('?') ? '&' : '?'}response-content-disposition=attachment%3B%20filename%3D%22meeting-recording.webm%22" style="background: #1E40AF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; margin-top: 10px;">
+              <a href="${APP_URL}/api/meeting-recordings/${params.recordingId}/download" style="background: #1E40AF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; margin-top: 10px;">
                 Download Recording
               </a>
             </div>

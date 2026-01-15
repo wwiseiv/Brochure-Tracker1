@@ -1091,37 +1091,63 @@ export async function registerRoutes(
             baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
           },
         });
-        
-        // Analyze the meeting with AI using text-based summary request
-        const analysisPrompt = `You are analyzing a sales meeting recording summary for a payment processing sales team.
-
-Business: ${recording.businessName || "Unknown"}
-Contact: ${recording.contactName || "Unknown"}
-Duration: ${Math.floor((durationSeconds || 0) / 60)} minutes
-
-Please analyze this sales interaction and provide:
-1. A brief summary (2-3 sentences) of the meeting
-2. 3-5 key takeaways as bullet points
-3. Overall sentiment (positive, neutral, or negative)
-
-Format your response as JSON:
-{
-  "summary": "Brief summary here",
-  "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
-  "sentiment": "positive|neutral|negative"
-}`;
 
         let aiSummary = "";
         let keyTakeaways: string[] = [];
         let sentiment = "neutral";
 
         try {
+          // Fetch the audio file and convert to base64
+          console.log("Fetching audio from:", recordingUrl);
+          const audioResponse = await fetch(recordingUrl);
+          if (!audioResponse.ok) {
+            throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
+          }
+          
+          const audioBuffer = await audioResponse.arrayBuffer();
+          const audioBase64 = Buffer.from(audioBuffer).toString("base64");
+          console.log("Audio fetched, size:", audioBuffer.byteLength, "bytes");
+          
+          // Analyze the meeting with AI using audio input
+          const analysisPrompt = `You are analyzing a sales meeting audio recording for a payment processing sales team (SignaPay).
+
+Business: ${recording.businessName || "Unknown"}
+Contact: ${recording.contactName || "Unknown"}
+
+Please listen to this audio recording and provide:
+1. A brief summary (2-3 sentences) of what was discussed in the meeting
+2. 3-5 key takeaways or important points from the conversation
+3. Overall sentiment of the interaction (positive, neutral, or negative)
+
+If the audio is unclear or you cannot understand it, still provide your best analysis based on what you can hear.
+
+Format your response as JSON:
+{
+  "summary": "Brief summary of the actual conversation here",
+  "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
+  "sentiment": "positive|neutral|negative"
+}`;
+
           const analysisResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: "audio/webm",
+                      data: audioBase64,
+                    },
+                  },
+                  { text: analysisPrompt },
+                ],
+              },
+            ],
           });
           
           const analysisText = analysisResponse.text || "";
+          console.log("AI Analysis response:", analysisText.substring(0, 200));
           
           // Parse the JSON response
           const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
@@ -1131,9 +1157,32 @@ Format your response as JSON:
             keyTakeaways = parsed.keyTakeaways || [];
             sentiment = parsed.sentiment || "neutral";
           }
-        } catch (analysisError) {
-          console.error("Error analyzing meeting:", analysisError);
-          aiSummary = "Analysis could not be completed";
+        } catch (analysisError: any) {
+          console.error("Error analyzing meeting audio:", analysisError?.message || analysisError);
+          // Mark as failed and don't send email with bogus analysis
+          const failedRecording = await storage.updateMeetingRecording(id, {
+            status: "failed",
+            aiSummary: "Audio analysis could not be completed. Please try again or contact support.",
+          });
+          return res.json({
+            ...failedRecording,
+            emailSent: false,
+            analysisError: "AI transcription failed",
+          });
+        }
+
+        // Validate that we got actual content from the analysis
+        if (!aiSummary || aiSummary.length < 10) {
+          console.error("AI returned empty or too short summary");
+          const failedRecording = await storage.updateMeetingRecording(id, {
+            status: "failed",
+            aiSummary: "Audio analysis returned no meaningful content. The recording may be too short or unclear.",
+          });
+          return res.json({
+            ...failedRecording,
+            emailSent: false,
+            analysisError: "Analysis returned no content",
+          });
         }
 
         // Update recording with analysis results
@@ -1153,7 +1202,7 @@ Format your response as JSON:
         const agentName = req.user.claims.name || req.user.claims.email || "Unknown Agent";
         const agentEmail = req.user.claims.email || "";
 
-        // Send email to office
+        // Send email to office with actual transcription results
         const emailSent = await sendMeetingRecordingEmail({
           agentName,
           agentEmail,
@@ -1161,6 +1210,7 @@ Format your response as JSON:
           contactName: recording.contactName || undefined,
           businessPhone: recording.businessPhone || undefined,
           recordingUrl,
+          recordingId: id,
           durationFormatted,
           aiSummary,
           keyTakeaways,
@@ -1183,6 +1233,51 @@ Format your response as JSON:
         res.status(500).json({ 
           error: "Failed to complete meeting recording",
         });
+      }
+    }
+  );
+
+  // Download meeting recording as file
+  app.get(
+    "/api/meeting-recordings/:id/download",
+    isAuthenticated,
+    ensureOrgMembership(),
+    async (req: any, res) => {
+      try {
+        const membership = req.orgMembership as OrgMembershipInfo;
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "Invalid recording ID" });
+        }
+        
+        const recording = await storage.getMeetingRecording(id);
+        if (!recording || !recording.recordingUrl) {
+          return res.status(404).json({ error: "Recording not found" });
+        }
+        
+        if (recording.orgId !== membership.orgId) {
+          return res.status(404).json({ error: "Recording not found" });
+        }
+        
+        // Fetch the file from storage
+        const response = await fetch(recording.recordingUrl);
+        if (!response.ok) {
+          return res.status(500).json({ error: "Failed to fetch recording" });
+        }
+        
+        // Generate filename
+        const filename = `meeting-recording-${id}.webm`;
+        
+        // Set headers for download
+        res.setHeader('Content-Type', 'audio/webm');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        
+        // Stream the response
+        const arrayBuffer = await response.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
+      } catch (error: any) {
+        console.error("Error downloading recording:", error?.message || error);
+        res.status(500).json({ error: "Failed to download recording" });
       }
     }
   );
