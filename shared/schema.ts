@@ -158,6 +158,9 @@ export const drops = pgTable("drops", {
   
   // Organization (for reporting)
   orgId: integer("org_id").references(() => organizations.id),
+  
+  // Link to merchant (for visit history tracking)
+  merchantId: integer("merchant_id").references(() => merchants.id),
 });
 
 export const dropsRelations = relations(drops, ({ one, many }) => ({
@@ -169,6 +172,10 @@ export const dropsRelations = relations(drops, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [drops.orgId],
     references: [organizations.id],
+  }),
+  merchant: one(merchants, {
+    fields: [drops.merchantId],
+    references: [merchants.id],
   }),
 }));
 
@@ -228,6 +235,10 @@ export type DropWithBrochure = Drop & {
   brochure?: Brochure;
 };
 
+// Merchant status types
+export const MERCHANT_STATUSES = ["prospect", "converted", "lost"] as const;
+export type MerchantStatus = typeof MERCHANT_STATUSES[number];
+
 // Merchants table (for Merchant Profiles)
 export const merchants = pgTable("merchants", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -241,6 +252,7 @@ export const merchants = pgTable("merchants", {
   latitude: real("latitude"),
   longitude: real("longitude"),
   notes: text("notes"),
+  status: varchar("status", { length: 20 }).default("prospect").notNull(),
   totalDrops: integer("total_drops").default(0),
   totalConversions: integer("total_conversions").default(0),
   leadScore: integer("lead_score"),
@@ -256,6 +268,7 @@ export const merchantsRelations = relations(merchants, ({ one, many }) => ({
   }),
   referralsGiven: many(referrals, { relationName: "sourceMerchant" }),
   referralsReceived: many(referrals, { relationName: "referredMerchant" }),
+  drops: many(drops),
 }));
 
 export const insertMerchantSchema = createInsertSchema(merchants).omit({

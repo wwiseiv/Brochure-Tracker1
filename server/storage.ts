@@ -90,6 +90,7 @@ export interface IStorage {
   getDrop(id: number): Promise<DropWithBrochure | undefined>;
   getDropsByAgent(agentId: string): Promise<DropWithBrochure[]>;
   getDropsByOrganization(agentIds: string[]): Promise<DropWithBrochure[]>;
+  getDropsByMerchant(merchantId: number): Promise<Drop[]>;
   createDrop(drop: InsertDrop): Promise<Drop>;
   updateDrop(id: number, data: Partial<Drop>): Promise<Drop | undefined>;
   
@@ -479,6 +480,10 @@ export class DatabaseStorage implements IStorage {
   async updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined> {
     const [updated] = await db.update(merchants).set({ ...data, updatedAt: new Date() }).where(eq(merchants.id, id)).returning();
     return updated;
+  }
+
+  async getDropsByMerchant(merchantId: number): Promise<Drop[]> {
+    return db.select().from(drops).where(eq(drops.merchantId, merchantId)).orderBy(desc(drops.droppedAt));
   }
 
   // Agent Inventory

@@ -483,7 +483,38 @@ export async function registerRoutes(
         });
       }
       
-      const drop = await storage.createDrop(parsed.data);
+      let drop = await storage.createDrop(parsed.data);
+      
+      // Auto-create or link to merchant if businessName is provided
+      if (drop.businessName && orgId) {
+        try {
+          let merchant = await storage.getMerchantByBusinessName(orgId, drop.businessName);
+          
+          if (!merchant) {
+            // Create new merchant as prospect
+            merchant = await storage.createMerchant({
+              orgId: orgId,
+              businessName: drop.businessName,
+              businessType: drop.businessType || undefined,
+              businessPhone: drop.businessPhone || undefined,
+              contactName: drop.contactName || undefined,
+              address: drop.address || undefined,
+              latitude: drop.latitude || undefined,
+              longitude: drop.longitude || undefined,
+              status: "prospect",
+            });
+          }
+          
+          // Link drop to merchant and update merchant stats
+          drop = (await storage.updateDrop(drop.id, { merchantId: merchant.id })) || drop;
+          await storage.updateMerchant(merchant.id, {
+            totalDrops: (merchant.totalDrops || 0) + 1,
+            lastVisitAt: new Date(),
+          });
+        } catch (e) {
+          console.error("Error linking drop to merchant:", e);
+        }
+      }
       
       // Create a reminder for the pickup
       if (drop.pickupScheduledFor) {
@@ -2089,7 +2120,33 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
-  // Get merchant visit history (drops for this merchant)
+  // Get merchant drops (drops linked via merchantId)
+  app.get("/api/merchants/:id/drops", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const drops = await storage.getDropsByMerchant(merchantId);
+      res.json(drops);
+    } catch (error) {
+      console.error("Error fetching merchant drops:", error);
+      res.status(500).json({ error: "Failed to fetch merchant drops" });
+    }
+  });
+
+  // Get merchant visit history (drops for this merchant - legacy, matches by business name)
   app.get("/api/merchants/:id/visits", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const merchantId = parseInt(req.params.id);
