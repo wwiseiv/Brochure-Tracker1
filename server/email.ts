@@ -492,8 +492,11 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
             ${takeawaysHtml}
             
             <div style="text-align: center; margin: 30px 0 20px 0;">
-              <a href="${params.recordingUrl}" style="background: #7C3AED; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">
+              <a href="${params.recordingUrl}" style="background: #7C3AED; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; margin-right: 10px;">
                 Listen to Recording
+              </a>
+              <a href="${params.recordingUrl}" download style="background: #1E40AF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; margin-top: 10px;">
+                Download Recording
               </a>
             </div>
             
