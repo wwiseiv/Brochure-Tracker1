@@ -776,6 +776,7 @@ export const meetingRecordings = pgTable("meeting_recordings", {
   agentId: varchar("agent_id").notNull(),
   orgId: integer("org_id").notNull().references(() => organizations.id),
   merchantId: integer("merchant_id").references(() => merchants.id),
+  dropId: integer("drop_id").references(() => drops.id),
   businessName: varchar("business_name", { length: 255 }),
   contactName: varchar("contact_name", { length: 255 }),
   businessPhone: varchar("business_phone", { length: 50 }),
@@ -797,6 +798,10 @@ export const meetingRecordingsRelations = relations(meetingRecordings, ({ one })
   merchant: one(merchants, {
     fields: [meetingRecordings.merchantId],
     references: [merchants.id],
+  }),
+  drop: one(drops, {
+    fields: [meetingRecordings.dropId],
+    references: [drops.id],
   }),
 }));
 

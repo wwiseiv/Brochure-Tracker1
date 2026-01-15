@@ -43,6 +43,7 @@ import { DropDetailSkeleton } from "@/components/LoadingState";
 import { BottomNav } from "@/components/BottomNav";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { RoleplayCoach } from "@/components/RoleplayCoach";
+import { DropMeetingRecorder } from "@/components/DropMeetingRecorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -767,6 +768,19 @@ export default function DropDetailPage() {
               Outcome Notes
             </h3>
             <p className="text-sm text-muted-foreground">{drop.outcomeNotes}</p>
+          </Card>
+        )}
+
+        {drop.status === "pending" && (
+          <Card className="p-4">
+            <h3 className="font-semibold flex items-center gap-2 mb-3">
+              <Mic className="w-4 h-4" />
+              Record Pickup Meeting
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Record your conversation during the pickup visit. The recording will be analyzed by AI and sent to the office for coaching review.
+            </p>
+            <DropMeetingRecorder drop={drop} />
           </Card>
         )}
 

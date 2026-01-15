@@ -751,6 +751,50 @@ export async function registerRoutes(
         await storage.updateBrochureStatus(existingDrop.brochureId, "returned");
       }
       
+      // Auto-create merchant in Merchants list when drop is converted (signed)
+      // Verify org access before merchant creation - prevent cross-tenant data leakage
+      const membership = req.orgMembership as OrgMembershipInfo;
+      if (updated && updateData.status === "converted" && req.body.outcome === "signed" && existingDrop.orgId && existingDrop.orgId === membership.orgId) {
+        try {
+          // Check if merchant already exists for this business
+          const existingMerchant = await storage.getMerchantByBusinessName(
+            existingDrop.orgId,
+            updated.businessName || existingDrop.businessName || "Unknown Business"
+          );
+          
+          if (existingMerchant) {
+            // Update existing merchant with conversion info
+            await storage.updateMerchant(existingMerchant.id, {
+              totalDrops: (existingMerchant.totalDrops || 0) + 1,
+              totalConversions: (existingMerchant.totalConversions || 0) + 1,
+              lastVisitAt: new Date(),
+              contactName: updated.contactName || existingMerchant.contactName,
+              businessPhone: updated.businessPhone || existingMerchant.businessPhone,
+              address: updated.address || existingMerchant.address,
+              latitude: updated.latitude || existingMerchant.latitude,
+              longitude: updated.longitude || existingMerchant.longitude,
+            });
+          } else {
+            // Create new merchant from drop data
+            await storage.createMerchant({
+              orgId: existingDrop.orgId,
+              businessName: updated.businessName || existingDrop.businessName || "Unknown Business",
+              businessType: updated.businessType || existingDrop.businessType || null,
+              contactName: updated.contactName || existingDrop.contactName || null,
+              businessPhone: updated.businessPhone || existingDrop.businessPhone || null,
+              address: updated.address || existingDrop.address || null,
+              latitude: updated.latitude || existingDrop.latitude || null,
+              longitude: updated.longitude || existingDrop.longitude || null,
+              notes: updated.textNotes || existingDrop.textNotes || null,
+              lastVisitAt: new Date(),
+            });
+          }
+        } catch (merchantError) {
+          // Log but don't fail the drop update if merchant creation fails
+          console.error("Error auto-creating merchant from converted drop:", merchantError);
+        }
+      }
+      
       res.json(updated);
     } catch (error) {
       console.error("Error updating drop:", error);
