@@ -54,6 +54,7 @@ Preferred communication style: Simple, everyday language.
 - **RoleplayMessages**: Conversation history for role-play sessions (system prompts, user messages, AI responses)
 - **BrochureLocations**: Track current custody of individual brochures by QR code (house, relationship_manager, agent)
 - **BrochureLocationHistory**: Complete chain of custody history with transfer records (register, assign, return, deploy)
+- **MeetingRecordings**: Store meeting recording metadata with merchant info, recording URL, AI analysis (summary, takeaways, sentiment), and email delivery status for sales coaching repository
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -63,6 +64,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026 (Advanced Features Release)
+- **Meeting Recording for Sales Coaching** (/merchants/:id): Record meetings directly from merchant detail pages. When agents stop recording, the system automatically: (1) uploads the audio to secure storage, (2) analyzes the conversation with AI to generate summaries, key takeaways, and sentiment analysis, (3) emails the recording with merchant contact info to wwiseiv@icloud.com for the office to review and build an AI-powered sales coaching repository. Simple one-button interface - just tap "Record Meeting" to start and "Stop & Send to Office" when done.
 - **Data Export** (/history, /merchants, /referrals): Export your data to CSV or Excel (XLSX) format. Available on History page (drops/contacts), Merchants page (merchant profiles), and Referrals page (referral data). Download includes formatted dates, business info, contact details, and all relevant fields for each data type.
 - **Standalone Sales Coach** (/coach): Full-page AI coaching experience accessible from bottom navigation bar. Two tabs: "New Session" for starting coaching/roleplay sessions, and "History" for reviewing past sessions. Session history shows date, mode, scenario, and score with expandable conversation transcripts. Users can delete individual sessions or clear all history. Includes voice input/output and performance feedback scoring.
 - **Improved Back Navigation**: All pages now use browser history for back buttons instead of always going to home. When you press back, you return to wherever you came from (previous page), not always the dashboard.

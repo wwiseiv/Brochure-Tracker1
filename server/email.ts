@@ -370,3 +370,153 @@ export async function sendNewMemberNotification(params: SendNewMemberNotificatio
     return false;
   }
 }
+
+const MEETING_RECORDING_RECIPIENT = "wwiseiv@icloud.com";
+
+interface SendMeetingRecordingParams {
+  agentName: string;
+  agentEmail: string;
+  businessName: string;
+  contactName?: string;
+  businessPhone?: string;
+  recordingUrl: string;
+  durationFormatted: string;
+  aiSummary?: string;
+  keyTakeaways?: string[];
+  sentiment?: string;
+  recordedAt: Date;
+}
+
+export async function sendMeetingRecordingEmail(params: SendMeetingRecordingParams): Promise<boolean> {
+  try {
+    console.log(`Sending meeting recording email for ${params.businessName}`);
+    const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send meeting recording email - Resend client not configured");
+      return false;
+    }
+
+    const takeawaysHtml = params.keyTakeaways && params.keyTakeaways.length > 0
+      ? `
+        <div style="margin: 20px 0;">
+          <h3 style="margin: 0 0 10px 0; color: #1E40AF;">Key Takeaways</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${params.keyTakeaways.map(t => `<li style="margin: 5px 0;">${t}</li>`).join("")}
+          </ul>
+        </div>
+      `
+      : "";
+
+    const sentimentColor = params.sentiment === "positive" ? "#059669" 
+      : params.sentiment === "negative" ? "#DC2626" 
+      : "#6B7280";
+
+    const sentimentLabel = params.sentiment 
+      ? params.sentiment.charAt(0).toUpperCase() + params.sentiment.slice(1)
+      : "Not analyzed";
+
+    const recordedDate = new Date(params.recordedAt);
+    const dateFormatted = recordedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: MEETING_RECORDING_RECIPIENT,
+      subject: `New Sales Meeting Recording: ${params.businessName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">New Meeting Recording</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Sales Coaching Repository</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 0 0 20px 0;">
+              <h2 style="margin: 0 0 15px 0; color: #1E40AF;">Merchant Information</h2>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; width: 120px;">Business:</td>
+                  <td style="padding: 8px 0;">${params.businessName}</td>
+                </tr>
+                ${params.contactName ? `
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Contact:</td>
+                  <td style="padding: 8px 0;">${params.contactName}</td>
+                </tr>
+                ` : ""}
+                ${params.businessPhone ? `
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Phone:</td>
+                  <td style="padding: 8px 0;">${params.businessPhone}</td>
+                </tr>
+                ` : ""}
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Agent:</td>
+                  <td style="padding: 8px 0;">${params.agentName} (${params.agentEmail})</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Recorded:</td>
+                  <td style="padding: 8px 0;">${dateFormatted}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Duration:</td>
+                  <td style="padding: 8px 0;">${params.durationFormatted}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Sentiment:</td>
+                  <td style="padding: 8px 0;"><span style="color: ${sentimentColor}; font-weight: 600;">${sentimentLabel}</span></td>
+                </tr>
+              </table>
+            </div>
+            
+            ${params.aiSummary ? `
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 0 0 20px 0;">
+              <h3 style="margin: 0 0 10px 0; color: #1E40AF;">AI Summary</h3>
+              <p style="margin: 0; color: #4B5563;">${params.aiSummary}</p>
+            </div>
+            ` : ""}
+            
+            ${takeawaysHtml}
+            
+            <div style="text-align: center; margin: 30px 0 20px 0;">
+              <a href="${params.recordingUrl}" style="background: #7C3AED; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">
+                Listen to Recording
+              </a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+            
+            <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">
+              This recording has been added to the sales coaching repository for AI analysis and training purposes.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Failed to send meeting recording email:", error);
+      return false;
+    }
+
+    console.log(`Meeting recording email sent to ${MEETING_RECORDING_RECIPIENT}`);
+    return true;
+  } catch (error: any) {
+    console.error("Error sending meeting recording email:", error?.message || error);
+    return false;
+  }
+}

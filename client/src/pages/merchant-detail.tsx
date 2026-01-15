@@ -38,6 +38,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { MeetingRecorder } from "@/components/MeetingRecorder";
 import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus } from "@shared/schema";
 
 const outcomeIcons: Record<OutcomeType, typeof CheckCircle2> = {
@@ -406,6 +407,11 @@ export default function MerchantDetailPage() {
               </p>
             )}
           </Card>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Record Meeting</h2>
+          <MeetingRecorder merchant={merchant} />
         </section>
 
         <section>

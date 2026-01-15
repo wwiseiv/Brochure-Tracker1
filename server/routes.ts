@@ -22,7 +22,8 @@ import {
   insertFeedbackSubmissionSchema,
   INVITATION_STATUSES,
 } from "@shared/schema";
-import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail } from "./email";
+import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail } from "./email";
+import { insertMeetingRecordingSchema } from "@shared/schema";
 import { exportReferrals, exportDrops, exportMerchants, ExportFormat } from "./export";
 import {
   getBusinessRiskProfile,
@@ -882,6 +883,229 @@ export async function registerRoutes(
             field: "audio", 
             message: error instanceof Error ? error.message : "Unknown error occurred during transcription" 
           }]
+        });
+      }
+    }
+  );
+
+  // Meeting Recordings API - for sales coaching repository
+  app.post("/api/meeting-recordings", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      
+      const parsed = insertMeetingRecordingSchema.safeParse({
+        ...req.body,
+        agentId: userId,
+        orgId: membership.orgId,
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const recording = await storage.createMeetingRecording(parsed.data);
+      res.json(recording);
+    } catch (error) {
+      console.error("Error creating meeting recording:", error);
+      res.status(500).json({ error: "Failed to create meeting recording" });
+    }
+  });
+
+  app.get("/api/meeting-recordings", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      
+      // Admins/RMs see all org recordings, agents see only their own
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+      
+      let recordings;
+      if (isAdmin) {
+        recordings = await storage.getMeetingRecordingsByOrg(membership.orgId);
+      } else {
+        recordings = await storage.getMeetingRecordingsByAgent(userId);
+      }
+      
+      res.json(recordings);
+    } catch (error) {
+      console.error("Error fetching meeting recordings:", error);
+      res.status(500).json({ error: "Failed to fetch meeting recordings" });
+    }
+  });
+
+  app.get("/api/meeting-recordings/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid recording ID" });
+      }
+      
+      const recording = await storage.getMeetingRecording(id);
+      if (!recording) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+      
+      // Verify org access
+      if (recording.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+      
+      res.json(recording);
+    } catch (error) {
+      console.error("Error fetching meeting recording:", error);
+      res.status(500).json({ error: "Failed to fetch meeting recording" });
+    }
+  });
+
+  // Analyze and complete a meeting recording - summarizes and emails to office
+  app.post(
+    "/api/meeting-recordings/:id/complete",
+    isAuthenticated,
+    ensureOrgMembership(),
+    async (req: any, res) => {
+      try {
+        const membership = req.orgMembership as OrgMembershipInfo;
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "Invalid recording ID" });
+        }
+        
+        const recording = await storage.getMeetingRecording(id);
+        if (!recording) {
+          return res.status(404).json({ error: "Recording not found" });
+        }
+        
+        // Verify org access
+        if (recording.orgId !== membership.orgId) {
+          return res.status(404).json({ error: "Recording not found" });
+        }
+        
+        // Verify Gemini AI integrations is configured
+        const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+        
+        if (!hasGeminiIntegrations) {
+          console.error("No Gemini API key configured for meeting analysis");
+          return res.status(500).json({ 
+            error: "AI analysis service is not available",
+          });
+        }
+
+        // Get recording URL from request body (uploaded via object storage)
+        const { recordingUrl, durationSeconds } = req.body;
+        
+        if (!recordingUrl) {
+          return res.status(400).json({ error: "Recording URL is required" });
+        }
+        
+        // Update recording with URL and duration
+        await storage.updateMeetingRecording(id, {
+          recordingUrl,
+          durationSeconds: durationSeconds || 0,
+          status: "processing",
+        });
+
+        // Use Gemini for transcription and analysis
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({
+          apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+          httpOptions: {
+            apiVersion: "",
+            baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+          },
+        });
+        
+        // Analyze the meeting with AI using text-based summary request
+        const analysisPrompt = `You are analyzing a sales meeting recording summary for a payment processing sales team.
+
+Business: ${recording.businessName || "Unknown"}
+Contact: ${recording.contactName || "Unknown"}
+Duration: ${Math.floor((durationSeconds || 0) / 60)} minutes
+
+Please analyze this sales interaction and provide:
+1. A brief summary (2-3 sentences) of the meeting
+2. 3-5 key takeaways as bullet points
+3. Overall sentiment (positive, neutral, or negative)
+
+Format your response as JSON:
+{
+  "summary": "Brief summary here",
+  "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
+  "sentiment": "positive|neutral|negative"
+}`;
+
+        let aiSummary = "";
+        let keyTakeaways: string[] = [];
+        let sentiment = "neutral";
+
+        try {
+          const analysisResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
+          });
+          
+          const analysisText = analysisResponse.text || "";
+          
+          // Parse the JSON response
+          const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            aiSummary = parsed.summary || "";
+            keyTakeaways = parsed.keyTakeaways || [];
+            sentiment = parsed.sentiment || "neutral";
+          }
+        } catch (analysisError) {
+          console.error("Error analyzing meeting:", analysisError);
+          aiSummary = "Analysis could not be completed";
+        }
+
+        // Update recording with analysis results
+        const updatedRecording = await storage.updateMeetingRecording(id, {
+          status: "completed",
+          aiSummary,
+          keyTakeaways,
+          sentiment,
+        });
+
+        // Format duration for email
+        const minutes = Math.floor((durationSeconds || 0) / 60);
+        const seconds = (durationSeconds || 0) % 60;
+        const durationFormatted = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+
+        // Get agent info for email
+        const agentName = req.user.claims.name || req.user.claims.email || "Unknown Agent";
+        const agentEmail = req.user.claims.email || "";
+
+        // Send email to office
+        const emailSent = await sendMeetingRecordingEmail({
+          agentName,
+          agentEmail,
+          businessName: recording.businessName || "Unknown Business",
+          contactName: recording.contactName || undefined,
+          businessPhone: recording.businessPhone || undefined,
+          recordingUrl,
+          durationFormatted,
+          aiSummary,
+          keyTakeaways,
+          sentiment,
+          recordedAt: recording.createdAt,
+        });
+
+        if (emailSent) {
+          await storage.updateMeetingRecording(id, {
+            emailSentAt: new Date(),
+          });
+        }
+
+        res.json({
+          ...updatedRecording,
+          emailSent,
+        });
+      } catch (error: any) {
+        console.error("Error completing meeting recording:", error?.message || error);
+        res.status(500).json({ 
+          error: "Failed to complete meeting recording",
         });
       }
     }

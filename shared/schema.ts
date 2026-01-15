@@ -765,3 +765,45 @@ export type BrochureLocationHistory = typeof brochureLocationHistory.$inferSelec
 export type BrochureWithLocation = Brochure & {
   location?: BrochureLocation;
 };
+
+// Meeting recording status enum
+export const MEETING_RECORDING_STATUSES = ["recording", "processing", "completed", "failed"] as const;
+export type MeetingRecordingStatus = typeof MEETING_RECORDING_STATUSES[number];
+
+// Meeting recordings table (tracks field recordings for sales coaching repository)
+export const meetingRecordings = pgTable("meeting_recordings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id").notNull(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  businessName: varchar("business_name", { length: 255 }),
+  contactName: varchar("contact_name", { length: 255 }),
+  businessPhone: varchar("business_phone", { length: 50 }),
+  recordingUrl: text("recording_url"),
+  durationSeconds: integer("duration_seconds"),
+  status: varchar("status", { length: 30 }).default("recording").notNull(),
+  aiSummary: text("ai_summary"),
+  keyTakeaways: text("key_takeaways").array(),
+  sentiment: varchar("sentiment", { length: 30 }),
+  emailSentAt: timestamp("email_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const meetingRecordingsRelations = relations(meetingRecordings, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [meetingRecordings.orgId],
+    references: [organizations.id],
+  }),
+  merchant: one(merchants, {
+    fields: [meetingRecordings.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const insertMeetingRecordingSchema = createInsertSchema(meetingRecordings).omit({
+  id: true,
+  createdAt: true,
+  emailSentAt: true,
+});
+export type InsertMeetingRecording = z.infer<typeof insertMeetingRecordingSchema>;
+export type MeetingRecording = typeof meetingRecordings.$inferSelect;

@@ -22,6 +22,7 @@ import {
   roleplayMessages,
   brochureLocations,
   brochureLocationHistory,
+  meetingRecordings,
   type Brochure,
   type InsertBrochure,
   type Drop,
@@ -73,6 +74,8 @@ import {
   type InsertBrochureLocationHistory,
   type BrochureWithLocation,
   type HolderType,
+  type MeetingRecording,
+  type InsertMeetingRecording,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -156,6 +159,13 @@ export interface IStorage {
   createBrochureLocationHistory(data: InsertBrochureLocationHistory): Promise<BrochureLocationHistory>;
   registerBrochure(brochureId: string, orgId: number, registeredBy: string, notes?: string): Promise<BrochureWithLocation>;
   getBrochuresWithLocations(orgId: number): Promise<BrochureWithLocation[]>;
+  
+  // Meeting Recordings
+  createMeetingRecording(data: InsertMeetingRecording): Promise<MeetingRecording>;
+  getMeetingRecording(id: number): Promise<MeetingRecording | undefined>;
+  getMeetingRecordingsByAgent(agentId: string): Promise<MeetingRecording[]>;
+  getMeetingRecordingsByOrg(orgId: number): Promise<MeetingRecording[]>;
+  updateMeetingRecording(id: number, data: Partial<MeetingRecording>): Promise<MeetingRecording | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -980,6 +990,42 @@ export class DatabaseStorage implements IStorage {
       ...brochure,
       location: location || undefined,
     }));
+  }
+
+  // Meeting Recordings
+  async createMeetingRecording(data: InsertMeetingRecording): Promise<MeetingRecording> {
+    const [created] = await db.insert(meetingRecordings).values(data).returning();
+    return created;
+  }
+
+  async getMeetingRecording(id: number): Promise<MeetingRecording | undefined> {
+    const [recording] = await db.select().from(meetingRecordings).where(eq(meetingRecordings.id, id));
+    return recording;
+  }
+
+  async getMeetingRecordingsByAgent(agentId: string): Promise<MeetingRecording[]> {
+    return db
+      .select()
+      .from(meetingRecordings)
+      .where(eq(meetingRecordings.agentId, agentId))
+      .orderBy(desc(meetingRecordings.createdAt));
+  }
+
+  async getMeetingRecordingsByOrg(orgId: number): Promise<MeetingRecording[]> {
+    return db
+      .select()
+      .from(meetingRecordings)
+      .where(eq(meetingRecordings.orgId, orgId))
+      .orderBy(desc(meetingRecordings.createdAt));
+  }
+
+  async updateMeetingRecording(id: number, data: Partial<MeetingRecording>): Promise<MeetingRecording | undefined> {
+    const [updated] = await db
+      .update(meetingRecordings)
+      .set(data)
+      .where(eq(meetingRecordings.id, id))
+      .returning();
+    return updated;
   }
 }
 
