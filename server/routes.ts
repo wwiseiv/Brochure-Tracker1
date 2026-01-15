@@ -2120,6 +2120,32 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
+  // Get merchant meeting recordings
+  app.get("/api/merchants/:id/recordings", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const recordings = await storage.getMeetingRecordingsByMerchant(merchantId);
+      res.json(recordings);
+    } catch (error) {
+      console.error("Error fetching merchant recordings:", error);
+      res.status(500).json({ error: "Failed to fetch merchant recordings" });
+    }
+  });
+
   // ============================================
   // INVENTORY API (Inventory Tracking)
   // ============================================

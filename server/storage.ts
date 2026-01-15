@@ -165,6 +165,7 @@ export interface IStorage {
   getMeetingRecording(id: number): Promise<MeetingRecording | undefined>;
   getMeetingRecordingsByAgent(agentId: string): Promise<MeetingRecording[]>;
   getMeetingRecordingsByOrg(orgId: number): Promise<MeetingRecording[]>;
+  getMeetingRecordingsByMerchant(merchantId: number): Promise<MeetingRecording[]>;
   updateMeetingRecording(id: number, data: Partial<MeetingRecording>): Promise<MeetingRecording | undefined>;
 }
 
@@ -1016,6 +1017,19 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(meetingRecordings)
       .where(eq(meetingRecordings.orgId, orgId))
+      .orderBy(desc(meetingRecordings.createdAt));
+  }
+
+  async getMeetingRecordingsByMerchant(merchantId: number): Promise<MeetingRecording[]> {
+    return db
+      .select()
+      .from(meetingRecordings)
+      .where(
+        and(
+          eq(meetingRecordings.merchantId, merchantId),
+          eq(meetingRecordings.status, "completed")
+        )
+      )
       .orderBy(desc(meetingRecordings.createdAt));
   }
 
