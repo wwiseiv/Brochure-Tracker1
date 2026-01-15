@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,6 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import {
+  savePendingRecording,
+  getPendingRecordingForDrop,
+  removePendingRecording,
+  updatePendingRecordingRetryCount,
+  type PendingRecording,
+} from "@/lib/offlineStore";
+import {
   Mic,
   Square,
   Loader2,
@@ -14,6 +21,9 @@ import {
   AlertCircle,
   Send,
   Clock,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import type { Drop, MeetingRecording } from "@shared/schema";
 
@@ -22,7 +32,9 @@ interface DropMeetingRecorderProps {
   onComplete?: (recording: MeetingRecording) => void;
 }
 
-type RecordingState = "idle" | "recording" | "processing" | "completed" | "error";
+type RecordingState = "idle" | "recording" | "processing" | "completed" | "error" | "pending_upload";
+
+const MAX_RECORDING_SECONDS = 60 * 60; // 60 minutes
 
 export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderProps) {
   const { toast } = useToast();
@@ -34,14 +46,41 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     sentiment?: string;
     emailSent?: boolean;
   } | null>(null);
+  const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIdRef = useRef<number | null>(null);
+  const audioBlobRef = useRef<Blob | null>(null);
 
-  const { uploadFile, isUploading } = useUpload();
+  const { uploadFile } = useUpload();
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    async function checkPendingRecording() {
+      const pending = await getPendingRecordingForDrop(drop.id);
+      if (pending) {
+        setPendingRecording(pending);
+        recordingIdRef.current = pending.recordingId;
+        setRecordingTime(pending.durationSeconds);
+        setState("pending_upload");
+      }
+    }
+    checkPendingRecording();
+  }, [drop.id]);
 
   const createRecordingMutation = useMutation({
     mutationFn: async () => {
@@ -68,7 +107,12 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
       });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      if (pendingRecording) {
+        await removePendingRecording(pendingRecording.id);
+        setPendingRecording(null);
+      }
+      audioBlobRef.current = null;
       setState("completed");
       setAnalysisResult({
         summary: data.aiSummary,
@@ -108,6 +152,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
       setState("recording");
       setRecordingTime(0);
       audioChunksRef.current = [];
+      audioBlobRef.current = null;
 
       const recording = await createRecordingMutation.mutateAsync();
       recordingIdRef.current = recording.id;
@@ -136,13 +181,24 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
       mediaRecorder.onstop = async () => {
         const mimeType = mediaRecorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        await processRecording(audioBlob);
+        audioBlobRef.current = audioBlob;
+        await processRecording(audioBlob, mimeType);
       };
 
       mediaRecorder.start(1000);
 
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          if (prev >= MAX_RECORDING_SECONDS - 1) {
+            stopRecording();
+            toast({
+              title: "Maximum length reached",
+              description: "Recording automatically stopped at 60 minutes.",
+            });
+            return MAX_RECORDING_SECONDS;
+          }
+          return prev + 1;
+        });
       }, 1000);
 
     } catch (error: any) {
@@ -189,7 +245,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     }
   }, []);
 
-  const processRecording = async (audioBlob: Blob) => {
+  const processRecording = async (audioBlob: Blob, mimeType?: string) => {
     setState("processing");
 
     if (!recordingIdRef.current) {
@@ -220,7 +276,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
 
     } catch (error) {
       console.error("Error processing recording:", error);
-      // Reset state properly to allow retry
+      
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -229,15 +285,87 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to process recording");
-      recordingIdRef.current = null;
+
+      try {
+        const saved = await savePendingRecording({
+          type: 'drop',
+          dropId: drop.id,
+          recordingId: recordingIdRef.current!,
+          businessName: drop.businessName || undefined,
+          contactName: drop.contactName || undefined,
+          businessPhone: drop.businessPhone || undefined,
+          audioBlob: audioBlob,
+          mimeType: mimeType || audioBlob.type,
+          durationSeconds: recordingTime,
+        });
+        setPendingRecording(saved);
+        setState("pending_upload");
+        toast({
+          title: "Recording saved locally",
+          description: "Upload failed but your recording is saved. Tap 'Retry Upload' when you have a better connection.",
+        });
+      } catch (saveError) {
+        console.error("Failed to save recording locally:", saveError);
+        setState("error");
+        setErrorMessage("Upload failed and couldn't save locally. Please try recording again.");
+        recordingIdRef.current = null;
+        toast({
+          title: "Upload failed",
+          description: "Failed to save your recording. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const retryUpload = async () => {
+    if (!pendingRecording) return;
+
+    setState("processing");
+    await updatePendingRecordingRetryCount(pendingRecording.id);
+    setPendingRecording(prev => prev ? { ...prev, retryCount: prev.retryCount + 1 } : null);
+
+    try {
+      const ext = pendingRecording.mimeType.includes("webm") ? "webm" : "m4a";
+      const file = new File([pendingRecording.audioBlob], `meeting-${Date.now()}.${ext}`, {
+        type: pendingRecording.mimeType,
+      });
+
+      const uploadResult = await uploadFile(file);
+
+      if (!uploadResult || !uploadResult.objectPath) {
+        throw new Error("Failed to upload recording");
+      }
+
+      const recordingUrl = window.location.origin + uploadResult.objectPath;
+
+      await completeRecordingMutation.mutateAsync({
+        recordingId: pendingRecording.recordingId,
+        recordingUrl,
+        durationSeconds: pendingRecording.durationSeconds,
+      });
+
+    } catch (error) {
+      console.error("Retry upload failed:", error);
+      setState("pending_upload");
       toast({
-        title: "Upload failed",
-        description: "Failed to save your recording. Please try again.",
+        title: "Upload still failing",
+        description: "Your recording is saved. Try again when you have a better connection.",
         variant: "destructive",
       });
     }
+  };
+
+  const discardPendingRecording = async () => {
+    if (pendingRecording) {
+      await removePendingRecording(pendingRecording.id);
+      setPendingRecording(null);
+    }
+    audioBlobRef.current = null;
+    recordingIdRef.current = null;
+    setState("idle");
+    setRecordingTime(0);
+    setErrorMessage("");
   };
 
   const resetRecorder = () => {
@@ -246,7 +374,61 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     setErrorMessage("");
     setAnalysisResult(null);
     recordingIdRef.current = null;
+    audioBlobRef.current = null;
   };
+
+  if (state === "pending_upload" && pendingRecording) {
+    return (
+      <Card className="p-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+        <div className="flex items-start gap-3 mb-3">
+          {isOnline ? (
+            <Wifi className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+          ) : (
+            <WifiOff className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <p className="font-medium text-amber-700 dark:text-amber-300">
+              Recording Saved Locally
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {pendingRecording.retryCount > 0 
+                ? `Upload failed ${pendingRecording.retryCount} time${pendingRecording.retryCount > 1 ? 's' : ''}. Your recording is safe.`
+                : "Upload failed but your recording is saved. Retry when you have a better connection."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="text-muted-foreground">Duration: {formatTime(pendingRecording.durationSeconds)}</span>
+          <span className={`font-medium ${isOnline ? 'text-green-600' : 'text-amber-600'}`}>
+            {isOnline ? 'Online' : 'Offline'}
+          </span>
+        </div>
+        <div className="space-y-2">
+          <Button
+            onClick={retryUpload}
+            disabled={completeRecordingMutation.isPending}
+            className="w-full bg-purple-600 hover:bg-purple-700"
+            data-testid="button-retry-drop-upload"
+          >
+            {completeRecordingMutation.isPending ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-5 h-5 mr-2" />
+            )}
+            Retry Upload
+          </Button>
+          <Button
+            onClick={discardPendingRecording}
+            variant="outline"
+            className="w-full text-destructive hover:text-destructive"
+            data-testid="button-discard-drop-recording"
+          >
+            Discard Recording
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (state === "idle") {
     return (
@@ -277,6 +459,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
           <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
             <Clock className="w-4 h-4" />
             <span className="font-mono">{formatTime(recordingTime)}</span>
+            <span className="text-xs text-muted-foreground">/ 60:00</span>
           </div>
         </div>
         <Button

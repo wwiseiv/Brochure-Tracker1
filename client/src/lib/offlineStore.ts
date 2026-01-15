@@ -1,7 +1,8 @@
 const DB_NAME = 'brochuredrop-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DROPS_STORE = 'offline-drops';
 const CACHE_STORE = 'api-cache';
+const RECORDINGS_STORE = 'pending-recordings';
 
 export interface OfflineDrop {
   id: string;
@@ -46,6 +47,10 @@ function openDB(): Promise<IDBDatabase> {
       
       if (!db.objectStoreNames.contains(CACHE_STORE)) {
         db.createObjectStore(CACHE_STORE, { keyPath: 'url' });
+      }
+      
+      if (!db.objectStoreNames.contains(RECORDINGS_STORE)) {
+        db.createObjectStore(RECORDINGS_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -186,4 +191,118 @@ export async function getCachedApiResponse<T>(url: string): Promise<T | null> {
 
 export function isOnline(): boolean {
   return navigator.onLine;
+}
+
+export interface PendingRecording {
+  id: string;
+  type: 'merchant' | 'drop';
+  merchantId?: number;
+  dropId?: number;
+  recordingId: number;
+  businessName?: string;
+  contactName?: string;
+  businessPhone?: string;
+  audioBlob: Blob;
+  mimeType: string;
+  durationSeconds: number;
+  createdAt: string;
+  retryCount: number;
+}
+
+export async function savePendingRecording(recording: Omit<PendingRecording, 'id' | 'createdAt' | 'retryCount'>): Promise<PendingRecording> {
+  const pendingRecording: PendingRecording = {
+    ...recording,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+    retryCount: 0,
+  };
+
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(RECORDINGS_STORE, 'readwrite');
+      const store = transaction.objectStore(RECORDINGS_STORE);
+      const request = store.add(pendingRecording);
+
+      request.onsuccess = () => resolve(pendingRecording);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[OfflineStore] Failed to save pending recording:', error);
+    throw error;
+  }
+}
+
+export async function getPendingRecordings(): Promise<PendingRecording[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(RECORDINGS_STORE, 'readonly');
+      const store = transaction.objectStore(RECORDINGS_STORE);
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[OfflineStore] Failed to get pending recordings:', error);
+    return [];
+  }
+}
+
+export async function getPendingRecordingByRecordingId(recordingId: number): Promise<PendingRecording | null> {
+  const recordings = await getPendingRecordings();
+  return recordings.find(r => r.recordingId === recordingId) || null;
+}
+
+export async function updatePendingRecordingRetryCount(id: string): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(RECORDINGS_STORE, 'readwrite');
+      const store = transaction.objectStore(RECORDINGS_STORE);
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const recording = getRequest.result;
+        if (recording) {
+          recording.retryCount = (recording.retryCount || 0) + 1;
+          const putRequest = store.put(recording);
+          putRequest.onsuccess = () => resolve();
+          putRequest.onerror = () => reject(putRequest.error);
+        } else {
+          resolve();
+        }
+      };
+      getRequest.onerror = () => reject(getRequest.error);
+    });
+  } catch (error) {
+    console.error('[OfflineStore] Failed to update retry count:', error);
+  }
+}
+
+export async function removePendingRecording(id: string): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(RECORDINGS_STORE, 'readwrite');
+      const store = transaction.objectStore(RECORDINGS_STORE);
+      const request = store.delete(id);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[OfflineStore] Failed to remove pending recording:', error);
+  }
+}
+
+export async function getPendingRecordingForDrop(dropId: number): Promise<PendingRecording | null> {
+  const recordings = await getPendingRecordings();
+  return recordings.find(r => r.type === 'drop' && r.dropId === dropId) || null;
+}
+
+export async function getPendingRecordingForMerchant(merchantId: number): Promise<PendingRecording | null> {
+  const recordings = await getPendingRecordings();
+  return recordings.find(r => r.type === 'merchant' && r.merchantId === merchantId) || null;
 }
