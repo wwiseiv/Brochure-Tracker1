@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   Collapsible,
@@ -77,6 +79,9 @@ import {
   Zap,
   Mail,
   MessageSquare,
+  Wand2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format, formatDistanceToNow, addDays } from "date-fns";
 import type { DropWithBrochure, BusinessType, OutcomeType, AiSummary, LeadScore, FollowUpSequence, FollowUpStep, FollowUpActionType } from "@shared/schema";
@@ -115,6 +120,17 @@ export default function DropDetailPage() {
   const [outcomeNotes, setOutcomeNotes] = useState("");
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const [isScoreOpen, setIsScoreOpen] = useState(true);
+  
+  // Email drafter state
+  const [showEmailDrafter, setShowEmailDrafter] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [polishedEmail, setPolishedEmail] = useState("");
+  const [emailPurpose, setEmailPurpose] = useState("");
+  const [emailTone, setEmailTone] = useState("professional");
+  const [emailContext, setEmailContext] = useState("");
+  const [emailKeyPoints, setEmailKeyPoints] = useState("");
+  const [generatedEmail, setGeneratedEmail] = useState("");
+  const [emailCopied, setEmailCopied] = useState(false);
 
   interface SequenceWithSteps extends FollowUpSequence {
     steps?: FollowUpStep[];
@@ -203,6 +219,69 @@ export default function DropDetailPage() {
       });
     },
   });
+
+  const polishEmailMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/email/polish", {
+        draft: emailDraft,
+        tone: emailTone,
+        context: emailContext,
+        businessName: drop?.businessName,
+        contactName: drop?.contactName,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setPolishedEmail(data.polishedEmail);
+      toast({ title: "Email polished!" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to polish email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generateEmailMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/email/generate", {
+        purpose: emailPurpose,
+        tone: emailTone,
+        keyPoints: emailKeyPoints,
+        businessName: drop?.businessName,
+        contactName: drop?.contactName,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedEmail(data.email);
+      toast({ title: "Email generated!" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePolishEmail = () => {
+    polishEmailMutation.mutate();
+  };
+
+  const handleGenerateEmail = () => {
+    generateEmailMutation.mutate();
+  };
+
+  const copyEmailToClipboard = async () => {
+    await navigator.clipboard.writeText(generatedEmail);
+    setEmailCopied(true);
+    toast({ title: "Copied to clipboard!" });
+    setTimeout(() => setEmailCopied(false), 2000);
+  };
 
   const form = useForm<EditDropFormData>({
     resolver: zodResolver(editDropSchema),
@@ -800,6 +879,262 @@ export default function DropDetailPage() {
             />
           </Card>
         )}
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Email Drafter
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmailDrafter(!showEmailDrafter)}
+              data-testid="button-toggle-email-drafter"
+            >
+              {showEmailDrafter ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          
+          {!showEmailDrafter ? (
+            <div 
+              className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover-elevate cursor-pointer"
+              onClick={() => setShowEmailDrafter(true)}
+              data-testid="card-email-drafter-collapsed"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">AI Email Drafter</p>
+                <p className="text-sm text-muted-foreground">
+                  Polish your draft or generate professional emails
+                </p>
+              </div>
+            </div>
+          ) : (
+            <Tabs defaultValue="polish" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="polish" className="min-h-touch gap-2" data-testid="tab-polish">
+                  <Wand2 className="w-4 h-4" />
+                  Polish Draft
+                </TabsTrigger>
+                <TabsTrigger value="generate" className="min-h-touch gap-2" data-testid="tab-generate">
+                  <Sparkles className="w-4 h-4" />
+                  Generate New
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="polish" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Your Draft Email</Label>
+                  <Textarea
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    placeholder="Write your email in your own words - AI will polish it professionally..."
+                    rows={4}
+                    data-testid="textarea-email-draft"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Tone</Label>
+                    <Select value={emailTone} onValueChange={setEmailTone}>
+                      <SelectTrigger data-testid="select-polish-tone">
+                        <SelectValue placeholder="Select tone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="friendly">Friendly</SelectItem>
+                        <SelectItem value="casual">Casual</SelectItem>
+                        <SelectItem value="formal">Formal</SelectItem>
+                        <SelectItem value="persuasive">Persuasive</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Context (optional)</Label>
+                    <Input
+                      value={emailContext}
+                      onChange={(e) => setEmailContext(e.target.value)}
+                      placeholder="e.g., First meeting"
+                      data-testid="input-email-context"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handlePolishEmail}
+                  disabled={polishEmailMutation.isPending || !emailDraft.trim()}
+                  className="w-full min-h-touch gap-2"
+                  data-testid="button-polish-email"
+                >
+                  {polishEmailMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Polishing...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4" />
+                      Polish Email
+                    </>
+                  )}
+                </Button>
+
+                {polishedEmail && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Polished Email
+                      </Label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handlePolishEmail}
+                          disabled={polishEmailMutation.isPending}
+                          data-testid="button-repolish"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(polishedEmail);
+                            setEmailCopied(true);
+                            toast({ title: "Copied to clipboard!" });
+                            setTimeout(() => setEmailCopied(false), 2000);
+                          }}
+                          data-testid="button-copy-polished"
+                        >
+                          {emailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <Card className="p-3 bg-primary/5 border-primary/20">
+                      <p className="text-sm whitespace-pre-wrap">{polishedEmail}</p>
+                    </Card>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="generate" className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Generate a professional email for {drop.businessName}
+                  {drop.contactName && ` (${drop.contactName})`}
+                </p>
+
+                <div className="space-y-2">
+                  <Label>Email Purpose</Label>
+                  <Select value={emailPurpose} onValueChange={setEmailPurpose}>
+                    <SelectTrigger data-testid="select-email-purpose">
+                      <SelectValue placeholder="Select purpose..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="follow-up">Follow-up after visit</SelectItem>
+                      <SelectItem value="introduction">Introduction / First contact</SelectItem>
+                      <SelectItem value="thank-you">Thank you message</SelectItem>
+                      <SelectItem value="reminder">Reminder about our meeting</SelectItem>
+                      <SelectItem value="proposal">Proposal / Offer</SelectItem>
+                      <SelectItem value="appointment">Schedule appointment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Tone</Label>
+                    <Select value={emailTone} onValueChange={setEmailTone}>
+                      <SelectTrigger data-testid="select-email-tone">
+                        <SelectValue placeholder="Select tone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="friendly">Friendly</SelectItem>
+                        <SelectItem value="casual">Casual</SelectItem>
+                        <SelectItem value="formal">Formal</SelectItem>
+                        <SelectItem value="persuasive">Persuasive</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Key Points</Label>
+                    <Input
+                      value={emailKeyPoints}
+                      onChange={(e) => setEmailKeyPoints(e.target.value)}
+                      placeholder="Important points..."
+                      data-testid="input-email-key-points"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleGenerateEmail}
+                  disabled={!emailPurpose || generateEmailMutation.isPending}
+                  className="w-full min-h-touch gap-2"
+                  data-testid="button-generate-email"
+                >
+                  {generateEmailMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate Email
+                    </>
+                  )}
+                </Button>
+
+                {generatedEmail && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Generated Email
+                      </Label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGenerateEmail}
+                          disabled={generateEmailMutation.isPending}
+                          data-testid="button-regenerate"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={copyEmailToClipboard}
+                          data-testid="button-copy-email"
+                        >
+                          {emailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <Card className="p-3 bg-primary/5 border-primary/20">
+                      <p className="text-sm whitespace-pre-wrap">{generatedEmail}</p>
+                    </Card>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </Card>
       </main>
 
       <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
