@@ -2242,6 +2242,86 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
+  // Get voice notes for a merchant
+  app.get("/api/merchants/:id/voice-notes", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const voiceNotes = await storage.getVoiceNotesByMerchant(merchantId);
+      res.json(voiceNotes);
+    } catch (error) {
+      console.error("Error fetching voice notes:", error);
+      res.status(500).json({ error: "Failed to fetch voice notes" });
+    }
+  });
+
+  // Create voice note for a merchant
+  app.post("/api/merchants/:id/voice-notes", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { transcription, durationSeconds } = req.body;
+      if (!transcription) {
+        return res.status(400).json({ error: "Transcription is required" });
+      }
+
+      const voiceNote = await storage.createVoiceNote({
+        merchantId,
+        orgId: membership.organization.id,
+        userId: req.user.id,
+        transcription,
+        durationSeconds: durationSeconds || null,
+      });
+      
+      res.status(201).json(voiceNote);
+    } catch (error) {
+      console.error("Error creating voice note:", error);
+      res.status(500).json({ error: "Failed to create voice note" });
+    }
+  });
+
+  // Delete voice note
+  app.delete("/api/voice-notes/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const voiceNoteId = parseInt(req.params.id);
+      if (isNaN(voiceNoteId)) {
+        return res.status(400).json({ error: "Invalid voice note ID" });
+      }
+      
+      await storage.deleteVoiceNote(voiceNoteId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting voice note:", error);
+      res.status(500).json({ error: "Failed to delete voice note" });
+    }
+  });
+
   // Get merchant visit history (drops for this merchant - legacy, matches by business name)
   app.get("/api/merchants/:id/visits", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {

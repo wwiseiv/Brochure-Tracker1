@@ -76,6 +76,9 @@ import {
   type HolderType,
   type MeetingRecording,
   type InsertMeetingRecording,
+  voiceNotes,
+  type VoiceNote,
+  type InsertVoiceNote,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -168,6 +171,11 @@ export interface IStorage {
   getMeetingRecordingsByOrg(orgId: number): Promise<MeetingRecording[]>;
   getMeetingRecordingsByMerchant(merchantId: number): Promise<MeetingRecording[]>;
   updateMeetingRecording(id: number, data: Partial<MeetingRecording>): Promise<MeetingRecording | undefined>;
+  
+  // Voice Notes
+  createVoiceNote(data: InsertVoiceNote): Promise<VoiceNote>;
+  getVoiceNotesByMerchant(merchantId: number): Promise<VoiceNote[]>;
+  deleteVoiceNote(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1042,6 +1050,24 @@ export class DatabaseStorage implements IStorage {
       .where(eq(meetingRecordings.id, id))
       .returning();
     return updated;
+  }
+
+  // Voice Notes
+  async createVoiceNote(data: InsertVoiceNote): Promise<VoiceNote> {
+    const [created] = await db.insert(voiceNotes).values(data).returning();
+    return created;
+  }
+
+  async getVoiceNotesByMerchant(merchantId: number): Promise<VoiceNote[]> {
+    return db
+      .select()
+      .from(voiceNotes)
+      .where(eq(voiceNotes.merchantId, merchantId))
+      .orderBy(desc(voiceNotes.createdAt));
+  }
+
+  async deleteVoiceNote(id: number): Promise<void> {
+    await db.delete(voiceNotes).where(eq(voiceNotes.id, id));
   }
 }
 
