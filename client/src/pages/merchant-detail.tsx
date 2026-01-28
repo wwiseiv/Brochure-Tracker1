@@ -19,6 +19,14 @@ import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
   ArrowLeft,
   Phone,
   Mail,
@@ -41,6 +49,9 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
@@ -152,6 +163,14 @@ export default function MerchantDetailPage() {
   });
 
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
+  
+  // Email drafter state
+  const [showEmailDrafter, setShowEmailDrafter] = useState(false);
+  const [emailPurpose, setEmailPurpose] = useState("");
+  const [emailTone, setEmailTone] = useState("professional");
+  const [emailKeyPoints, setEmailKeyPoints] = useState("");
+  const [generatedEmail, setGeneratedEmail] = useState("");
+  const [emailCopied, setEmailCopied] = useState(false);
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (data: Partial<Merchant>) => {
@@ -175,6 +194,62 @@ export default function MerchantDetailPage() {
       });
     },
   });
+
+  const generateEmailMutation = useMutation({
+    mutationFn: async (data: { businessName: string; contactName: string; purpose: string; keyPoints: string; tone: string; businessType?: string; agentNotes?: string }) => {
+      const res = await apiRequest("POST", "/api/email/generate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedEmail(data.email);
+      toast({
+        title: "Email generated!",
+        description: "Your email has been created. Tap to copy.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate email",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerateEmail = () => {
+    if (!merchant || !emailPurpose) {
+      toast({
+        title: "Missing information",
+        description: "Please select an email purpose.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateEmailMutation.mutate({
+      businessName: merchant.businessName,
+      contactName: merchant.contactName || "",
+      purpose: emailPurpose,
+      keyPoints: emailKeyPoints,
+      tone: emailTone,
+      businessType: merchant.businessType || undefined,
+      agentNotes: merchant.notes || undefined,
+    });
+  };
+
+  const copyEmailToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedEmail);
+      setEmailCopied(true);
+      toast({ title: "Copied to clipboard!" });
+      setTimeout(() => setEmailCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Please select and copy the text manually.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleOpenNotesDialog = () => {
     setEditedNotes(merchant?.notes || "");
@@ -439,6 +514,148 @@ export default function MerchantDetailPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">Record Meeting</h2>
           <MeetingRecorder merchant={merchant} />
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Draft Email</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmailDrafter(!showEmailDrafter)}
+              data-testid="button-toggle-email-drafter"
+            >
+              {showEmailDrafter ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          
+          {!showEmailDrafter ? (
+            <Card 
+              className="p-4 hover-elevate cursor-pointer"
+              onClick={() => setShowEmailDrafter(true)}
+              data-testid="card-email-drafter-collapsed"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">AI Email Drafter</p>
+                  <p className="text-sm text-muted-foreground">
+                    Generate professional emails for {merchant.businessName}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Email Purpose</Label>
+                <Select value={emailPurpose} onValueChange={setEmailPurpose}>
+                  <SelectTrigger data-testid="select-email-purpose">
+                    <SelectValue placeholder="Select purpose..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="follow-up">Follow-up after visit</SelectItem>
+                    <SelectItem value="introduction">Introduction / First contact</SelectItem>
+                    <SelectItem value="thank-you">Thank you message</SelectItem>
+                    <SelectItem value="reminder">Reminder about our meeting</SelectItem>
+                    <SelectItem value="proposal">Proposal / Offer</SelectItem>
+                    <SelectItem value="appointment">Schedule appointment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tone</Label>
+                <Select value={emailTone} onValueChange={setEmailTone}>
+                  <SelectTrigger data-testid="select-email-tone">
+                    <SelectValue placeholder="Select tone..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="friendly">Friendly</SelectItem>
+                    <SelectItem value="casual">Casual</SelectItem>
+                    <SelectItem value="formal">Formal</SelectItem>
+                    <SelectItem value="persuasive">Persuasive</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Key Points (optional)</Label>
+                <Textarea
+                  value={emailKeyPoints}
+                  onChange={(e) => setEmailKeyPoints(e.target.value)}
+                  placeholder="Any specific points you want to mention..."
+                  rows={2}
+                  data-testid="textarea-email-key-points"
+                />
+              </div>
+
+              <Button
+                onClick={handleGenerateEmail}
+                disabled={!emailPurpose || generateEmailMutation.isPending}
+                className="w-full min-h-touch gap-2"
+                data-testid="button-generate-email"
+              >
+                {generateEmailMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                Generate Email
+              </Button>
+
+              {generatedEmail && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Generated Email</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyEmailToClipboard}
+                      className="gap-1"
+                      data-testid="button-copy-email"
+                    >
+                      {emailCopied ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <Card className="p-3 bg-muted/50">
+                    <p className="text-sm whitespace-pre-wrap">{generatedEmail}</p>
+                  </Card>
+                  {merchant.email && (
+                    <Button
+                      variant="outline"
+                      className="w-full min-h-touch gap-2"
+                      onClick={() => {
+                        window.location.href = `mailto:${merchant.email}?body=${encodeURIComponent(generatedEmail)}`;
+                      }}
+                      data-testid="button-send-email"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Open in Email App
+                    </Button>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
         </section>
 
         <section>
