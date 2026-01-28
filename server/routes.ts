@@ -2260,7 +2260,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const voiceNotes = await storage.getVoiceNotesByMerchant(merchantId);
+      const voiceNotes = await storage.getVoiceNotesByMerchant(merchantId, membership.organization.id);
       res.json(voiceNotes);
     } catch (error) {
       console.error("Error fetching voice notes:", error);
@@ -2287,8 +2287,15 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       }
 
       const { transcription, durationSeconds } = req.body;
-      if (!transcription) {
-        return res.status(400).json({ error: "Transcription is required" });
+      if (!transcription || typeof transcription !== 'string') {
+        return res.status(400).json({ error: "Valid transcription string is required" });
+      }
+      
+      const parsedDuration = durationSeconds !== undefined && durationSeconds !== null 
+        ? parseInt(durationSeconds) 
+        : null;
+      if (parsedDuration !== null && isNaN(parsedDuration)) {
+        return res.status(400).json({ error: "Duration must be a number" });
       }
 
       const voiceNote = await storage.createVoiceNote({
@@ -2296,7 +2303,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         orgId: membership.organization.id,
         userId: req.user.id,
         transcription,
-        durationSeconds: durationSeconds || null,
+        durationSeconds: parsedDuration,
       });
       
       res.status(201).json(voiceNote);
@@ -2314,7 +2321,18 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         return res.status(400).json({ error: "Invalid voice note ID" });
       }
       
-      await storage.deleteVoiceNote(voiceNoteId);
+      const membership = req.orgMembership;
+      
+      // Verify the voice note belongs to the user's organization
+      const voiceNote = await storage.getVoiceNote(voiceNoteId);
+      if (!voiceNote) {
+        return res.status(404).json({ error: "Voice note not found" });
+      }
+      if (voiceNote.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteVoiceNote(voiceNoteId, membership.organization.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting voice note:", error);

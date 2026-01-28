@@ -59,7 +59,7 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
-import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus, MeetingRecording } from "@shared/schema";
+import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus, MeetingRecording, VoiceNote } from "@shared/schema";
 
 const outcomeIcons: Record<OutcomeType, typeof CheckCircle2> = {
   signed: CheckCircle2,
@@ -166,6 +166,11 @@ export default function MerchantDetailPage() {
     enabled: !!merchantId,
   });
 
+  const { data: voiceNotes, isLoading: voiceNotesLoading } = useQuery<VoiceNote[]>({
+    queryKey: ["/api/merchants", merchantId, "voice-notes"],
+    enabled: !!merchantId,
+  });
+
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
   
   // Voice recording for notes
@@ -173,6 +178,8 @@ export default function MerchantDetailPage() {
   const [isTranscribingNotes, setIsTranscribingNotes] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStartTimeRef = useRef<number>(0);
+  const [copiedVoiceNoteId, setCopiedVoiceNoteId] = useState<number | null>(null);
 
   // Email drafter state
   const [showEmailDrafter, setShowEmailDrafter] = useState(false);
@@ -251,6 +258,19 @@ export default function MerchantDetailPage() {
     },
   });
 
+  const saveVoiceNoteMutation = useMutation({
+    mutationFn: async (data: { transcription: string; durationSeconds?: number }) => {
+      const res = await apiRequest("POST", `/api/merchants/${merchantId}/voice-notes`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "voice-notes"] });
+    },
+    onError: (error) => {
+      console.error("Failed to save voice note:", error);
+    },
+  });
+
   const handlePolishEmail = () => {
     if (!emailDraft.trim()) {
       toast({
@@ -323,6 +343,7 @@ export default function MerchantDetailPage() {
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      recordingStartTimeRef.current = Date.now();
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -332,10 +353,11 @@ export default function MerchantDetailPage() {
       
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
+        const durationSeconds = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
         const audioBlob = new Blob(audioChunksRef.current, { 
           type: mediaRecorder.mimeType || "audio/webm" 
         });
-        await transcribeNotesAudio(audioBlob);
+        await transcribeNotesAudio(audioBlob, durationSeconds);
       };
       
       mediaRecorder.start();
@@ -357,7 +379,7 @@ export default function MerchantDetailPage() {
     }
   };
 
-  const transcribeNotesAudio = async (audioBlob: Blob) => {
+  const transcribeNotesAudio = async (audioBlob: Blob, durationSeconds?: number) => {
     setIsTranscribingNotes(true);
     try {
       const formData = new FormData();
@@ -380,6 +402,13 @@ export default function MerchantDetailPage() {
       const data = await response.json();
       if (data.text) {
         setEditedNotes(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+        
+        // Save transcription to voice notes history
+        saveVoiceNoteMutation.mutate({
+          transcription: data.text,
+          durationSeconds,
+        });
+        
         toast({ title: "Transcription complete!" });
       }
     } catch (error) {
@@ -642,6 +671,62 @@ export default function MerchantDetailPage() {
               </p>
             )}
           </Card>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Voice Note History</h2>
+          {voiceNotesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : voiceNotes && voiceNotes.length > 0 ? (
+            <div className="space-y-2">
+              {voiceNotes.map((note) => (
+                <Card 
+                  key={note.id} 
+                  className="p-3"
+                  data-testid={`card-voice-note-${note.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Mic className="w-3 h-3 text-primary" />
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                          {note.durationSeconds && ` • ${Math.floor(note.durationSeconds / 60)}:${(note.durationSeconds % 60).toString().padStart(2, '0')}`}
+                        </span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">{note.transcription}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(note.transcription);
+                        setCopiedVoiceNoteId(note.id);
+                        toast({ title: "Copied to clipboard!" });
+                        setTimeout(() => setCopiedVoiceNoteId(null), 2000);
+                      }}
+                      data-testid={`button-copy-voice-note-${note.id}`}
+                    >
+                      {copiedVoiceNoteId === note.id ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-4">
+              <p className="text-sm text-muted-foreground italic text-center">
+                No voice notes yet. Use "Dictate Notes" to record and transcribe voice notes.
+              </p>
+            </Card>
+          )}
         </section>
 
         <section>

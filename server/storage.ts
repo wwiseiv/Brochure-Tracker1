@@ -174,8 +174,9 @@ export interface IStorage {
   
   // Voice Notes
   createVoiceNote(data: InsertVoiceNote): Promise<VoiceNote>;
-  getVoiceNotesByMerchant(merchantId: number): Promise<VoiceNote[]>;
-  deleteVoiceNote(id: number): Promise<void>;
+  getVoiceNotesByMerchant(merchantId: number, orgId: number): Promise<VoiceNote[]>;
+  getVoiceNote(id: number): Promise<VoiceNote | undefined>;
+  deleteVoiceNote(id: number, orgId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1058,16 +1059,21 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getVoiceNotesByMerchant(merchantId: number): Promise<VoiceNote[]> {
+  async getVoiceNotesByMerchant(merchantId: number, orgId: number): Promise<VoiceNote[]> {
     return db
       .select()
       .from(voiceNotes)
-      .where(eq(voiceNotes.merchantId, merchantId))
+      .where(and(eq(voiceNotes.merchantId, merchantId), eq(voiceNotes.orgId, orgId)))
       .orderBy(desc(voiceNotes.createdAt));
   }
 
-  async deleteVoiceNote(id: number): Promise<void> {
-    await db.delete(voiceNotes).where(eq(voiceNotes.id, id));
+  async getVoiceNote(id: number): Promise<VoiceNote | undefined> {
+    const [note] = await db.select().from(voiceNotes).where(eq(voiceNotes.id, id));
+    return note;
+  }
+
+  async deleteVoiceNote(id: number, orgId: number): Promise<void> {
+    await db.delete(voiceNotes).where(and(eq(voiceNotes.id, id), eq(voiceNotes.orgId, orgId)));
   }
 }
 
