@@ -527,3 +527,178 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
     return false;
   }
 }
+
+interface SendRoleplaySessionEmailParams {
+  agentName: string;
+  agentEmail: string;
+  scenario: string;
+  mode: string;
+  performanceScore: number;
+  feedback: {
+    overallScore?: number;
+    strengths?: string[];
+    areasToImprove?: string[];
+    nepqUsage?: string;
+    objectionHandling?: string;
+    rapportBuilding?: string;
+    topTip?: string;
+  };
+  conversationSummary: string;
+  sessionId: number;
+  completedAt: Date;
+}
+
+export async function sendRoleplaySessionEmail(params: SendRoleplaySessionEmailParams): Promise<boolean> {
+  try {
+    console.log(`Sending roleplay session email for session ${params.sessionId}`);
+    const client = getResendClient();
+    
+    if (!client) {
+      console.error("Cannot send roleplay session email - Resend client not configured");
+      return false;
+    }
+
+    const strengthsHtml = params.feedback.strengths && params.feedback.strengths.length > 0
+      ? `
+        <div style="margin: 15px 0;">
+          <h4 style="margin: 0 0 8px 0; color: #059669;">Strengths</h4>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${params.feedback.strengths.map(s => `<li style="margin: 4px 0; color: #4B5563;">${s}</li>`).join("")}
+          </ul>
+        </div>
+      `
+      : "";
+
+    const improvementsHtml = params.feedback.areasToImprove && params.feedback.areasToImprove.length > 0
+      ? `
+        <div style="margin: 15px 0;">
+          <h4 style="margin: 0 0 8px 0; color: #DC2626;">Areas to Improve</h4>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${params.feedback.areasToImprove.map(a => `<li style="margin: 4px 0; color: #4B5563;">${a}</li>`).join("")}
+          </ul>
+        </div>
+      `
+      : "";
+
+    const scoreColor = params.performanceScore >= 80 ? "#059669" 
+      : params.performanceScore >= 60 ? "#D97706" 
+      : "#DC2626";
+
+    const modeLabel = params.mode === "coaching" ? "Coaching Session" : "Role-Play Practice";
+    const scenarioLabel = params.scenario.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+
+    const completedDate = new Date(params.completedAt);
+    const dateFormatted = completedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: MEETING_RECORDING_RECIPIENT,
+      subject: `AI Coach Session: ${params.agentName} - ${scenarioLabel} (Score: ${params.performanceScore})`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">AI Coach Session Complete</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">${modeLabel}</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; width: 120px;">Agent:</td>
+                  <td style="padding: 8px 0;">${params.agentName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Email:</td>
+                  <td style="padding: 8px 0;">${params.agentEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Scenario:</td>
+                  <td style="padding: 8px 0;">${scenarioLabel}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600;">Completed:</td>
+                  <td style="padding: 8px 0;">${dateFormatted}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <div style="text-align: center; margin: 25px 0;">
+              <div style="display: inline-block; background: ${scoreColor}; color: white; padding: 20px 40px; border-radius: 12px;">
+                <div style="font-size: 14px; opacity: 0.9;">Performance Score</div>
+                <div style="font-size: 48px; font-weight: bold;">${params.performanceScore}</div>
+              </div>
+            </div>
+            
+            ${strengthsHtml}
+            ${improvementsHtml}
+            
+            ${params.feedback.nepqUsage ? `
+            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 15px 0;">
+              <h4 style="margin: 0 0 8px 0; color: #1E40AF;">NEPQ Usage</h4>
+              <p style="margin: 0; color: #4B5563;">${params.feedback.nepqUsage}</p>
+            </div>
+            ` : ""}
+            
+            ${params.feedback.objectionHandling ? `
+            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 15px 0;">
+              <h4 style="margin: 0 0 8px 0; color: #1E40AF;">Objection Handling</h4>
+              <p style="margin: 0; color: #4B5563;">${params.feedback.objectionHandling}</p>
+            </div>
+            ` : ""}
+            
+            ${params.feedback.rapportBuilding ? `
+            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 15px 0;">
+              <h4 style="margin: 0 0 8px 0; color: #1E40AF;">Rapport Building</h4>
+              <p style="margin: 0; color: #4B5563;">${params.feedback.rapportBuilding}</p>
+            </div>
+            ` : ""}
+            
+            ${params.feedback.topTip ? `
+            <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); padding: 15px; border-radius: 8px; border: 1px solid #F59E0B; margin: 20px 0;">
+              <h4 style="margin: 0 0 8px 0; color: #92400E;">Top Tip</h4>
+              <p style="margin: 0; color: #78350F; font-weight: 500;">${params.feedback.topTip}</p>
+            </div>
+            ` : ""}
+            
+            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+              <h4 style="margin: 0 0 8px 0; color: #1E40AF;">Conversation Summary</h4>
+              <p style="margin: 0; color: #4B5563; white-space: pre-wrap; font-size: 14px;">${params.conversationSummary}</p>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+            
+            <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">
+              This coaching session has been logged for team training analytics.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Failed to send roleplay session email:", error);
+      return false;
+    }
+
+    console.log(`Roleplay session email sent to ${MEETING_RECORDING_RECIPIENT}`);
+    return true;
+  } catch (error: any) {
+    console.error("Error sending roleplay session email:", error?.message || error);
+    return false;
+  }
+}

@@ -22,7 +22,7 @@ import {
   insertFeedbackSubmissionSchema,
   INVITATION_STATUSES,
 } from "@shared/schema";
-import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail } from "./email";
+import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail, sendRoleplaySessionEmail } from "./email";
 import { insertMeetingRecordingSchema } from "@shared/schema";
 import { exportReferrals, exportDrops, exportMerchants, ExportFormat } from "./export";
 import {
@@ -3903,12 +3903,34 @@ Provide constructive feedback in JSON format:
         feedback = { overallScore: 50, topTip: "Keep practicing!" };
       }
 
+      const endedAt = new Date();
       await storage.updateRoleplaySession(sessionId, {
         status: "completed",
-        endedAt: new Date(),
+        endedAt,
         feedback: JSON.stringify(feedback),
         performanceScore: feedback.overallScore || 50,
       });
+
+      // Send email notification with session summary
+      const agentName = req.user.claims.name || req.user.claims.username || "Agent";
+      const agentEmail = req.user.claims.email || "";
+      
+      // Create a summary of the conversation (first 500 chars)
+      const conversationSummary = conversationText.length > 500 
+        ? conversationText.substring(0, 500) + "..."
+        : conversationText;
+
+      sendRoleplaySessionEmail({
+        agentName,
+        agentEmail,
+        scenario: session.scenario,
+        mode: session.mode,
+        performanceScore: feedback.overallScore || 50,
+        feedback,
+        conversationSummary,
+        sessionId,
+        completedAt: endedAt,
+      }).catch(err => console.error("Failed to send roleplay session email:", err));
 
       res.json({
         status: "completed",
