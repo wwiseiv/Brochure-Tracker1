@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload } from "lucide-react";
+import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
 
@@ -79,7 +80,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <span className="font-semibold">BrochureDrop</span>
+            <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
             <div className="w-8 h-8 rounded-full bg-muted" />
           </div>
         </header>
@@ -95,7 +96,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-          <span className="font-semibold">BrochureDrop</span>
+          <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
           <div className="flex items-center gap-2">
             <Link href="/activity">
               <Button variant="ghost" size="icon" data-testid="button-activity-feed">

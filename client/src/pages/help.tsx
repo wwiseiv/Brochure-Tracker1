@@ -188,7 +188,7 @@ export default function HelpPage() {
   const gettingStartedItems: HelpItem[] = [
     {
       title: "Install the App",
-      description: "Add BrochureDrop to your home screen for quick access. Works offline and feels like a native app.",
+      description: "Add BrochureTracker to your home screen for quick access. Works offline and feels like a native app.",
       link: "/profile",
       icon: <Download className="w-5 h-5 text-primary" />,
     },
@@ -299,7 +299,7 @@ export default function HelpPage() {
     },
     {
       title: "Coaching Mode",
-      description: "Ask questions like 'What should I say when they object to the price?' or 'How do I approach a busy restaurant?' Get advice based on NEPQ methodology and SignaPay training.",
+      description: "Ask questions like 'What should I say when they object to the price?' or 'How do I approach a busy restaurant?' Get advice based on NEPQ methodology and PCBancard training.",
       link: "/",
       icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
     },
@@ -653,7 +653,7 @@ export default function HelpPage() {
 
       <main className="p-4 space-y-8 max-w-2xl mx-auto">
         <div className="text-center py-4">
-          <h1 className="text-2xl font-bold text-primary">BrochureDrop Help</h1>
+          <h1 className="text-2xl font-bold text-primary">BrochureTracker Help</h1>
           <p className="text-muted-foreground mt-2">
             Complete guide to all features and how to use them
           </p>
@@ -686,11 +686,11 @@ export default function HelpPage() {
           const query = searchQuery.toLowerCase().trim();
           
           const allSections = [
-            { title: "Getting Started", description: "New to BrochureDrop? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
+            { title: "Getting Started", description: "New to BrochureTracker? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
-            { title: "Offline & Mobile", description: "BrochureDrop is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
+            { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users" },
             { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users" },
@@ -785,7 +785,7 @@ export default function HelpPage() {
               User Roles & Permissions
             </CardTitle>
             <CardDescription>
-              BrochureDrop has three user roles, each with different access levels:
+              BrochureTracker has three user roles, each with different access levels:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -844,7 +844,7 @@ export default function HelpPage() {
               <AccordionItem value="item-4">
                 <AccordionTrigger className="text-sm">Can I use the app without internet?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  Yes! BrochureDrop works offline. You can view your drops, log new ones, and record notes. Everything syncs automatically when you're back online. Voice transcription requires internet.
+                  Yes! BrochureTracker works offline. You can view your drops, log new ones, and record notes. Everything syncs automatically when you're back online. Voice transcription requires internet.
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-5">

@@ -1,11 +1,11 @@
 {
-  "name": "BrochureDrop",
-  "short_name": "BrochureDrop",
-  "description": "Field tracking app for video brochure deployment",
+  "name": "BrochureTracker",
+  "short_name": "BrochureTracker",
+  "description": "PCBancard field tracking app for video brochure deployment",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F9FAFB",
-  "theme_color": "#1E40AF",
+  "theme_color": "#7C5CFC",
   "orientation": "portrait",
   "icons": [
     {

@@ -1,11 +1,11 @@
-// SignaPay PayLo Sales Script - Used for AI-powered email generation
-// This script provides context about the SignaPay PayLo dual pricing program
+// PCBancard PayLo Sales Script - Used for AI-powered email generation
+// This script provides context about the PCBancard PayLo dual pricing program
 // for crafting personalized follow-up emails to merchants
 
 export const SIGNAPAY_SALES_SCRIPT = `
-## SignaPay PayLo Overview
+## PCBancard PayLo Overview
 
-SignaPay PayLo is a dual pricing program that helps business owners stop losing 3-4% of every card transaction to processing fees.
+PCBancard PayLo is a dual pricing program that helps business owners stop losing 3-4% of every card transaction to processing fees.
 
 ### The Problem
 - Every card transaction (dip, tap, swipe) takes 3-4% off the top
@@ -138,7 +138,7 @@ export function getEmailPrompt(
 ): string {
   const businessContext = BUSINESS_TYPE_CONTEXT[businessType] || BUSINESS_TYPE_CONTEXT.other;
   
-  return `You are a professional sales email writer for SignaPay, a payment processing company. 
+  return `You are a professional sales email writer for PCBancard, a payment processing company. 
 Your job is to write a personalized follow-up email to a merchant based on the agent's visit notes.
 
 ${SIGNAPAY_SALES_SCRIPT}

@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { QrCode, MapPin, Mic, Bell, CheckCircle2, ArrowRight, Package, GraduationCap, Users, TrendingUp } from "lucide-react";
+import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
+import pcbLogoLight from "@/assets/pcb_logo_light.png";
 
 const features = [
   {
@@ -54,10 +56,11 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-lg border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <QrCode className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg">BrochureDrop</span>
+            <img 
+              src={pcbLogoFullColor} 
+              alt="PCBancard" 
+              className="h-8 w-auto"
+            />
           </div>
           <a href="/api/login">
             <Button className="min-h-touch" data-testid="button-login-header">
@@ -135,7 +138,7 @@ export default function LandingPage() {
 
         <section className="text-center py-8 border-t border-border">
           <p className="text-sm text-muted-foreground mb-4">
-            Built for SignaPay field representatives
+            Built for PCBancard field representatives
           </p>
           <a href="/api/login">
             <Button variant="outline" className="w-full min-h-touch gap-2" data-testid="button-login-bottom">
@@ -157,8 +160,8 @@ export default function LandingPage() {
             <a href="/legal/refunds-policy.html" className="hover:text-foreground">Refunds Policy</a>
           </div>
           <p className="text-xs text-muted-foreground">
-            Copyright SignaPay, LTD. All Rights Reserved &copy;2026<br />
-            <span className="text-[10px]">SignaPay is a registered ISO of Chesapeake Bank, Kilmarnock, VA; Commercial Bank of California, Irvine, CA; Esquire Bank, Jericho, NY; Synovus Bank, Columbus, GA.</span>
+            Copyright PCBancard. All Rights Reserved &copy;2026<br />
+            <span className="text-[10px]">PCBancard is a registered ISO of Chesapeake Bank, Kilmarnock, VA; Commercial Bank of California, Irvine, CA; Esquire Bank, Jericho, NY; Synovus Bank, Columbus, GA.</span>
           </p>
         </div>
       </footer>

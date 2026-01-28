@@ -239,7 +239,7 @@ export default function NewDropPage() {
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
             {
               headers: {
-                "User-Agent": "BrochureDrop/1.0",
+                "User-Agent": "BrochureTracker/1.0",
               },
             }
           );
@@ -662,7 +662,7 @@ export default function NewDropPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                This business type is prohibited under SignaPay underwriting guidelines and cannot be processed.
+                This business type is prohibited under PCBancard underwriting guidelines and cannot be processed.
               </p>
               {businessCheck?.matches.map((match, idx) => (
                 <div key={idx} className="p-3 bg-destructive/10 rounded-md">

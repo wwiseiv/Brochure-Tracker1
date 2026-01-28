@@ -1,4 +1,4 @@
-// SignaPay Credit & Underwriting Policy Guidelines
+// PCBancard Credit & Underwriting Policy Guidelines
 // Used for AI-powered lead scoring and prohibited business warnings
 
 export type RiskLevel = "level1" | "level2" | "level3" | "prohibited";
@@ -13,7 +13,7 @@ export interface BusinessRiskProfile {
 }
 
 // Map business types to underwriting risk levels
-// Based on SignaPay Credit & Underwriting Policy Guidelines v01.01.2026
+// Based on PCBancard Credit & Underwriting Policy Guidelines v01.01.2026
 export const BUSINESS_RISK_MAPPING: Record<string, BusinessRiskProfile> = {
   // Level 1 - Low Risk (Card Present, Retail)
   restaurant: {
@@ -142,7 +142,7 @@ export const PROHIBITED_BUSINESSES = [
   {
     keywords: ["kratom"],
     name: "Kratom Products",
-    reason: "Kratom is a prohibited product under SignaPay underwriting guidelines.",
+    reason: "Kratom is a prohibited product under PCBancard underwriting guidelines.",
   },
   {
     keywords: ["delta 8", "delta-8", "delta8", "delta 10", "delta-10"],
@@ -218,7 +218,7 @@ export function getBusinessRiskProfile(businessType: string): BusinessRiskProfil
 
 // Underwriting context for AI lead scoring
 export const UNDERWRITING_AI_CONTEXT = `
-## SignaPay Underwriting Risk Levels
+## PCBancard Underwriting Risk Levels
 
 ### LEVEL 1 - LOW RISK (Best Candidates)
 - Retail locations with 70%+ card-present transactions

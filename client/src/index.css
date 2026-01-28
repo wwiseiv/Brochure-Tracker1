@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - SignaPay Blue Theme */
+/* LIGHT MODE - PCBancard Purple Theme */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -18,15 +18,15 @@
   --sidebar: 220 13% 95%;
   --sidebar-foreground: 222 47% 11%;
   --sidebar-border: 220 13% 91%;
-  --sidebar-primary: 221 83% 40%;
+  --sidebar-primary: 252 91% 55%;
   --sidebar-primary-foreground: 210 40% 98%;
   --sidebar-accent: 220 14% 89%;
   --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 221 83% 40%;
+  --sidebar-ring: 252 91% 55%;
   --popover: 220 13% 93%;
   --popover-foreground: 222 47% 11%;
   --popover-border: 220 13% 89%;
-  --primary: 221 83% 40%;
+  --primary: 252 91% 55%;
   --primary-foreground: 210 40% 98%;
   --secondary: 220 14% 88%;
   --secondary-foreground: 222 47% 11%;
@@ -41,8 +41,8 @@
   --warning: 38 92% 50%;
   --warning-foreground: 222 47% 11%;
   --input: 217 19% 27%;
-  --ring: 221 83% 40%;
-  --chart-1: 221 83% 40%;
+  --ring: 252 91% 55%;
+  --chart-1: 252 91% 55%;
   --chart-2: 160 84% 39%;
   --chart-3: 262 83% 58%;
   --chart-4: 38 92% 50%;
@@ -106,15 +106,15 @@
   --sidebar: 220 13% 15%;
   --sidebar-foreground: 210 40% 98%;
   --sidebar-border: 217 19% 20%;
-  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary: 252 91% 65%;
   --sidebar-primary-foreground: 210 40% 98%;
   --sidebar-accent: 220 13% 18%;
   --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 217 91% 60%;
+  --sidebar-ring: 252 91% 65%;
   --popover: 220 13% 18%;
   --popover-foreground: 210 40% 98%;
   --popover-border: 217 19% 23%;
-  --primary: 217 91% 60%;
+  --primary: 252 91% 65%;
   --primary-foreground: 210 40% 98%;
   --secondary: 220 13% 21%;
   --secondary-foreground: 210 40% 98%;
@@ -129,8 +129,8 @@
   --warning: 38 92% 55%;
   --warning-foreground: 222 47% 11%;
   --input: 217 19% 45%;
-  --ring: 217 91% 60%;
-  --chart-1: 217 91% 60%;
+  --ring: 252 91% 65%;
+  --chart-1: 252 91% 65%;
   --chart-2: 160 84% 45%;
   --chart-3: 262 83% 75%;
   --chart-4: 38 92% 55%;

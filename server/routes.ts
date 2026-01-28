@@ -1109,7 +1109,7 @@ export async function registerRoutes(
           console.log("Audio fetched, size:", audioBuffer.byteLength, "bytes");
           
           // Analyze the meeting with AI using audio input
-          const analysisPrompt = `You are analyzing a sales meeting audio recording for a payment processing sales team (SignaPay).
+          const analysisPrompt = `You are analyzing a sales meeting audio recording for a payment processing sales team (PCBancard).
 
 Business: ${recording.businessName || "Unknown"}
 Contact: ${recording.contactName || "Unknown"}
@@ -1563,7 +1563,7 @@ Format your response as JSON:
       // Send invitation email
       const replUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
         ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
-        : 'https://brochuredrop.replit.app';
+        : 'https://brochuretracker.replit.app';
       const inviteLink = `${replUrl}/accept-invite?token=${invitation.token}`;
       
       console.log(`Sending invitation email to ${email} with link: ${inviteLink}`);
@@ -1618,7 +1618,7 @@ Format your response as JSON:
       }
 
       // Resend the email
-      const inviteLink = `${process.env.REPL_URL || 'https://brochuredrop.replit.app'}/accept-invite?token=${targetInvitation.token}`;
+      const inviteLink = `${process.env.REPL_URL || 'https://brochuretracker.replit.app'}/accept-invite?token=${targetInvitation.token}`;
       await sendInvitationEmail({
         to: targetInvitation.email,
         inviterName: req.user.claims.name || req.user.claims.email,
@@ -2789,7 +2789,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         return res.status(400).json({ error: "Subject and body are required" });
       }
       
-      const senderName = req.user.claims.name || req.user.claims.email || "BrochureDrop Team";
+      const senderName = req.user.claims.name || req.user.claims.email || "BrochureTracker Team";
       const recipientName = referral.referringPartyName || "Valued Partner";
       
       const result = await sendThankYouEmail({
@@ -3209,7 +3209,7 @@ Respond in JSON format:
         return res.status(201).json({
           ...leadScore,
           factors: [`PROHIBITED: ${matchReasons}`],
-          suggestions: ["This business type is prohibited under SignaPay underwriting guidelines"],
+          suggestions: ["This business type is prohibited under PCBancard underwriting guidelines"],
           riskLevel: "prohibited",
           isProhibited: true,
         });
@@ -3232,8 +3232,8 @@ Respond in JSON format:
         voiceTranscript: drop.voiceTranscript || "",
       };
       
-      const systemPrompt = `You are a lead scoring AI for SignaPay payment processing sales team.
-Score this merchant lead based on the available information and SignaPay underwriting guidelines.
+      const systemPrompt = `You are a lead scoring AI for PCBancard payment processing sales team.
+Score this merchant lead based on the available information and PCBancard underwriting guidelines.
 
 ${UNDERWRITING_AI_CONTEXT}
 
@@ -3535,7 +3535,7 @@ Respond in JSON format:
       let systemMessage: string;
 
       if (isCoachingMode) {
-        systemMessage = `You are an expert sales coach helping a SignaPay sales agent prepare for their merchant visits. You have deep knowledge of:
+        systemMessage = `You are an expert sales coach helping a PCBancard sales agent prepare for their merchant visits. You have deep knowledge of:
 
 ${SALES_TRAINING_KNOWLEDGE.substring(0, 8000)}
 

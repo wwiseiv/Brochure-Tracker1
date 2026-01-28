@@ -1,4 +1,4 @@
-const DB_NAME = 'brochuredrop-offline';
+const DB_NAME = 'brochuretracker-offline';
 const DB_VERSION = 2;
 const DROPS_STORE = 'offline-drops';
 const CACHE_STORE = 'api-cache';

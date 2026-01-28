@@ -14,11 +14,11 @@ function getResendClient(): Resend | null {
   return resend;
 }
 
-const FROM_EMAIL = "BrochureDrop <onboarding@resend.dev>";
+const FROM_EMAIL = "BrochureTracker <onboarding@resend.dev>";
 const FEEDBACK_RECIPIENT = "wwiseiv@icloud.com";
 const APP_URL = process.env.REPLIT_DEV_DOMAIN 
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-  : process.env.APP_URL || "https://brochuredrop.com";
+  : process.env.APP_URL || "https://brochuretracker.com";
 
 interface SendInvitationParams {
   to: string;
@@ -48,7 +48,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
     const { error } = await client.emails.send({
       from: FROM_EMAIL,
       to: params.to,
-      subject: `You're invited to join ${params.organizationName} on BrochureDrop`,
+      subject: `You're invited to join ${params.organizationName} on BrochureTracker`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -58,7 +58,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">BrochureDrop</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">BrochureTracker</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">You're Invited!</p>
           </div>
           
@@ -68,11 +68,11 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
             </p>
             
             <p style="font-size: 16px; margin: 0 0 20px 0;">
-              <strong>${params.inviterName}</strong> has invited you to join <strong>${params.organizationName}</strong> as a <strong>${roleLabel}</strong> on BrochureDrop.
+              <strong>${params.inviterName}</strong> has invited you to join <strong>${params.organizationName}</strong> as a <strong>${roleLabel}</strong> on BrochureTracker.
             </p>
             
             <p style="font-size: 16px; margin: 0 0 25px 0;">
-              BrochureDrop is a mobile app for tracking video brochure deployments. As a team member, you'll be able to log drops, track pickups, and manage your sales activities.
+              BrochureTracker is a mobile app for tracking video brochure deployments. As a team member, you'll be able to log drops, track pickups, and manage your sales activities.
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -137,7 +137,7 @@ export async function sendFeedbackEmail(params: SendFeedbackParams): Promise<boo
     const { error } = await client.emails.send({
       from: FROM_EMAIL,
       to: FEEDBACK_RECIPIENT,
-      subject: `[BrochureDrop ${typeLabel}] ${params.subject}`,
+      subject: `[BrochureTracker ${typeLabel}] ${params.subject}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -347,13 +347,13 @@ export async function sendNewMemberNotification(params: SendNewMemberNotificatio
             </div>
             
             <p style="font-size: 14px; color: #64748b; margin: 20px 0 0 0;">
-              You can manage team members and their roles from the Team Management page in BrochureDrop.
+              You can manage team members and their roles from the Team Management page in BrochureTracker.
             </p>
             
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
             
             <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">
-              This is an automated notification from BrochureDrop.
+              This is an automated notification from BrochureTracker.
             </p>
           </div>
         </body>

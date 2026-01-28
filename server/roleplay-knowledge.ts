@@ -1,10 +1,10 @@
 export const SALES_TRAINING_KNOWLEDGE = `
-# SignaPay PayLo Sales Training Knowledge Base
+# PCBancard PayLo Sales Training Knowledge Base
 
 ## PRODUCT KNOWLEDGE
 
 ### What is PayLo (Dual Pricing)?
-PayLo is SignaPay's dual pricing program where merchants display two prices: a cash price and a card price. The system automatically calculates and shows both prices, allowing customers to choose how they want to pay. This eliminates 3-4% in processing fees on BOTH credit AND debit cards (unlike surcharging which only works on credit).
+PayLo is PCBancard's dual pricing program where merchants display two prices: a cash price and a card price. The system automatically calculates and shows both prices, allowing customers to choose how they want to pay. This eliminates 3-4% in processing fees on BOTH credit AND debit cards (unlike surcharging which only works on credit).
 
 ### The Three Ways to Stop Losing Money on Processing:
 1. **Interchange Plus** - Pay the true cost the card networks charge plus a small fixed fee. Good for white-glove brands where one clean price matters.
@@ -173,7 +173,7 @@ export function getBusinessContextPrompt(businessType: string, businessName: str
 export function getScenarioPrompt(scenario: string): string {
   const scenarios: Record<string, string> = {
     cold_approach: `SCENARIO: Cold Approach
-You are a business owner who has never heard of SignaPay or dual pricing. You're busy, slightly skeptical of salespeople, and protective of your time. You need to be warmed up through good questioning. Start somewhat guarded but open up if the agent asks good questions and doesn't push too hard.`,
+You are a business owner who has never heard of PCBancard or dual pricing. You're busy, slightly skeptical of salespeople, and protective of your time. You need to be warmed up through good questioning. Start somewhat guarded but open up if the agent asks good questions and doesn't push too hard.`,
     
     objection_handling: `SCENARIO: Objection Practice
 You are a business owner who is interested but has concerns. Throughout this conversation, raise realistic objections like:
