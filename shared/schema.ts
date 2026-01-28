@@ -825,3 +825,32 @@ export const insertMeetingRecordingSchema = createInsertSchema(meetingRecordings
 });
 export type InsertMeetingRecording = z.infer<typeof insertMeetingRecordingSchema>;
 export type MeetingRecording = typeof meetingRecordings.$inferSelect;
+
+// Voice notes table - stores transcribed voice recordings for merchants
+export const voiceNotes = pgTable("voice_notes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull(),
+  transcription: text("transcription").notNull(),
+  durationSeconds: integer("duration_seconds"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const voiceNotesRelations = relations(voiceNotes, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [voiceNotes.merchantId],
+    references: [merchants.id],
+  }),
+  organization: one(organizations, {
+    fields: [voiceNotes.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertVoiceNoteSchema = createInsertSchema(voiceNotes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertVoiceNote = z.infer<typeof insertVoiceNoteSchema>;
+export type VoiceNote = typeof voiceNotes.$inferSelect;
