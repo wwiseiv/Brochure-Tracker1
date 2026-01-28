@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  Square,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
@@ -164,6 +165,12 @@ export default function MerchantDetailPage() {
 
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
   
+  // Voice recording for notes
+  const [isRecordingNotes, setIsRecordingNotes] = useState(false);
+  const [isTranscribingNotes, setIsTranscribingNotes] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   // Email drafter state
   const [showEmailDrafter, setShowEmailDrafter] = useState(false);
   const [emailPurpose, setEmailPurpose] = useState("");
@@ -258,6 +265,92 @@ export default function MerchantDetailPage() {
 
   const handleSaveNotes = () => {
     updateMerchantMutation.mutate({ notes: editedNotes });
+  };
+
+  const startRecordingNotes = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: mediaRecorder.mimeType || "audio/webm" 
+        });
+        await transcribeNotesAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsRecordingNotes(true);
+      toast({ title: "Recording...", description: "Speak now to dictate your notes" });
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice dictation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecordingNotes = () => {
+    if (mediaRecorderRef.current && isRecordingNotes) {
+      mediaRecorderRef.current.stop();
+      setIsRecordingNotes(false);
+    }
+  };
+
+  const transcribeNotesAudio = async (audioBlob: Blob) => {
+    setIsTranscribingNotes(true);
+    try {
+      const formData = new FormData();
+      let ext = "webm";
+      const blobType = audioBlob.type.toLowerCase();
+      if (blobType.includes("mp4") || blobType.includes("m4a")) {
+        ext = "m4a";
+      }
+      formData.append("audio", audioBlob, `notes.${ext}`);
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Transcription failed");
+      }
+      
+      const data = await response.json();
+      if (data.text) {
+        setEditedNotes(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+        toast({ title: "Transcription complete!" });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Please try again or type your notes manually",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribingNotes(false);
+    }
   };
 
   const handleCall = () => {
@@ -861,13 +954,45 @@ export default function MerchantDetailPage() {
           <DialogHeader>
             <DialogTitle>Edit Notes</DialogTitle>
           </DialogHeader>
-          <Textarea
-            value={editedNotes}
-            onChange={(e) => setEditedNotes(e.target.value)}
-            placeholder="Add notes about this merchant..."
-            rows={6}
-            data-testid="textarea-merchant-notes"
-          />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={isRecordingNotes ? "destructive" : "outline"}
+                size="sm"
+                onClick={isRecordingNotes ? stopRecordingNotes : startRecordingNotes}
+                disabled={isTranscribingNotes}
+                className="gap-2"
+                data-testid="button-record-notes"
+              >
+                {isTranscribingNotes ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Transcribing...
+                  </>
+                ) : isRecordingNotes ? (
+                  <>
+                    <Square className="w-4 h-4" />
+                    Stop Recording
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-4 h-4" />
+                    Dictate Notes
+                  </>
+                )}
+              </Button>
+              {isRecordingNotes && (
+                <span className="text-sm text-red-600 animate-pulse">Recording...</span>
+              )}
+            </div>
+            <Textarea
+              value={editedNotes}
+              onChange={(e) => setEditedNotes(e.target.value)}
+              placeholder="Add notes about this merchant..."
+              rows={6}
+              data-testid="textarea-merchant-notes"
+            />
+          </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
@@ -879,7 +1004,7 @@ export default function MerchantDetailPage() {
             </Button>
             <Button
               onClick={handleSaveNotes}
-              disabled={updateMerchantMutation.isPending}
+              disabled={updateMerchantMutation.isPending || isRecordingNotes || isTranscribingNotes}
               className="min-h-touch gap-2"
               data-testid="button-save-notes"
             >
