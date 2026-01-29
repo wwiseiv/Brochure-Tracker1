@@ -15,6 +15,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { BottomNav } from "@/components/BottomNav";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -39,6 +48,7 @@ import {
   Loader2,
   FolderSync,
   CheckCircle,
+  Pencil,
 } from "lucide-react";
 import { isToday, isPast, parseISO, startOfDay } from "date-fns";
 import { format, formatDistanceToNow } from "date-fns";
@@ -160,6 +170,9 @@ export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedFilter, setSelectedFilter] = useState<DropsFilter>(null);
+  const [editingMember, setEditingMember] = useState<OrganizationMember | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
@@ -197,6 +210,64 @@ export default function AdminDashboardPage() {
       });
     },
   });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: async ({ memberId, firstName, lastName }: { memberId: number; firstName: string; lastName: string }) => {
+      const res = await apiRequest("PATCH", `/api/organization/members/${memberId}`, {
+        firstName: firstName || null,
+        lastName: lastName || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Member Updated",
+        description: "Team member name has been updated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/organization/members"] });
+      setEditingMember(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (member: OrganizationMember) => {
+    setEditingMember(member);
+    setEditFirstName(member.firstName || "");
+    setEditLastName(member.lastName || "");
+  };
+
+  const handleSaveMember = () => {
+    if (editingMember) {
+      updateMemberMutation.mutate({
+        memberId: editingMember.id,
+        firstName: editFirstName,
+        lastName: editLastName,
+      });
+    }
+  };
+
+  const getMemberDisplayName = (member: OrganizationMember) => {
+    if (member.firstName || member.lastName) {
+      return `${member.firstName || ""} ${member.lastName || ""}`.trim();
+    }
+    return `User ${member.userId.slice(0, 8)}...`;
+  };
+
+  const getMemberInitials = (member: OrganizationMember) => {
+    if (member.firstName && member.lastName) {
+      return `${member.firstName[0]}${member.lastName[0]}`.toUpperCase();
+    }
+    if (member.firstName) {
+      return member.firstName.slice(0, 2).toUpperCase();
+    }
+    return member.userId.slice(0, 2).toUpperCase();
+  };
 
   const getFilteredDrops = (): DropWithBrochure[] => {
     if (!allDrops) return [];
@@ -584,17 +655,25 @@ export default function AdminDashboardPage() {
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-8 w-8">
                                     <AvatarFallback className="text-xs">
-                                      {member.userId.slice(0, 2).toUpperCase()}
+                                      {getMemberInitials(member)}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <p className="font-medium text-sm">
-                                      {member.userId.slice(0, 12)}...
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate" data-testid={`text-member-name-${member.id}`}>
+                                      {getMemberDisplayName(member)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground" data-testid={`text-member-id-${member.id}`}>
                                       ID: {member.id}
                                     </p>
                                   </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEditDialog(member)}
+                                    data-testid={`button-edit-member-${member.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -691,6 +770,59 @@ export default function AdminDashboardPage() {
       </main>
 
       <BottomNav />
+
+      <Dialog open={!!editingMember} onOpenChange={(open) => !open && setEditingMember(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="Enter first name"
+                data-testid="input-member-first-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Enter last name"
+                data-testid="input-member-last-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingMember(null)}
+              data-testid="button-cancel-edit-member"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMember}
+              disabled={updateMemberMutation.isPending}
+              data-testid="button-save-member"
+            >
+              {updateMemberMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
