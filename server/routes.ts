@@ -56,6 +56,7 @@ import {
   isDriveConnected,
   syncDriveToDatabase 
 } from "./google-drive";
+import { seedDailyEdgeContent } from "./daily-edge-seed";
 import fs from "fs";
 import path from "path";
 
@@ -129,6 +130,11 @@ export async function registerRoutes(
   
   // Setup object storage routes
   registerObjectStorageRoutes(app);
+
+  // Seed Daily Edge content if not already present
+  seedDailyEdgeContent().catch((error) => {
+    console.error("Failed to seed Daily Edge content:", error);
+  });
 
   // Brochures API
   app.post("/api/brochures", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
