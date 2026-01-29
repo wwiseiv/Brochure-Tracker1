@@ -1,4 +1,4 @@
-import pdfParse from "pdf-parse";
+const pdfParse = require("pdf-parse");
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import {
   Document,

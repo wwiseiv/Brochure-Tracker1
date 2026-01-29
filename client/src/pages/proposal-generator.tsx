@@ -180,6 +180,7 @@ export default function ProposalGeneratorPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentProduct | null>(null);
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(null);
   const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
+  const [isDragging, setIsDragging] = useState(false);
 
   const { data: proposals, isLoading: proposalsLoading } = useQuery<Proposal[]>({
     queryKey: ["/api/proposals"],
@@ -260,6 +261,37 @@ export default function ProposalGeneratorPage() {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      setUploadedFile(file);
+    }
+  };
+
   const handleParse = () => {
     if (uploadedFile) {
       parseMutation.mutate(uploadedFile);
@@ -306,7 +338,17 @@ export default function ProposalGeneratorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="border-2 border-dashed rounded-lg p-8 text-center hover-elevate transition-colors cursor-pointer" data-testid="upload-dropzone">
+          <div 
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+              isDragging 
+                ? "border-primary bg-primary/5" 
+                : "border-muted-foreground/25 hover:border-primary/50"
+            }`}
+            data-testid="upload-dropzone"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               type="file"
               accept=".pdf,application/pdf"
@@ -315,10 +357,14 @@ export default function ProposalGeneratorPage() {
               id="pdf-upload"
               data-testid="input-pdf-upload"
             />
-            <label htmlFor="pdf-upload" className="cursor-pointer">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <label htmlFor="pdf-upload" className="cursor-pointer block">
+              <FileText className={`w-12 h-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
               <p className="text-lg font-medium mb-2">
-                {uploadedFile ? uploadedFile.name : "Click to upload or drag PDF here"}
+                {isDragging 
+                  ? "Drop your PDF here" 
+                  : uploadedFile 
+                    ? uploadedFile.name 
+                    : "Click to upload or drag PDF here"}
               </p>
               <p className="text-sm text-muted-foreground">
                 Supports Dual Pricing and Interchange Plus proposals
