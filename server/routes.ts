@@ -1450,6 +1450,8 @@ Format your response as JSON:
           errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
         }).optional(),
         managerId: z.number().nullable().optional(),
+        firstName: z.string().max(100).nullable().optional(),
+        lastName: z.string().max(100).nullable().optional(),
       });
       
       const parsed = updateSchema.safeParse(req.body);

@@ -71,6 +71,8 @@ export const organizationMembers = pgTable("organization_members", {
   userId: varchar("user_id").notNull(),
   role: varchar("role", { length: 30 }).notNull(),
   managerId: integer("manager_id"),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -96,6 +98,8 @@ export const insertOrganizationMemberSchema = z.object({
     errorMap: () => ({ message: `Role must be one of: ${ORG_MEMBER_ROLES.join(", ")}` })
   }),
   managerId: z.number().nullable().optional(),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
 });
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
