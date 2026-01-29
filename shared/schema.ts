@@ -104,6 +104,33 @@ export const insertOrganizationMemberSchema = z.object({
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
 
+// User permissions table - individual feature toggles per user
+export const userPermissions = pgTable("user_permissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull().unique(),
+  
+  // Feature toggles (default off unless specified)
+  canViewLeaderboard: boolean("can_view_leaderboard").default(false).notNull(),
+  canAccessCoach: boolean("can_access_coach").default(true).notNull(),
+  canAccessEquipIQ: boolean("can_access_equip_iq").default(true).notNull(),
+  canExportData: boolean("can_export_data").default(true).notNull(),
+  canRecordMeetings: boolean("can_record_meetings").default(true).notNull(),
+  canManageReferrals: boolean("can_manage_referrals").default(true).notNull(),
+  canViewDailyEdge: boolean("can_view_daily_edge").default(true).notNull(),
+  canAccessSequences: boolean("can_access_sequences").default(true).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserPermissionsSchema = createInsertSchema(userPermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUserPermissions = z.infer<typeof insertUserPermissionsSchema>;
+export type UserPermissions = typeof userPermissions.$inferSelect;
+
 // Brochures table
 export const brochures = pgTable("brochures", {
   id: varchar("id", { length: 50 }).primaryKey(),

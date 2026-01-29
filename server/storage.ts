@@ -111,6 +111,8 @@ import {
   type InsertEquipmentRecommendationSession,
   type EquipmentQuizResult,
   type InsertEquipmentQuizResult,
+  userPermissions,
+  type UserPermissions,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
@@ -228,6 +230,12 @@ export interface IStorage {
   seedDailyEdgeContent(content: InsertDailyEdgeContent[]): Promise<DailyEdgeContent[]>;
   getDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak | undefined>;
   markChallengeCompleted(userId: string, contentId: number): Promise<UserDailyEdge | undefined>;
+  
+  // User Permissions
+  getUserPermissions(userId: string): Promise<UserPermissions | undefined>;
+  createUserPermissions(userId: string): Promise<UserPermissions>;
+  updateUserPermissions(userId: string, data: Partial<UserPermissions>): Promise<UserPermissions | undefined>;
+  getAllUserPermissions(): Promise<UserPermissions[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -524,6 +532,28 @@ export class DatabaseStorage implements IStorage {
 
   async getMerchantsByOrg(orgId: number): Promise<Merchant[]> {
     return db.select().from(merchants).where(eq(merchants.orgId, orgId)).orderBy(desc(merchants.lastVisitAt));
+  }
+
+  async getMerchantsByAgentIds(orgId: number, agentIds: string[]): Promise<Merchant[]> {
+    if (agentIds.length === 0) return [];
+    
+    // Get unique merchant IDs from drops made by these agents
+    const dropsWithMerchants = await db
+      .select({ merchantId: drops.merchantId })
+      .from(drops)
+      .where(and(
+        eq(drops.orgId, orgId),
+        inArray(drops.agentId, agentIds),
+        sql`${drops.merchantId} IS NOT NULL`
+      ));
+    
+    const merchantIds = [...new Set(dropsWithMerchants.map(d => d.merchantId).filter(Boolean))] as number[];
+    
+    if (merchantIds.length === 0) return [];
+    
+    return db.select().from(merchants)
+      .where(and(eq(merchants.orgId, orgId), inArray(merchants.id, merchantIds)))
+      .orderBy(desc(merchants.lastVisitAt));
   }
 
   async getMerchantByBusinessName(orgId: number, businessName: string): Promise<Merchant | undefined> {
@@ -1638,6 +1668,31 @@ export class DatabaseStorage implements IStorage {
   async getEquipmentProductsByCategory(category: string): Promise<EquipmentProduct[]> {
     return db.select().from(equipmentProducts)
       .where(and(eq(equipmentProducts.category, category), eq(equipmentProducts.isActive, true)));
+  }
+
+  // User Permissions
+  async getUserPermissions(userId: string): Promise<UserPermissions | undefined> {
+    const [perms] = await db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
+    return perms;
+  }
+
+  async createUserPermissions(userId: string): Promise<UserPermissions> {
+    const [perms] = await db.insert(userPermissions).values({ userId }).returning();
+    return perms;
+  }
+
+  async updateUserPermissions(userId: string, data: Partial<UserPermissions>): Promise<UserPermissions | undefined> {
+    const { id, userId: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db
+      .update(userPermissions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(userPermissions.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  async getAllUserPermissions(): Promise<UserPermissions[]> {
+    return db.select().from(userPermissions);
   }
 }
 

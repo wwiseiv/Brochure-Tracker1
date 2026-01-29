@@ -59,9 +59,11 @@ import {
   Clock,
   Copy,
   Check,
+  Settings,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
-import type { OrganizationMember, OrgMemberRole } from "@shared/schema";
+import type { OrganizationMember, OrgMemberRole, UserPermissions } from "@shared/schema";
 
 interface UserRole {
   role: string;
@@ -328,6 +330,60 @@ export default function TeamManagementPage() {
       });
     },
   });
+
+  // User Permissions State
+  const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+  const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<OrganizationMember | null>(null);
+  const [memberPermissions, setMemberPermissions] = useState<UserPermissions | null>(null);
+
+  const { refetch: refetchPermissions } = useQuery<UserPermissions>({
+    queryKey: ["/api/permissions", selectedMemberForPermissions?.userId],
+    enabled: false,
+  });
+
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: Partial<UserPermissions> }) => {
+      const res = await apiRequest("PATCH", `/api/permissions/${encodeURIComponent(userId)}`, data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setMemberPermissions(data);
+      toast({
+        title: "Permissions updated",
+        description: "User permissions have been updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update permissions",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openPermissionsDialog = async (member: OrganizationMember) => {
+    setSelectedMemberForPermissions(member);
+    try {
+      const res = await fetch(`/api/permissions/${encodeURIComponent(member.userId)}`, { credentials: "include" });
+      if (res.ok) {
+        const perms = await res.json();
+        setMemberPermissions(perms);
+      }
+    } catch (error) {
+      console.error("Failed to fetch permissions:", error);
+    }
+    setIsPermissionsDialogOpen(true);
+  };
+
+  const togglePermission = (key: keyof UserPermissions) => {
+    if (!selectedMemberForPermissions || !memberPermissions) return;
+    const newValue = !memberPermissions[key];
+    updatePermissionsMutation.mutate({
+      userId: selectedMemberForPermissions.userId,
+      data: { [key]: newValue },
+    });
+  };
 
   const resetAddForm = () => {
     setNewUserId("");
@@ -768,6 +824,15 @@ export default function TeamManagementPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  onClick={() => openPermissionsDialog(member)}
+                                  title="Manage Permissions"
+                                  data-testid={`button-permissions-member-${member.id}`}
+                                >
+                                  <Settings className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => openEditDialog(member)}
                                   data-testid={`button-edit-member-${member.id}`}
                                 >
@@ -1080,6 +1145,149 @@ export default function TeamManagementPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* User Permissions Dialog */}
+      <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              User Permissions
+            </DialogTitle>
+            <DialogDescription>
+              {selectedMemberForPermissions && (
+                <span>Manage feature access for {selectedMemberForPermissions.userId.slice(0, 16)}...</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {memberPermissions ? (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">View Leaderboard</Label>
+                  <p className="text-xs text-muted-foreground">Can see team leaderboard rankings</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canViewLeaderboard}
+                  onCheckedChange={() => togglePermission("canViewLeaderboard")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-view-leaderboard"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">AI Coach</Label>
+                  <p className="text-xs text-muted-foreground">Access AI role-play coaching</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canAccessCoach}
+                  onCheckedChange={() => togglePermission("canAccessCoach")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-access-coach"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">EquipIQ</Label>
+                  <p className="text-xs text-muted-foreground">Access equipment advisor</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canAccessEquipIQ}
+                  onCheckedChange={() => togglePermission("canAccessEquipIQ")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-access-equipiq"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Daily Edge</Label>
+                  <p className="text-xs text-muted-foreground">Access motivation system</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canViewDailyEdge}
+                  onCheckedChange={() => togglePermission("canViewDailyEdge")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-view-daily-edge"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Export Data</Label>
+                  <p className="text-xs text-muted-foreground">Can export data to CSV/Excel</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canExportData}
+                  onCheckedChange={() => togglePermission("canExportData")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-export-data"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Record Meetings</Label>
+                  <p className="text-xs text-muted-foreground">Can record and analyze meetings</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canRecordMeetings}
+                  onCheckedChange={() => togglePermission("canRecordMeetings")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-record-meetings"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Manage Referrals</Label>
+                  <p className="text-xs text-muted-foreground">Can create and manage referrals</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canManageReferrals}
+                  onCheckedChange={() => togglePermission("canManageReferrals")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-manage-referrals"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Follow-up Sequences</Label>
+                  <p className="text-xs text-muted-foreground">Access automated sequences</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canAccessSequences}
+                  onCheckedChange={() => togglePermission("canAccessSequences")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-access-sequences"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              Loading permissions...
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPermissionsDialogOpen(false);
+                setSelectedMemberForPermissions(null);
+                setMemberPermissions(null);
+              }}
+              data-testid="button-close-permissions"
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

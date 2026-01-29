@@ -1547,6 +1547,76 @@ Format your response as JSON:
   });
 
   // ============================================
+  // USER PERMISSIONS API
+  // ============================================
+
+  // Get current user's permissions
+  app.get("/api/me/permissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let perms = await storage.getUserPermissions(userId);
+      
+      // Create default permissions if they don't exist
+      if (!perms) {
+        perms = await storage.createUserPermissions(userId);
+      }
+      
+      res.json(perms);
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch permissions" });
+    }
+  });
+
+  // Get permissions for a specific user (admin only)
+  app.get("/api/permissions/:userId", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      let perms = await storage.getUserPermissions(userId);
+      
+      // Create default permissions if they don't exist
+      if (!perms) {
+        perms = await storage.createUserPermissions(userId);
+      }
+      
+      res.json(perms);
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch permissions" });
+    }
+  });
+
+  // Update permissions for a user (admin only)
+  app.patch("/api/permissions/:userId", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Ensure permissions exist first
+      let perms = await storage.getUserPermissions(userId);
+      if (!perms) {
+        perms = await storage.createUserPermissions(userId);
+      }
+      
+      const updated = await storage.updateUserPermissions(userId, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating user permissions:", error);
+      res.status(500).json({ error: "Failed to update permissions" });
+    }
+  });
+
+  // Get all user permissions (admin only, for management UI)
+  app.get("/api/permissions", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const perms = await storage.getAllUserPermissions();
+      res.json(perms);
+    } catch (error) {
+      console.error("Error fetching all permissions:", error);
+      res.status(500).json({ error: "Failed to fetch permissions" });
+    }
+  });
+
+  // ============================================
   // INVITATIONS API
   // ============================================
 
