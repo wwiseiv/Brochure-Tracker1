@@ -32,7 +32,8 @@ import {
   Smartphone,
   CreditCard,
   Globe,
-  Zap
+  Zap,
+  Mic
 } from "lucide-react";
 
 interface Vendor {
@@ -122,7 +123,11 @@ export default function EquipIQPage() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
 
   const { data: vendors = [], isLoading: vendorsLoading } = useQuery<Vendor[]>({
@@ -200,6 +205,111 @@ export default function EquipIQPage() {
     setChatMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setChatInput("");
     recommendMutation.mutate(userMessage);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      } else if (MediaRecorder.isTypeSupported("audio/aac")) {
+        options.mimeType = "audio/aac";
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+          await transcribeAudio(audioBlob);
+        }
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      let ext = "m4a";
+      const blobType = audioBlob.type.toLowerCase();
+      if (blobType.includes("webm")) {
+        ext = "webm";
+      } else if (blobType.includes("mp4") || blobType.includes("aac") || blobType.includes("m4a")) {
+        ext = "m4a";
+      } else if (blobType.includes("mpeg") || blobType.includes("mp3")) {
+        ext = "mp3";
+      } else if (blobType.includes("wav")) {
+        ext = "wav";
+      } else if (blobType.includes("ogg")) {
+        ext = "ogg";
+      }
+      formData.append("audio", audioBlob, `recording.${ext}`);
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Transcription failed");
+      }
+      
+      const data = await response.json();
+      if (data.text && data.text.trim()) {
+        const transcribedText = data.text.trim();
+        setChatMessages(prev => [...prev, { role: "user", content: transcribedText }]);
+        recommendMutation.mutate(transcribedText);
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking again",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Please try again or type your message",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const handleAnswerSelect = (index: number) => {
@@ -335,14 +445,24 @@ export default function EquipIQPage() {
                     <Input
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Describe the merchant's needs..."
-                      onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                      disabled={recommendMutation.isPending}
+                      placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Describe the merchant's needs..."}
+                      onKeyDown={(e) => e.key === "Enter" && !isRecording && !isTranscribing && handleSendMessage()}
+                      disabled={recommendMutation.isPending || isRecording || isTranscribing}
                       data-testid="chat-input"
                     />
                     <Button
+                      size="icon"
+                      variant={isRecording ? "destructive" : "outline"}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={recommendMutation.isPending || isTranscribing}
+                      className={isRecording ? "animate-pulse" : ""}
+                      data-testid="button-mic"
+                    >
+                      {isTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                    </Button>
+                    <Button
                       onClick={handleSendMessage}
-                      disabled={!chatInput.trim() || recommendMutation.isPending}
+                      disabled={!chatInput.trim() || recommendMutation.isPending || isRecording || isTranscribing}
                       data-testid="button-send"
                     >
                       <Send className="w-4 h-4" />
