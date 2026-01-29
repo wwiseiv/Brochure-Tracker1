@@ -63,36 +63,13 @@ export async function getGoogleDocsClient() {
   return google.docs({ version: 'v1', auth: oauth2Client });
 }
 
-// Find or create the BrochureTracker coaching folder
+// User's specific coaching folder from Google Drive
+// https://drive.google.com/drive/folders/1_QYPCqf_VX31noF7II0aCTALvz8v0_a0
+const COACHING_FOLDER_ID = '1_QYPCqf_VX31noF7II0aCTALvz8v0_a0';
+
+// Get the coaching folder ID (uses the user's specific folder)
 export async function getCoachingFolderId(): Promise<string | null> {
-  try {
-    const drive = await getGoogleDriveClient();
-    
-    // Search for existing folder
-    const response = await drive.files.list({
-      q: "name='BrochureTracker Coaching' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-      fields: 'files(id, name)',
-      spaces: 'drive'
-    });
-
-    if (response.data.files && response.data.files.length > 0) {
-      return response.data.files[0].id || null;
-    }
-
-    // Create folder if it doesn't exist
-    const folderResponse = await drive.files.create({
-      requestBody: {
-        name: 'BrochureTracker Coaching',
-        mimeType: 'application/vnd.google-apps.folder'
-      },
-      fields: 'id'
-    });
-
-    return folderResponse.data.id || null;
-  } catch (error) {
-    console.error('Error getting coaching folder:', error);
-    return null;
-  }
+  return COACHING_FOLDER_ID;
 }
 
 // List all documents in the coaching folder

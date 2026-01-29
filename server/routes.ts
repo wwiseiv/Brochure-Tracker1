@@ -43,6 +43,12 @@ import { insertRoleplaySessionSchema, ROLEPLAY_SCENARIOS } from "@shared/schema"
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
+import { 
+  listCoachingDocuments, 
+  getAllCoachingContent, 
+  buildDriveKnowledgeContext,
+  isDriveConnected 
+} from "./google-drive";
 import fs from "fs";
 import path from "path";
 
@@ -3636,12 +3642,21 @@ Respond in JSON format:
         status: "active",
       });
 
+      // Fetch custom training materials from Google Drive (if available)
+      let driveKnowledge = '';
+      try {
+        driveKnowledge = await buildDriveKnowledgeContext();
+      } catch (driveError) {
+        console.log('Google Drive content not available, using default training materials');
+      }
+
       let systemMessage: string;
 
       if (isCoachingMode) {
         systemMessage = `You are an expert sales coach helping a PCBancard sales agent prepare for their merchant visits. You have deep knowledge of:
 
 ${SALES_TRAINING_KNOWLEDGE.substring(0, 8000)}
+${driveKnowledge}
 
 BUSINESS CONTEXT:
 ${businessContext}
@@ -3664,6 +3679,7 @@ You're their personal sales coach. Help them succeed!`;
 ${scenarioPrompt}
 
 ${businessContext}
+${driveKnowledge ? `\nREFERENCE MATERIALS (use these to create realistic scenarios):\n${driveKnowledge.substring(0, 4000)}` : ''}
 
 IMPORTANT GUIDELINES:
 - Stay in character as the business owner at all times
@@ -3725,6 +3741,37 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     } catch (error) {
       console.error("Error fetching personas:", error);
       res.status(500).json({ error: "Failed to fetch personas" });
+    }
+  });
+
+  // Google Drive Integration Routes
+  app.get("/api/drive/status", isAuthenticated, async (_req: any, res) => {
+    try {
+      const connected = await isDriveConnected();
+      res.json({ connected });
+    } catch (error) {
+      console.error("Error checking drive status:", error);
+      res.json({ connected: false });
+    }
+  });
+
+  app.get("/api/drive/documents", isAuthenticated, async (_req: any, res) => {
+    try {
+      const documents = await listCoachingDocuments();
+      res.json({ documents });
+    } catch (error) {
+      console.error("Error listing drive documents:", error);
+      res.status(500).json({ error: "Failed to list documents" });
+    }
+  });
+
+  app.get("/api/drive/content", isAuthenticated, async (_req: any, res) => {
+    try {
+      const content = await getAllCoachingContent();
+      res.json(content);
+    } catch (error) {
+      console.error("Error getting drive content:", error);
+      res.status(500).json({ error: "Failed to get content" });
     }
   });
 
