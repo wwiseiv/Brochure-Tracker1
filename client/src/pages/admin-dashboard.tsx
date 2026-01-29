@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -32,6 +34,11 @@ import {
   ChevronRight,
   MapPin,
   X,
+  RefreshCw,
+  BookOpen,
+  Loader2,
+  FolderSync,
+  CheckCircle,
 } from "lucide-react";
 import { isToday, isPast, parseISO, startOfDay } from "date-fns";
 import { format, formatDistanceToNow } from "date-fns";
@@ -142,8 +149,15 @@ function AdminDashboardSkeleton() {
 
 type DropsFilter = "todays" | "overdue" | "pending" | null;
 
+interface DriveStatus {
+  connected: boolean;
+  localDocCount: number;
+  lastSynced: string | null;
+}
+
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedFilter, setSelectedFilter] = useState<DropsFilter>(null);
 
@@ -157,6 +171,31 @@ export default function AdminDashboardPage() {
 
   const { data: allDrops, isLoading: dropsLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/admin/drops"],
+  });
+
+  const { data: driveStatus, isLoading: driveLoading, refetch: refetchDrive } = useQuery<DriveStatus>({
+    queryKey: ["/api/drive/status"],
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/drive/sync");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${data.synced} training documents from Google Drive`,
+      });
+      refetchDrive();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const getFilteredDrops = (): DropWithBrochure[] => {
@@ -304,6 +343,69 @@ export default function AdminDashboardPage() {
                   </p>
                 </Card>
               </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                AI Training Materials
+              </h2>
+              <Card className="p-4" data-testid="card-training-sync">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <FolderSync className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Google Drive Training Materials</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Sync sales scripts, objection handling guides, and training docs to enhance AI coaching.
+                      </p>
+                      <div className="flex items-center gap-3 mt-2 text-sm">
+                        {driveLoading ? (
+                          <Skeleton className="h-4 w-32" />
+                        ) : (
+                          <>
+                            <span className="flex items-center gap-1">
+                              {driveStatus?.connected ? (
+                                <CheckCircle className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <AlertTriangle className="h-3 w-3 text-amber-600" />
+                              )}
+                              {driveStatus?.connected ? "Connected" : "Not connected"}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {driveStatus?.localDocCount || 0} documents synced
+                            </span>
+                            {driveStatus?.lastSynced && (
+                              <span className="text-muted-foreground">
+                                Last: {formatDistanceToNow(new Date(driveStatus.lastSynced), { addSuffix: true })}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending || !driveStatus?.connected}
+                    data-testid="button-sync-training"
+                  >
+                    {syncMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sync Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
             </section>
 
             <section>
