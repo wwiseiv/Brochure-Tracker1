@@ -3806,6 +3806,28 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     }
   });
 
+  // Track sync status globally
+  let syncStatus: { 
+    inProgress: boolean; 
+    synced: number; 
+    total: number; 
+    errors: string[];
+    lastCompleted: Date | null;
+    message: string;
+  } = {
+    inProgress: false,
+    synced: 0,
+    total: 0,
+    errors: [],
+    lastCompleted: null,
+    message: "Ready to sync"
+  };
+
+  // Get sync status
+  app.get("/api/drive/sync-status", isAuthenticated, async (_req: any, res) => {
+    res.json(syncStatus);
+  });
+
   app.post("/api/drive/sync", isAuthenticated, async (_req: any, res) => {
     try {
       const connected = await isDriveConnected();
@@ -3813,15 +3835,61 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         return res.status(400).json({ error: "Google Drive not connected" });
       }
       
-      const result = await syncDriveToDatabase();
+      // If already syncing, return current status
+      if (syncStatus.inProgress) {
+        return res.json({ 
+          success: true, 
+          inProgress: true,
+          message: "Sync already in progress",
+          synced: syncStatus.synced,
+          total: syncStatus.total
+        });
+      }
+      
+      // Start sync in background
+      syncStatus = {
+        inProgress: true,
+        synced: 0,
+        total: 0,
+        errors: [],
+        lastCompleted: null,
+        message: "Starting sync..."
+      };
+      
+      // Respond immediately
       res.json({ 
         success: true, 
-        synced: result.synced, 
-        errors: result.errors,
-        message: `Synced ${result.synced} documents from Google Drive`
+        inProgress: true,
+        message: "Sync started in background. Check status for progress."
       });
+      
+      // Run sync in background
+      syncDriveToDatabase()
+        .then((result) => {
+          syncStatus = {
+            inProgress: false,
+            synced: result.synced,
+            total: result.total,
+            errors: result.errors,
+            lastCompleted: new Date(),
+            message: `Completed: synced ${result.synced}/${result.total} documents`
+          };
+          console.log(`Drive sync completed: ${result.synced}/${result.total} documents`);
+        })
+        .catch((error) => {
+          syncStatus = {
+            inProgress: false,
+            synced: 0,
+            total: 0,
+            errors: [error instanceof Error ? error.message : 'Unknown error'],
+            lastCompleted: new Date(),
+            message: "Sync failed"
+          };
+          console.error("Background sync error:", error);
+        });
+        
     } catch (error) {
-      console.error("Error syncing from drive:", error);
+      console.error("Error starting drive sync:", error);
       res.status(500).json({ error: "Failed to sync from Google Drive" });
     }
   });

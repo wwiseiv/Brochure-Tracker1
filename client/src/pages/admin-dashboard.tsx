@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -190,19 +190,55 @@ export default function AdminDashboardPage() {
     queryKey: ["/api/drive/status"],
   });
 
+  // Track sync status with polling
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  const { data: syncStatusData, refetch: refetchSyncStatus } = useQuery<{
+    inProgress: boolean;
+    synced: number;
+    total: number;
+    message: string;
+    errors: string[];
+  }>({
+    queryKey: ["/api/drive/sync-status"],
+    enabled: isSyncing,
+    refetchInterval: isSyncing ? 2000 : false, // Poll every 2 seconds while syncing
+  });
+  
+  // Check if sync completed
+  useEffect(() => {
+    if (isSyncing && syncStatusData && !syncStatusData.inProgress && syncStatusData.message.startsWith("Completed")) {
+      setIsSyncing(false);
+      toast({
+        title: "Sync Complete",
+        description: syncStatusData.message,
+      });
+      refetchDrive();
+    }
+  }, [syncStatusData, isSyncing, refetchDrive, toast]);
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/drive/sync");
       return res.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Sync Complete",
-        description: `Synced ${data.synced} training documents from Google Drive`,
-      });
-      refetchDrive();
+      if (data.inProgress) {
+        setIsSyncing(true);
+        toast({
+          title: "Sync Started",
+          description: "Syncing in background. This may take a few minutes for large folders.",
+        });
+      } else {
+        toast({
+          title: "Sync Complete",
+          description: `Synced ${data.synced} training documents from Google Drive`,
+        });
+        refetchDrive();
+      }
     },
     onError: (error: Error) => {
+      setIsSyncing(false);
       toast({
         title: "Sync Failed",
         description: error.message,
@@ -460,13 +496,15 @@ export default function AdminDashboardPage() {
                   </div>
                   <Button
                     onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending || !driveStatus?.connected}
+                    disabled={syncMutation.isPending || isSyncing || !driveStatus?.connected}
                     data-testid="button-sync-training"
                   >
-                    {syncMutation.isPending ? (
+                    {syncMutation.isPending || isSyncing ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Syncing...
+                        {isSyncing && syncStatusData 
+                          ? `Syncing... ${syncStatusData.message}` 
+                          : "Starting sync..."}
                       </>
                     ) : (
                       <>
