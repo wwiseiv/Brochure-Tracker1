@@ -16,6 +16,7 @@ function getResendClient(): Resend | null {
 
 const FROM_EMAIL = "BrochureTracker <onboarding@resend.dev>";
 const FEEDBACK_RECIPIENT = "wwiseiv@icloud.com";
+const ADDITIONAL_RECIPIENT = "wwise@pcbancard.com";
 const APP_URL = process.env.REPLIT_DEV_DOMAIN 
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
   : process.env.APP_URL || "https://brochuretracker.com";
@@ -374,7 +375,7 @@ export async function sendNewMemberNotification(params: SendNewMemberNotificatio
   }
 }
 
-const MEETING_RECORDING_RECIPIENT = "wwiseiv@icloud.com";
+const MEETING_RECORDING_RECIPIENTS = ["wwiseiv@icloud.com", "wwise@pcbancard.com"];
 
 interface SendMeetingRecordingParams {
   agentName: string;
@@ -432,7 +433,7 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
 
     const { error } = await client.emails.send({
       from: FROM_EMAIL,
-      to: MEETING_RECORDING_RECIPIENT,
+      to: MEETING_RECORDING_RECIPIENTS,
       subject: `New Sales Meeting Recording: ${params.businessName}`,
       html: `
         <!DOCTYPE html>
@@ -520,7 +521,7 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
       return false;
     }
 
-    console.log(`Meeting recording email sent to ${MEETING_RECORDING_RECIPIENT}`);
+    console.log(`Meeting recording email sent to ${MEETING_RECORDING_RECIPIENTS.join(", ")}`);
     return true;
   } catch (error: any) {
     console.error("Error sending meeting recording email:", error?.message || error);
@@ -599,7 +600,7 @@ export async function sendRoleplaySessionEmail(params: SendRoleplaySessionEmailP
 
     const { error } = await client.emails.send({
       from: FROM_EMAIL,
-      to: MEETING_RECORDING_RECIPIENT,
+      to: MEETING_RECORDING_RECIPIENTS,
       subject: `AI Coach Session: ${params.agentName} - ${scenarioLabel} (Score: ${params.performanceScore})`,
       html: `
         <!DOCTYPE html>
@@ -695,7 +696,7 @@ export async function sendRoleplaySessionEmail(params: SendRoleplaySessionEmailP
       return false;
     }
 
-    console.log(`Roleplay session email sent to ${MEETING_RECORDING_RECIPIENT}`);
+    console.log(`Roleplay session email sent to ${MEETING_RECORDING_RECIPIENTS.join(", ")}`);
     return true;
   } catch (error: any) {
     console.error("Error sending roleplay session email:", error?.message || error);
