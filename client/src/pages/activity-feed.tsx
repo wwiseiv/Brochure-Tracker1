@@ -242,7 +242,7 @@ export default function ActivityFeedPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-2">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <ActivityIcon className="w-5 h-5 text-primary" />
             <span className="font-semibold">Team Activity</span>
@@ -253,7 +253,7 @@ export default function ActivityFeedPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-4 space-y-4">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
         <div className="flex gap-2">
           <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
             <SelectTrigger 

@@ -151,13 +151,13 @@ export default function MerchantsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Store className="w-5 h-5 text-primary" />
           <span className="font-semibold">Merchants</span>
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-4 space-y-4">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
         <div className="flex flex-col gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

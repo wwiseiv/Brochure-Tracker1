@@ -343,7 +343,7 @@ export default function NewDropPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -362,7 +362,7 @@ export default function NewDropPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-6">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Card className="p-4">

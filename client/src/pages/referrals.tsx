@@ -1240,13 +1240,13 @@ export default function ReferralsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Users className="w-5 h-5 text-primary" />
           <span className="font-semibold">Referrals</span>
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-4 space-y-4">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
         <div className="grid grid-cols-3 gap-3" data-testid="referral-stats">
           <Card className="p-3 text-center">
             <p className="text-2xl font-bold" data-testid="stat-total">{stats.total}</p>

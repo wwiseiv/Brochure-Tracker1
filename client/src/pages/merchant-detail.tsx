@@ -457,7 +457,7 @@ export default function MerchantDetailPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
-          <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -469,7 +469,7 @@ export default function MerchantDetailPage() {
             <span className="font-semibold">Merchant Details</span>
           </div>
         </header>
-        <main className="container max-w-md mx-auto">
+        <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto">
           <DetailSkeleton />
         </main>
         <BottomNav />
@@ -481,7 +481,7 @@ export default function MerchantDetailPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
-          <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -493,7 +493,7 @@ export default function MerchantDetailPage() {
             <span className="font-semibold">Merchant Not Found</span>
           </div>
         </header>
-        <main className="container max-w-md mx-auto px-4 py-12 text-center">
+        <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-12 text-center">
           <Store className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-lg font-semibold mb-2">Merchant not found</h2>
           <p className="text-muted-foreground mb-6">
@@ -515,7 +515,7 @@ export default function MerchantDetailPage() {
   return (
     <div className="min-h-screen bg-background pb-32">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -528,7 +528,7 @@ export default function MerchantDetailPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-6 space-y-6">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
         <section className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
             <BusinessTypeIcon 
@@ -1191,7 +1191,7 @@ export default function MerchantDetailPage() {
       </main>
 
       <div className="fixed bottom-16 left-0 right-0 bg-card border-t border-border p-4 z-40 safe-area-inset-bottom">
-        <div className="container max-w-md mx-auto flex gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto flex gap-3">
           <Button
             variant="outline"
             className="flex-1 min-h-touch gap-2"

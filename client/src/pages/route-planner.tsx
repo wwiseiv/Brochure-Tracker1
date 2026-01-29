@@ -133,7 +133,7 @@ export default function RoutePlannerPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -141,7 +141,7 @@ export default function RoutePlannerPage() {
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-6 space-y-6">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center justify-between gap-4">
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>

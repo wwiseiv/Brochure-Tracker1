@@ -68,27 +68,27 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md mx-auto px-4 h-14 flex items-center">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center">
           <span className="font-semibold">All Drops</span>
         </div>
       </header>
 
-      <main className="container max-w-md mx-auto px-4 py-4">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterType)}>
-          <TabsList className="w-full grid grid-cols-5 mb-4">
-            <TabsTrigger value="all" className="text-xs min-h-touch" data-testid="tab-all">
+          <TabsList className="w-full grid grid-cols-5 mb-4 h-12">
+            <TabsTrigger value="all" className="text-sm min-h-touch px-1" data-testid="tab-all">
               All
             </TabsTrigger>
-            <TabsTrigger value="today" className="text-xs min-h-touch" data-testid="tab-today">
+            <TabsTrigger value="today" className="text-sm min-h-touch px-1" data-testid="tab-today">
               Today
             </TabsTrigger>
-            <TabsTrigger value="upcoming" className="text-xs min-h-touch" data-testid="tab-upcoming">
+            <TabsTrigger value="upcoming" className="text-sm min-h-touch px-1" data-testid="tab-upcoming">
               Soon
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="text-xs min-h-touch" data-testid="tab-overdue">
+            <TabsTrigger value="overdue" className="text-sm min-h-touch px-1" data-testid="tab-overdue">
               Late
             </TabsTrigger>
-            <TabsTrigger value="completed" className="text-xs min-h-touch" data-testid="tab-completed">
+            <TabsTrigger value="completed" className="text-sm min-h-touch px-1" data-testid="tab-completed">
               Done
             </TabsTrigger>
           </TabsList>
