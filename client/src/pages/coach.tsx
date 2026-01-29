@@ -189,6 +189,10 @@ function DailyEdgeSection() {
   const [chatInput, setChatInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isDailyEdgeRecording, setIsDailyEdgeRecording] = useState(false);
+  const [isDailyEdgeTranscribing, setIsDailyEdgeTranscribing] = useState(false);
+  const dailyEdgeMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const dailyEdgeAudioChunksRef = useRef<Blob[]>([]);
   
   const { data: todayData, isLoading: todayLoading } = useQuery<DailyEdgeToday>({
     queryKey: ["/api/daily-edge/today"],
@@ -257,6 +261,88 @@ function DailyEdgeSection() {
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const startDailyEdgeRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      dailyEdgeMediaRecorderRef.current = mediaRecorder;
+      dailyEdgeAudioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          dailyEdgeAudioChunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        
+        const audioBlob = new Blob(dailyEdgeAudioChunksRef.current, { type: mediaRecorder.mimeType });
+        await transcribeDailyEdgeAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsDailyEdgeRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopDailyEdgeRecording = () => {
+    if (dailyEdgeMediaRecorderRef.current && isDailyEdgeRecording) {
+      dailyEdgeMediaRecorderRef.current.stop();
+      setIsDailyEdgeRecording(false);
+    }
+  };
+
+  const transcribeDailyEdgeAudio = async (audioBlob: Blob) => {
+    setIsDailyEdgeTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Transcription failed");
+      
+      const data = await response.json();
+      if (data.text) {
+        setChatInput(data.text);
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking again",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Please try again or type your message",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDailyEdgeTranscribing(false);
     }
   };
   
@@ -561,8 +647,9 @@ function DailyEdgeSection() {
               <Textarea
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about today's content, how to apply it, or share a challenge..."
+                placeholder={isDailyEdgeRecording ? "Listening..." : isDailyEdgeTranscribing ? "Transcribing..." : "Ask about today's content, how to apply it, or share a challenge..."}
                 className="min-h-[44px] max-h-32 resize-none"
+                disabled={isDailyEdgeRecording || isDailyEdgeTranscribing}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -572,8 +659,18 @@ function DailyEdgeSection() {
                 data-testid="input-daily-edge-chat"
               />
               <Button
+                size="icon"
+                variant={isDailyEdgeRecording ? "destructive" : "outline"}
+                onClick={isDailyEdgeRecording ? stopDailyEdgeRecording : startDailyEdgeRecording}
+                disabled={isSending || isDailyEdgeTranscribing}
+                className={`h-11 w-11 flex-shrink-0 ${isDailyEdgeRecording ? "animate-pulse" : ""}`}
+                data-testid="button-mic-daily-edge"
+              >
+                {isDailyEdgeTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+              </Button>
+              <Button
                 onClick={handleSendMessage}
-                disabled={!chatInput.trim() || isSending}
+                disabled={!chatInput.trim() || isSending || isDailyEdgeRecording || isDailyEdgeTranscribing}
                 size="icon"
                 className="h-11 w-11 flex-shrink-0"
                 data-testid="button-send-daily-edge"
