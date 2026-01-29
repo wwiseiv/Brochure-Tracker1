@@ -60,9 +60,16 @@ export default function DashboardPage() {
     queryKey: ["/api/me/permissions"],
   });
 
+  // Fetch leaderboard when role is known and user has access
+  // Query is enabled once we know the user's role AND they're either admin or have permission
+  const shouldFetchLeaderboard = userRole !== undefined && (
+    userRole?.role === "master_admin" || myPermissions?.canViewLeaderboard === true
+  );
+  
   const { data: leaderboard } = useQuery<LeaderboardEntry[]>({
     queryKey: ["/api/leaderboard"],
-    enabled: userRole?.role === "master_admin" || myPermissions?.canViewLeaderboard === true,
+    enabled: shouldFetchLeaderboard,
+    retry: false, // Don't retry on 403
   });
 
   const isAdmin = userRole?.role === "master_admin";

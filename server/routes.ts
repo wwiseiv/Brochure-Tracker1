@@ -1648,7 +1648,7 @@ Format your response as JSON:
           const drops = await storage.getDropsByAgent(member.userId);
           
           const totalDrops = drops.length;
-          const conversions = drops.filter(d => d.drop.status === "converted").length;
+          const conversions = drops.filter(d => d.status === "converted").length;
           const conversionRate = totalDrops > 0 ? Math.round((conversions / totalDrops) * 100) : 0;
           
           return {
