@@ -635,6 +635,84 @@ export default function HelpPage() {
     },
   ];
 
+  const equipIQFeatures: HelpItem[] = [
+    {
+      title: "AI Equipment Advisor",
+      description: "Chat with AI to get personalized equipment recommendations based on merchant needs. Describe the business and get instant suggestions.",
+      link: "/equipiq",
+      icon: <Brain className="w-5 h-5 text-primary" />,
+    },
+    {
+      title: "Product Catalog",
+      description: "Browse 63+ payment products from 6 vendors: SwipeSimple, Dejavoo, MX POS, Hot Sauce POS, Valor PayTech, and FluidPay.",
+      link: "/equipiq",
+      icon: <Package className="w-5 h-5 text-primary" />,
+    },
+    {
+      title: "Filter by Vendor",
+      description: "Quickly narrow down products by selecting a specific vendor. Compare features and find the right fit.",
+      link: "/equipiq",
+      icon: <Search className="w-5 h-5 text-primary" />,
+    },
+    {
+      title: "Product Details",
+      description: "View complete product information including features, pricing, and best-use scenarios for each device.",
+      link: "/equipiq",
+      icon: <FileText className="w-5 h-5 text-primary" />,
+    },
+    {
+      title: "Training Quizzes",
+      description: "Test your product knowledge with AI-generated quizzes. Choose difficulty: Beginner, Intermediate, or Advanced.",
+      link: "/equipiq",
+      icon: <Target className="w-5 h-5 text-primary" />,
+    },
+    {
+      title: "Track Progress",
+      description: "View your quiz results and track improvement over time. Identify areas where you need more practice.",
+      link: "/equipiq",
+      icon: <TrendingUp className="w-5 h-5 text-primary" />,
+    },
+  ];
+
+  const dailyEdgeFeatures: HelpItem[] = [
+    {
+      title: "Daily Motivation",
+      description: "Start each day with focused content from The Salesperson's Secret Code. Build the mindset habits of top performers.",
+      link: "/coach",
+      icon: <Zap className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "5 Destination Beliefs",
+      description: "Master the 5 beliefs that set elite salespeople apart: Fulfilment, Control, Resilience, Influence, and Communication.",
+      link: "/coach",
+      icon: <Target className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Daily Content Types",
+      description: "Each day brings fresh content: inspiring quotes, key insights, practical challenges, iconic stories, and journey motivators.",
+      link: "/coach",
+      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Discuss with AI",
+      description: "Tap 'Discuss This with AI Coach' to explore the day's content deeper. Ask questions and learn how to apply principles to real situations.",
+      link: "/coach",
+      icon: <MessageSquare className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Streak Tracking",
+      description: "Build momentum with daily engagement streaks. See your progress and stay consistent in developing winning habits.",
+      link: "/coach",
+      icon: <Activity className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      title: "Belief Progress",
+      description: "Track your growth across all 5 Destination Beliefs with visual progress rings. See which areas need more focus.",
+      link: "/coach",
+      icon: <BarChart3 className="w-5 h-5 text-amber-500" />,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
@@ -690,6 +768,8 @@ export default function HelpPage() {
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
+            { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
+            { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
             { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users" },
