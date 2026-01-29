@@ -4573,6 +4573,29 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
   // EquipIQ - Equipment Recommendation System
   // ============================================
 
+  // EquipIQ request validation schemas
+  const equipIQRecommendSchema = z.object({
+    message: z.string().min(1, "Message is required"),
+    conversationHistory: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+    })).optional().default([]),
+  });
+
+  const equipIQQuizResultSchema = z.object({
+    vendorId: z.string().nullable().optional(),
+    difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+    totalQuestions: z.number().int().positive(),
+    correctAnswers: z.number().int().min(0),
+    score: z.number().min(0).max(100),
+  });
+
+  const equipIQQuizGenerateSchema = z.object({
+    vendorId: z.string().nullable().optional(),
+    difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional().default("beginner"),
+    questionCount: z.number().int().min(1).max(20).optional().default(5),
+  });
+
   // Initialize EquipIQ data on startup
   seedEquipIQData().then(result => {
     console.log(`[EquipIQ] Seeded ${result.vendors} vendors, ${result.products} products, ${result.businessTypes} business types`);
@@ -4662,11 +4685,11 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
   app.post("/api/equipiq/recommend", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const { message, conversationHistory = [] } = req.body;
-
-      if (!message) {
-        return res.status(400).json({ error: "Message is required" });
+      const parseResult = equipIQRecommendSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
       }
+      const { message, conversationHistory } = parseResult.data;
 
       // Get all products and vendors for context
       const [products, vendors] = await Promise.all([
@@ -4805,7 +4828,11 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   app.post("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const { vendorId, difficulty, totalQuestions, correctAnswers, score } = req.body;
+      const parseResult = equipIQQuizResultSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+      const { vendorId, difficulty, totalQuestions, correctAnswers, score } = parseResult.data;
 
       const result = await storage.createEquipmentQuizResult({
         userId: user.id,
@@ -4826,7 +4853,11 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   // Generate quiz questions for a vendor
   app.post("/api/equipiq/quiz/generate", isAuthenticated, async (req, res) => {
     try {
-      const { vendorId, difficulty = "beginner", questionCount = 5 } = req.body;
+      const parseResult = equipIQQuizGenerateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+      const { vendorId, difficulty, questionCount } = parseResult.data;
 
       // Get vendor and products
       const vendor = vendorId ? await storage.getEquipmentVendorById(vendorId) : null;

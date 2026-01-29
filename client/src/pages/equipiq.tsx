@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import BottomNav from "@/components/BottomNav";
+import { BottomNav } from "@/components/BottomNav";
 import { 
   Bot, 
   Send, 
@@ -129,15 +129,11 @@ export default function EquipIQPage() {
     queryKey: ["/api/equipiq/vendors"],
   });
 
+  const productsUrl = selectedVendor 
+    ? `/api/equipiq/products?vendor=${selectedVendor}`
+    : "/api/equipiq/products";
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/equipiq/products", selectedVendor],
-    queryFn: async () => {
-      const url = selectedVendor 
-        ? `/api/equipiq/products?vendor=${selectedVendor}`
-        : "/api/equipiq/products";
-      const res = await fetch(url, { credentials: "include" });
-      return res.json();
-    },
+    queryKey: [productsUrl],
   });
 
   const recommendMutation = useMutation({
