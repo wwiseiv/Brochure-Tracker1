@@ -2313,6 +2313,119 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
+  // AI Draft Email for Referrals - generates subject and body based on email type
+  app.post("/api/ai/draft-email", isAuthenticated, async (req: any, res) => {
+    try {
+      const { referralId, emailType, customInstructions, context } = req.body;
+      
+      if (!emailType) {
+        return res.status(400).json({ error: "Email type is required" });
+      }
+      
+      const validEmailTypes = ["introduction", "follow_up", "thank_you", "meeting_request"];
+      if (!validEmailTypes.includes(emailType)) {
+        return res.status(400).json({ error: `Invalid email type. Must be one of: ${validEmailTypes.join(", ")}` });
+      }
+      
+      // Get referral data if referralId is provided
+      let referral = null;
+      if (referralId) {
+        referral = await storage.getReferral(referralId);
+        if (!referral) {
+          return res.status(404).json({ error: "Referral not found" });
+        }
+      }
+      
+      const businessName = context?.businessName || referral?.referredBusinessName || "the business";
+      const contactName = context?.contactName || referral?.referredContactName || "";
+      const notes = context?.notes || referral?.notes || "";
+      const phone = context?.phone || referral?.referredPhone || "";
+      
+      const client = getAIIntegrationsClient();
+      
+      const emailTypeDescriptions: Record<string, string> = {
+        introduction: "an introductory email to establish first contact and introduce your payment processing services",
+        follow_up: "a follow-up email to check in after a previous conversation or visit",
+        thank_you: "a thank you email to express gratitude for their time or consideration",
+        meeting_request: "a meeting request email to schedule a time to discuss payment processing solutions",
+      };
+      
+      const systemPrompt = `You are a professional email writing assistant for sales representatives in the payment processing industry.
+Generate a professional, persuasive email based on the provided context.
+
+You MUST respond with valid JSON in this exact format:
+{
+  "subject": "The email subject line",
+  "body": "The full email body text"
+}
+
+Guidelines:
+- Be professional but friendly and approachable
+- Keep the email concise (under 200 words for the body)
+- Include a clear call-to-action appropriate for the email type
+- Personalize with the contact name when provided
+- Focus on value proposition and building relationships
+- Do not use overly salesy language
+- Sign off as "[Your Name]" placeholder for the sender to fill in
+
+${customInstructions ? `Additional instructions: ${customInstructions}` : ""}
+
+Return ONLY the JSON object, no additional text or markdown.`;
+
+      const userPrompt = `Generate ${emailTypeDescriptions[emailType]} for:
+Business: ${businessName}
+${contactName ? `Contact: ${contactName}` : ""}
+${phone ? `Phone: ${phone}` : ""}
+${notes ? `Notes/Context: ${notes}` : ""}`;
+
+      console.log("AI Draft Email request:", { emailType, businessName, hasContext: !!context });
+      
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_completion_tokens: 2048,
+      });
+      
+      const responseContent = response.choices[0]?.message?.content || "";
+      
+      console.log("AI Draft Email response:", { 
+        hasContent: !!responseContent, 
+        contentLength: responseContent.length,
+        finishReason: response.choices[0]?.finish_reason 
+      });
+      
+      // Parse the JSON response
+      let parsedResponse;
+      try {
+        // Try to extract JSON from the response (handling potential markdown code blocks)
+        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedResponse = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON found in response");
+        }
+      } catch (parseError) {
+        console.error("Failed to parse AI response as JSON:", parseError);
+        // Fallback: create a basic response from the content
+        parsedResponse = {
+          subject: `${emailType.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())} - ${businessName}`,
+          body: responseContent
+        };
+      }
+      
+      res.json({
+        subject: parsedResponse.subject || "",
+        body: parsedResponse.body || ""
+      });
+    } catch (error) {
+      console.error("Error generating draft email:", error);
+      res.status(500).json({ error: "Failed to generate draft email" });
+    }
+  });
+
   // ============================================
   // MERCHANTS API (Merchant Profiles)
   // ============================================
@@ -2996,7 +3109,28 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   app.get("/api/referrals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const referrals = await storage.getReferralsByAgent(userId);
+      const membership = req.orgMembership as OrgMembershipInfo;
+      let referrals;
+      
+      if (membership.role === "master_admin") {
+        // Admins can see all org referrals, optionally filtered by agentIds
+        const agentIdsParam = req.query.agentIds as string | undefined;
+        if (agentIdsParam) {
+          const agentIds = agentIdsParam.split(",").map(id => id.trim()).filter(id => id);
+          referrals = await storage.getReferralsByAgentIds(agentIds);
+        } else {
+          referrals = await storage.getReferralsByOrg(membership.organization.id);
+        }
+      } else if (membership.role === "relationship_manager") {
+        // Managers see referrals from all agents they manage plus their own
+        const managedAgents = await storage.getAgentsByManager(membership.id);
+        const agentIds = [userId, ...managedAgents.map(a => a.userId)];
+        referrals = await storage.getReferralsByAgentIds(agentIds);
+      } else {
+        // Agents see only their own referrals
+        referrals = await storage.getReferralsByAgent(userId);
+      }
+      
       res.json(referrals);
     } catch (error) {
       console.error("Error fetching referrals:", error);
@@ -3061,13 +3195,32 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       }
       
       const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
       const referral = await storage.getReferral(referralId);
       
       if (!referral) {
         return res.status(404).json({ error: "Referral not found" });
       }
       
-      if (referral.agentId !== userId) {
+      // Role-based access check
+      let hasAccess = false;
+      if (membership.role === "master_admin") {
+        // Admins can update any referral in their org
+        hasAccess = referral.orgId === membership.organization.id;
+      } else if (membership.role === "relationship_manager") {
+        // Managers can update their own referrals or those of agents they manage
+        if (referral.agentId === userId) {
+          hasAccess = true;
+        } else {
+          const managedAgents = await storage.getAgentsByManager(membership.id);
+          hasAccess = managedAgents.some(a => a.userId === referral.agentId);
+        }
+      } else {
+        // Agents can only update their own referrals
+        hasAccess = referral.agentId === userId;
+      }
+      
+      if (!hasAccess) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -3076,7 +3229,6 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         updateData.convertedAt = new Date();
         
         // Create activity event for conversion
-        const membership = req.orgMembership;
         await storage.createActivityEvent({
           orgId: membership.organization.id,
           agentId: userId,
@@ -3104,13 +3256,32 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       }
       
       const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
       const referral = await storage.getReferral(referralId);
       
       if (!referral) {
         return res.status(404).json({ error: "Referral not found" });
       }
       
-      if (referral.agentId !== userId) {
+      // Role-based access check
+      let hasAccess = false;
+      if (membership.role === "master_admin") {
+        // Admins can delete any referral in their org
+        hasAccess = referral.orgId === membership.organization.id;
+      } else if (membership.role === "relationship_manager") {
+        // Managers can delete their own referrals or those of agents they manage
+        if (referral.agentId === userId) {
+          hasAccess = true;
+        } else {
+          const managedAgents = await storage.getAgentsByManager(membership.id);
+          hasAccess = managedAgents.some(a => a.userId === referral.agentId);
+        }
+      } else {
+        // Agents can only delete their own referrals
+        hasAccess = referral.agentId === userId;
+      }
+      
+      if (!hasAccess) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -3183,6 +3354,7 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   app.get("/api/referrals/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
       const format = (req.query.format as ExportFormat) || "csv";
       const status = req.query.status as string | undefined;
       
@@ -3190,7 +3362,26 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
         return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
       }
       
-      let referrals = await storage.getReferralsByAgent(userId);
+      let referrals;
+      
+      if (membership.role === "master_admin") {
+        // Admins can export all org referrals, optionally filtered by agentIds
+        const agentIdsParam = req.query.agentIds as string | undefined;
+        if (agentIdsParam) {
+          const agentIds = agentIdsParam.split(",").map(id => id.trim()).filter(id => id);
+          referrals = await storage.getReferralsByAgentIds(agentIds);
+        } else {
+          referrals = await storage.getReferralsByOrg(membership.organization.id);
+        }
+      } else if (membership.role === "relationship_manager") {
+        // Managers export referrals from all agents they manage plus their own
+        const managedAgents = await storage.getAgentsByManager(membership.id);
+        const agentIds = [userId, ...managedAgents.map(a => a.userId)];
+        referrals = await storage.getReferralsByAgentIds(agentIds);
+      } else {
+        // Agents export only their own referrals
+        referrals = await storage.getReferralsByAgent(userId);
+      }
       
       if (status && status !== "all") {
         referrals = referrals.filter(r => r.status === status);

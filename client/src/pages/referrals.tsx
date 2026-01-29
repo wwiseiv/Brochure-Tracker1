@@ -67,6 +67,8 @@ import {
   Copy,
   Check,
   User,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Referral, DropWithBrochure, ReferralStatus } from "@shared/schema";
@@ -130,6 +132,7 @@ function ReferralCard({
   onEdit,
   onDelete,
   onSendThankYou,
+  onDraftEmail,
   isDeleting,
 }: { 
   referral: Referral; 
@@ -138,6 +141,7 @@ function ReferralCard({
   onEdit: (referral: Referral) => void;
   onDelete: (id: number) => void;
   onSendThankYou: (referral: Referral) => void;
+  onDraftEmail: (referral: Referral) => void;
   isDeleting: boolean;
 }) {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -233,6 +237,16 @@ function ReferralCard({
                 <Send className="w-4 h-4 text-primary" />
               </Button>
             )}
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDraftEmail(referral)}
+              data-testid={`button-draft-email-${referral.id}`}
+              title="Draft Email with AI"
+            >
+              <FileText className="w-4 h-4 text-primary" />
+            </Button>
             
             <Button
               variant="ghost"
@@ -530,6 +544,212 @@ function ThankYouEmailDialog({
                 Send Email
               </Button>
             </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const EMAIL_TYPES = [
+  { value: "introduction", label: "Introduction" },
+  { value: "follow_up", label: "Follow-up" },
+  { value: "thank_you", label: "Thank You" },
+  { value: "meeting_request", label: "Meeting Request" },
+] as const;
+
+type EmailType = typeof EMAIL_TYPES[number]["value"];
+
+function AIEmailDraftDialog({ 
+  referral,
+  open,
+  onOpenChange,
+}: { 
+  referral: Referral | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [emailType, setEmailType] = useState<EmailType>("introduction");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (open && referral) {
+      setEmailType("introduction");
+      setSubject("");
+      setBody("");
+    }
+  }, [open, referral]);
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      if (!referral) throw new Error("No referral");
+      const res = await apiRequest("POST", "/api/ai/draft-email", {
+        referralId: referral.id,
+        emailType,
+        context: {
+          businessName: referral.referredBusinessName,
+          contactName: referral.referredContactName || "",
+          notes: referral.notes || "",
+          phone: referral.referredPhone || "",
+        },
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSubject(data.subject || "");
+      setBody(data.body || "");
+      toast({
+        title: "Email generated",
+        description: "AI has drafted an email for you to review and edit.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate email",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+      setCopied(true);
+      toast({ title: "Copied to clipboard!" });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
+  const openMailto = () => {
+    const mailtoLink = `mailto:${encodeURIComponent(referral?.referredContactName ? "" : "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, "_blank");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Draft Email with AI
+          </DialogTitle>
+        </DialogHeader>
+
+        {referral && (
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
+              <p className="font-medium">{referral.referredBusinessName}</p>
+              {referral.referredContactName && (
+                <p className="text-muted-foreground flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {referral.referredContactName}
+                </p>
+              )}
+              {referral.referredPhone && (
+                <p className="text-muted-foreground flex items-center gap-1">
+                  <Phone className="w-3 h-3" />
+                  {referral.referredPhone}
+                </p>
+              )}
+              {referral.notes && (
+                <p className="text-muted-foreground text-xs line-clamp-2 flex items-start gap-1">
+                  <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  {referral.notes}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email-type">Email Type</Label>
+              <Select value={emailType} onValueChange={(val) => setEmailType(val as EmailType)}>
+                <SelectTrigger className="min-h-touch" data-testid="select-email-type">
+                  <SelectValue placeholder="Select email type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMAIL_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full min-h-touch"
+              onClick={() => generateMutation.mutate()}
+              disabled={generateMutation.isPending}
+              data-testid="button-generate-ai-email"
+            >
+              {generateMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              Generate with AI
+            </Button>
+
+            {(subject || body) && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-subject">Subject</Label>
+                  <Input
+                    id="ai-subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="min-h-touch"
+                    placeholder="Email subject..."
+                    data-testid="input-ai-email-subject"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-body">Message</Label>
+                  <Textarea
+                    id="ai-body"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    className="min-h-[200px] resize-none"
+                    placeholder="Email body..."
+                    data-testid="textarea-ai-email-body"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 min-h-touch"
+                    onClick={copyToClipboard}
+                    disabled={!body.trim()}
+                    data-testid="button-copy-ai-email"
+                  >
+                    {copied ? (
+                      <Check className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Copy className="w-4 h-4 mr-2" />
+                    )}
+                    Copy
+                  </Button>
+                  <Button
+                    className="flex-1 min-h-touch"
+                    onClick={openMailto}
+                    disabled={!subject.trim() || !body.trim()}
+                    data-testid="button-send-ai-email"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Send Email
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </DialogContent>
@@ -1158,6 +1378,8 @@ export default function ReferralsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [thankYouReferral, setThankYouReferral] = useState<Referral | null>(null);
   const [isThankYouDialogOpen, setIsThankYouDialogOpen] = useState(false);
+  const [draftEmailReferral, setDraftEmailReferral] = useState<Referral | null>(null);
+  const [isDraftEmailDialogOpen, setIsDraftEmailDialogOpen] = useState(false);
 
   const { data: referrals, isLoading: referralsLoading } = useQuery<Referral[]>({
     queryKey: ["/api/referrals"],
@@ -1225,6 +1447,11 @@ export default function ReferralsPage() {
   const handleSendThankYou = (referral: Referral) => {
     setThankYouReferral(referral);
     setIsThankYouDialogOpen(true);
+  };
+
+  const handleDraftEmail = (referral: Referral) => {
+    setDraftEmailReferral(referral);
+    setIsDraftEmailDialogOpen(true);
   };
 
   const stats = useMemo(() => {
@@ -1300,6 +1527,7 @@ export default function ReferralsPage() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onSendThankYou={handleSendThankYou}
+                onDraftEmail={handleDraftEmail}
                 isDeleting={deleteMutation.isPending}
               />
             ))}
@@ -1332,6 +1560,12 @@ export default function ReferralsPage() {
         open={isThankYouDialogOpen}
         onOpenChange={setIsThankYouDialogOpen}
         onSuccess={() => setThankYouReferral(null)}
+      />
+
+      <AIEmailDraftDialog
+        referral={draftEmailReferral}
+        open={isDraftEmailDialogOpen}
+        onOpenChange={setIsDraftEmailDialogOpen}
       />
 
       <BottomNav />

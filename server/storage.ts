@@ -650,6 +650,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(referrals).where(eq(referrals.agentId, agentId)).orderBy(desc(referrals.createdAt));
   }
 
+  async getReferralsByAgentIds(agentIds: string[]): Promise<Referral[]> {
+    if (agentIds.length === 0) return [];
+    return db.select().from(referrals).where(inArray(referrals.agentId, agentIds)).orderBy(desc(referrals.createdAt));
+  }
+
   async createReferral(data: InsertReferral): Promise<Referral> {
     const [created] = await db.insert(referrals).values(data).returning();
     return created;
