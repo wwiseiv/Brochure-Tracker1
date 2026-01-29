@@ -43,7 +43,8 @@ Preferred communication style: Simple, everyday language.
     - **Voice Note Summaries**: AI-generated summaries with key takeaways and sentiment.
     - **Lead Scoring**: AI-calculated lead quality scores (hot/warm/cold).
     - **AI Role-Play Coach**: Conversational AI for sales training (coaching/role-play modes) with voice input/output, performance feedback, and email reporting. Features difficulty levels (beginner/intermediate/advanced) and 7 detailed personas. Real-time coaching hints during roleplay.
-    - **Google Drive Training Integration**: AI coaching pulls custom training materials from Google Drive folder (ID: 1_QYPCqf_VX31noF7II0aCTALvz8v0_a0) to enhance roleplay scenarios and coaching advice.
+    - **Google Drive Training Integration**: AI coaching pulls custom training materials from Google Drive folder (ID: 1_QYPCqf_VX31noF7II0aCTALvz8v0_a0). Supports recursive subfolder scanning and multiple file types (Google Docs, Sheets, Slides, PDFs, text files, CSV, JSON, Markdown).
+    - **Daily Edge Motivation System**: Mindset training based on "The Salesperson's Secret Code" with 5 Destination Beliefs (Fulfilment, Control, Resilience, Influence, Communication). Features daily rotating content (quotes, insights, challenges, iconic stories, journey motivators), streak tracking, belief progress rings, and AI coaching integration.
     - **Meeting Recording & Analysis**: Record sales conversations, upload to secure storage, transcribe and analyze audio with Gemini AI for summaries, key takeaways, and sentiment analysis. Recordings automatically emailed for sales coaching repository. Supports offline retry.
     - **AI Email Drafter**: AI-powered email composition.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
