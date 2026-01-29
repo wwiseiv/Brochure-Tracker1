@@ -49,6 +49,7 @@ Preferred communication style: Simple, everyday language.
     - **AI Email Drafter**: AI-powered email composition.
     - **EquipIQ**: AI-powered equipment recommendation system with conversational advisor, searchable product catalog (6 vendors, 63+ products), and quiz-based training with difficulty levels (beginner/intermediate/advanced).
     - **Presentation Training ("Teach Me the Presentation")**: Interactive 8-module training system teaching the PCBancard Dual Pricing presentation. Features 25 lessons covering persuasion psychology (anchoring, loss aversion, social proof), story proof techniques, objection handling, and closing strategies. Includes voice dictation support, AI Q&A for lesson questions, practice scenarios, quizzes, and progress tracking. Accessible from Coach page via "Teach Me the Presentation" card.
+    - **Proposal Generator**: Upload Dual Pricing or Interchange Plus pricing PDFs, parse merchant data (card volumes, rates, fees, savings), select terminal equipment from EquipIQ catalog, and generate professional branded proposals in PDF/DOCX format. Features AI-enhanced proposal text, PCBancard purple branding, and volume-based equipment recommendations. Accessible from Coach page via "Proposal Generator" card.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
