@@ -48,6 +48,7 @@ Preferred communication style: Simple, everyday language.
     - **Meeting Recording & Analysis**: Record sales conversations, upload to secure storage, transcribe and analyze audio with Gemini AI for summaries, key takeaways, and sentiment analysis. Recordings automatically emailed for sales coaching repository. Supports offline retry.
     - **AI Email Drafter**: AI-powered email composition.
     - **EquipIQ**: AI-powered equipment recommendation system with conversational advisor, searchable product catalog (6 vendors, 63+ products), and quiz-based training with difficulty levels (beginner/intermediate/advanced).
+    - **Presentation Training ("Teach Me the Presentation")**: Interactive 8-module training system teaching the PCBancard Dual Pricing presentation. Features 25 lessons covering persuasion psychology (anchoring, loss aversion, social proof), story proof techniques, objection handling, and closing strategies. Includes voice dictation support, AI Q&A for lesson questions, practice scenarios, quizzes, and progress tracking. Accessible from Coach page via "Teach Me the Presentation" card.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
