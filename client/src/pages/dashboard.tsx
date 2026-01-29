@@ -12,10 +12,23 @@ import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
-import type { DropWithBrochure, UserPreferences } from "@shared/schema";
+import type { DropWithBrochure, UserPreferences, UserPermissions } from "@shared/schema";
+
+interface LeaderboardEntry {
+  rank: number;
+  memberId: number;
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  totalDrops: number;
+  conversions: number;
+  conversionRate: number;
+  score: number;
+}
 
 interface UserRole {
   role: string;
@@ -41,6 +54,15 @@ export default function DashboardPage() {
 
   const { data: userPreferences } = useQuery<UserPreferences>({
     queryKey: ["/api/me/preferences"],
+  });
+
+  const { data: myPermissions } = useQuery<UserPermissions>({
+    queryKey: ["/api/me/permissions"],
+  });
+
+  const { data: leaderboard } = useQuery<LeaderboardEntry[]>({
+    queryKey: ["/api/leaderboard"],
+    enabled: userRole?.role === "master_admin" || myPermissions?.canViewLeaderboard === true,
   });
 
   const isAdmin = userRole?.role === "master_admin";
@@ -269,6 +291,59 @@ export default function DashboardPage() {
             </Card>
           </Link>
         </div>
+
+        {/* Leaderboard Section - Only shows when user has permission */}
+        {(isAdmin || myPermissions?.canViewLeaderboard) && leaderboard && leaderboard.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-semibold">Team Leaderboard</h2>
+              </div>
+            </div>
+            <Card className="overflow-hidden">
+              <div className="divide-y divide-border">
+                {leaderboard.slice(0, 5).map((entry) => (
+                  <div 
+                    key={entry.memberId} 
+                    className={`flex items-center justify-between p-3 ${
+                      entry.userId === user?.id ? "bg-primary/5" : ""
+                    }`}
+                    data-testid={`leaderboard-row-${entry.memberId}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
+                        entry.rank === 1 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                        entry.rank === 2 ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" :
+                        entry.rank === 3 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                        "bg-muted text-muted-foreground"
+                      }`}>
+                        {entry.rank}
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">
+                          {entry.firstName || entry.lastName 
+                            ? `${entry.firstName || ""} ${entry.lastName || ""}`.trim()
+                            : entry.userId.slice(0, 12) + "..."}
+                          {entry.userId === user?.id && (
+                            <span className="ml-1 text-xs text-muted-foreground">(You)</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {entry.totalDrops} drops, {entry.conversions} conversions
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-sm">{entry.score}</div>
+                      <div className="text-xs text-muted-foreground">points</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+        )}
 
         {upcomingPickups.length > 0 && (
           <section className="md:hidden">

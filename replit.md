@@ -51,6 +51,10 @@ Preferred communication style: Simple, everyday language.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
+- **Individual User Permissions**: Per-user feature toggles (leaderboard, coach, EquipIQ, export, etc.) manageable by admins in Team Management.
+- **Data Isolation**: Role-based data access - agents see only their own data, managers see team data, admins see all organization data.
+- **Team Leaderboard**: Optional leaderboard showing top agents by drops/conversions. Controlled by individual permission (off by default).
+- **Access Control**: Proper "Access Denied" pages for restricted routes instead of 404s.
 - **PWA Features**: Service worker for offline support.
 - **UI/UX**: Bottom navigation, improved back navigation, searchable help page.
 

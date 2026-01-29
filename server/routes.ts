@@ -1617,6 +1617,71 @@ Format your response as JSON:
   });
 
   // ============================================
+  // LEADERBOARD API
+  // ============================================
+
+  // Get leaderboard - requires canViewLeaderboard permission
+  app.get("/api/leaderboard", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      // Check permission (admins always have access)
+      if (membership.role !== "master_admin") {
+        let perms = await storage.getUserPermissions(userId);
+        if (!perms) {
+          perms = await storage.createUserPermissions(userId);
+        }
+        
+        if (!perms.canViewLeaderboard) {
+          return res.status(403).json({ error: "Leaderboard access not enabled for your account" });
+        }
+      }
+      
+      // Get all organization members
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      
+      // Build leaderboard from drops data
+      const leaderboard = await Promise.all(
+        members.map(async (member) => {
+          // Get drops for this agent
+          const drops = await storage.getDropsByAgent(member.userId);
+          
+          const totalDrops = drops.length;
+          const conversions = drops.filter(d => d.drop.status === "converted").length;
+          const conversionRate = totalDrops > 0 ? Math.round((conversions / totalDrops) * 100) : 0;
+          
+          return {
+            memberId: member.id,
+            userId: member.userId,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            role: member.role,
+            totalDrops,
+            conversions,
+            conversionRate,
+            score: conversions * 10 + totalDrops, // Simple scoring formula
+          };
+        })
+      );
+      
+      // Sort by score descending
+      leaderboard.sort((a, b) => b.score - a.score);
+      
+      // Add rank
+      const rankedLeaderboard = leaderboard.map((entry, index) => ({
+        ...entry,
+        rank: index + 1,
+      }));
+      
+      res.json(rankedLeaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // ============================================
   // INVITATIONS API
   // ============================================
 
@@ -2205,8 +2270,26 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   
   app.get("/api/merchants", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const membership = req.orgMembership;
-      const merchants = await storage.getMerchantsByOrg(membership.organization.id);
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const orgId = membership.organization.id;
+      
+      let merchants;
+      
+      // Data isolation based on role
+      if (membership.role === "master_admin") {
+        // Admins see all merchants in organization
+        merchants = await storage.getMerchantsByOrg(orgId);
+      } else if (membership.role === "relationship_manager") {
+        // Managers see merchants from their drops + their agents' drops
+        const teamMembers = await storage.getAgentsByManager(membership.id);
+        const teamAgentIds = [userId, ...teamMembers.map(m => m.userId)];
+        merchants = await storage.getMerchantsByAgentIds(orgId, teamAgentIds);
+      } else {
+        // Agents see only merchants from their own drops
+        merchants = await storage.getMerchantsByAgentIds(orgId, [userId]);
+      }
+      
       res.json(merchants);
     } catch (error) {
       console.error("Error fetching merchants:", error);
@@ -2217,14 +2300,26 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   // Export merchants - MUST be before /api/merchants/:id to avoid route conflict
   app.get("/api/merchants/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const membership = req.orgMembership;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const orgId = membership.organization.id;
       const format = (req.query.format as ExportFormat) || "csv";
       
       if (!["csv", "xlsx"].includes(format)) {
         return res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
       }
       
-      const merchants = await storage.getMerchantsByOrg(membership.organization.id);
+      // Data isolation based on role
+      let merchants;
+      if (membership.role === "master_admin") {
+        merchants = await storage.getMerchantsByOrg(orgId);
+      } else if (membership.role === "relationship_manager") {
+        const teamMembers = await storage.getAgentsByManager(membership.id);
+        const teamAgentIds = [userId, ...teamMembers.map(m => m.userId)];
+        merchants = await storage.getMerchantsByAgentIds(orgId, teamAgentIds);
+      } else {
+        merchants = await storage.getMerchantsByAgentIds(orgId, [userId]);
+      }
       
       const filename = `merchants_export_${new Date().toISOString().split("T")[0]}`;
       const buffer = await exportMerchants(merchants, { format, filename });
@@ -2256,9 +2351,32 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
       }
       
       // Verify merchant belongs to user's org
-      const membership = req.orgMembership;
-      if (merchant.orgId !== membership.organization.id) {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const orgId = membership.organization.id;
+      
+      if (merchant.orgId !== orgId) {
         return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Data isolation based on role (verify user can access this specific merchant)
+      if (membership.role !== "master_admin") {
+        let allowedAgentIds: string[] = [];
+        
+        if (membership.role === "relationship_manager") {
+          const teamMembers = await storage.getAgentsByManager(membership.id);
+          allowedAgentIds = [userId, ...teamMembers.map(m => m.userId)];
+        } else {
+          allowedAgentIds = [userId];
+        }
+        
+        // Check if merchant has drops from allowed agents
+        const allowedMerchants = await storage.getMerchantsByAgentIds(orgId, allowedAgentIds);
+        const hasAccess = allowedMerchants.some(m => m.id === merchantId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
       
       res.json(merchant);
@@ -3052,10 +3170,26 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
   
   app.get("/api/activity", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const membership = req.orgMembership;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
       const limit = parseInt(req.query.limit as string) || 50;
-      const events = await storage.getActivityEventsByOrg(membership.organization.id, limit);
-      res.json(events);
+      
+      // Data isolation based on role
+      if (membership.role === "master_admin") {
+        // Admins see all activity
+        const events = await storage.getActivityEventsByOrg(membership.organization.id, limit);
+        res.json(events);
+      } else if (membership.role === "relationship_manager") {
+        // Managers see their own + team's activity
+        const teamMembers = await storage.getAgentsByManager(membership.id);
+        const teamAgentIds = [userId, ...teamMembers.map(m => m.userId)];
+        const events = await storage.getActivityEventsByAgentIds(teamAgentIds, limit);
+        res.json(events);
+      } else {
+        // Agents see only their own activity
+        const events = await storage.getActivityEventsByAgent(userId, limit);
+        res.json(events);
+      }
     } catch (error) {
       console.error("Error fetching activity feed:", error);
       res.status(500).json({ error: "Failed to fetch activity feed" });

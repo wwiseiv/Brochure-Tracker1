@@ -740,6 +740,14 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  async getActivityEventsByAgentIds(agentIds: string[], limit: number = 50): Promise<ActivityEvent[]> {
+    if (agentIds.length === 0) return [];
+    return db.select().from(activityEvents)
+      .where(inArray(activityEvents.agentId, agentIds))
+      .orderBy(desc(activityEvents.createdAt))
+      .limit(limit);
+  }
+
   // AI Summaries
   async getAiSummary(dropId: number): Promise<AiSummary | undefined> {
     const [summary] = await db.select().from(aiSummaries).where(eq(aiSummaries.dropId, dropId));
