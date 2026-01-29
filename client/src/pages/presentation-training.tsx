@@ -197,7 +197,7 @@ export default function PresentationTrainingPage() {
         {
           id: Date.now() + 1,
           role: "assistant",
-          content: data.response,
+          content: data.answer,
         },
       ]);
     } catch (error) {

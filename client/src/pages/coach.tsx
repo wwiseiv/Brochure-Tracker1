@@ -49,7 +49,10 @@ import {
   Quote,
   Sparkles,
   ChevronUp,
+  GraduationCap,
+  ChevronRight,
 } from "lucide-react";
+import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RoleplayScenario, RoleplaySession } from "@shared/schema";
 import { format } from "date-fns";
@@ -1379,6 +1382,24 @@ export default function CoachPage() {
               <div className="max-w-4xl mx-auto">
                 <DailyEdgeSection />
               <div className="p-4 pt-0 space-y-4">
+              {/* Presentation Training Link */}
+              <Link href="/presentation-training">
+                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-presentation-training">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <GraduationCap className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Teach Me the Presentation</div>
+                        <div className="text-sm text-muted-foreground">Master the PCBancard Dual Pricing presentation</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
                 <div className="grid grid-cols-2 gap-2 mb-4">
