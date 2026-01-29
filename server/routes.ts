@@ -5560,19 +5560,19 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
   app.post("/api/proposals/parse", isAuthenticated, ensureOrgMembership(), pdfUpload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "PDF file is required" });
+        return res.status(400).json({ error: "File is required" });
       }
 
-      const { parsePDFProposal } = await import("./proposal-generator");
-      const parsedData = await parsePDFProposal(req.file.buffer);
+      const { parseProposalFile } = await import("./proposal-generator");
+      const parsedData = await parseProposalFile(req.file.buffer, req.file.originalname);
 
       res.json({
         success: true,
         data: parsedData,
       });
     } catch (error: any) {
-      console.error("[Proposals] Error parsing PDF:", error);
-      res.status(500).json({ error: "Failed to parse PDF: " + (error.message || "Unknown error") });
+      console.error("[Proposals] Error parsing file:", error);
+      res.status(500).json({ error: "Failed to parse file: " + (error.message || "Unknown error") });
     }
   });
 

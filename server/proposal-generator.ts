@@ -12,7 +12,10 @@ import {
   BorderStyle,
   HeadingLevel,
   ShadingType,
+  ImageRun,
 } from "docx";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface CardBreakdown {
   volume: number;
@@ -373,6 +376,152 @@ export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposa
   return result;
 }
 
+// Parse Word documents using mammoth
+async function parseWordDocument(buffer: Buffer): Promise<string> {
+  const mammoth = await import("mammoth");
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value;
+}
+
+// Parse Excel files using xlsx
+async function parseExcelFile(buffer: Buffer): Promise<string> {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  let text = "";
+  
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const csv = XLSX.utils.sheet_to_csv(sheet);
+    text += csv + "\n";
+  }
+  
+  return text;
+}
+
+// Main function to parse any supported file type
+export async function parseProposalFile(buffer: Buffer, filename: string): Promise<ParsedProposal> {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  let text = "";
+  
+  if (ext === 'pdf') {
+    // Use PDF parser
+    const pdfParseModule = await import("pdf-parse");
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    const data = await pdfParse(buffer);
+    text = data.text;
+  } else if (ext === 'doc' || ext === 'docx') {
+    // Use mammoth for Word docs
+    text = await parseWordDocument(buffer);
+  } else if (ext === 'xls' || ext === 'xlsx') {
+    // Use xlsx for Excel files
+    text = await parseExcelFile(buffer);
+  } else {
+    throw new Error(`Unsupported file type: ${ext}`);
+  }
+  
+  // Now extract data from the text (same logic as PDF)
+  const merchantName = extractMerchantName(text);
+  const preparedDate = extractDate(text);
+  const agentInfo = extractAgentInfo(text);
+  const proposalType = isDualPricingProposal(text) ? "dual_pricing" : "interchange_plus";
+  
+  const currentVisa = extractCardData(text, "visa", "current");
+  const currentMC = extractCardData(text, "mastercard", "current");
+  const currentDiscover = extractCardData(text, "discover", "current");
+  const currentAmex = extractCardData(text, "amex", "current");
+  const fees = extractFees(text);
+  
+  const totalVolume = currentVisa.volume + currentMC.volume + currentDiscover.volume + currentAmex.volume;
+  const totalTransactions = currentVisa.transactions + currentMC.transactions + currentDiscover.transactions + currentAmex.transactions;
+  const avgTicket = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
+  
+  const currentProcessingFees = extractTotalProcessingFees(text);
+  const totalMonthlyCost = currentProcessingFees + fees.statementFee + fees.pciNonCompliance + 
+    fees.creditPassthrough + fees.otherFees + fees.batchHeader;
+  
+  const effectiveRate = totalVolume > 0 ? (totalMonthlyCost / totalVolume) * 100 : 0;
+  
+  const currentState: ProposalCurrentState = {
+    totalVolume,
+    totalTransactions,
+    avgTicket,
+    cardBreakdown: {
+      visa: currentVisa,
+      mastercard: currentMC,
+      discover: currentDiscover,
+      amex: currentAmex,
+    },
+    fees,
+    totalMonthlyCost,
+    effectiveRatePercent: effectiveRate,
+  };
+  
+  const savings = extractMonthlySavings(text);
+  
+  const result: ParsedProposal = {
+    merchantName,
+    preparedDate,
+    agentName: agentInfo.name,
+    agentTitle: agentInfo.title,
+    currentState,
+    proposalType,
+  };
+  
+  if (proposalType === "dual_pricing") {
+    const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
+    const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
+    
+    result.optionDualPricing = {
+      cashDiscountPercent: 4.0,
+      monthlyFee: dpMonthlyFee,
+      projectedCosts: {
+        visaCost: 0,
+        mastercardCost: 0,
+        discoverCost: 0,
+        amexCost: 0,
+        monthlyDualPricingFee: dpMonthlyFee,
+        otherFees: fees.statementFee + fees.pciNonCompliance,
+      },
+      totalMonthlyCost: dpMonthlyFee + fees.statementFee + fees.pciNonCompliance,
+      monthlySavings: savings.monthly,
+      savingsPercent: savings.percent,
+      annualSavings: savings.yearly,
+    };
+  } else {
+    const proposedRateMatch = text.match(/(?:Proposed|New)\s+(?:Discount\s+)?Rate[:\s]+(\d+\.?\d*)%/i);
+    const proposedFeeMatch = text.match(/(?:Proposed|New)\s+(?:Per\s+)?(?:Transaction|Auth)\s+Fee[:\s]+\$?(\d+\.?\d*)/i);
+    const proposedTotalMatch = text.match(/(?:Projected|Proposed|New)\s+(?:Total|Monthly)\s+(?:Cost)?[:\s]+\$?([\d,]+\.?\d*)/i);
+    
+    const proposedRate = proposedRateMatch ? parseFloat(proposedRateMatch[1]) : 0.25;
+    const proposedFee = proposedFeeMatch ? parseFloat(proposedFeeMatch[1]) : 0.10;
+    const proposedTotal = proposedTotalMatch ? parseNumber(proposedTotalMatch[1]) : 0;
+    
+    const onFileMatch = text.match(/On\s+File\s+Fee\s+\$?([\d,]+\.?\d*)/i);
+    const onFileFee = onFileMatch ? parseNumber(onFileMatch[1]) : 9.95;
+    
+    result.optionInterchangePlus = {
+      discountRatePercent: proposedRate,
+      perTransactionFee: proposedFee,
+      projectedCosts: {
+        visaCost: currentVisa.volume * (proposedRate / 100) + currentVisa.transactions * proposedFee,
+        mastercardCost: currentMC.volume * (proposedRate / 100) + currentMC.transactions * proposedFee,
+        discoverCost: currentDiscover.volume * (proposedRate / 100) + currentDiscover.transactions * proposedFee,
+        amexCost: currentAmex.volume * (proposedRate / 100) + currentAmex.transactions * proposedFee,
+        transactionFees: totalTransactions * proposedFee,
+        onFileFee: onFileFee,
+        creditPassthrough: fees.creditPassthrough,
+        otherFees: 0,
+      },
+      totalMonthlyCost: proposedTotal > 0 ? proposedTotal + onFileFee + fees.creditPassthrough : savings.monthly,
+      monthlySavings: savings.monthly,
+      savingsPercent: savings.percent,
+      annualSavings: savings.yearly,
+    };
+  }
+  
+  return result;
+}
+
 export interface ProposalBlueprint {
   cover: {
     headline: string;
@@ -456,23 +605,57 @@ export async function generateProposalDOCX(
 ): Promise<Buffer> {
   const primaryColor = "7C5CFC";
   
+  // Build document children with logo if available
+  const documentChildren: Paragraph[] = [];
+  
+  // Try to add logo at the top
+  try {
+    const logoPath = path.join(process.cwd(), "server/assets/logos/pcb_logo_fullcolor.png");
+    if (fs.existsSync(logoPath)) {
+      const logoBytes = fs.readFileSync(logoPath);
+      documentChildren.push(
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: logoBytes,
+              transformation: {
+                width: 200,
+                height: 38,
+              },
+              type: "png",
+            }),
+          ],
+          alignment: AlignmentType.RIGHT,
+          spacing: { after: 400 },
+        })
+      );
+    }
+  } catch (logoError) {
+    console.log("Could not add logo to DOCX:", logoError);
+  }
+  
+  // Add headline
+  documentChildren.push(
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: blueprint.cover.headline,
+          bold: true,
+          size: 48,
+          color: primaryColor,
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+    })
+  );
+  
   const doc = new Document({
     sections: [
       {
         properties: {},
         children: [
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: blueprint.cover.headline,
-                bold: true,
-                size: 48,
-                color: primaryColor,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          }),
+          ...documentChildren,
           new Paragraph({
             children: [
               new TextRun({
@@ -630,6 +813,9 @@ export async function generateProposalPDF(
   blueprint: ProposalBlueprint,
   parsedData: ParsedProposal
 ): Promise<Buffer> {
+  const fs = await import("fs");
+  const path = await import("path");
+  
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -639,8 +825,30 @@ export async function generateProposalPDF(
   const grayColor = rgb(0.4, 0.4, 0.4);
   
   const page = pdfDoc.addPage([612, 792]);
-  const { height } = page.getSize();
-  let y = height - 80;
+  const { width, height } = page.getSize();
+  let y = height - 50;
+  
+  // Add company logo at top right
+  try {
+    const logoPath = path.join(process.cwd(), "server/assets/logos/pcb_logo_fullcolor.png");
+    if (fs.existsSync(logoPath)) {
+      const logoBytes = fs.readFileSync(logoPath);
+      const logoImage = await pdfDoc.embedPng(logoBytes);
+      const logoWidth = 150;
+      const logoHeight = (logoImage.height / logoImage.width) * logoWidth;
+      
+      page.drawImage(logoImage, {
+        x: width - logoWidth - 50,
+        y: height - logoHeight - 30,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    }
+  } catch (logoError) {
+    console.log("Could not embed logo:", logoError);
+  }
+  
+  y -= 30;
   
   page.drawText(blueprint.cover.headline, {
     x: 50,

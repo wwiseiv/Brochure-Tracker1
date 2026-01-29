@@ -254,21 +254,34 @@ export default function ProposalGeneratorPage() {
     },
   });
 
+  const supportedMimeTypes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ];
+
+  const isValidFile = (file: File) => {
+    return supportedMimeTypes.includes(file.type) || 
+      /\.(pdf|doc|docx|xls|xlsx)$/i.test(file.name);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const pdfFiles = files.filter(file => file.type === "application/pdf");
-    const nonPdfCount = files.length - pdfFiles.length;
+    const validFiles = files.filter(isValidFile);
+    const invalidCount = files.length - validFiles.length;
     
-    if (nonPdfCount > 0) {
+    if (invalidCount > 0) {
       toast({
         title: "Some files skipped",
-        description: `${nonPdfCount} non-PDF file(s) were not added`,
+        description: `${invalidCount} unsupported file(s) were not added`,
         variant: "destructive",
       });
     }
     
-    if (pdfFiles.length > 0) {
-      setUploadedFiles(prev => [...prev, ...pdfFiles]);
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
     }
   };
 
@@ -290,19 +303,19 @@ export default function ProposalGeneratorPage() {
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files || []);
-    const pdfFiles = files.filter(file => file.type === "application/pdf");
-    const nonPdfCount = files.length - pdfFiles.length;
+    const validFiles = files.filter(isValidFile);
+    const invalidCount = files.length - validFiles.length;
     
-    if (nonPdfCount > 0) {
+    if (invalidCount > 0) {
       toast({
         title: "Some files skipped",
-        description: `${nonPdfCount} non-PDF file(s) were not added`,
+        description: `${invalidCount} unsupported file(s) were not added`,
         variant: "destructive",
       });
     }
     
-    if (pdfFiles.length > 0) {
-      setUploadedFiles(prev => [...prev, ...pdfFiles]);
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
     }
   };
 
@@ -369,24 +382,24 @@ export default function ProposalGeneratorPage() {
           >
             <input
               type="file"
-              accept=".pdf,application/pdf"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={handleFileChange}
               className="hidden"
-              id="pdf-upload"
+              id="file-upload"
               multiple
-              data-testid="input-pdf-upload"
+              data-testid="input-file-upload"
             />
-            <label htmlFor="pdf-upload" className="cursor-pointer block">
+            <label htmlFor="file-upload" className="cursor-pointer block">
               <FileText className={`w-12 h-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
               <p className="text-lg font-medium mb-2">
                 {isDragging 
-                  ? "Drop your PDFs here" 
+                  ? "Drop your files here" 
                   : uploadedFiles.length > 0 
                     ? `${uploadedFiles.length} file${uploadedFiles.length > 1 ? 's' : ''} selected` 
-                    : "Click to upload or drag PDFs here"}
+                    : "Click to upload or drag files here"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Supports multiple Dual Pricing and Interchange Plus proposals
+                Supports PDF, Word, and Excel files
               </p>
             </label>
           </div>
