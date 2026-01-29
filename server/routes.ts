@@ -4684,7 +4684,7 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
   // AI-powered equipment recommendation chat
   app.post("/api/equipiq/recommend", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
+      const userId = req.user.claims.sub;
       const parseResult = equipIQRecommendSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
@@ -4785,7 +4785,7 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
 
       // Save the recommendation session
       await storage.createEquipmentRecommendationSession({
-        userId: user.id,
+        userId: userId,
         aiResponse: aiResponse,
       });
 
@@ -4803,8 +4803,8 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   // Get user's recommendation history
   app.get("/api/equipiq/recommendations", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const sessions = await storage.getEquipmentRecommendationSessions(user.id);
+      const userId = req.user.claims.sub;
+      const sessions = await storage.getEquipmentRecommendationSessions(userId);
       res.json(sessions);
     } catch (error) {
       console.error("[EquipIQ] Error fetching recommendations:", error);
@@ -4815,8 +4815,8 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   // Get user's quiz results
   app.get("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const results = await storage.getEquipmentQuizResults(user.id);
+      const userId = req.user.claims.sub;
+      const results = await storage.getEquipmentQuizResults(userId);
       res.json(results);
     } catch (error) {
       console.error("[EquipIQ] Error fetching quiz results:", error);
@@ -4827,7 +4827,7 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   // Submit quiz result
   app.post("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
+      const userId = req.user.claims.sub;
       const parseResult = equipIQQuizResultSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
@@ -4835,7 +4835,7 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
       const { vendorId, difficulty, totalQuestions, correctAnswers, score } = parseResult.data;
 
       const result = await storage.createEquipmentQuizResult({
-        userId: user.id,
+        userId: userId,
         vendorId,
         difficulty,
         totalQuestions,
