@@ -56,12 +56,13 @@ export default function CompleteProfilePage() {
       const res = await apiRequest("PUT", "/api/me/profile", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/me/role"] });
+    onSuccess: async () => {
       toast({
         title: "Profile completed",
         description: "Welcome to PCBancard! Your profile has been saved.",
       });
+      await queryClient.invalidateQueries({ queryKey: ["/api/me/role"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/me/role"] });
       setLocation("/");
     },
     onError: (error: Error) => {
