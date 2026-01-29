@@ -1116,3 +1116,123 @@ export const insertEquipmentQuizResultSchema = createInsertSchema(equipmentQuizR
 });
 export type InsertEquipmentQuizResult = z.infer<typeof insertEquipmentQuizResultSchema>;
 export type EquipmentQuizResult = typeof equipmentQuizResults.$inferSelect;
+
+// ============================================
+// Presentation Training System
+// ============================================
+
+// Presentation Modules table (8 modules for the training curriculum)
+export const presentationModules = pgTable("presentation_modules", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  moduleNumber: integer("module_number").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const presentationModulesRelations = relations(presentationModules, ({ many }) => ({
+  lessons: many(presentationLessons),
+}));
+
+export const insertPresentationModuleSchema = createInsertSchema(presentationModules).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPresentationModule = z.infer<typeof insertPresentationModuleSchema>;
+export type PresentationModule = typeof presentationModules.$inferSelect;
+
+// Presentation Lessons table (individual lessons within modules)
+export const presentationLessons = pgTable("presentation_lessons", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  moduleId: integer("module_id").notNull().references(() => presentationModules.id),
+  lessonNumber: integer("lesson_number").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  scriptText: text("script_text"),
+  psychology: text("psychology"),
+  timing: text("timing"),
+  commonMistakes: text("common_mistakes"),
+  practicePrompt: text("practice_prompt"),
+  videoId: varchar("video_id", { length: 10 }),
+  paragraphId: varchar("paragraph_id", { length: 20 }),
+  mechanism: varchar("mechanism", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const presentationLessonsRelations = relations(presentationLessons, ({ one, many }) => ({
+  module: one(presentationModules, {
+    fields: [presentationLessons.moduleId],
+    references: [presentationModules.id],
+  }),
+  progress: many(presentationProgress),
+  quizzes: many(presentationQuizzes),
+}));
+
+export const insertPresentationLessonSchema = createInsertSchema(presentationLessons).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPresentationLesson = z.infer<typeof insertPresentationLessonSchema>;
+export type PresentationLesson = typeof presentationLessons.$inferSelect;
+
+// Presentation Progress table (tracks user progress through lessons)
+export const presentationProgress = pgTable("presentation_progress", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  lessonId: integer("lesson_id").notNull().references(() => presentationLessons.id),
+  userId: varchar("user_id").notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  practiceRecorded: boolean("practice_recorded").default(false).notNull(),
+  quizPassed: boolean("quiz_passed").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  lessonUserUnique: unique().on(table.lessonId, table.userId),
+}));
+
+export const presentationProgressRelations = relations(presentationProgress, ({ one }) => ({
+  lesson: one(presentationLessons, {
+    fields: [presentationProgress.lessonId],
+    references: [presentationLessons.id],
+  }),
+}));
+
+export const insertPresentationProgressSchema = createInsertSchema(presentationProgress).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPresentationProgress = z.infer<typeof insertPresentationProgressSchema>;
+export type PresentationProgress = typeof presentationProgress.$inferSelect;
+
+// Presentation Quizzes table (quiz questions for each lesson)
+export const presentationQuizzes = pgTable("presentation_quizzes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  lessonId: integer("lesson_id").notNull().references(() => presentationLessons.id),
+  question: text("question").notNull(),
+  options: text("options").array().notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  explanation: text("explanation"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const presentationQuizzesRelations = relations(presentationQuizzes, ({ one }) => ({
+  lesson: one(presentationLessons, {
+    fields: [presentationQuizzes.lessonId],
+    references: [presentationLessons.id],
+  }),
+}));
+
+export const insertPresentationQuizSchema = createInsertSchema(presentationQuizzes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPresentationQuiz = z.infer<typeof insertPresentationQuizSchema>;
+export type PresentationQuiz = typeof presentationQuizzes.$inferSelect;
+
+// Extended types for presentation training
+export type PresentationModuleWithLessons = PresentationModule & {
+  lessons: PresentationLesson[];
+};
+
+export type PresentationLessonWithProgress = PresentationLesson & {
+  progress?: PresentationProgress;
+  quizzes?: PresentationQuiz[];
+};
