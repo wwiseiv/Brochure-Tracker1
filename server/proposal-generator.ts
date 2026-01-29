@@ -1,4 +1,3 @@
-const pdfParse = require("pdf-parse");
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import {
   Document,
@@ -266,6 +265,9 @@ function isDualPricingProposal(text: string): boolean {
 }
 
 export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposal> {
+  // Dynamic import to avoid ESM/CJS interop issues
+  const pdfParseModule = await import("pdf-parse");
+  const pdfParse = pdfParseModule.default || pdfParseModule;
   const data = await pdfParse(pdfBuffer);
   const text = data.text;
   
