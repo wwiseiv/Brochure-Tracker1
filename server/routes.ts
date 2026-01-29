@@ -4764,7 +4764,7 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
 
       console.log("[EquipIQ] Calling AI with", chatMessages.length, "messages");
 
-      const client = new OpenAI();
+      const client = getAIIntegrationsClient();
       
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("AI response timeout")), 30000);
@@ -4898,7 +4898,7 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
 
-      const client = new OpenAI();
+      const client = getAIIntegrationsClient();
       const response = await client.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [{ role: "system", content: systemPrompt }],
