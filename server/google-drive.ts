@@ -285,6 +285,68 @@ export async function readGoogleSlides(fileId: string): Promise<string> {
   }
 }
 
+// Read Word document (.docx) as text
+async function readWordDocument(fileId: string): Promise<string> {
+  try {
+    const drive = await getGoogleDriveClient();
+    
+    // Download the file content
+    const response = await drive.files.get({
+      fileId,
+      alt: 'media'
+    }, { responseType: 'arraybuffer' });
+    
+    const buffer = Buffer.from(response.data as ArrayBuffer);
+    
+    // Extract text from docx (simplified - looks for text in XML)
+    const content = buffer.toString('utf-8');
+    const textParts: string[] = [];
+    
+    // Look for text between XML tags (docx is a zip of XML files)
+    const textRegex = /<w:t[^>]*>([^<]+)<\/w:t>/g;
+    let match;
+    while ((match = textRegex.exec(content)) !== null) {
+      textParts.push(match[1]);
+    }
+    
+    return textParts.join(' ').replace(/\s+/g, ' ').trim();
+  } catch (error) {
+    console.error('Error reading Word document:', error);
+    return '';
+  }
+}
+
+// Read PowerPoint (.pptx) as text
+async function readPowerPoint(fileId: string): Promise<string> {
+  try {
+    const drive = await getGoogleDriveClient();
+    
+    // Download the file content
+    const response = await drive.files.get({
+      fileId,
+      alt: 'media'
+    }, { responseType: 'arraybuffer' });
+    
+    const buffer = Buffer.from(response.data as ArrayBuffer);
+    
+    // Extract text from pptx (simplified - looks for text in XML)
+    const content = buffer.toString('utf-8');
+    const textParts: string[] = [];
+    
+    // Look for text between XML tags
+    const textRegex = /<a:t>([^<]+)<\/a:t>/g;
+    let match;
+    while ((match = textRegex.exec(content)) !== null) {
+      textParts.push(match[1]);
+    }
+    
+    return textParts.join(' ').replace(/\s+/g, ' ').trim();
+  } catch (error) {
+    console.error('Error reading PowerPoint:', error);
+    return '';
+  }
+}
+
 // Read file content based on mime type
 async function readFileContent(file: {id: string, name: string, mimeType: string}): Promise<string> {
   try {
@@ -300,6 +362,16 @@ async function readFileContent(file: {id: string, name: string, mimeType: string
       
       case 'application/pdf':
         return await readPdfFile(file.id, file.name);
+      
+      // Word documents
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      case 'application/msword':
+        return await readWordDocument(file.id);
+      
+      // PowerPoint presentations
+      case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+      case 'application/vnd.ms-powerpoint':
+        return await readPowerPoint(file.id);
       
       case 'text/plain':
       case 'text/markdown':
