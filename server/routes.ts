@@ -58,6 +58,7 @@ import {
   syncDriveToDatabase 
 } from "./google-drive";
 import { seedDailyEdgeContent } from "./daily-edge-seed";
+import { seedEquipIQData } from "./equipiq-seed";
 import fs from "fs";
 import path from "path";
 
@@ -4565,6 +4566,328 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
       } else {
         res.status(500).json({ error: "Failed to generate response. Please try again." });
       }
+    }
+  });
+
+  // ============================================
+  // EquipIQ - Equipment Recommendation System
+  // ============================================
+
+  // Initialize EquipIQ data on startup
+  seedEquipIQData().then(result => {
+    console.log(`[EquipIQ] Seeded ${result.vendors} vendors, ${result.products} products, ${result.businessTypes} business types`);
+  }).catch(err => {
+    console.error("[EquipIQ] Error seeding data:", err);
+  });
+
+  // Get all vendors
+  app.get("/api/equipiq/vendors", isAuthenticated, async (req, res) => {
+    try {
+      const vendors = await storage.getEquipmentVendors();
+      res.json(vendors);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching vendors:", error);
+      res.status(500).json({ error: "Failed to fetch vendors" });
+    }
+  });
+
+  // Get vendor by ID
+  app.get("/api/equipiq/vendors/:vendorId", isAuthenticated, async (req, res) => {
+    try {
+      const vendor = await storage.getEquipmentVendorById(req.params.vendorId);
+      if (!vendor) {
+        return res.status(404).json({ error: "Vendor not found" });
+      }
+      res.json(vendor);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching vendor:", error);
+      res.status(500).json({ error: "Failed to fetch vendor" });
+    }
+  });
+
+  // Get all products (optionally by vendor)
+  app.get("/api/equipiq/products", isAuthenticated, async (req, res) => {
+    try {
+      const vendorId = req.query.vendor as string | undefined;
+      const products = await storage.getEquipmentProducts(vendorId);
+      res.json(products);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  // Search products
+  app.get("/api/equipiq/products/search", isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+      const products = await storage.searchEquipmentProducts(query);
+      res.json(products);
+    } catch (error) {
+      console.error("[EquipIQ] Error searching products:", error);
+      res.status(500).json({ error: "Failed to search products" });
+    }
+  });
+
+  // Get product by ID
+  app.get("/api/equipiq/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const product = await storage.getEquipmentProductById(id);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching product:", error);
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  // Get business types
+  app.get("/api/equipiq/business-types", isAuthenticated, async (req, res) => {
+    try {
+      const types = await storage.getEquipmentBusinessTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching business types:", error);
+      res.status(500).json({ error: "Failed to fetch business types" });
+    }
+  });
+
+  // AI-powered equipment recommendation chat
+  app.post("/api/equipiq/recommend", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { message, conversationHistory = [] } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      // Get all products and vendors for context
+      const [products, vendors] = await Promise.all([
+        storage.getEquipmentProducts(),
+        storage.getEquipmentVendors()
+      ]);
+
+      // Build product catalog context
+      const productContext = vendors.map(vendor => {
+        const vendorProducts = products.filter(p => p.vendorId === vendor.vendorId);
+        return `
+## ${vendor.name}
+${vendor.description}
+Target Market: ${vendor.targetMarket}
+Key Differentiators: ${vendor.keyDifferentiators?.join(", ") || "N/A"}
+
+Products:
+${vendorProducts.map(p => `- ${p.name} (${p.type}): ${p.description} ${p.bestFor ? `Best for: ${p.bestFor.join(", ")}` : ""}`).join("\n")}
+`;
+      }).join("\n\n");
+
+      const systemPrompt = `You are EquipIQ, an expert AI assistant helping PCBancard sales agents recommend the right payment equipment to merchants. You have deep knowledge of 6 payment solution vendors and their products.
+
+YOUR KNOWLEDGE BASE:
+${productContext}
+
+VENDOR QUICK REFERENCE:
+- SwipeSimple: Best for mobile/simple needs, Tap to Pay on iPhone, easy setup
+- Dejavoo: Widest terminal selection (P, QD, Z lines), Android & Linux, gateway integration
+- MX POS: FREE hardware program, 600+ features, great for restaurants/retail/salons
+- Hot Sauce POS: Bars & nightclubs specialist, 24/7 LIVE support, on-premise reliability
+- Valor PayTech: ISO/ISV focused, dual pricing/surcharge, chargeback protection
+- FluidPay: Gateway only, non-compete guarantee, processor agnostic, white-label
+
+YOUR ROLE:
+1. Ask clarifying questions about the merchant's business (type, volume, mobility needs, integration requirements)
+2. Recommend 1-3 specific products based on their needs
+3. Explain WHY each product fits their use case
+4. Highlight key features and differentiators
+5. Mention pricing considerations if relevant
+
+GUIDELINES:
+- Be conversational and helpful, like an experienced colleague
+- Give specific product recommendations with model names
+- Explain trade-offs between options
+- Consider the merchant's technical sophistication
+- Focus on solving their business problems
+- Keep responses concise but complete (3-5 paragraphs max)
+
+If you don't have enough info, ask ONE clarifying question. Common questions:
+- What type of business? (restaurant, retail, mobile service, etc.)
+- Average monthly processing volume?
+- Need mobility (tableside, delivery, events)?
+- Any specific integrations needed (QuickBooks, inventory, online ordering)?
+- Is cost or features more important?`;
+
+      const chatMessages: Array<{role: "system" | "user" | "assistant", content: string}> = [
+        { role: "system", content: systemPrompt }
+      ];
+
+      // Add conversation history (last 20 messages)
+      const recentMessages = conversationHistory.slice(-20);
+      recentMessages.forEach((m: {role: string, content: string}) => {
+        chatMessages.push({ 
+          role: m.role as "user" | "assistant", 
+          content: m.content 
+        });
+      });
+
+      // Add the new user message
+      chatMessages.push({ role: "user", content: message });
+
+      console.log("[EquipIQ] Calling AI with", chatMessages.length, "messages");
+
+      const client = new OpenAI();
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("AI response timeout")), 30000);
+      });
+
+      const aiPromise = client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: chatMessages,
+        max_completion_tokens: 1200,
+        temperature: 0.7,
+      });
+
+      const response = await Promise.race([aiPromise, timeoutPromise]);
+      const aiResponse = response.choices[0]?.message?.content?.trim() || 
+        "I'd be happy to help you find the right payment solution. Could you tell me more about the type of business and their needs?";
+
+      console.log("[EquipIQ] Got response:", aiResponse.slice(0, 80) + "...");
+
+      // Save the recommendation session
+      await storage.createEquipmentRecommendationSession({
+        userId: user.id,
+        aiResponse: aiResponse,
+      });
+
+      res.json({ response: aiResponse });
+    } catch (error: any) {
+      console.error("[EquipIQ] Error:", error?.message || error);
+      if (error?.message === "AI response timeout") {
+        res.status(504).json({ error: "Response took too long. Please try again." });
+      } else {
+        res.status(500).json({ error: "Failed to generate recommendation. Please try again." });
+      }
+    }
+  });
+
+  // Get user's recommendation history
+  app.get("/api/equipiq/recommendations", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const sessions = await storage.getEquipmentRecommendationSessions(user.id);
+      res.json(sessions);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching recommendations:", error);
+      res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+  });
+
+  // Get user's quiz results
+  app.get("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const results = await storage.getEquipmentQuizResults(user.id);
+      res.json(results);
+    } catch (error) {
+      console.error("[EquipIQ] Error fetching quiz results:", error);
+      res.status(500).json({ error: "Failed to fetch quiz results" });
+    }
+  });
+
+  // Submit quiz result
+  app.post("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { vendorId, difficulty, totalQuestions, correctAnswers, score } = req.body;
+
+      const result = await storage.createEquipmentQuizResult({
+        userId: user.id,
+        vendorId,
+        difficulty,
+        totalQuestions,
+        correctAnswers,
+        score,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("[EquipIQ] Error saving quiz result:", error);
+      res.status(500).json({ error: "Failed to save quiz result" });
+    }
+  });
+
+  // Generate quiz questions for a vendor
+  app.post("/api/equipiq/quiz/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { vendorId, difficulty = "beginner", questionCount = 5 } = req.body;
+
+      // Get vendor and products
+      const vendor = vendorId ? await storage.getEquipmentVendorById(vendorId) : null;
+      const products = vendorId 
+        ? await storage.getEquipmentProducts(vendorId)
+        : await storage.getEquipmentProducts();
+      const vendors = await storage.getEquipmentVendors();
+
+      const contextInfo = vendor 
+        ? `Focus on ${vendor.name}: ${vendor.description}\nProducts: ${products.map(p => `${p.name}: ${p.description}`).join("\n")}`
+        : `All vendors: ${vendors.map(v => `${v.name}: ${v.description}`).join("\n")}\nProducts: ${products.slice(0, 30).map(p => `${p.vendorId} - ${p.name}: ${p.description}`).join("\n")}`;
+
+      const difficultyContext = {
+        beginner: "Ask basic questions about product names, categories, and simple features. Suitable for new agents.",
+        intermediate: "Ask about product comparisons, best-use scenarios, and key differentiators. Suitable for agents with some experience.",
+        advanced: "Ask complex questions about integration capabilities, pricing strategies, and nuanced product selection. Suitable for experienced agents."
+      };
+
+      const systemPrompt = `You are generating quiz questions to train sales agents on payment equipment knowledge.
+
+CONTEXT:
+${contextInfo}
+
+DIFFICULTY LEVEL: ${difficulty}
+${difficultyContext[difficulty as keyof typeof difficultyContext]}
+
+Generate exactly ${questionCount} multiple choice questions. Each question should have 4 options with exactly one correct answer.
+
+Return ONLY valid JSON in this exact format:
+{
+  "questions": [
+    {
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Brief explanation of why this is correct"
+    }
+  ]
+}`;
+
+      const client = new OpenAI();
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [{ role: "system", content: systemPrompt }],
+        max_completion_tokens: 2000,
+        temperature: 0.8,
+      });
+
+      const content = response.choices[0]?.message?.content?.trim() || "";
+      
+      // Parse JSON from response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Invalid response format");
+      }
+
+      const quizData = JSON.parse(jsonMatch[0]);
+      res.json(quizData);
+    } catch (error: any) {
+      console.error("[EquipIQ] Error generating quiz:", error);
+      res.status(500).json({ error: "Failed to generate quiz questions" });
     }
   });
 
