@@ -186,7 +186,7 @@ interface DailyEdgeChatMessage {
 
 function DailyEdgeSection() {
   const { toast } = useToast();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<DailyEdgeChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
