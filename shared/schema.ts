@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, real, boolean, timestamp, integer, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, boolean, timestamp, integer, unique, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1236,3 +1236,106 @@ export type PresentationLessonWithProgress = PresentationLesson & {
   progress?: PresentationProgress;
   quizzes?: PresentationQuiz[];
 };
+
+// ============================================
+// Proposal Generator - Merchant Processing Proposals
+// ============================================
+
+export const proposals = pgTable("proposals", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  // Merchant info
+  merchantName: varchar("merchant_name", { length: 255 }).notNull(),
+  preparedDate: timestamp("prepared_date").defaultNow().notNull(),
+  agentName: varchar("agent_name", { length: 255 }),
+  agentTitle: varchar("agent_title", { length: 255 }),
+  
+  // Current state data (parsed from uploads)
+  currentState: jsonb("current_state").$type<{
+    totalVolume: number;
+    totalTransactions: number;
+    avgTicket: number;
+    cardBreakdown: {
+      visa: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      mastercard: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      discover: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      amex: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+    };
+    fees: {
+      statementFee: number;
+      pciNonCompliance: number;
+      creditPassthrough: number;
+      otherFees: number;
+      batchHeader: number;
+    };
+    totalMonthlyCost: number;
+    effectiveRatePercent: number;
+  }>(),
+  
+  // Interchange Plus option
+  optionInterchangePlus: jsonb("option_interchange_plus").$type<{
+    discountRatePercent: number;
+    perTransactionFee: number;
+    projectedCosts: {
+      visaCost: number;
+      mastercardCost: number;
+      discoverCost: number;
+      amexCost: number;
+      transactionFees: number;
+      onFileFee: number;
+      creditPassthrough: number;
+      otherFees: number;
+    };
+    totalMonthlyCost: number;
+    monthlySavings: number;
+    savingsPercent: number;
+    annualSavings: number;
+  }>(),
+  
+  // Dual Pricing option
+  optionDualPricing: jsonb("option_dual_pricing").$type<{
+    merchantDiscountRate: number;
+    perTransactionFee: number;
+    monthlyProgramFee: number;
+    projectedCosts: {
+      processingCost: number;
+      dualPricingMonthly: number;
+      creditPassthrough: number;
+      otherFees: number;
+    };
+    totalMonthlyCost: number;
+    monthlySavings: number;
+    savingsPercent: number;
+    annualSavings: number;
+  }>(),
+  
+  // Equipment selection
+  selectedTerminalId: integer("selected_terminal_id"),
+  terminalName: varchar("terminal_name", { length: 255 }),
+  terminalFeatures: text("terminal_features").array(),
+  terminalImageUrl: varchar("terminal_image_url", { length: 500 }),
+  whySelected: text("why_selected"),
+  
+  // Generated proposal content
+  proposalBlueprint: jsonb("proposal_blueprint"),
+  
+  // Document URLs
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  docxUrl: varchar("docx_url", { length: 500 }),
+  
+  // Status
+  status: varchar("status", { length: 50 }).default("draft").notNull(), // draft, generated, sent
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProposalSchema = createInsertSchema(proposals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProposal = z.infer<typeof insertProposalSchema>;
+export type Proposal = typeof proposals.$inferSelect;
