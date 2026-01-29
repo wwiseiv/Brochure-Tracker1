@@ -47,7 +47,8 @@ import {
   listCoachingDocuments, 
   getAllCoachingContent, 
   buildDriveKnowledgeContext,
-  isDriveConnected 
+  isDriveConnected,
+  syncDriveToDatabase 
 } from "./google-drive";
 import fs from "fs";
 import path from "path";
@@ -3642,12 +3643,12 @@ Respond in JSON format:
         status: "active",
       });
 
-      // Fetch custom training materials from Google Drive (if available)
+      // Fetch custom training materials from database (synced from Google Drive)
       let driveKnowledge = '';
       try {
-        driveKnowledge = await buildDriveKnowledgeContext();
-      } catch (driveError) {
-        console.log('Google Drive content not available, using default training materials');
+        driveKnowledge = await storage.getTrainingKnowledgeContext();
+      } catch (dbError) {
+        console.log('Training materials not available from database, using default materials');
       }
 
       let systemMessage: string;
@@ -3748,29 +3749,60 @@ Remember: You're helping them practice real sales conversations. Be challenging 
   app.get("/api/drive/status", isAuthenticated, async (_req: any, res) => {
     try {
       const connected = await isDriveConnected();
-      res.json({ connected });
+      const localDocs = await storage.getTrainingDocuments();
+      res.json({ 
+        connected, 
+        localDocCount: localDocs.length,
+        lastSynced: localDocs.length > 0 ? localDocs[0].syncedAt : null
+      });
     } catch (error) {
       console.error("Error checking drive status:", error);
-      res.json({ connected: false });
+      res.json({ connected: false, localDocCount: 0, lastSynced: null });
     }
   });
 
   app.get("/api/drive/documents", isAuthenticated, async (_req: any, res) => {
     try {
-      const documents = await listCoachingDocuments();
+      // Return locally stored documents (from database)
+      const documents = await storage.getTrainingDocuments();
       res.json({ documents });
     } catch (error) {
-      console.error("Error listing drive documents:", error);
+      console.error("Error listing documents:", error);
       res.status(500).json({ error: "Failed to list documents" });
+    }
+  });
+
+  app.post("/api/drive/sync", isAuthenticated, async (_req: any, res) => {
+    try {
+      const connected = await isDriveConnected();
+      if (!connected) {
+        return res.status(400).json({ error: "Google Drive not connected" });
+      }
+      
+      const result = await syncDriveToDatabase();
+      res.json({ 
+        success: true, 
+        synced: result.synced, 
+        errors: result.errors,
+        message: `Synced ${result.synced} documents from Google Drive`
+      });
+    } catch (error) {
+      console.error("Error syncing from drive:", error);
+      res.status(500).json({ error: "Failed to sync from Google Drive" });
     }
   });
 
   app.get("/api/drive/content", isAuthenticated, async (_req: any, res) => {
     try {
-      const content = await getAllCoachingContent();
-      res.json(content);
+      // Return locally stored content from database
+      const context = await storage.getTrainingKnowledgeContext();
+      const documents = await storage.getTrainingDocuments();
+      res.json({ 
+        documents: documents.map(d => ({ name: d.name, content: d.content.substring(0, 500) + '...' })),
+        totalDocs: documents.length
+      });
     } catch (error) {
-      console.error("Error getting drive content:", error);
+      console.error("Error getting content:", error);
       res.status(500).json({ error: "Failed to get content" });
     }
   });

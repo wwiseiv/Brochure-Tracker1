@@ -854,3 +854,21 @@ export const insertVoiceNoteSchema = createInsertSchema(voiceNotes).omit({
 });
 export type InsertVoiceNote = z.infer<typeof insertVoiceNoteSchema>;
 export type VoiceNote = typeof voiceNotes.$inferSelect;
+
+// Training documents table - stores synced content from Google Drive for AI coaching
+export const trainingDocuments = pgTable("training_documents", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  driveFileId: varchar("drive_file_id", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 500 }).notNull(),
+  content: text("content").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+export const insertTrainingDocumentSchema = createInsertSchema(trainingDocuments).omit({
+  id: true,
+  syncedAt: true,
+});
+export type InsertTrainingDocument = z.infer<typeof insertTrainingDocumentSchema>;
+export type TrainingDocument = typeof trainingDocuments.$inferSelect;

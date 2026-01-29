@@ -79,6 +79,9 @@ import {
   voiceNotes,
   type VoiceNote,
   type InsertVoiceNote,
+  trainingDocuments,
+  type TrainingDocument,
+  type InsertTrainingDocument,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
@@ -177,6 +180,13 @@ export interface IStorage {
   getVoiceNotesByMerchant(merchantId: number, orgId: number): Promise<VoiceNote[]>;
   getVoiceNote(id: number): Promise<VoiceNote | undefined>;
   deleteVoiceNote(id: number, orgId: number): Promise<void>;
+  
+  // Training Documents
+  getTrainingDocuments(): Promise<TrainingDocument[]>;
+  getTrainingDocument(driveFileId: string): Promise<TrainingDocument | undefined>;
+  upsertTrainingDocument(data: InsertTrainingDocument): Promise<TrainingDocument>;
+  deleteTrainingDocument(driveFileId: string): Promise<void>;
+  getTrainingKnowledgeContext(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1074,6 +1084,73 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVoiceNote(id: number, orgId: number): Promise<void> {
     await db.delete(voiceNotes).where(and(eq(voiceNotes.id, id), eq(voiceNotes.orgId, orgId)));
+  }
+
+  // Training Documents
+  async getTrainingDocuments(): Promise<TrainingDocument[]> {
+    return db
+      .select()
+      .from(trainingDocuments)
+      .where(eq(trainingDocuments.isActive, true))
+      .orderBy(desc(trainingDocuments.syncedAt));
+  }
+
+  async getTrainingDocument(driveFileId: string): Promise<TrainingDocument | undefined> {
+    const [doc] = await db
+      .select()
+      .from(trainingDocuments)
+      .where(eq(trainingDocuments.driveFileId, driveFileId));
+    return doc;
+  }
+
+  async upsertTrainingDocument(data: InsertTrainingDocument): Promise<TrainingDocument> {
+    // Check if document exists
+    const existing = await this.getTrainingDocument(data.driveFileId);
+    
+    if (existing) {
+      // Update existing document
+      const [updated] = await db
+        .update(trainingDocuments)
+        .set({
+          name: data.name,
+          content: data.content,
+          mimeType: data.mimeType,
+          syncedAt: new Date(),
+          isActive: data.isActive ?? true,
+        })
+        .where(eq(trainingDocuments.driveFileId, data.driveFileId))
+        .returning();
+      return updated;
+    } else {
+      // Insert new document
+      const [created] = await db.insert(trainingDocuments).values(data).returning();
+      return created;
+    }
+  }
+
+  async deleteTrainingDocument(driveFileId: string): Promise<void> {
+    await db.delete(trainingDocuments).where(eq(trainingDocuments.driveFileId, driveFileId));
+  }
+
+  async getTrainingKnowledgeContext(): Promise<string> {
+    const docs = await this.getTrainingDocuments();
+    
+    if (docs.length === 0) {
+      return '';
+    }
+
+    let context = '\n\n--- CUSTOM TRAINING MATERIALS ---\n';
+    context += 'The following materials have been provided by the sales team:\n\n';
+
+    for (const doc of docs) {
+      // Limit each document to prevent token overload
+      const truncatedContent = doc.content.substring(0, 3000);
+      context += `### ${doc.name}\n${truncatedContent}\n\n`;
+    }
+
+    context += '--- END CUSTOM TRAINING MATERIALS ---\n';
+    
+    return context;
   }
 }
 

@@ -202,3 +202,40 @@ export async function isDriveConnected(): Promise<boolean> {
     return false;
   }
 }
+
+// Sync all documents from Google Drive to the database
+export async function syncDriveToDatabase(): Promise<{synced: number, errors: string[]}> {
+  const { storage } = await import('./storage');
+  const files = await listCoachingDocuments();
+  let synced = 0;
+  const errors: string[] = [];
+
+  for (const file of files) {
+    try {
+      let content = '';
+      
+      if (file.mimeType === 'application/vnd.google-apps.document') {
+        content = await readGoogleDoc(file.id);
+      } else if (file.mimeType === 'text/plain') {
+        content = await readTextFile(file.id);
+      }
+      
+      if (content) {
+        await storage.upsertTrainingDocument({
+          driveFileId: file.id,
+          name: file.name,
+          content,
+          mimeType: file.mimeType,
+          isActive: true,
+        });
+        synced++;
+      }
+    } catch (error) {
+      const errorMsg = `Failed to sync ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error(errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  return { synced, errors };
+}
