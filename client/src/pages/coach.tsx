@@ -882,6 +882,10 @@ export default function CoachPage() {
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const [isObjectionsRecording, setIsObjectionsRecording] = useState(false);
+  const [isObjectionsTranscribing, setIsObjectionsTranscribing] = useState(false);
+  const objectionsMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const objectionsAudioChunksRef = useRef<Blob[]>([]);
 
   const handleBack = () => {
     if (window.history.length > 2) {
@@ -1192,6 +1196,88 @@ export default function CoachPage() {
     }
   };
 
+  const startObjectionsRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      objectionsMediaRecorderRef.current = mediaRecorder;
+      objectionsAudioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          objectionsAudioChunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        
+        const audioBlob = new Blob(objectionsAudioChunksRef.current, { type: mediaRecorder.mimeType });
+        await transcribeObjectionsAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsObjectionsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopObjectionsRecording = () => {
+    if (objectionsMediaRecorderRef.current && isObjectionsRecording) {
+      objectionsMediaRecorderRef.current.stop();
+      setIsObjectionsRecording(false);
+    }
+  };
+
+  const transcribeObjectionsAudio = async (audioBlob: Blob) => {
+    setIsObjectionsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Transcription failed");
+      
+      const data = await response.json();
+      if (data.text) {
+        setCustomObjections(prev => prev ? `${prev}\n${data.text}` : data.text);
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking again",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Please try again or type your objections",
+        variant: "destructive",
+      });
+    } finally {
+      setIsObjectionsTranscribing(false);
+    }
+  };
+
   const handleSend = () => {
     if (!inputMessage.trim() || !sessionId) return;
 
@@ -1384,13 +1470,26 @@ export default function CoachPage() {
                   <label className="text-sm font-medium mb-2 block">
                     Custom Objections (optional)
                   </label>
-                  <Textarea
-                    placeholder="Enter specific objections you want to practice, e.g., 'I'm happy with my current processor' or 'Your fees are too high'"
-                    value={customObjections}
-                    onChange={(e) => setCustomObjections(e.target.value)}
-                    className="min-h-[80px]"
-                    data-testid="input-custom-objections"
-                  />
+                  <div className="flex gap-2">
+                    <Textarea
+                      placeholder={isObjectionsRecording ? "Listening..." : isObjectionsTranscribing ? "Transcribing..." : "Enter specific objections you want to practice, e.g., 'I'm happy with my current processor' or 'Your fees are too high'"}
+                      value={customObjections}
+                      onChange={(e) => setCustomObjections(e.target.value)}
+                      className="min-h-[80px] flex-1"
+                      disabled={isObjectionsRecording || isObjectionsTranscribing}
+                      data-testid="input-custom-objections"
+                    />
+                    <Button
+                      size="icon"
+                      variant={isObjectionsRecording ? "destructive" : "outline"}
+                      onClick={isObjectionsRecording ? stopObjectionsRecording : startObjectionsRecording}
+                      disabled={isObjectionsTranscribing}
+                      className={`h-11 w-11 flex-shrink-0 self-start ${isObjectionsRecording ? "animate-pulse" : ""}`}
+                      data-testid="button-mic-objections"
+                    >
+                      {isObjectionsTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               )}
 
