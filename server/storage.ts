@@ -82,9 +82,23 @@ import {
   trainingDocuments,
   type TrainingDocument,
   type InsertTrainingDocument,
+  dailyEdgeContent,
+  userDailyEdge,
+  userBeliefProgress,
+  dailyEdgeStreaks,
+  type DailyEdgeContent,
+  type InsertDailyEdgeContent,
+  type UserDailyEdge,
+  type InsertUserDailyEdge,
+  type UserBeliefProgress,
+  type InsertUserBeliefProgress,
+  type DailyEdgeStreak,
+  type InsertDailyEdgeStreak,
+  DAILY_EDGE_BELIEFS,
+  DAILY_EDGE_CONTENT_TYPES,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
 
 export interface IStorage {
   // Brochures
@@ -187,6 +201,18 @@ export interface IStorage {
   upsertTrainingDocument(data: InsertTrainingDocument): Promise<TrainingDocument>;
   deleteTrainingDocument(driveFileId: string): Promise<void>;
   getTrainingKnowledgeContext(): Promise<string>;
+  
+  // Daily Edge
+  getDailyEdgeContent(belief?: string, contentType?: string): Promise<DailyEdgeContent[]>;
+  getTodaysDailyEdge(userId: string): Promise<{ belief: string; content: Record<string, DailyEdgeContent | null> }>;
+  recordDailyEdgeView(userId: string, contentId: number, reflection?: string): Promise<UserDailyEdge>;
+  getUserDailyEdgeProgress(userId: string): Promise<{ totalViewed: number; challengesCompleted: number; streak: DailyEdgeStreak | null }>;
+  getUserBeliefProgress(userId: string): Promise<UserBeliefProgress[]>;
+  updateBeliefProgress(userId: string, belief: string, viewedContent?: boolean, completedChallenge?: boolean): Promise<UserBeliefProgress>;
+  updateDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak>;
+  seedDailyEdgeContent(content: InsertDailyEdgeContent[]): Promise<DailyEdgeContent[]>;
+  getDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak | undefined>;
+  markChallengeCompleted(userId: string, contentId: number): Promise<UserDailyEdge | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1151,6 +1177,361 @@ export class DatabaseStorage implements IStorage {
     context += '--- END CUSTOM TRAINING MATERIALS ---\n';
     
     return context;
+  }
+
+  // Daily Edge Methods
+  async getDailyEdgeContent(belief?: string, contentType?: string): Promise<DailyEdgeContent[]> {
+    let query = db.select().from(dailyEdgeContent).where(eq(dailyEdgeContent.isActive, true));
+    
+    const conditions = [eq(dailyEdgeContent.isActive, true)];
+    if (belief) {
+      conditions.push(eq(dailyEdgeContent.belief, belief));
+    }
+    if (contentType) {
+      conditions.push(eq(dailyEdgeContent.contentType, contentType));
+    }
+    
+    return db
+      .select()
+      .from(dailyEdgeContent)
+      .where(and(...conditions))
+      .orderBy(dailyEdgeContent.displayOrder, dailyEdgeContent.id);
+  }
+
+  async getTodaysDailyEdge(userId: string): Promise<{ belief: string; content: Record<string, DailyEdgeContent | null> }> {
+    // Get day of week (0=Sunday, 1=Monday, etc.)
+    const dayOfWeek = new Date().getDay();
+    
+    // Map day to belief: Mon=fulfilment, Tue=control, Wed=resilience, Thu=influence, Fri=communication
+    // Weekend (0=Sunday, 6=Saturday) = user's choice (use a random/rotating belief)
+    const beliefMap: Record<number, string> = {
+      1: "fulfilment",
+      2: "control", 
+      3: "resilience",
+      4: "influence",
+      5: "communication",
+    };
+    
+    let todaysBelief: string;
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      // Weekend - rotate through beliefs based on user's progress
+      const progress = await this.getUserBeliefProgress(userId);
+      if (progress.length > 0) {
+        // Pick the belief with least content viewed
+        const sorted = progress.sort((a, b) => (a.contentViewed || 0) - (b.contentViewed || 0));
+        todaysBelief = sorted[0].belief;
+      } else {
+        // Default to first belief
+        todaysBelief = DAILY_EDGE_BELIEFS[0];
+      }
+    } else {
+      todaysBelief = beliefMap[dayOfWeek] || DAILY_EDGE_BELIEFS[0];
+    }
+    
+    // Get content user has already viewed
+    const viewedContent = await db
+      .select({ contentId: userDailyEdge.contentId })
+      .from(userDailyEdge)
+      .where(eq(userDailyEdge.userId, userId));
+    
+    const viewedIds = viewedContent.map(v => v.contentId);
+    
+    // Get one item of each content type for today's belief
+    const contentResult: Record<string, DailyEdgeContent | null> = {};
+    
+    for (const contentType of DAILY_EDGE_CONTENT_TYPES) {
+      // Build conditions
+      const conditions = [
+        eq(dailyEdgeContent.isActive, true),
+        eq(dailyEdgeContent.belief, todaysBelief),
+        eq(dailyEdgeContent.contentType, contentType),
+      ];
+      
+      // Add not-in condition only if user has viewed content
+      if (viewedIds.length > 0) {
+        conditions.push(notInArray(dailyEdgeContent.id, viewedIds));
+      }
+      
+      // Try to get unseen content first
+      const [unseenItem] = await db
+        .select()
+        .from(dailyEdgeContent)
+        .where(and(...conditions))
+        .orderBy(dailyEdgeContent.displayOrder, dailyEdgeContent.id)
+        .limit(1);
+      
+      if (unseenItem) {
+        contentResult[contentType] = unseenItem;
+      } else {
+        // Fall back to any content of this type (user has seen all)
+        const [anyItem] = await db
+          .select()
+          .from(dailyEdgeContent)
+          .where(and(
+            eq(dailyEdgeContent.isActive, true),
+            eq(dailyEdgeContent.belief, todaysBelief),
+            eq(dailyEdgeContent.contentType, contentType)
+          ))
+          .orderBy(dailyEdgeContent.displayOrder, dailyEdgeContent.id)
+          .limit(1);
+        
+        contentResult[contentType] = anyItem || null;
+      }
+    }
+    
+    return {
+      belief: todaysBelief,
+      content: contentResult,
+    };
+  }
+
+  async recordDailyEdgeView(userId: string, contentId: number, reflection?: string): Promise<UserDailyEdge> {
+    // Get content to determine belief
+    const [content] = await db
+      .select()
+      .from(dailyEdgeContent)
+      .where(eq(dailyEdgeContent.id, contentId));
+    
+    if (!content) {
+      throw new Error("Content not found");
+    }
+    
+    // Record the view
+    const [created] = await db
+      .insert(userDailyEdge)
+      .values({
+        userId,
+        contentId,
+        reflection: reflection || null,
+        completedChallenge: false,
+      })
+      .returning();
+    
+    // Update belief progress
+    await this.updateBeliefProgress(userId, content.belief, true, false);
+    
+    // Update streak
+    await this.updateDailyEdgeStreak(userId);
+    
+    return created;
+  }
+
+  async getUserDailyEdgeProgress(userId: string): Promise<{ totalViewed: number; challengesCompleted: number; streak: DailyEdgeStreak | null }> {
+    // Count total viewed
+    const [viewedResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(userDailyEdge)
+      .where(eq(userDailyEdge.userId, userId));
+    
+    // Count challenges completed
+    const [challengeResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(userDailyEdge)
+      .where(and(
+        eq(userDailyEdge.userId, userId),
+        eq(userDailyEdge.completedChallenge, true)
+      ));
+    
+    // Get streak
+    const streak = await this.getDailyEdgeStreak(userId);
+    
+    return {
+      totalViewed: viewedResult?.count || 0,
+      challengesCompleted: challengeResult?.count || 0,
+      streak: streak || null,
+    };
+  }
+
+  async getUserBeliefProgress(userId: string): Promise<UserBeliefProgress[]> {
+    return db
+      .select()
+      .from(userBeliefProgress)
+      .where(eq(userBeliefProgress.userId, userId));
+  }
+
+  async updateBeliefProgress(userId: string, belief: string, viewedContent?: boolean, completedChallenge?: boolean): Promise<UserBeliefProgress> {
+    // Check if progress exists
+    const [existing] = await db
+      .select()
+      .from(userBeliefProgress)
+      .where(and(
+        eq(userBeliefProgress.userId, userId),
+        eq(userBeliefProgress.belief, belief)
+      ));
+    
+    if (existing) {
+      // Update existing progress
+      const updates: Partial<UserBeliefProgress> = {
+        lastActivity: new Date(),
+      };
+      
+      if (viewedContent) {
+        updates.contentViewed = (existing.contentViewed || 0) + 1;
+      }
+      if (completedChallenge) {
+        updates.challengesCompleted = (existing.challengesCompleted || 0) + 1;
+      }
+      
+      const [updated] = await db
+        .update(userBeliefProgress)
+        .set(updates)
+        .where(eq(userBeliefProgress.id, existing.id))
+        .returning();
+      
+      return updated;
+    } else {
+      // Create new progress record
+      const [created] = await db
+        .insert(userBeliefProgress)
+        .values({
+          userId,
+          belief,
+          contentViewed: viewedContent ? 1 : 0,
+          challengesCompleted: completedChallenge ? 1 : 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          lastActivity: new Date(),
+        })
+        .returning();
+      
+      return created;
+    }
+  }
+
+  async updateDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const [existing] = await db
+      .select()
+      .from(dailyEdgeStreaks)
+      .where(eq(dailyEdgeStreaks.userId, userId));
+    
+    if (existing) {
+      const lastActive = existing.lastActiveDate ? new Date(existing.lastActiveDate) : null;
+      let newStreak = existing.currentStreak || 0;
+      
+      if (lastActive) {
+        lastActive.setHours(0, 0, 0, 0);
+        const dayDiff = Math.floor((today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dayDiff === 0) {
+          // Already active today, no change needed
+          return existing;
+        } else if (dayDiff === 1) {
+          // Consecutive day
+          newStreak = (existing.currentStreak || 0) + 1;
+        } else {
+          // Streak broken
+          newStreak = 1;
+        }
+      } else {
+        newStreak = 1;
+      }
+      
+      const longestStreak = Math.max(existing.longestStreak || 0, newStreak);
+      
+      const [updated] = await db
+        .update(dailyEdgeStreaks)
+        .set({
+          currentStreak: newStreak,
+          longestStreak,
+          lastActiveDate: new Date(),
+          totalDaysActive: (existing.totalDaysActive || 0) + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(dailyEdgeStreaks.id, existing.id))
+        .returning();
+      
+      return updated;
+    } else {
+      // Create new streak record
+      const [created] = await db
+        .insert(dailyEdgeStreaks)
+        .values({
+          userId,
+          currentStreak: 1,
+          longestStreak: 1,
+          lastActiveDate: new Date(),
+          totalDaysActive: 1,
+        })
+        .returning();
+      
+      return created;
+    }
+  }
+
+  async seedDailyEdgeContent(content: InsertDailyEdgeContent[]): Promise<DailyEdgeContent[]> {
+    if (content.length === 0) return [];
+    
+    const created = await db
+      .insert(dailyEdgeContent)
+      .values(content)
+      .returning();
+    
+    return created;
+  }
+
+  async getDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak | undefined> {
+    const [streak] = await db
+      .select()
+      .from(dailyEdgeStreaks)
+      .where(eq(dailyEdgeStreaks.userId, userId));
+    
+    return streak;
+  }
+
+  async markChallengeCompleted(userId: string, contentId: number): Promise<UserDailyEdge | undefined> {
+    // Get the content to find the belief
+    const [content] = await db
+      .select()
+      .from(dailyEdgeContent)
+      .where(eq(dailyEdgeContent.id, contentId));
+    
+    if (!content) {
+      return undefined;
+    }
+    
+    // Check if user has already viewed this content
+    const [existingView] = await db
+      .select()
+      .from(userDailyEdge)
+      .where(and(
+        eq(userDailyEdge.userId, userId),
+        eq(userDailyEdge.contentId, contentId)
+      ));
+    
+    if (existingView) {
+      // Update existing view record
+      const [updated] = await db
+        .update(userDailyEdge)
+        .set({ completedChallenge: true })
+        .where(eq(userDailyEdge.id, existingView.id))
+        .returning();
+      
+      // Update belief progress
+      await this.updateBeliefProgress(userId, content.belief, false, true);
+      
+      return updated;
+    } else {
+      // Create new view record with challenge completed
+      const [created] = await db
+        .insert(userDailyEdge)
+        .values({
+          userId,
+          contentId,
+          completedChallenge: true,
+        })
+        .returning();
+      
+      // Update belief progress
+      await this.updateBeliefProgress(userId, content.belief, true, true);
+      
+      // Update streak
+      await this.updateDailyEdgeStreak(userId);
+      
+      return created;
+    }
   }
 }
 

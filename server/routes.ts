@@ -39,7 +39,13 @@ import {
   getCoachingHint,
   ROLEPLAY_PERSONAS,
 } from "./roleplay-knowledge";
-import { insertRoleplaySessionSchema, ROLEPLAY_SCENARIOS } from "@shared/schema";
+import { 
+  insertRoleplaySessionSchema, 
+  ROLEPLAY_SCENARIOS,
+  insertDailyEdgeContentSchema,
+  DAILY_EDGE_BELIEFS,
+  DAILY_EDGE_CONTENT_TYPES,
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
@@ -4194,6 +4200,135 @@ Provide constructive feedback in JSON format:
     } catch (error) {
       console.error("Error deleting roleplay sessions:", error);
       res.status(500).json({ error: "Failed to delete sessions" });
+    }
+  });
+
+  // ======================
+  // Daily Edge API Routes
+  // ======================
+  
+  // Get today's Daily Edge content for the logged-in user
+  app.get("/api/daily-edge/today", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const todaysContent = await storage.getTodaysDailyEdge(userId);
+      res.json(todaysContent);
+    } catch (error) {
+      console.error("Error fetching today's Daily Edge:", error);
+      res.status(500).json({ error: "Failed to fetch today's content" });
+    }
+  });
+
+  // Record viewing content
+  app.post("/api/daily-edge/view", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { contentId, reflection } = req.body;
+      
+      if (!contentId || typeof contentId !== "number") {
+        return res.status(400).json({ error: "contentId is required and must be a number" });
+      }
+      
+      const view = await storage.recordDailyEdgeView(userId, contentId, reflection);
+      res.status(201).json(view);
+    } catch (error: any) {
+      console.error("Error recording Daily Edge view:", error);
+      if (error.message === "Content not found") {
+        return res.status(404).json({ error: "Content not found" });
+      }
+      res.status(500).json({ error: "Failed to record view" });
+    }
+  });
+
+  // Mark challenge as completed
+  app.post("/api/daily-edge/challenge-complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { contentId } = req.body;
+      
+      if (!contentId || typeof contentId !== "number") {
+        return res.status(400).json({ error: "contentId is required and must be a number" });
+      }
+      
+      const result = await storage.markChallengeCompleted(userId, contentId);
+      if (!result) {
+        return res.status(404).json({ error: "Content not found" });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error completing Daily Edge challenge:", error);
+      res.status(500).json({ error: "Failed to mark challenge as completed" });
+    }
+  });
+
+  // Get user's Daily Edge progress and streaks
+  app.get("/api/daily-edge/progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserDailyEdgeProgress(userId);
+      const beliefProgress = await storage.getUserBeliefProgress(userId);
+      
+      res.json({
+        ...progress,
+        beliefs: beliefProgress,
+      });
+    } catch (error) {
+      console.error("Error fetching Daily Edge progress:", error);
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  });
+
+  // Get all content for a specific belief
+  app.get("/api/daily-edge/belief/:belief", isAuthenticated, async (req: any, res) => {
+    try {
+      const { belief } = req.params;
+      
+      if (!DAILY_EDGE_BELIEFS.includes(belief as any)) {
+        return res.status(400).json({ 
+          error: `Invalid belief. Must be one of: ${DAILY_EDGE_BELIEFS.join(", ")}` 
+        });
+      }
+      
+      const content = await storage.getDailyEdgeContent(belief);
+      res.json(content);
+    } catch (error) {
+      console.error("Error fetching belief content:", error);
+      res.status(500).json({ error: "Failed to fetch content" });
+    }
+  });
+
+  // Admin only: Seed Daily Edge content
+  app.post("/api/daily-edge/seed", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { content } = req.body;
+      
+      if (!Array.isArray(content) || content.length === 0) {
+        return res.status(400).json({ error: "content must be a non-empty array" });
+      }
+      
+      // Validate each content item
+      const validatedContent = [];
+      for (const item of content) {
+        const parsed = insertDailyEdgeContentSchema.safeParse(item);
+        if (!parsed.success) {
+          return res.status(400).json({ 
+            error: "Invalid content item",
+            details: parsed.error.errors 
+          });
+        }
+        validatedContent.push(parsed.data);
+      }
+      
+      const created = await storage.seedDailyEdgeContent(validatedContent);
+      res.status(201).json({ 
+        success: true, 
+        count: created.length,
+        items: created 
+      });
+    } catch (error) {
+      console.error("Error seeding Daily Edge content:", error);
+      res.status(500).json({ error: "Failed to seed content" });
     }
   });
 
