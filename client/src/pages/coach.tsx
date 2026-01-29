@@ -1400,6 +1400,24 @@ export default function CoachPage() {
                 </Card>
               </Link>
 
+              {/* Proposal Generator Link */}
+              <Link href="/proposal-generator">
+                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Proposal Generator</div>
+                        <div className="text-sm text-muted-foreground">Create professional sales proposals</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
                 <div className="grid grid-cols-2 gap-2 mb-4">

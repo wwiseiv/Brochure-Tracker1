@@ -1,0 +1,776 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { BottomNav } from "@/components/BottomNav";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
+  Download,
+  Loader2,
+  CheckCircle,
+  DollarSign,
+  CreditCard,
+  Building2,
+  TrendingDown,
+  Sparkles,
+  FileCheck,
+  Monitor
+} from "lucide-react";
+
+interface ParsedProposal {
+  merchantName: string;
+  preparedFor: string;
+  proposalType: "dual_pricing" | "interchange_plus" | "both";
+  cardVolumes: {
+    visa: { volume: number; transactions: number };
+    mastercard: { volume: number; transactions: number };
+    discover: { volume: number; transactions: number };
+    amex: { volume: number; transactions: number };
+  };
+  currentCosts: {
+    monthlyProcessingFees: number;
+    monthlyStatementFee: number;
+    monthlyPCIFee: number;
+    otherFees: number;
+    totalMonthly: number;
+  };
+  proposedCosts: {
+    dualPricing: {
+      monthlyProcessingFees: number;
+      monthlyFees: number;
+      totalMonthly: number;
+    };
+    interchangePlus: {
+      monthlyProcessingFees: number;
+      monthlyFees: number;
+      totalMonthly: number;
+    };
+  };
+  savings: {
+    dualPricingMonthly: number;
+    dualPricingAnnual: number;
+    interchangePlusMonthly: number;
+    interchangePlusAnnual: number;
+  };
+}
+
+interface EquipmentProduct {
+  id: number;
+  name: string;
+  type: string;
+  description: string;
+  features: string[];
+  priceRange: string;
+}
+
+interface Proposal {
+  id: number;
+  merchantName: string;
+  proposalType: string;
+  status: string;
+  createdAt: string;
+  parsedData: ParsedProposal;
+  selectedEquipment: EquipmentProduct | null;
+}
+
+interface ServerParsedProposal {
+  merchantName: string;
+  preparedDate?: string | null;
+  agentName?: string | null;
+  agentTitle?: string | null;
+  currentState: {
+    totalVolume: number;
+    totalTransactions: number;
+    avgTicket: number;
+    cardBreakdown: {
+      visa: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      mastercard: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      discover: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+      amex: { volume: number; transactions: number; ratePercent: number; perTxFee: number; totalCost: number };
+    };
+    fees: { statementFee: number; pciNonCompliance: number; creditPassthrough: number; otherFees: number; batchHeader: number };
+    totalMonthlyCost: number;
+    effectiveRatePercent: number;
+  };
+  optionInterchangePlus?: {
+    discountRatePercent: number;
+    perTransactionFee: number;
+    totalMonthlyCost: number;
+    monthlySavings: number;
+    annualSavings: number;
+  };
+  optionDualPricing?: {
+    merchantDiscountRate: number;
+    perTransactionFee: number;
+    monthlyProgramFee: number;
+    totalMonthlyCost: number;
+    monthlySavings: number;
+    annualSavings: number;
+  };
+  proposalType: string;
+}
+
+function transformParsedData(server: ServerParsedProposal): ParsedProposal {
+  const cardBreakdown = server.currentState?.cardBreakdown || {
+    visa: { volume: 0, transactions: 0 },
+    mastercard: { volume: 0, transactions: 0 },
+    discover: { volume: 0, transactions: 0 },
+    amex: { volume: 0, transactions: 0 },
+  };
+  
+  const currentCosts = server.currentState || { totalMonthlyCost: 0 };
+  const fees = server.currentState?.fees || {};
+  
+  return {
+    merchantName: server.merchantName || "Unknown Merchant",
+    preparedFor: server.merchantName || "Unknown Merchant",
+    proposalType: server.proposalType as "dual_pricing" | "interchange_plus" | "both",
+    cardVolumes: {
+      visa: { volume: cardBreakdown.visa?.volume || 0, transactions: cardBreakdown.visa?.transactions || 0 },
+      mastercard: { volume: cardBreakdown.mastercard?.volume || 0, transactions: cardBreakdown.mastercard?.transactions || 0 },
+      discover: { volume: cardBreakdown.discover?.volume || 0, transactions: cardBreakdown.discover?.transactions || 0 },
+      amex: { volume: cardBreakdown.amex?.volume || 0, transactions: cardBreakdown.amex?.transactions || 0 },
+    },
+    currentCosts: {
+      monthlyProcessingFees: (cardBreakdown.visa?.totalCost || 0) + 
+        (cardBreakdown.mastercard?.totalCost || 0) + 
+        (cardBreakdown.discover?.totalCost || 0) + 
+        (cardBreakdown.amex?.totalCost || 0),
+      monthlyStatementFee: fees.statementFee || 0,
+      monthlyPCIFee: fees.pciNonCompliance || 0,
+      otherFees: (fees.otherFees || 0) + (fees.creditPassthrough || 0) + (fees.batchHeader || 0),
+      totalMonthly: currentCosts.totalMonthlyCost || 0,
+    },
+    proposedCosts: {
+      dualPricing: {
+        monthlyProcessingFees: server.optionDualPricing?.totalMonthlyCost || 0,
+        monthlyFees: server.optionDualPricing?.monthlyProgramFee || 0,
+        totalMonthly: server.optionDualPricing?.totalMonthlyCost || 0,
+      },
+      interchangePlus: {
+        monthlyProcessingFees: server.optionInterchangePlus?.totalMonthlyCost || 0,
+        monthlyFees: 0,
+        totalMonthly: server.optionInterchangePlus?.totalMonthlyCost || 0,
+      },
+    },
+    savings: {
+      dualPricingMonthly: server.optionDualPricing?.monthlySavings || 0,
+      dualPricingAnnual: server.optionDualPricing?.annualSavings || 0,
+      interchangePlusMonthly: server.optionInterchangePlus?.monthlySavings || 0,
+      interchangePlusAnnual: server.optionInterchangePlus?.annualSavings || 0,
+    },
+  };
+}
+
+export default function ProposalGeneratorPage() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<ParsedProposal | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentProduct | null>(null);
+  const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(null);
+  const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
+
+  const { data: proposals, isLoading: proposalsLoading } = useQuery<Proposal[]>({
+    queryKey: ["/api/proposals"],
+  });
+
+  const { data: equipment } = useQuery<EquipmentProduct[]>({
+    queryKey: ["/api/equipiq/products"],
+  });
+
+  const parseMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/proposals/parse", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
+        throw new Error(errorData.error || errorData.message || "Failed to parse PDF");
+      }
+      const result = await res.json();
+      return result.data || result;
+    },
+    onSuccess: (data) => {
+      const transformedData = transformParsedData(data);
+      setParsedData(transformedData);
+      setStep("review");
+      toast({
+        title: "PDF Parsed Successfully",
+        description: `Extracted data for ${transformedData.merchantName}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Parsing PDF",
+        description: error instanceof Error ? error.message : "Failed to parse the PDF file",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async (data: { parsedData: ParsedProposal; equipment?: EquipmentProduct; useAI?: boolean }) => {
+      const res = await apiRequest("POST", "/api/proposals/generate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedProposalId(data.id);
+      setStep("generated");
+      toast({
+        title: "Proposal Generated",
+        description: "Your professional proposal is ready for download!",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Generating Proposal",
+        description: error instanceof Error ? error.message : "Failed to generate proposal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      setUploadedFile(file);
+    }
+  };
+
+  const handleParse = () => {
+    if (uploadedFile) {
+      parseMutation.mutate(uploadedFile);
+    }
+  };
+
+  const handleGenerate = (useAI: boolean) => {
+    if (parsedData) {
+      generateMutation.mutate({
+        parsedData,
+        equipment: selectedEquipment || undefined,
+        useAI,
+      });
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
+
+  const getTotalVolume = () => {
+    if (!parsedData?.cardVolumes) return 0;
+    return (
+      parsedData.cardVolumes.visa.volume +
+      parsedData.cardVolumes.mastercard.volume +
+      parsedData.cardVolumes.discover.volume +
+      parsedData.cardVolumes.amex.volume
+    );
+  };
+
+  const renderUploadStep = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-primary" />
+            Upload Pricing PDF
+          </CardTitle>
+          <CardDescription>
+            Upload a Dual Pricing or Interchange Plus proposal PDF to extract merchant data and generate a professional proposal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border-2 border-dashed rounded-lg p-8 text-center hover-elevate transition-colors cursor-pointer" data-testid="upload-dropzone">
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handleFileChange}
+              className="hidden"
+              id="pdf-upload"
+              data-testid="input-pdf-upload"
+            />
+            <label htmlFor="pdf-upload" className="cursor-pointer">
+              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg font-medium mb-2">
+                {uploadedFile ? uploadedFile.name : "Click to upload or drag PDF here"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supports Dual Pricing and Interchange Plus proposals
+              </p>
+            </label>
+          </div>
+          
+          {uploadedFile && (
+            <div className="flex items-center justify-between bg-muted rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <FileCheck className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="font-medium">{uploadedFile.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(uploadedFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleParse}
+                disabled={parseMutation.isPending}
+                data-testid="button-parse-pdf"
+              >
+                {parseMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Parsing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Parse PDF
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {proposals && proposals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Proposals</CardTitle>
+            <CardDescription>Previously generated proposals</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {proposals.slice(0, 5).map((proposal) => (
+                <div
+                  key={proposal.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover-elevate"
+                  data-testid={`proposal-item-${proposal.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="font-medium">{proposal.merchantName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(proposal.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={proposal.status === "completed" ? "default" : "secondary"}>
+                      {proposal.status}
+                    </Badge>
+                    <a
+                      href={`/api/proposals/${proposal.id}/download/pdf`}
+                      download
+                      className="text-primary hover:underline"
+                      data-testid={`download-proposal-${proposal.id}`}
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  const renderReviewStep = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-primary" />
+            Merchant Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-muted-foreground">Business Name</Label>
+              <p className="text-lg font-medium">{parsedData?.merchantName || parsedData?.preparedFor || "Unknown"}</p>
+            </div>
+            <div>
+              <Label className="text-muted-foreground">Proposal Type</Label>
+              <Badge variant="outline" className="mt-1">
+                {parsedData?.proposalType === "dual_pricing" ? "Dual Pricing" : 
+                 parsedData?.proposalType === "interchange_plus" ? "Interchange Plus" : "Both"}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-primary" />
+            Card Volume Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Visa</p>
+              <p className="text-lg font-semibold">{formatCurrency(parsedData?.cardVolumes?.visa?.volume || 0)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Mastercard</p>
+              <p className="text-lg font-semibold">{formatCurrency(parsedData?.cardVolumes?.mastercard?.volume || 0)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Discover</p>
+              <p className="text-lg font-semibold">{formatCurrency(parsedData?.cardVolumes?.discover?.volume || 0)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">Amex</p>
+              <p className="text-lg font-semibold">{formatCurrency(parsedData?.cardVolumes?.amex?.volume || 0)}</p>
+            </div>
+          </div>
+          <div className="mt-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+            <p className="text-sm text-muted-foreground">Total Monthly Volume</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(getTotalVolume())}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-primary" />
+            Cost Comparison
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg border">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Current Costs</p>
+              <p className="text-2xl font-bold">{formatCurrency(parsedData?.currentCosts?.totalMonthly || 0)}</p>
+              <p className="text-sm text-muted-foreground">per month</p>
+            </div>
+            <div className="p-4 rounded-lg border border-primary bg-primary/5">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Dual Pricing</p>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(parsedData?.proposedCosts?.dualPricing?.totalMonthly || 0)}</p>
+              <p className="text-sm text-muted-foreground">per month</p>
+            </div>
+            <div className="p-4 rounded-lg border">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Interchange Plus</p>
+              <p className="text-2xl font-bold">{formatCurrency(parsedData?.proposedCosts?.interchangePlus?.totalMonthly || 0)}</p>
+              <p className="text-sm text-muted-foreground">per month</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="w-5 h-5 text-green-500" />
+            Estimated Savings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Dual Pricing Savings</p>
+              <p className="text-3xl font-bold text-green-500">{formatCurrency(parsedData?.savings?.dualPricingMonthly || 0)}</p>
+              <p className="text-sm text-muted-foreground">per month / {formatCurrency(parsedData?.savings?.dualPricingAnnual || 0)} per year</p>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Interchange Plus Savings</p>
+              <p className="text-3xl font-bold">{formatCurrency(parsedData?.savings?.interchangePlusMonthly || 0)}</p>
+              <p className="text-sm text-muted-foreground">per month / {formatCurrency(parsedData?.savings?.interchangePlusAnnual || 0)} per year</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setStep("upload");
+            setParsedData(null);
+            setUploadedFile(null);
+          }}
+          data-testid="button-back-upload"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => setStep("equipment")}
+          data-testid="button-continue-equipment"
+        >
+          Continue to Equipment Selection
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderEquipmentStep = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-primary" />
+            Terminal Selection
+          </CardTitle>
+          <CardDescription>
+            Choose a recommended terminal for the merchant (optional)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                selectedEquipment === null ? "border-primary bg-primary/5" : "hover-elevate"
+              }`}
+              onClick={() => setSelectedEquipment(null)}
+              data-testid="equipment-none"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  selectedEquipment === null ? "border-primary bg-primary" : "border-muted-foreground"
+                }`}>
+                  {selectedEquipment === null && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                </div>
+                <div>
+                  <p className="font-medium">No Equipment</p>
+                  <p className="text-sm text-muted-foreground">Generate proposal without equipment recommendation</p>
+                </div>
+              </div>
+            </div>
+
+            {equipment?.filter(eq => eq.type === "countertop" || eq.type === "wireless").slice(0, 6).map((eq) => (
+              <div
+                key={eq.id}
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  selectedEquipment?.id === eq.id ? "border-primary bg-primary/5" : "hover-elevate"
+                }`}
+                onClick={() => setSelectedEquipment(eq)}
+                data-testid={`equipment-${eq.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedEquipment?.id === eq.id ? "border-primary bg-primary" : "border-muted-foreground"
+                  }`}>
+                    {selectedEquipment?.id === eq.id && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{eq.name}</p>
+                      <Badge variant="outline">{eq.type}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{eq.description}</p>
+                    {eq.priceRange && (
+                      <p className="text-sm font-medium text-primary mt-1">{eq.priceRange}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4">
+        <Button
+          variant="outline"
+          onClick={() => setStep("review")}
+          data-testid="button-back-review"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => handleGenerate(false)}
+          disabled={generateMutation.isPending}
+          data-testid="button-generate-basic"
+        >
+          {generateMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <FileText className="w-4 h-4 mr-2" />
+          )}
+          Basic Proposal
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={() => handleGenerate(true)}
+          disabled={generateMutation.isPending}
+          data-testid="button-generate-ai"
+        >
+          {generateMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4 mr-2" />
+              Generate with AI Enhancement
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderGeneratedStep = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+          </div>
+          <CardTitle className="text-center">Proposal Generated!</CardTitle>
+          <CardDescription className="text-center">
+            Your professional proposal for {parsedData?.merchantName || parsedData?.preparedFor} is ready for download.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <a
+              href={`/api/proposals/${generatedProposalId}/download/pdf`}
+              download
+              className="block"
+              data-testid="download-pdf"
+            >
+              <Button variant="outline" className="w-full h-auto py-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-8 h-8 text-red-500" />
+                  <div className="text-left">
+                    <p className="font-medium">Download PDF</p>
+                    <p className="text-sm text-muted-foreground">Professional PDF document</p>
+                  </div>
+                </div>
+              </Button>
+            </a>
+            <a
+              href={`/api/proposals/${generatedProposalId}/download/docx`}
+              download
+              className="block"
+              data-testid="download-docx"
+            >
+              <Button variant="outline" className="w-full h-auto py-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-8 h-8 text-blue-500" />
+                  <div className="text-left">
+                    <p className="font-medium">Download Word</p>
+                    <p className="text-sm text-muted-foreground">Editable DOCX document</p>
+                  </div>
+                </div>
+              </Button>
+            </a>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              setStep("upload");
+              setParsedData(null);
+              setUploadedFile(null);
+              setSelectedEquipment(null);
+              setGeneratedProposalId(null);
+            }}
+            data-testid="button-new-proposal"
+          >
+            Create Another Proposal
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="container flex items-center gap-4 h-14 px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/coach")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="font-semibold">Proposal Generator</h1>
+            <p className="text-xs text-muted-foreground">Create professional proposals</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="container px-4 py-6 max-w-2xl">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          {["upload", "review", "equipment", "generated"].map((s, i) => (
+            <div key={s} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step === s
+                    ? "bg-primary text-primary-foreground"
+                    : ["upload", "review", "equipment", "generated"].indexOf(step) > i
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {i + 1}
+              </div>
+              {i < 3 && (
+                <div
+                  className={`w-8 h-0.5 ${
+                    ["upload", "review", "equipment", "generated"].indexOf(step) > i
+                      ? "bg-primary"
+                      : "bg-muted"
+                  }`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {step === "upload" && renderUploadStep()}
+        {step === "review" && renderReviewStep()}
+        {step === "equipment" && renderEquipmentStep()}
+        {step === "generated" && renderGeneratedStep()}
+      </main>
+
+      <BottomNav />
+    </div>
+  );
+}
