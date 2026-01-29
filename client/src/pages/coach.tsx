@@ -370,7 +370,7 @@ function DailyEdgeSection() {
                     <Award className="w-4 h-4 text-primary" />
                     <span className="text-xs font-medium">Your Belief Progress</span>
                   </div>
-                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:justify-between sm:overflow-visible">
                     {progressData.beliefs.map((bp) => {
                       const progress = bp.totalContent > 0 
                         ? (bp.viewedContent / bp.totalContent) * 100 
@@ -965,7 +965,7 @@ export default function CoachPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 bg-background border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="max-w-4xl mx-auto flex items-center gap-3">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -1000,22 +1000,25 @@ export default function CoachPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="border-b px-4">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="new" data-testid="tab-new-session">
-              <Play className="w-4 h-4 mr-2" />
-              New Session
-            </TabsTrigger>
-            <TabsTrigger value="history" data-testid="tab-history">
-              <History className="w-4 h-4 mr-2" />
-              History
-            </TabsTrigger>
-          </TabsList>
+          <div className="max-w-4xl mx-auto">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="new" data-testid="tab-new-session">
+                <Play className="w-4 h-4 mr-2" />
+                New Session
+              </TabsTrigger>
+              <TabsTrigger value="history" data-testid="tab-history">
+                <History className="w-4 h-4 mr-2" />
+                History
+              </TabsTrigger>
+            </TabsList>
+          </div>
         </div>
 
         <TabsContent value="new" className="flex-1 flex flex-col m-0">
           {!sessionId ? (
             <div className="flex-1 overflow-auto">
-              <DailyEdgeSection />
+              <div className="max-w-4xl mx-auto">
+                <DailyEdgeSection />
               <div className="p-4 pt-0 space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
@@ -1147,8 +1150,9 @@ export default function CoachPage() {
               </Button>
               </div>
             </div>
+            </div>
           ) : showFeedback && feedback ? (
-            <div className="p-4 space-y-4 overflow-auto flex-1">
+            <div className="p-4 space-y-4 overflow-auto flex-1 max-w-4xl mx-auto w-full">
               <div className="text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-3">
                   <Award className="w-8 h-8 text-primary" />
@@ -1223,7 +1227,8 @@ export default function CoachPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-auto p-4 space-y-3">
+              <div className="flex-1 overflow-auto p-4">
+                <div className="max-w-4xl mx-auto space-y-3">
                 {messages.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
                     {mode === "coaching" ? (
@@ -1288,31 +1293,35 @@ export default function CoachPage() {
                   </div>
                 )}
                 <div ref={messagesEndRef} />
+                </div>
               </div>
 
               {/* Coaching Hint Display */}
               {coachingHint && mode === "roleplay" && (
-                <div className="mx-4 mb-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-0.5">Coach's Tip</div>
-                      <p className="text-sm text-amber-800 dark:text-amber-200">{coachingHint}</p>
+                <div className="px-4 pb-2">
+                  <div className="max-w-4xl mx-auto p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-0.5">Coach's Tip</div>
+                        <p className="text-sm text-amber-800 dark:text-amber-200">{coachingHint}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 ml-auto -mt-1 -mr-1"
+                        onClick={() => setCoachingHint(null)}
+                        data-testid="button-dismiss-hint"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 ml-auto -mt-1 -mr-1"
-                      onClick={() => setCoachingHint(null)}
-                      data-testid="button-dismiss-hint"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
                   </div>
                 </div>
               )}
 
-              <div className="p-4 border-t space-y-2">
+              <div className="p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                <div className="max-w-4xl mx-auto space-y-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Tap mic to speak, or type below</span>
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1370,6 +1379,7 @@ export default function CoachPage() {
                     </Button>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
           )}
@@ -1377,6 +1387,7 @@ export default function CoachPage() {
 
         <TabsContent value="history" className="flex-1 flex flex-col m-0">
           <div className="p-4 flex-1 overflow-auto">
+            <div className="max-w-4xl mx-auto">
             {sessionsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -1403,10 +1414,11 @@ export default function CoachPage() {
                 ))}
               </div>
             )}
+            </div>
           </div>
           
           {sessions.length > 0 && (
-            <div className="p-4 border-t">
+            <div className="p-4 border-t max-w-4xl mx-auto w-full">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
