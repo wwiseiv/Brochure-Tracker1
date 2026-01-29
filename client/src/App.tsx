@@ -27,6 +27,7 @@ import AcceptInvitePage from "@/pages/accept-invite";
 import CoachPage from "@/pages/coach";
 import EquipIQPage from "@/pages/equipiq";
 import NotFound from "@/pages/not-found";
+import AccessDenied from "@/pages/access-denied";
 
 interface UserRole {
   role: string;
@@ -55,7 +56,7 @@ function AdminRoute() {
   }
 
   if (userRole?.role !== "master_admin" && userRole?.role !== "relationship_manager") {
-    return <NotFound />;
+    return <AccessDenied feature="the Admin Dashboard" />;
   }
 
   return <AdminDashboardPage />;
@@ -78,7 +79,7 @@ function TeamManagementRoute() {
   }
 
   if (userRole?.role !== "master_admin") {
-    return <NotFound />;
+    return <AccessDenied feature="Team Management" />;
   }
 
   return <TeamManagementPage />;
@@ -101,7 +102,7 @@ function RMRoute() {
   }
 
   if (userRole?.role !== "relationship_manager") {
-    return <NotFound />;
+    return <AccessDenied feature="the Manager Dashboard" />;
   }
 
   return <RMDashboardPage />;
