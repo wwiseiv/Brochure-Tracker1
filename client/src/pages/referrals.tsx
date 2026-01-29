@@ -1372,6 +1372,21 @@ function AddReferralDialog({
   );
 }
 
+type MembershipData = {
+  id: number;
+  role: string;
+  organization: { id: number; name: string };
+};
+
+type TeamMember = {
+  id: number;
+  userId: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  role: string;
+};
+
 export default function ReferralsPage() {
   const { toast } = useToast();
   const [editingReferral, setEditingReferral] = useState<Referral | null>(null);
@@ -1380,9 +1395,43 @@ export default function ReferralsPage() {
   const [isThankYouDialogOpen, setIsThankYouDialogOpen] = useState(false);
   const [draftEmailReferral, setDraftEmailReferral] = useState<Referral | null>(null);
   const [isDraftEmailDialogOpen, setIsDraftEmailDialogOpen] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
+
+  // Get membership info to determine role
+  const { data: membership } = useQuery<MembershipData>({
+    queryKey: ["/api/membership"],
+  });
+
+  const isAdmin = membership?.role === "master_admin";
+  const isManager = membership?.role === "relationship_manager";
+  const canFilterByAgent = isAdmin || isManager;
+
+  // Get team members for filtering (admins and managers only)
+  const { data: teamMembers } = useQuery<TeamMember[]>({
+    queryKey: ["/api/admin/members"],
+    enabled: isAdmin,
+  });
+
+  const { data: managedAgents } = useQuery<TeamMember[]>({
+    queryKey: ["/api/rm/agents"],
+    enabled: isManager,
+  });
+
+  const agentList = isAdmin ? teamMembers : managedAgents;
+
+  // Build query params for filtering
+  const queryParams = useMemo(() => {
+    if (!canFilterByAgent || selectedAgentId === "all") return "";
+    return `?agentIds=${selectedAgentId}`;
+  }, [canFilterByAgent, selectedAgentId]);
 
   const { data: referrals, isLoading: referralsLoading } = useQuery<Referral[]>({
-    queryKey: ["/api/referrals"],
+    queryKey: ["/api/referrals", selectedAgentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/referrals${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch referrals");
+      return res.json();
+    },
   });
 
   const { data: drops } = useQuery<DropWithBrochure[]>({
@@ -1493,17 +1542,38 @@ export default function ReferralsPage() {
           </Card>
         </div>
 
-        <div className="flex justify-end gap-2">
-          <ExportDialog
-            title="Export Referrals"
-            description="Download your referral data as a spreadsheet file."
-            exportEndpoint="/api/referrals/export"
-            buttonLabel="Export"
-          />
-          <AddReferralDialog 
-            drops={drops || []} 
-            onSuccess={() => {}} 
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {canFilterByAgent && (
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                <SelectTrigger className="min-h-touch w-full max-w-xs" data-testid="select-agent-filter">
+                  <SelectValue placeholder="All Team Members" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Team Members</SelectItem>
+                  {agentList?.map((agent) => (
+                    <SelectItem key={agent.userId} value={agent.userId}>
+                      {agent.firstName && agent.lastName 
+                        ? `${agent.firstName} ${agent.lastName}`
+                        : agent.email || agent.userId.slice(0, 12) + "..."}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <ExportDialog
+              title="Export Referrals"
+              description="Download your referral data as a spreadsheet file."
+              exportEndpoint={`/api/referrals/export${queryParams}`}
+              buttonLabel="Export"
+            />
+            <AddReferralDialog 
+              drops={drops || []} 
+              onSuccess={() => {}} 
+            />
+          </div>
         </div>
 
         <div className="text-sm text-muted-foreground">
