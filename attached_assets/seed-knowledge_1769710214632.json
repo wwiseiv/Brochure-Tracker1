@@ -1,0 +1,88 @@
+{
+  "items": [
+    {
+      "title": "Objection: Happy with Current Processor",
+      "content": "When a merchant says they're happy with their current processor, acknowledge their satisfaction first. Say: 'That's great to hear - a good processor relationship is important. Mind if I ask what you like most about them?' This opens dialogue. Then ask: 'When was the last time you compared rates?' Most merchants haven't checked in 2+ years. Offer a free statement analysis: 'I'd love to show you a side-by-side comparison - no obligation. You might be surprised what you find.'",
+      "content_type": "objection",
+      "category": "objection_handling",
+      "tags": ["objection", "happy customer", "statement analysis"]
+    },
+    {
+      "title": "Objection: Locked in Contract",
+      "content": "When merchants say they're locked in a contract, first find out the details: 'I understand. Do you know when your contract ends and what the early termination fee would be?' Often they don't know. Then calculate: 'If you're overpaying $200/month and have 8 months left, that's $1,600 in savings minus any termination fee. Let's see if the math makes sense.' Many contracts have buyout clauses we can help with, or the savings outweigh the penalty.",
+      "content_type": "objection",
+      "category": "objection_handling",
+      "tags": ["objection", "contract", "buyout"]
+    },
+    {
+      "title": "Objection: Need to Think About It",
+      "content": "When a merchant says they need to think about it, don't push - but do clarify: 'Absolutely, this is an important decision. To help you think it through, what specific aspects would you like to consider?' This reveals their real concern. Common responses: 'I need to check with my partner' (offer to meet together), 'I want to compare' (offer competitive analysis), 'It's just a lot' (simplify to one key benefit). Always set a specific follow-up: 'How about I call you Thursday at 2pm?'",
+      "content_type": "objection",
+      "category": "objection_handling",
+      "tags": ["objection", "think about it", "follow-up"]
+    },
+    {
+      "title": "Objection: Rates are Too High",
+      "content": "When a merchant objects to rates, first understand their current situation: 'What rates are you paying now?' Often they don't know their effective rate. Explain: 'There are three components: interchange (set by Visa/MC), processor markup, and fees. I can't change interchange, but I can show you exactly what our markup is versus what you're paying now.' Use a statement analysis to show the real comparison. For PayLo: 'With dual pricing, your effective rate can be near zero because customers cover the fee.'",
+      "content_type": "objection",
+      "category": "objection_handling",
+      "tags": ["objection", "pricing", "rates", "PayLo"]
+    },
+    {
+      "title": "PayLo Dual Pricing Complete Pitch",
+      "content": "PayLo dual pricing lets merchants display two prices: cash and card. Here's the pitch: 'PayLo eliminates your processing costs by showing customers a small convenience fee for card payments. You keep 100% of the cash price. It's legal in all 50 states when done correctly. We handle all compliance - proper signage, receipt formatting, everything. Most customers don't mind - they're used to it at gas stations. Your competitors are probably already doing this. Would you like to see how much you'd save each month?'",
+      "content_type": "script",
+      "category": "pricing",
+      "tags": ["PayLo", "dual pricing", "surcharge", "cash discount"]
+    },
+    {
+      "title": "Cold Call Script: Restaurant",
+      "content": "Opening: 'Hi, is this the owner or manager? Great - I'm [name] with PC Bancard. I specialize in helping restaurants like yours reduce credit card processing costs. Quick question - are you the one who handles your merchant account, or is that someone else?' If yes: 'Perfect. I've helped several restaurants in [area] save 20-40% on processing. I'm not asking you to switch today - I just want to show you a free comparison. Do you have your latest statement handy, or should I swing by tomorrow during a slow time?'",
+      "content_type": "script",
+      "category": "cold_calling",
+      "tags": ["cold call", "restaurant", "opening"]
+    },
+    {
+      "title": "Cold Call Script: Retail Store",
+      "content": "Opening: 'Hi there! I noticed your store while I was in the area. I'm [name] with PC Bancard - we help retail businesses lower their payment processing costs. Are you the owner? Great! Quick question - when was the last time someone actually looked at your processing statement to make sure you're getting the best rate? Most business owners tell me it's been over a year. I offer a free analysis that takes about 5 minutes. Worth a look?'",
+      "content_type": "script",
+      "category": "cold_calling",
+      "tags": ["cold call", "retail", "walk-in"]
+    },
+    {
+      "title": "PCI Compliance Talking Points",
+      "content": "PCI compliance is required for all merchants accepting cards. Key points: 1) Non-compliance can result in fines of $5,000-$100,000 per month. 2) We provide free PCI compliance assistance - most processors charge $99+ annually. 3) We help with the annual SAQ (Self-Assessment Questionnaire). 4) Our equipment is always PCI-compliant and receives automatic updates. 5) In case of a breach, compliant merchants have liability protection. Ask: 'Are you currently PCI compliant? Do you know when your last assessment was?'",
+      "content_type": "training",
+      "category": "compliance",
+      "tags": ["PCI", "compliance", "security"]
+    },
+    {
+      "title": "Closing Technique: The Assumptive Close",
+      "content": "The assumptive close moves forward as if the decision is made. Instead of asking 'Would you like to sign up?', say: 'Great, so we'll get you set up with the new terminal by Friday. I just need to verify a few details - is the business name exactly as it appears on your bank statement?' If they object, it reveals their true concern. If they answer, they've mentally committed. Follow with: 'And for the shipping address, should I use this location or is there a better one?' Keep moving forward naturally.",
+      "content_type": "training",
+      "category": "closing",
+      "tags": ["closing", "assumptive", "technique"]
+    },
+    {
+      "title": "Closing Technique: Creating Urgency",
+      "content": "Legitimate urgency helps merchants act: 1) Monthly savings urgency: 'Every month you wait, you're leaving $X on the table. If we start this week, you'll see savings on next month's statement.' 2) Promotion urgency: 'We have a free terminal program running through the end of the month.' 3) Busy season: 'With the holidays coming, you want this locked in before your busiest time.' Never create false urgency - it damages trust. Instead, help them see the real cost of delay.",
+      "content_type": "training",
+      "category": "closing",
+      "tags": ["closing", "urgency", "timing"]
+    },
+    {
+      "title": "Statement Analysis Best Practices",
+      "content": "When analyzing a merchant statement: 1) Calculate effective rate (total fees ÷ total volume). 2) Look for hidden fees: PCI non-compliance, statement fees, batch fees, minimum fees. 3) Check for rate padding on interchange. 4) Note their equipment - are they leasing? 5) Identify their average ticket and volume. Present findings: 'Your effective rate is X%. Based on your volume, you're paying $Y in fees. I can get that to $Z, saving you $$ monthly.' Always show math - transparency builds trust.",
+      "content_type": "training",
+      "category": "product_knowledge",
+      "tags": ["statement analysis", "effective rate", "fees"]
+    },
+    {
+      "title": "Handling the Gatekeeper",
+      "content": "Gatekeepers protect decision-makers' time. Work with them, not against them: 1) Be friendly and professional: 'Hi! I'm hoping you can help me...' 2) Use their name if visible. 3) Be honest about why you're calling - vague answers seem sketchy. 4) Ask for help: 'Who handles your credit card processing decisions?' 5) If owner is unavailable: 'When would be the best time to catch them?' 6) Leave value: 'Could you let them know I can save them money on processing? Here's my card.' 7) Follow up as promised.",
+      "content_type": "training",
+      "category": "cold_calling",
+      "tags": ["gatekeeper", "receptionist", "getting through"]
+    }
+  ]
+}

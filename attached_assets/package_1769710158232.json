@@ -1,0 +1,40 @@
+{
+  "name": "pcbancard-coaching-app",
+  "version": "3.0.0",
+  "description": "AI-powered sales coaching with Role-Play, RAG Knowledge, and Daily Edge mindset training",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "db:setup": "psql $DATABASE_URL -f database/schema.sql",
+    "db:seed-knowledge": "curl -X POST http://localhost:3001/api/content/bulk -H 'Content-Type: application/json' -d @database/seed-knowledge.json",
+    "db:seed-daily-edge": "curl -X POST http://localhost:3001/api/daily-edge/content/bulk -H 'Content-Type: application/json' -d @database/daily-edge-seed.json",
+    "db:seed-all": "npm run db:seed-knowledge && npm run db:seed-daily-edge",
+    "sync": "curl -X POST http://localhost:3001/api/admin/sync-drive"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "googleapis": "^134.0.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "openai": "^4.47.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "sales-coaching",
+    "ai",
+    "role-play",
+    "merchant-services",
+    "payment-processing",
+    "training"
+  ]
+}
