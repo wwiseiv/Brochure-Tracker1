@@ -59,6 +59,7 @@ import {
 } from "./google-drive";
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
+import { seedPresentationContent } from "./presentation-seed";
 import fs from "fs";
 import path from "path";
 
@@ -136,6 +137,11 @@ export async function registerRoutes(
   // Seed Daily Edge content if not already present
   seedDailyEdgeContent().catch((error) => {
     console.error("Failed to seed Daily Edge content:", error);
+  });
+
+  // Seed Presentation Training content if not already present
+  seedPresentationContent().catch((error) => {
+    console.error("Failed to seed Presentation Training content:", error);
   });
 
   // Brochures API
@@ -5363,6 +5369,173 @@ Return ONLY valid JSON in this exact format:
     } catch (error: any) {
       console.error("[EquipIQ] Error generating quiz:", error);
       res.status(500).json({ error: "Failed to generate quiz questions" });
+    }
+  });
+
+  // ============================================
+  // Presentation Training API
+  // ============================================
+
+  // Get all modules with lessons and user progress
+  app.get("/api/presentation/modules", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const modulesWithLessons = await storage.getPresentationModulesWithLessons();
+      const userProgress = await storage.getUserPresentationProgress(userId);
+      
+      const progressMap = new Map(userProgress.map(p => [p.lessonId, p]));
+      
+      const result = modulesWithLessons.map(module => ({
+        ...module,
+        lessons: module.lessons.map((lesson: any) => ({
+          ...lesson,
+          progress: progressMap.get(lesson.id) || null,
+        })),
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[Presentation] Error fetching modules:", error);
+      res.status(500).json({ error: "Failed to fetch presentation modules" });
+    }
+  });
+
+  // Get a specific lesson with full content, quizzes, and progress
+  app.get("/api/presentation/lessons/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const lessonId = parseInt(req.params.id, 10);
+      
+      if (isNaN(lessonId)) {
+        return res.status(400).json({ error: "Invalid lesson ID" });
+      }
+      
+      const lesson = await storage.getPresentationLesson(lessonId);
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+      
+      const [quizzes, progress] = await Promise.all([
+        storage.getPresentationLessonQuizzes(lessonId),
+        storage.getUserLessonProgress(userId, lessonId),
+      ]);
+      
+      res.json({
+        ...lesson,
+        quizzes,
+        progress: progress || null,
+      });
+    } catch (error) {
+      console.error("[Presentation] Error fetching lesson:", error);
+      res.status(500).json({ error: "Failed to fetch lesson" });
+    }
+  });
+
+  // Update lesson progress
+  app.post("/api/presentation/progress/:lessonId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const lessonId = parseInt(req.params.lessonId, 10);
+      
+      if (isNaN(lessonId)) {
+        return res.status(400).json({ error: "Invalid lesson ID" });
+      }
+      
+      const lesson = await storage.getPresentationLesson(lessonId);
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+      
+      const { completed, practiceRecorded, quizPassed } = req.body;
+      
+      const progressData = {
+        userId,
+        lessonId,
+        completed: completed ?? false,
+        practiceRecorded: practiceRecorded ?? false,
+        quizPassed: quizPassed ?? false,
+      };
+      
+      const progress = await storage.upsertPresentationProgress(progressData);
+      res.json(progress);
+    } catch (error) {
+      console.error("[Presentation] Error updating progress:", error);
+      res.status(500).json({ error: "Failed to update progress" });
+    }
+  });
+
+  // AI teaching endpoint for asking questions
+  app.post("/api/presentation/ask", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { question, lessonContext } = req.body;
+      
+      if (!question || typeof question !== "string") {
+        return res.status(400).json({ error: "Question is required" });
+      }
+      
+      const systemPrompt = `You are an expert sales training coach for PCBancard's Dual Pricing presentation. Your role is to help sales agents understand and master the presentation.
+
+## Your Knowledge Base
+
+### Master Sales Script Overview
+${SIGNAPAY_SALES_SCRIPT}
+
+### Key Persuasion Principles
+The PCBancard presentation uses proven psychological principles:
+
+1. **Problem Awareness**: Merchants often don't realize they're losing 3-4% on every card transaction
+2. **Anchoring**: Use specific numbers like "$17,412" instead of "about $17,000" for psychological impact
+3. **Social Proof**: Reference other merchants who have successfully switched (like Marcus the tire shop owner)
+4. **Loss Aversion**: Frame the conversation around money being "taken" rather than "saved"
+5. **Identity Activation**: Connect the solution to the merchant's identity as a business owner
+6. **Three Options Framework**: Present Interchange-Plus, Surcharging, and Dual Pricing as choices
+7. **Risk Reversal**: The 90-Day Protection Promise removes fear of commitment
+8. **Community Building**: Position the merchant as joining a movement of smart business owners
+
+### Presentation Structure (8 Videos)
+1. Hello - Initial connection and problem introduction
+2. Problem Statement - Quantify the fee losses
+3. Story Proof - Real merchant success stories
+4. Solution Options - Present the three pricing options
+5. Dual Pricing Details - Deep dive into PayLo
+6. Process & Protection - How switching works, 90-day promise
+7. Fit Check - Ensure solution fits their business
+8. Close & Community - Action steps and referral opportunity
+
+${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
+
+## Your Teaching Approach
+- Explain WHY each element of the presentation works, not just WHAT to say
+- Connect script elements to psychological principles
+- Provide practical examples and role-play scenarios
+- Help agents anticipate and handle objections
+- Encourage agents to practice and internalize the material
+- Be supportive but direct - this is sales training, not hand-holding
+
+## Response Guidelines
+- Keep answers focused and actionable
+- Use examples from the presentation when relevant
+- If asked about objections, provide specific language to use
+- If asked about psychology, explain the mechanism clearly
+- Encourage practice and repetition for mastery`;
+
+      const client = getAIIntegrationsClient();
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: question },
+        ],
+        max_completion_tokens: 1000,
+        temperature: 0.7,
+      });
+
+      const answer = response.choices[0]?.message?.content?.trim() || "I'm sorry, I couldn't generate a response. Please try again.";
+      res.json({ answer });
+    } catch (error: any) {
+      console.error("[Presentation] Error in AI ask:", error);
+      res.status(500).json({ error: "Failed to get AI response" });
     }
   });
 

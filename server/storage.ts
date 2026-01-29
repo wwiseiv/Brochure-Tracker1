@@ -113,6 +113,17 @@ import {
   type InsertEquipmentQuizResult,
   userPermissions,
   type UserPermissions,
+  presentationModules,
+  presentationLessons,
+  presentationProgress,
+  presentationQuizzes,
+  type PresentationModule,
+  type PresentationLesson,
+  type PresentationProgress,
+  type InsertPresentationProgress,
+  type PresentationQuiz,
+  type PresentationModuleWithLessons,
+  type PresentationLessonWithProgress,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
@@ -237,6 +248,15 @@ export interface IStorage {
   createUserPermissions(userId: string): Promise<UserPermissions>;
   updateUserPermissions(userId: string, data: Partial<UserPermissions>): Promise<UserPermissions | undefined>;
   getAllUserPermissions(): Promise<UserPermissions[]>;
+  
+  // Presentation Training
+  getPresentationModules(): Promise<PresentationModule[]>;
+  getPresentationModulesWithLessons(): Promise<PresentationModuleWithLessons[]>;
+  getPresentationLesson(id: number): Promise<PresentationLesson | undefined>;
+  getPresentationLessonQuizzes(lessonId: number): Promise<PresentationQuiz[]>;
+  getUserPresentationProgress(userId: string): Promise<PresentationProgress[]>;
+  getUserLessonProgress(userId: string, lessonId: number): Promise<PresentationProgress | undefined>;
+  upsertPresentationProgress(data: InsertPresentationProgress): Promise<PresentationProgress>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1716,6 +1736,69 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUserPermissions(): Promise<UserPermissions[]> {
     return db.select().from(userPermissions);
+  }
+
+  // Presentation Training
+  async getPresentationModules(): Promise<PresentationModule[]> {
+    return db.select().from(presentationModules).orderBy(presentationModules.moduleNumber);
+  }
+
+  async getPresentationModulesWithLessons(): Promise<PresentationModuleWithLessons[]> {
+    const modules = await db.select().from(presentationModules).orderBy(presentationModules.moduleNumber);
+    const lessons = await db.select().from(presentationLessons).orderBy(presentationLessons.lessonNumber);
+    
+    return modules.map(module => ({
+      ...module,
+      lessons: lessons.filter(lesson => lesson.moduleId === module.id),
+    }));
+  }
+
+  async getPresentationLesson(id: number): Promise<PresentationLesson | undefined> {
+    const [lesson] = await db.select().from(presentationLessons).where(eq(presentationLessons.id, id));
+    return lesson;
+  }
+
+  async getPresentationLessonQuizzes(lessonId: number): Promise<PresentationQuiz[]> {
+    return db.select().from(presentationQuizzes).where(eq(presentationQuizzes.lessonId, lessonId));
+  }
+
+  async getUserPresentationProgress(userId: string): Promise<PresentationProgress[]> {
+    return db.select().from(presentationProgress).where(eq(presentationProgress.userId, userId));
+  }
+
+  async getUserLessonProgress(userId: string, lessonId: number): Promise<PresentationProgress | undefined> {
+    const [progress] = await db.select().from(presentationProgress).where(
+      and(
+        eq(presentationProgress.userId, userId),
+        eq(presentationProgress.lessonId, lessonId)
+      )
+    );
+    return progress;
+  }
+
+  async upsertPresentationProgress(data: InsertPresentationProgress): Promise<PresentationProgress> {
+    const existing = await this.getUserLessonProgress(data.userId, data.lessonId);
+    
+    if (existing) {
+      const updateData: Partial<PresentationProgress> = {};
+      if (data.completed !== undefined) updateData.completed = data.completed;
+      if (data.practiceRecorded !== undefined) updateData.practiceRecorded = data.practiceRecorded;
+      if (data.quizPassed !== undefined) updateData.quizPassed = data.quizPassed;
+      if (data.completed && !existing.completedAt) updateData.completedAt = new Date();
+      
+      const [updated] = await db.update(presentationProgress)
+        .set(updateData)
+        .where(eq(presentationProgress.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const insertData = {
+        ...data,
+        completedAt: data.completed ? new Date() : null,
+      };
+      const [created] = await db.insert(presentationProgress).values(insertData).returning();
+      return created;
+    }
   }
 }
 
