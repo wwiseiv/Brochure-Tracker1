@@ -47,6 +47,7 @@ Preferred communication style: Simple, everyday language.
     - **Daily Edge Motivation System**: Mindset training based on "The Salesperson's Secret Code" with 5 Destination Beliefs (Fulfilment, Control, Resilience, Influence, Communication). Features daily rotating content (quotes, insights, challenges, iconic stories, journey motivators), streak tracking, belief progress rings, and interactive AI chat. Users can tap "Discuss This with AI Coach" to have conversations about the day's content, get deeper insights, and learn how to apply the principles to real sales situations.
     - **Meeting Recording & Analysis**: Record sales conversations, upload to secure storage, transcribe and analyze audio with Gemini AI for summaries, key takeaways, and sentiment analysis. Recordings automatically emailed for sales coaching repository. Supports offline retry.
     - **AI Email Drafter**: AI-powered email composition.
+    - **EquipIQ**: AI-powered equipment recommendation system with conversational advisor, searchable product catalog (6 vendors, 63+ products), and quiz-based training with difficulty levels (beginner/intermediate/advanced).
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
