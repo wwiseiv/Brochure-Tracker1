@@ -175,9 +175,20 @@ function CircularProgress({
   );
 }
 
+interface DailyEdgeChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+}
+
 function DailyEdgeSection() {
   const { toast } = useToast();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<DailyEdgeChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   
   const { data: todayData, isLoading: todayLoading } = useQuery<DailyEdgeToday>({
     queryKey: ["/api/daily-edge/today"],
@@ -186,6 +197,68 @@ function DailyEdgeSection() {
   const { data: progressData, isLoading: progressLoading } = useQuery<DailyEdgeProgress>({
     queryKey: ["/api/daily-edge/progress"],
   });
+  
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages]);
+  
+  const handleOpenChat = () => {
+    // Add initial greeting if first time opening
+    if (chatMessages.length === 0 && todayData?.content) {
+      const beliefLabel = BELIEF_LABELS[todayData.todaysBelief] || todayData.todaysBelief;
+      setChatMessages([{
+        id: 1,
+        role: "assistant",
+        content: `Today we're focused on **${beliefLabel}** — one of the 5 Destination Beliefs that distinguish top sales performers.\n\n${todayData.content.quote ? `I love today's quote: "${todayData.content.quote.content}"\n\n` : ""}What's on your mind? You can ask me to explain today's content more deeply, share how it applies to real sales situations, or discuss any challenges you're facing.`
+      }]);
+    }
+    setIsChatOpen(true);
+  };
+  
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isSending || !todayData) return;
+    
+    const userMessage: DailyEdgeChatMessage = {
+      id: Date.now(),
+      role: "user",
+      content: chatInput.trim()
+    };
+    
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput("");
+    setIsSending(true);
+    
+    try {
+      const response = await apiRequest("POST", "/api/daily-edge/chat", {
+        messages: [...chatMessages, userMessage].map(m => ({ role: m.role, content: m.content })),
+        todaysBelief: todayData.todaysBelief,
+        todaysContent: {
+          quote: todayData.content.quote ? { content: todayData.content.quote.content, source: todayData.content.quote.source } : null,
+          insight: todayData.content.insight ? { content: todayData.content.insight.content } : null,
+          challenge: todayData.content.challenge ? { content: todayData.content.challenge.content } : null
+        }
+      });
+      
+      const data = await response.json();
+      
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: data.response
+      }]);
+    } catch (error) {
+      toast({
+        title: "Failed to get response",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
   
   const viewContentMutation = useMutation({
     mutationFn: async (contentId: number) => {
@@ -408,10 +481,113 @@ function DailyEdgeSection() {
                   )}
                 </div>
               )}
+              
+              <Button
+                onClick={handleOpenChat}
+                className="w-full mt-3"
+                variant="outline"
+                style={{ borderColor: beliefColor + "60", color: beliefColor }}
+                data-testid="button-discuss-daily-edge"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Discuss This with AI Coach
+              </Button>
             </div>
           </CollapsibleContent>
         </Card>
       </Collapsible>
+      
+      {isChatOpen && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          <div 
+            className="flex items-center justify-between p-4 border-b"
+            style={{ backgroundColor: beliefColor + "10" }}
+          >
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: beliefColor + "20" }}
+              >
+                <Sparkles className="w-5 h-5" style={{ color: beliefColor }} />
+              </div>
+              <div>
+                <h2 className="font-semibold">Daily Edge Coach</h2>
+                <p className="text-xs text-muted-foreground">
+                  Discussing: {BELIEF_LABELS[todayData.todaysBelief] || todayData.todaysBelief}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsChatOpen(false)}
+              data-testid="button-close-daily-edge-chat"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              {chatMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] p-3 rounded-lg ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {isSending && (
+                <div className="flex justify-start">
+                  <div className="bg-muted p-3 rounded-lg">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+          
+          <div className="border-t p-4 backdrop-blur-sm bg-background/80">
+            <div className="max-w-4xl mx-auto flex gap-2">
+              <Textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask about today's content, how to apply it, or share a challenge..."
+                className="min-h-[44px] max-h-32 resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                data-testid="input-daily-edge-chat"
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!chatInput.trim() || isSending}
+                size="icon"
+                className="h-11 w-11 flex-shrink-0"
+                data-testid="button-send-daily-edge"
+              >
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

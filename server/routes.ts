@@ -4454,5 +4454,119 @@ Provide constructive feedback in JSON format:
     }
   });
 
+  // Daily Edge AI Chat - Interactive discussion about today's content
+  app.post("/api/daily-edge/chat", isAuthenticated, async (req: any, res) => {
+    try {
+      console.log("[Daily Edge Chat] Received request");
+      const { messages, todaysBelief, todaysContent } = req.body;
+      
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Messages array is required" });
+      }
+      
+      if (!todaysBelief) {
+        return res.status(400).json({ error: "Today's belief is required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      console.log("[Daily Edge Chat] Got AI client");
+      
+      // Build comprehensive knowledge context
+      const beliefDescriptions: Record<string, string> = {
+        fulfilment: "finding meaning and purpose in sales work, making a genuine difference in customers' lives, and achieving personal satisfaction from helping others succeed",
+        control: "taking responsibility for your outcomes, being proactive rather than reactive, owning your mindset and actions regardless of external circumstances",
+        resilience: "bouncing back from rejection, maintaining mental toughness and persistence, learning from setbacks and using them as fuel for growth",
+        influence: "understanding buyer psychology, building authentic rapport, ethical persuasion techniques, and the art of helping people make decisions that serve them",
+        communication: "active listening, powerful storytelling, asking transformative questions, and connecting authentically with prospects and clients"
+      };
+      
+      // Skip Drive context for now to avoid blocking - can be added in background later
+      const trainingContext = "";
+      
+      const systemPrompt = `You are a world-class sales mindset coach, deeply versed in "The Salesperson's Secret Code" and the 5 Destination Beliefs that distinguish top sales performers. You help sales professionals develop the mental frameworks and beliefs that drive success.
+
+TODAY'S FOCUS: ${todaysBelief.toUpperCase()}
+${beliefDescriptions[todaysBelief] ? `This belief is about ${beliefDescriptions[todaysBelief]}.` : ""}
+
+${todaysContent?.quote ? `TODAY'S INSPIRING QUOTE: "${todaysContent.quote.content}"${todaysContent.quote.source ? ` — ${todaysContent.quote.source}` : ""}` : ""}
+
+${todaysContent?.insight ? `TODAY'S RESEARCH INSIGHT: ${todaysContent.insight.content}` : ""}
+
+${todaysContent?.challenge ? `TODAY'S CHALLENGE: ${todaysContent.challenge.content}` : ""}
+
+THE 5 DESTINATION BELIEFS (from "The Salesperson's Secret Code"):
+1. FULFILMENT - Top performers find deep meaning in their work. They see sales as a noble profession of helping others.
+2. CONTROL - Winners take responsibility for outcomes. They control what they can and adapt to what they can't.
+3. RESILIENCE - The best bounce back fast. Rejection is fuel, not failure. They maintain unshakeable mental toughness.
+4. INFLUENCE - Masters understand psychology. They build trust naturally and help prospects see new possibilities.
+5. COMMUNICATION - Elite sellers listen more than they talk. They tell compelling stories and ask transformative questions.
+
+KEY PRINCIPLES TO REFERENCE:
+- Beliefs shape behaviors, behaviors shape results
+- Success comes from mastering your inner game first
+- The difference between good and great is mindset, not technique
+- Top performers have learned to control their emotional state
+- Resilience is a skill that can be developed through practice
+- Your self-talk determines your sales outcomes
+${trainingContext}
+
+YOUR APPROACH:
+1. Be warm, encouraging, and conversational - like a trusted mentor
+2. Connect the day's content to practical sales situations they might face
+3. Share relevant stories, examples, and research from sales psychology
+4. Ask thought-provoking questions that help them internalize the lessons
+5. Offer specific, actionable ideas they can apply immediately
+6. Keep responses focused and impactful (2-4 paragraphs typically)
+7. Reference the 5 Beliefs naturally when relevant
+8. Use their name if they share it, build personal connection
+
+Remember: You're not just sharing information - you're helping them BELIEVE differently so they can PERFORM differently.`;
+      
+      const chatMessages: Array<{role: "system" | "user" | "assistant", content: string}> = [
+        { role: "system", content: systemPrompt }
+      ];
+      
+      // Add recent conversation messages (last 20)
+      const recentMessages = messages.slice(-20);
+      recentMessages.forEach((m: {role: string, content: string}) => {
+        chatMessages.push({ 
+          role: m.role as "user" | "assistant", 
+          content: m.content 
+        });
+      });
+      
+      console.log("[Daily Edge Chat] Calling AI with", chatMessages.length, "messages");
+      
+      // Add timeout protection (25 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("AI response timeout")), 25000);
+      });
+      
+      const aiPromise = client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: chatMessages,
+        max_completion_tokens: 1000,
+        temperature: 0.85,
+      });
+      
+      const response = await Promise.race([aiPromise, timeoutPromise]);
+      
+      console.log("[Daily Edge Chat] Got AI response");
+      
+      const aiResponse = response.choices[0]?.message?.content?.trim() || 
+        "That's a great question. Let me think about how to best connect this to your sales journey. Could you share a bit more about what's on your mind?";
+      
+      console.log("[Daily Edge Chat] Sending response:", aiResponse.slice(0, 50) + "...");
+      res.json({ response: aiResponse });
+    } catch (error: any) {
+      console.error("[Daily Edge Chat] Error:", error?.message || error);
+      if (error?.message === "AI response timeout") {
+        res.status(504).json({ error: "Response took too long. Please try again." });
+      } else {
+        res.status(500).json({ error: "Failed to generate response. Please try again." });
+      }
+    }
+  });
+
   return httpServer;
 }
