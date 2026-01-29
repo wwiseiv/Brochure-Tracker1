@@ -72,17 +72,15 @@ export async function getCoachingFolderId(): Promise<string | null> {
   return COACHING_FOLDER_ID;
 }
 
-// List all documents in the coaching folder
-export async function listCoachingDocuments(): Promise<Array<{id: string, name: string, mimeType: string}>> {
+// List all documents in a folder (non-recursive)
+async function listFilesInFolder(folderId: string): Promise<Array<{id: string, name: string, mimeType: string}>> {
   try {
-    const folderId = await getCoachingFolderId();
-    if (!folderId) return [];
-
     const drive = await getGoogleDriveClient();
     const response = await drive.files.list({
       q: `'${folderId}' in parents and trashed=false`,
       fields: 'files(id, name, mimeType)',
-      spaces: 'drive'
+      spaces: 'drive',
+      pageSize: 1000
     });
 
     return (response.data.files || []).map(f => ({
@@ -90,6 +88,42 @@ export async function listCoachingDocuments(): Promise<Array<{id: string, name: 
       name: f.name || '',
       mimeType: f.mimeType || ''
     }));
+  } catch (error) {
+    console.error('Error listing files in folder:', error);
+    return [];
+  }
+}
+
+// Recursively list all documents in the coaching folder and all subfolders
+export async function listCoachingDocuments(): Promise<Array<{id: string, name: string, mimeType: string, path?: string}>> {
+  try {
+    const folderId = await getCoachingFolderId();
+    if (!folderId) return [];
+
+    const allFiles: Array<{id: string, name: string, mimeType: string, path?: string}> = [];
+    
+    async function processFolder(currentFolderId: string, currentPath: string = '') {
+      const files = await listFilesInFolder(currentFolderId);
+      
+      for (const file of files) {
+        if (file.mimeType === 'application/vnd.google-apps.folder') {
+          // Recursively process subfolders
+          const subPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+          console.log(`Scanning subfolder: ${subPath}`);
+          await processFolder(file.id, subPath);
+        } else {
+          // Add file with its path
+          allFiles.push({
+            ...file,
+            path: currentPath
+          });
+        }
+      }
+    }
+
+    await processFolder(folderId);
+    console.log(`Found ${allFiles.length} total files in folder tree`);
+    return allFiles;
   } catch (error) {
     console.error('Error listing coaching documents:', error);
     return [];
@@ -139,26 +173,175 @@ export async function readTextFile(fileId: string): Promise<string> {
   }
 }
 
+// Read content from a PDF file (exports as text)
+export async function readPdfFile(fileId: string, fileName: string): Promise<string> {
+  try {
+    const drive = await getGoogleDriveClient();
+    
+    // Download the PDF file as arraybuffer
+    const response = await drive.files.get({
+      fileId,
+      alt: 'media'
+    }, { responseType: 'arraybuffer' });
+    
+    // Convert buffer to string and extract readable text
+    const buffer = Buffer.from(response.data as ArrayBuffer);
+    const text = extractTextFromPdfBuffer(buffer);
+    
+    if (text.trim()) {
+      console.log(`Extracted ${text.length} chars from PDF: ${fileName}`);
+      return text;
+    }
+    
+    // If no text extracted, return file metadata as placeholder
+    return `[PDF Document: ${fileName}]`;
+  } catch (error) {
+    console.error('Error reading PDF file:', error);
+    return '';
+  }
+}
+
+// Simple text extraction from PDF buffer
+function extractTextFromPdfBuffer(buffer: Buffer): string {
+  try {
+    const content = buffer.toString('utf-8');
+    
+    // Extract text between stream markers (common PDF text location)
+    const textParts: string[] = [];
+    
+    // Look for text in parentheses (PDF text objects)
+    const parenRegex = /\(([^)]+)\)/g;
+    let match;
+    while ((match = parenRegex.exec(content)) !== null) {
+      const text = match[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '')
+        .replace(/\\t/g, ' ')
+        .replace(/\\\(/g, '(')
+        .replace(/\\\)/g, ')')
+        .replace(/\\\\/g, '\\');
+      
+      // Filter out binary/control characters
+      const cleaned = text.replace(/[^\x20-\x7E\n]/g, ' ').trim();
+      if (cleaned.length > 2) {
+        textParts.push(cleaned);
+      }
+    }
+    
+    // Also look for BT...ET text blocks with Tj operators
+    const tjRegex = /\[([^\]]+)\]\s*TJ/g;
+    while ((match = tjRegex.exec(content)) !== null) {
+      const parts = match[1].split(/\(|\)/);
+      for (const part of parts) {
+        const cleaned = part.replace(/[^\x20-\x7E\n]/g, ' ').trim();
+        if (cleaned.length > 2 && !/^[-\d\s.]+$/.test(cleaned)) {
+          textParts.push(cleaned);
+        }
+      }
+    }
+    
+    // Dedupe and join
+    const uniqueParts = [...new Set(textParts)];
+    return uniqueParts.join(' ').replace(/\s+/g, ' ').trim();
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    return '';
+  }
+}
+
+// Read Google Sheets as text
+export async function readGoogleSheet(fileId: string): Promise<string> {
+  try {
+    const drive = await getGoogleDriveClient();
+    
+    // Export sheet as CSV
+    const response = await drive.files.export({
+      fileId,
+      mimeType: 'text/csv'
+    }, { responseType: 'text' });
+    
+    return String(response.data);
+  } catch (error) {
+    console.error('Error reading Google Sheet:', error);
+    return '';
+  }
+}
+
+// Read Google Slides as text
+export async function readGoogleSlides(fileId: string): Promise<string> {
+  try {
+    const drive = await getGoogleDriveClient();
+    
+    // Export slides as plain text
+    const response = await drive.files.export({
+      fileId,
+      mimeType: 'text/plain'
+    }, { responseType: 'text' });
+    
+    return String(response.data);
+  } catch (error) {
+    console.error('Error reading Google Slides:', error);
+    return '';
+  }
+}
+
+// Read file content based on mime type
+async function readFileContent(file: {id: string, name: string, mimeType: string}): Promise<string> {
+  try {
+    switch (file.mimeType) {
+      case 'application/vnd.google-apps.document':
+        return await readGoogleDoc(file.id);
+      
+      case 'application/vnd.google-apps.spreadsheet':
+        return await readGoogleSheet(file.id);
+      
+      case 'application/vnd.google-apps.presentation':
+        return await readGoogleSlides(file.id);
+      
+      case 'application/pdf':
+        return await readPdfFile(file.id, file.name);
+      
+      case 'text/plain':
+      case 'text/markdown':
+      case 'text/csv':
+        return await readTextFile(file.id);
+      
+      case 'application/json':
+        return await readTextFile(file.id);
+      
+      default:
+        // Try to read as text for unknown types
+        if (file.mimeType?.startsWith('text/')) {
+          return await readTextFile(file.id);
+        }
+        console.log(`Skipping unsupported file type: ${file.mimeType} (${file.name})`);
+        return '';
+    }
+  } catch (error) {
+    console.error(`Error reading file ${file.name}:`, error);
+    return '';
+  }
+}
+
 // Get all coaching content from Drive
-export async function getAllCoachingContent(): Promise<{documents: Array<{name: string, content: string}>}> {
+export async function getAllCoachingContent(): Promise<{documents: Array<{name: string, content: string, path?: string}>}> {
   try {
     const files = await listCoachingDocuments();
-    const documents: Array<{name: string, content: string}> = [];
+    const documents: Array<{name: string, content: string, path?: string}> = [];
 
+    console.log(`Processing ${files.length} files from Drive...`);
+    
     for (const file of files) {
-      let content = '';
+      const content = await readFileContent(file);
       
-      if (file.mimeType === 'application/vnd.google-apps.document') {
-        content = await readGoogleDoc(file.id);
-      } else if (file.mimeType === 'text/plain') {
-        content = await readTextFile(file.id);
-      }
-      
-      if (content) {
-        documents.push({ name: file.name, content });
+      if (content && content.length > 10) {
+        const displayName = file.path ? `${file.path}/${file.name}` : file.name;
+        documents.push({ name: displayName, content, path: file.path });
+        console.log(`Loaded: ${displayName} (${content.length} chars)`);
       }
     }
 
+    console.log(`Successfully loaded ${documents.length} documents`);
     return { documents };
   } catch (error) {
     console.error('Error getting coaching content:', error);
@@ -204,31 +387,32 @@ export async function isDriveConnected(): Promise<boolean> {
 }
 
 // Sync all documents from Google Drive to the database
-export async function syncDriveToDatabase(): Promise<{synced: number, errors: string[]}> {
+export async function syncDriveToDatabase(): Promise<{synced: number, errors: string[], total: number}> {
   const { storage } = await import('./storage');
   const files = await listCoachingDocuments();
   let synced = 0;
   const errors: string[] = [];
 
+  console.log(`Starting sync of ${files.length} files from Drive folder tree...`);
+
   for (const file of files) {
     try {
-      let content = '';
+      const content = await readFileContent(file);
       
-      if (file.mimeType === 'application/vnd.google-apps.document') {
-        content = await readGoogleDoc(file.id);
-      } else if (file.mimeType === 'text/plain') {
-        content = await readTextFile(file.id);
-      }
-      
-      if (content) {
+      if (content && content.length > 10) {
+        const displayName = file.path ? `${file.path}/${file.name}` : file.name;
+        
         await storage.upsertTrainingDocument({
           driveFileId: file.id,
-          name: file.name,
+          name: displayName,
           content,
           mimeType: file.mimeType,
           isActive: true,
         });
         synced++;
+        console.log(`Synced: ${displayName}`);
+      } else {
+        console.log(`Skipped (no content): ${file.name} (${file.mimeType})`);
       }
     } catch (error) {
       const errorMsg = `Failed to sync ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -237,5 +421,6 @@ export async function syncDriveToDatabase(): Promise<{synced: number, errors: st
     }
   }
 
-  return { synced, errors };
+  console.log(`Sync complete: ${synced}/${files.length} files synced`);
+  return { synced, errors, total: files.length };
 }
