@@ -53,7 +53,7 @@ function AdminRoute() {
     );
   }
 
-  if (userRole?.role !== "master_admin") {
+  if (userRole?.role !== "master_admin" && userRole?.role !== "relationship_manager") {
     return <NotFound />;
   }
 
