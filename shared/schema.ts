@@ -876,3 +876,98 @@ export const insertTrainingDocumentSchema = createInsertSchema(trainingDocuments
 });
 export type InsertTrainingDocument = z.infer<typeof insertTrainingDocumentSchema>;
 export type TrainingDocument = typeof trainingDocuments.$inferSelect;
+
+// Daily Edge Belief Systems
+export const DAILY_EDGE_BELIEFS = ["fulfilment", "control", "resilience", "influence", "communication"] as const;
+export type DailyEdgeBelief = typeof DAILY_EDGE_BELIEFS[number];
+
+// Daily Edge Content Types
+export const DAILY_EDGE_CONTENT_TYPES = ["quote", "insight", "challenge", "iconic_story", "journey_motivator"] as const;
+export type DailyEdgeContentType = typeof DAILY_EDGE_CONTENT_TYPES[number];
+
+// Daily Edge Content table - stores motivation/mindset training content
+export const dailyEdgeContent = pgTable("daily_edge_content", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  belief: varchar("belief", { length: 50 }).notNull(),
+  contentType: varchar("content_type", { length: 30 }).notNull(),
+  title: varchar("title", { length: 200 }),
+  content: text("content").notNull(),
+  source: varchar("source", { length: 100 }),
+  difficulty: varchar("difficulty", { length: 20 }).default("all"),
+  tags: text("tags").array(),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDailyEdgeContentSchema = createInsertSchema(dailyEdgeContent).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDailyEdgeContent = z.infer<typeof insertDailyEdgeContentSchema>;
+export type DailyEdgeContent = typeof dailyEdgeContent.$inferSelect;
+
+// User Daily Edge engagement table - tracks which content users have seen
+export const userDailyEdge = pgTable("user_daily_edge", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  contentId: integer("content_id").notNull().references(() => dailyEdgeContent.id),
+  viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  completedChallenge: boolean("completed_challenge").default(false),
+  reflection: text("reflection"),
+  rating: integer("rating"),
+});
+
+export const userDailyEdgeRelations = relations(userDailyEdge, ({ one }) => ({
+  content: one(dailyEdgeContent, {
+    fields: [userDailyEdge.contentId],
+    references: [dailyEdgeContent.id],
+  }),
+}));
+
+export const insertUserDailyEdgeSchema = createInsertSchema(userDailyEdge).omit({
+  id: true,
+  viewedAt: true,
+});
+export type InsertUserDailyEdge = z.infer<typeof insertUserDailyEdgeSchema>;
+export type UserDailyEdge = typeof userDailyEdge.$inferSelect;
+
+// User Belief Progress table - tracks overall progress through each belief system
+export const userBeliefProgress = pgTable("user_belief_progress", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  belief: varchar("belief", { length: 50 }).notNull(),
+  contentViewed: integer("content_viewed").default(0),
+  challengesCompleted: integer("challenges_completed").default(0),
+  currentStreak: integer("current_streak").default(0),
+  longestStreak: integer("longest_streak").default(0),
+  lastActivity: timestamp("last_activity"),
+}, (table) => ({
+  userBeliefUnique: unique().on(table.userId, table.belief),
+}));
+
+export const insertUserBeliefProgressSchema = createInsertSchema(userBeliefProgress).omit({
+  id: true,
+});
+export type InsertUserBeliefProgress = z.infer<typeof insertUserBeliefProgressSchema>;
+export type UserBeliefProgress = typeof userBeliefProgress.$inferSelect;
+
+// Daily Edge Streaks table - tracks consecutive days of engagement
+export const dailyEdgeStreaks = pgTable("daily_edge_streaks", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull().unique(),
+  currentStreak: integer("current_streak").default(0),
+  longestStreak: integer("longest_streak").default(0),
+  lastActiveDate: timestamp("last_active_date"),
+  totalDaysActive: integer("total_days_active").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDailyEdgeStreakSchema = createInsertSchema(dailyEdgeStreaks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDailyEdgeStreak = z.infer<typeof insertDailyEdgeStreakSchema>;
+export type DailyEdgeStreak = typeof dailyEdgeStreaks.$inferSelect;
