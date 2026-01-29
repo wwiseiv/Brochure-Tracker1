@@ -36,6 +36,8 @@ import {
   SALES_TRAINING_KNOWLEDGE,
   getBusinessContextPrompt,
   getScenarioPrompt,
+  getCoachingHint,
+  ROLEPLAY_PERSONAS,
 } from "./roleplay-knowledge";
 import { insertRoleplaySessionSchema, ROLEPLAY_SCENARIOS } from "@shared/schema";
 import { z } from "zod";
@@ -3593,13 +3595,17 @@ Respond in JSON format:
   app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { dropId, scenario, customObjections, mode = "roleplay" } = req.body;
+      const { dropId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona } = req.body;
 
       if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
         return res.status(400).json({ 
           error: `Invalid scenario. Must be one of: ${ROLEPLAY_SCENARIOS.join(", ")}` 
         });
       }
+
+      // Validate difficulty level
+      const validDifficulties = ["beginner", "intermediate", "advanced"];
+      const selectedDifficulty = validDifficulties.includes(difficulty) ? difficulty : "intermediate";
 
       const isCoachingMode = mode === "coaching";
 
@@ -3626,7 +3632,7 @@ Respond in JSON format:
         dropId: dropId ? parseInt(dropId) : null,
         scenario,
         mode: mode || "roleplay",
-        businessContext,
+        businessContext: `${businessContext}\nDifficulty: ${selectedDifficulty}${persona ? `\nPersona: ${persona}` : ''}`,
         status: "active",
       });
 
@@ -3652,7 +3658,7 @@ YOUR ROLE AS COACH:
 
 You're their personal sales coach. Help them succeed!`;
       } else {
-        const scenarioPrompt = getScenarioPrompt(scenario);
+        const scenarioPrompt = getScenarioPrompt(scenario, selectedDifficulty as 'beginner' | 'intermediate' | 'advanced', persona);
         systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
 
 ${scenarioPrompt}
@@ -3703,6 +3709,22 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     } catch (error) {
       console.error("Error creating roleplay session:", error);
       res.status(500).json({ error: "Failed to create roleplay session" });
+    }
+  });
+
+  // Get available personas for roleplay
+  app.get("/api/roleplay/personas", isAuthenticated, async (_req: any, res) => {
+    try {
+      const personas = Object.entries(ROLEPLAY_PERSONAS).map(([key, value]) => ({
+        id: key,
+        name: value.name,
+        description: value.description,
+        difficulty: value.difficulty,
+      }));
+      res.json({ personas });
+    } catch (error) {
+      console.error("Error fetching personas:", error);
+      res.status(500).json({ error: "Failed to fetch personas" });
     }
   });
 
@@ -3828,9 +3850,20 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         content: aiResponse,
       });
 
+      // Generate coaching hint for roleplay mode (not coaching mode)
+      let coachingHint: string | null = null;
+      if (session.mode === "roleplay") {
+        const conversationHistory = recentMessages.map(m => ({
+          role: m.role,
+          content: m.content
+        }));
+        coachingHint = getCoachingHint(trimmedMessage, aiResponse, conversationHistory);
+      }
+
       res.json({
         response: aiResponse,
         messageId: savedMessage.id,
+        coachingHint,
       });
     } catch (error: any) {
       const errorMessage = error?.message || "Unknown error";

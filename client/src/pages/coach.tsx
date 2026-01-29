@@ -44,6 +44,7 @@ import {
   ChevronDown,
   Calendar,
   History,
+  X,
 } from "lucide-react";
 import type { RoleplayScenario, RoleplaySession } from "@shared/schema";
 import { format } from "date-fns";
@@ -229,6 +230,13 @@ const scenarioOptions: { value: RoleplayScenario; label: string; description: st
 ];
 
 type SessionMode = "roleplay" | "coaching";
+type DifficultyLevel = "beginner" | "intermediate" | "advanced";
+
+const difficultyOptions: { value: DifficultyLevel; label: string; description: string }[] = [
+  { value: "beginner", label: "Beginner", description: "Easier prospect, more forgiving" },
+  { value: "intermediate", label: "Intermediate", description: "Balanced challenge" },
+  { value: "advanced", label: "Advanced", description: "Tough prospect, realistic challenges" },
+];
 
 export default function CoachPage() {
   const { toast } = useToast();
@@ -237,6 +245,8 @@ export default function CoachPage() {
   const [mode, setMode] = useState<SessionMode>("coaching");
   const [scenario, setScenario] = useState<RoleplayScenario>("cold_approach");
   const [customObjections, setCustomObjections] = useState("");
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>("intermediate");
+  const [coachingHint, setCoachingHint] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -280,17 +290,19 @@ export default function CoachPage() {
         scenario,
         mode,
         customObjections: customObjections.trim() || undefined,
+        difficulty: mode === "roleplay" ? difficulty : undefined,
       });
       return res.json();
     },
     onSuccess: (data) => {
       setSessionId(data.sessionId);
       setMessages([]);
+      setCoachingHint(null);
       toast({
         title: mode === "coaching" ? "Coaching session started" : "Role-play started",
         description: mode === "coaching" 
           ? "Ask me anything about sales techniques or what to say!"
-          : "Begin your approach! The prospect is waiting...",
+          : `Begin your approach! (${difficulty} difficulty)`,
       });
     },
     onError: (error: Error) => {
@@ -316,6 +328,12 @@ export default function CoachPage() {
         content: data.response,
       };
       setMessages((prev) => [...prev, newMessage]);
+      // Display coaching hint if available
+      if (data.coachingHint) {
+        setCoachingHint(data.coachingHint);
+      } else {
+        setCoachingHint(null);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -714,6 +732,29 @@ export default function CoachPage() {
                 </div>
               </div>
 
+              {mode === "roleplay" && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Difficulty Level</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {difficultyOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setDifficulty(option.value)}
+                        className={`p-2 rounded-lg border-2 text-center transition-colors ${
+                          difficulty === option.value
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        data-testid={`difficulty-${option.value}`}
+                      >
+                        <div className="font-medium text-sm">{option.label}</div>
+                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {scenario === "objection_handling" && (
                 <div>
                   <label className="text-sm font-medium mb-2 block">
@@ -899,6 +940,28 @@ export default function CoachPage() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Coaching Hint Display */}
+              {coachingHint && mode === "roleplay" && (
+                <div className="mx-4 mb-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-0.5">Coach's Tip</div>
+                      <p className="text-sm text-amber-800 dark:text-amber-200">{coachingHint}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 ml-auto -mt-1 -mr-1"
+                      onClick={() => setCoachingHint(null)}
+                      data-testid="button-dismiss-hint"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="p-4 border-t space-y-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
