@@ -4238,7 +4238,11 @@ Provide constructive feedback in JSON format:
     try {
       const userId = req.user.claims.sub;
       const todaysContent = await storage.getTodaysDailyEdge(userId);
-      res.json(todaysContent);
+      // Transform to match UI expectations
+      res.json({
+        todaysBelief: todaysContent.belief,
+        content: todaysContent.content,
+      });
     } catch (error) {
       console.error("Error fetching today's Daily Edge:", error);
       res.status(500).json({ error: "Failed to fetch today's content" });
@@ -4295,9 +4299,33 @@ Provide constructive feedback in JSON format:
       const progress = await storage.getUserDailyEdgeProgress(userId);
       const beliefProgress = await storage.getUserBeliefProgress(userId);
       
+      // Get total content per belief for progress calculation
+      const allContent = await storage.getDailyEdgeContent();
+      const contentByBelief: Record<string, number> = {};
+      for (const item of allContent) {
+        contentByBelief[item.belief] = (contentByBelief[item.belief] || 0) + 1;
+      }
+      
+      // Transform beliefProgress to match UI expectations
+      // Include all 5 beliefs even if user hasn't viewed any content yet
+      const beliefs = DAILY_EDGE_BELIEFS.map(belief => {
+        const userProgress = beliefProgress.find(p => p.belief === belief);
+        return {
+          belief,
+          totalContent: contentByBelief[belief] || 0,
+          viewedContent: userProgress?.contentViewed || 0,
+          completedChallenges: userProgress?.challengesCompleted || 0,
+        };
+      });
+      
       res.json({
-        ...progress,
-        beliefs: beliefProgress,
+        totalViewed: progress.totalViewed,
+        challengesCompleted: progress.challengesCompleted,
+        streak: {
+          current: progress.streak?.currentStreak || 0,
+          longest: progress.streak?.longestStreak || 0,
+        },
+        beliefs,
       });
     } catch (error) {
       console.error("Error fetching Daily Edge progress:", error);
