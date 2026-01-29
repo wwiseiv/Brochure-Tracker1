@@ -5539,5 +5539,326 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
     }
   });
 
+  // ============================================
+  // Proposal Generator Routes
+  // ============================================
+
+  const pdfUpload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") {
+        cb(null, true);
+      } else {
+        cb(new Error("Only PDF files are allowed"));
+      }
+    },
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+  });
+
+  app.post("/api/proposals/parse", isAuthenticated, ensureOrgMembership(), pdfUpload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "PDF file is required" });
+      }
+
+      const { parsePDFProposal } = await import("./proposal-generator");
+      const parsedData = await parsePDFProposal(req.file.buffer);
+
+      res.json({
+        success: true,
+        data: parsedData,
+      });
+    } catch (error: any) {
+      console.error("[Proposals] Error parsing PDF:", error);
+      res.status(500).json({ error: "Failed to parse PDF: " + (error.message || "Unknown error") });
+    }
+  });
+
+  app.post("/api/proposals/generate", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+
+      const { parsedData, useAI, selectedTerminalId } = req.body;
+
+      if (!parsedData || !parsedData.merchantName) {
+        return res.status(400).json({ error: "Parsed proposal data is required" });
+      }
+
+      const { generateProposalBlueprint, generateProposalPDF, generateProposalDOCX } = await import("./proposal-generator");
+
+      let equipment: { name: string; features: string[]; whySelected: string } | undefined;
+      if (selectedTerminalId) {
+        const products = await storage.getEquipmentProducts();
+        const terminal = products.find(p => p.id === selectedTerminalId);
+        if (terminal) {
+          equipment = {
+            name: terminal.name,
+            features: terminal.features || [],
+            whySelected: `Based on your monthly volume of $${parsedData.currentState?.totalVolume?.toLocaleString() || "N/A"}, ${terminal.name} is recommended for its ${terminal.bestFor?.join(", ") || "versatile features"}.`,
+          };
+        }
+      } else {
+        const products = await storage.getEquipmentProducts();
+        const volume = parsedData.currentState?.totalVolume || 0;
+        let recommended = products.find(p => p.isActive && p.category === "hardware");
+        if (volume > 50000) {
+          recommended = products.find(p => p.name?.toLowerCase().includes("z11") || p.type === "countertop");
+        } else if (volume > 10000) {
+          recommended = products.find(p => p.name?.toLowerCase().includes("z9") || p.type === "wireless");
+        }
+        if (recommended) {
+          equipment = {
+            name: recommended.name,
+            features: recommended.features || [],
+            whySelected: `Recommended based on your processing volume and business needs.`,
+          };
+        }
+      }
+
+      let blueprint = await generateProposalBlueprint(parsedData, equipment);
+
+      if (useAI) {
+        try {
+          const client = getAIIntegrationsClient();
+          const aiPrompt = `You are a professional proposal writer for PCBancard, a payment processing company. Based on the following merchant analysis, enhance the proposal content to be more persuasive and professional.
+
+Merchant: ${parsedData.merchantName}
+Current Monthly Cost: $${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "N/A"}
+Recommended Option: ${blueprint.savingsComparison.recommendedOption === "dual_pricing" ? "Dual Pricing" : "Interchange Plus"}
+Estimated Monthly Savings: $${Math.max(blueprint.savingsComparison.dualPricingSavings || 0, blueprint.savingsComparison.interchangePlusSavings || 0).toLocaleString()}
+
+Generate:
+1. A compelling executive summary intro (2-3 sentences)
+2. A strong recommendation statement (2-3 sentences)
+3. A persuasive call to action (2-3 sentences)
+
+Format your response as JSON:
+{
+  "intro": "...",
+  "recommendation": "...",
+  "callToAction": "..."
+}`;
+
+          const response = await client.chat.completions.create({
+            model: "gpt-4.1-mini",
+            messages: [
+              { role: "system", content: "You are a professional B2B sales proposal writer. Be persuasive but professional. Focus on value and savings." },
+              { role: "user", content: aiPrompt },
+            ],
+            max_completion_tokens: 500,
+            temperature: 0.7,
+          });
+
+          const aiContent = response.choices[0]?.message?.content || "";
+          const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const aiEnhancements = JSON.parse(jsonMatch[0]);
+            if (aiEnhancements.intro) blueprint.executiveSummary.intro = aiEnhancements.intro;
+            if (aiEnhancements.recommendation) blueprint.executiveSummary.recommendation = aiEnhancements.recommendation;
+            if (aiEnhancements.callToAction) blueprint.callToAction = aiEnhancements.callToAction;
+          }
+        } catch (aiError: any) {
+          console.error("[Proposals] AI enhancement failed:", aiError.message);
+        }
+      }
+
+      const proposal = await storage.createProposal({
+        userId,
+        organizationId: membership.orgId,
+        merchantName: parsedData.merchantName,
+        agentName: parsedData.agentName || req.user.claims.name || undefined,
+        agentTitle: parsedData.agentTitle || "Account Executive",
+        currentState: parsedData.currentState,
+        optionInterchangePlus: parsedData.optionInterchangePlus,
+        optionDualPricing: parsedData.optionDualPricing,
+        selectedTerminalId: equipment ? selectedTerminalId : undefined,
+        terminalName: equipment?.name,
+        terminalFeatures: equipment?.features,
+        whySelected: equipment?.whySelected,
+        proposalBlueprint: blueprint,
+        status: "draft",
+      });
+
+      res.json({
+        success: true,
+        proposal,
+        blueprint,
+      });
+    } catch (error: any) {
+      console.error("[Proposals] Error generating proposal:", error);
+      res.status(500).json({ error: "Failed to generate proposal: " + (error.message || "Unknown error") });
+    }
+  });
+
+  app.get("/api/proposals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+
+      let proposals;
+      if (isAdmin) {
+        proposals = await storage.getProposalsByOrganization(membership.orgId);
+      } else {
+        proposals = await storage.getProposalsByUser(userId);
+      }
+
+      res.json(proposals);
+    } catch (error: any) {
+      console.error("[Proposals] Error fetching proposals:", error);
+      res.status(500).json({ error: "Failed to fetch proposals" });
+    }
+  });
+
+  app.get("/api/proposals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid proposal ID" });
+      }
+
+      const proposal = await storage.getProposal(id);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      res.json(proposal);
+    } catch (error: any) {
+      console.error("[Proposals] Error fetching proposal:", error);
+      res.status(500).json({ error: "Failed to fetch proposal" });
+    }
+  });
+
+  app.get("/api/proposals/:id/download/:format", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+      const format = req.params.format?.toLowerCase();
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid proposal ID" });
+      }
+
+      if (format !== "pdf" && format !== "docx") {
+        return res.status(400).json({ error: "Format must be 'pdf' or 'docx'" });
+      }
+
+      const proposal = await storage.getProposal(id);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const { generateProposalPDF, generateProposalDOCX, ProposalBlueprint, ParsedProposal } = await import("./proposal-generator");
+
+      const blueprint = proposal.proposalBlueprint as any;
+      const parsedData = {
+        merchantName: proposal.merchantName,
+        preparedDate: proposal.preparedDate,
+        agentName: proposal.agentName,
+        agentTitle: proposal.agentTitle,
+        currentState: proposal.currentState,
+        optionInterchangePlus: proposal.optionInterchangePlus,
+        optionDualPricing: proposal.optionDualPricing,
+        proposalType: proposal.optionDualPricing ? "dual_pricing" : "interchange_plus",
+      } as any;
+
+      let buffer: Buffer;
+      let contentType: string;
+      let filename: string;
+
+      const safeMerchantName = proposal.merchantName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+
+      if (format === "pdf") {
+        buffer = await generateProposalPDF(blueprint, parsedData);
+        contentType = "application/pdf";
+        filename = `PCBancard_Proposal_${safeMerchantName}.pdf`;
+      } else {
+        buffer = await generateProposalDOCX(blueprint, parsedData);
+        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        filename = `PCBancard_Proposal_${safeMerchantName}.docx`;
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", buffer.length);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[Proposals] Error downloading proposal:", error);
+      res.status(500).json({ error: "Failed to download proposal: " + (error.message || "Unknown error") });
+    }
+  });
+
+  app.patch("/api/proposals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid proposal ID" });
+      }
+
+      const proposal = await storage.getProposal(id);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const { status } = req.body;
+      const updateData: any = {};
+      if (status && ["draft", "generated", "sent"].includes(status)) {
+        updateData.status = status;
+      }
+
+      const updated = await storage.updateProposal(id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Proposals] Error updating proposal:", error);
+      res.status(500).json({ error: "Failed to update proposal" });
+    }
+  });
+
+  app.delete("/api/proposals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid proposal ID" });
+      }
+
+      const proposal = await storage.getProposal(id);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      await storage.deleteProposal(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Proposals] Error deleting proposal:", error);
+      res.status(500).json({ error: "Failed to delete proposal" });
+    }
+  });
+
   return httpServer;
 }

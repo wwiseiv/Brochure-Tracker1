@@ -124,6 +124,9 @@ import {
   type PresentationQuiz,
   type PresentationModuleWithLessons,
   type PresentationLessonWithProgress,
+  proposals,
+  type Proposal,
+  type InsertProposal,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
@@ -1799,6 +1802,41 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(presentationProgress).values(insertData).returning();
       return created;
     }
+  }
+
+  async createProposal(data: InsertProposal): Promise<Proposal> {
+    const [created] = await db.insert(proposals).values(data).returning();
+    return created;
+  }
+
+  async getProposal(id: number): Promise<Proposal | undefined> {
+    const [proposal] = await db.select().from(proposals).where(eq(proposals.id, id));
+    return proposal;
+  }
+
+  async getProposalsByUser(userId: string): Promise<Proposal[]> {
+    return db.select().from(proposals)
+      .where(eq(proposals.userId, userId))
+      .orderBy(desc(proposals.createdAt));
+  }
+
+  async getProposalsByOrganization(orgId: number): Promise<Proposal[]> {
+    return db.select().from(proposals)
+      .where(eq(proposals.organizationId, orgId))
+      .orderBy(desc(proposals.createdAt));
+  }
+
+  async updateProposal(id: number, data: Partial<Proposal>): Promise<Proposal | undefined> {
+    const { id: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db.update(proposals)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(proposals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProposal(id: number): Promise<void> {
+    await db.delete(proposals).where(eq(proposals.id, id));
   }
 }
 
