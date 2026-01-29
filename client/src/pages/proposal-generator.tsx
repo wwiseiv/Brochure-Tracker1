@@ -23,7 +23,8 @@ import {
   TrendingDown,
   Sparkles,
   FileCheck,
-  Monitor
+  Monitor,
+  X
 } from "lucide-react";
 
 interface ParsedProposal {
@@ -175,12 +176,13 @@ export default function ProposalGeneratorPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [parsedData, setParsedData] = useState<ParsedProposal | null>(null);
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentProduct | null>(null);
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(null);
   const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
   const [isDragging, setIsDragging] = useState(false);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
   const { data: proposals, isLoading: proposalsLoading } = useQuery<Proposal[]>({
     queryKey: ["/api/proposals"],
@@ -191,29 +193,35 @@ export default function ProposalGeneratorPage() {
   });
 
   const parseMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/proposals/parse", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
-        throw new Error(errorData.error || errorData.message || "Failed to parse PDF");
+    mutationFn: async (files: File[]) => {
+      const allResults: any[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/proposals/parse", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
+          throw new Error(errorData.error || errorData.message || `Failed to parse ${file.name}`);
+        }
+        const result = await res.json();
+        allResults.push({ data: result.data || result, fileName: file.name });
       }
-      const result = await res.json();
-      return result.data || result;
+      return allResults;
     },
-    onSuccess: (data) => {
-      const transformedData = transformParsedData(data);
-      setParsedData(transformedData);
-      setStep("review");
-      toast({
-        title: "PDF Parsed Successfully",
-        description: `Extracted data for ${transformedData.merchantName}`,
-      });
+    onSuccess: (results) => {
+      if (results.length > 0) {
+        const transformedData = transformParsedData(results[0].data);
+        setParsedData(transformedData);
+        setStep("review");
+        toast({
+          title: "PDFs Parsed Successfully",
+          description: `Extracted data from ${results.length} file${results.length > 1 ? 's' : ''}`,
+        });
+      }
     },
     onError: (error) => {
       toast({
@@ -247,17 +255,20 @@ export default function ProposalGeneratorPage() {
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setUploadedFile(file);
+    const files = Array.from(e.target.files || []);
+    const pdfFiles = files.filter(file => file.type === "application/pdf");
+    const nonPdfCount = files.length - pdfFiles.length;
+    
+    if (nonPdfCount > 0) {
+      toast({
+        title: "Some files skipped",
+        description: `${nonPdfCount} non-PDF file(s) were not added`,
+        variant: "destructive",
+      });
+    }
+    
+    if (pdfFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...pdfFiles]);
     }
   };
 
@@ -278,23 +289,30 @@ export default function ProposalGeneratorPage() {
     e.stopPropagation();
     setIsDragging(false);
     
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setUploadedFile(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    const pdfFiles = files.filter(file => file.type === "application/pdf");
+    const nonPdfCount = files.length - pdfFiles.length;
+    
+    if (nonPdfCount > 0) {
+      toast({
+        title: "Some files skipped",
+        description: `${nonPdfCount} non-PDF file(s) were not added`,
+        variant: "destructive",
+      });
+    }
+    
+    if (pdfFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...pdfFiles]);
     }
   };
 
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleParse = () => {
-    if (uploadedFile) {
-      parseMutation.mutate(uploadedFile);
+    if (uploadedFiles.length > 0) {
+      parseMutation.mutate(uploadedFiles);
     }
   };
 
@@ -355,48 +373,63 @@ export default function ProposalGeneratorPage() {
               onChange={handleFileChange}
               className="hidden"
               id="pdf-upload"
+              multiple
               data-testid="input-pdf-upload"
             />
             <label htmlFor="pdf-upload" className="cursor-pointer block">
               <FileText className={`w-12 h-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
               <p className="text-lg font-medium mb-2">
                 {isDragging 
-                  ? "Drop your PDF here" 
-                  : uploadedFile 
-                    ? uploadedFile.name 
-                    : "Click to upload or drag PDF here"}
+                  ? "Drop your PDFs here" 
+                  : uploadedFiles.length > 0 
+                    ? `${uploadedFiles.length} file${uploadedFiles.length > 1 ? 's' : ''} selected` 
+                    : "Click to upload or drag PDFs here"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Supports Dual Pricing and Interchange Plus proposals
+                Supports multiple Dual Pricing and Interchange Plus proposals
               </p>
             </label>
           </div>
           
-          {uploadedFile && (
-            <div className="flex items-center justify-between bg-muted rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <FileCheck className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium">{uploadedFile.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(uploadedFile.size / 1024).toFixed(1)} KB
-                  </p>
+          {uploadedFiles.length > 0 && (
+            <div className="space-y-2">
+              {uploadedFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between bg-muted rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <FileCheck className="w-6 h-6 text-primary" />
+                    <div>
+                      <p className="font-medium text-sm">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleRemoveFile(index)}
+                    data-testid={`button-remove-file-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-              </div>
+              ))}
+              
               <Button 
                 onClick={handleParse}
                 disabled={parseMutation.isPending}
+                className="w-full mt-4"
                 data-testid="button-parse-pdf"
               >
                 {parseMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Parsing...
+                    Parsing {uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''}...
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Parse PDF
+                    Parse {uploadedFiles.length} PDF{uploadedFiles.length > 1 ? 's' : ''}
                   </>
                 )}
               </Button>

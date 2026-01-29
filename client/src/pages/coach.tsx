@@ -1381,7 +1381,7 @@ export default function CoachPage() {
             <div className="flex-1 overflow-auto">
               <div className="max-w-4xl mx-auto">
                 <DailyEdgeSection />
-              <div className="p-4 pt-0 space-y-4">
+              <div className="p-4 space-y-4">
               {/* Presentation Training Link */}
               <Link href="/presentation-training">
                 <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-presentation-training">
