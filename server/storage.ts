@@ -155,6 +155,7 @@ export interface IStorage {
   createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
   updateOrganizationMember(id: number, data: Partial<Pick<OrganizationMember, 'role' | 'managerId'>>): Promise<OrganizationMember | undefined>;
   updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined>;
+  updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; profileComplete?: boolean }): Promise<OrganizationMember | undefined>;
   deleteOrganizationMember(id: number): Promise<boolean>;
   getAgentsByManager(managerId: number): Promise<OrganizationMember[]>;
   
@@ -507,6 +508,15 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(organizationMembers)
       .set({ role })
+      .where(eq(organizationMembers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; profileComplete?: boolean }): Promise<OrganizationMember | undefined> {
+    const [updated] = await db
+      .update(organizationMembers)
+      .set(data)
       .where(eq(organizationMembers.id, id))
       .returning();
     return updated;

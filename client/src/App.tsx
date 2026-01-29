@@ -1,3 +1,4 @@
+import React from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -26,8 +27,11 @@ import SequencesPage from "@/pages/sequences";
 import AcceptInvitePage from "@/pages/accept-invite";
 import CoachPage from "@/pages/coach";
 import EquipIQPage from "@/pages/equipiq";
+import CompleteProfilePage from "@/pages/complete-profile";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
+
+import { useLocation } from "wouter";
 
 interface UserRole {
   role: string;
@@ -37,6 +41,7 @@ interface UserRole {
     name: string;
   };
   managerId: number | null;
+  profileComplete?: boolean;
 }
 
 function AdminRoute() {
@@ -129,11 +134,47 @@ function AuthenticatedRouter() {
       <Route path="/sequences" component={SequencesPage} />
       <Route path="/coach" component={CoachPage} />
       <Route path="/equipiq" component={EquipIQPage} />
+      <Route path="/complete-profile" component={CompleteProfilePage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/email" component={EmailDrafterPage} />
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+function ProfileCompletionGuard({ children }: { children: React.ReactNode }) {
+  const [location, setLocation] = useLocation();
+  const { data: userRole, isLoading } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
+
+  // Use effect for navigation to avoid render-time side effects
+  const needsProfileCompletion = userRole && userRole.profileComplete === false && location !== "/complete-profile";
+  
+  React.useEffect(() => {
+    if (needsProfileCompletion) {
+      setLocation("/complete-profile");
+    }
+  }, [needsProfileCompletion, setLocation]);
+
+  // Don't block while loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Return null while redirecting
+  if (needsProfileCompletion) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
 
 function AppContent() {
@@ -154,7 +195,11 @@ function AppContent() {
     return <LandingPage />;
   }
 
-  return <AuthenticatedRouter />;
+  return (
+    <ProfileCompletionGuard>
+      <AuthenticatedRouter />
+    </ProfileCompletionGuard>
+  );
 }
 
 function App() {

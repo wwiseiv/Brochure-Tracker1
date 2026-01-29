@@ -1369,10 +1369,59 @@ Format your response as JSON:
           name: membership.organization.name,
         },
         managerId: membership.managerId,
+        profileComplete: membership.profileComplete,
       });
     } catch (error) {
       console.error("Error fetching user role:", error);
       res.status(500).json({ error: "Failed to fetch user role" });
+    }
+  });
+
+  // Update current user's profile
+  app.put("/api/me/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let membership = await storage.getUserMembership(userId);
+      
+      if (!membership) {
+        membership = await bootstrapUserOrganization(userId);
+      }
+
+      const profileSchema = z.object({
+        firstName: z.string().min(1, "First name is required").max(100),
+        lastName: z.string().min(1, "Last name is required").max(100),
+        email: z.string().email("Invalid email address").max(255),
+        phone: z.string().min(10, "Phone number must be at least 10 digits").max(20),
+      });
+
+      const parsed = profileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: errors 
+        });
+      }
+
+      const updated = await storage.updateMemberProfile(membership.id, {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        email: parsed.data.email,
+        phone: parsed.data.phone,
+        profileComplete: true,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
 

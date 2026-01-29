@@ -764,16 +764,17 @@ export default function TeamManagementPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name / ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Contact</TableHead>
                       <TableHead>Role</TableHead>
-                      <TableHead className="hidden md:table-cell">Manager</TableHead>
+                      <TableHead className="hidden lg:table-cell">Manager</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {!members || members.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                           No team members found
                         </TableCell>
                       </TableRow>
@@ -785,19 +786,60 @@ export default function TeamManagementPage() {
                         const RoleIcon = getRoleIcon(member.role);
                         const isCurrentUser = member.id === userRole?.memberId;
 
+                        const memberName = member.firstName && member.lastName
+                          ? `${member.firstName} ${member.lastName}`
+                          : member.firstName || member.lastName || null;
+                        const managerName = managerMember
+                          ? (managerMember.firstName && managerMember.lastName
+                            ? `${managerMember.firstName} ${managerMember.lastName}`
+                            : managerMember.firstName || managerMember.lastName || `Member #${managerMember.id}`)
+                          : null;
+                        
                         return (
                           <TableRow key={member.id} data-testid={`row-member-${member.id}`}>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-medium">
-                                  {member.userId.slice(0, 16)}...
+                                  {memberName || (
+                                    <span className="text-muted-foreground italic">
+                                      {member.email || `Member #${member.id}`}
+                                    </span>
+                                  )}
                                   {isCurrentUser && (
                                     <span className="ml-2 text-xs text-muted-foreground">(You)</span>
                                   )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  Member ID: {member.id}
-                                </span>
+                                {!member.profileComplete && (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                                    Profile incomplete
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <div className="flex flex-col text-sm">
+                                {member.email ? (
+                                  <a 
+                                    href={`mailto:${member.email}`} 
+                                    className="text-foreground hover:underline"
+                                    data-testid={`link-email-member-${member.id}`}
+                                  >
+                                    {member.email}
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground">No email</span>
+                                )}
+                                {member.phone ? (
+                                  <a 
+                                    href={`tel:${member.phone}`} 
+                                    className="text-muted-foreground hover:underline"
+                                    data-testid={`link-phone-member-${member.id}`}
+                                  >
+                                    {member.phone}
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">No phone</span>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -810,10 +852,10 @@ export default function TeamManagementPage() {
                                 {getRoleLabel(member.role)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="hidden md:table-cell">
+                            <TableCell className="hidden lg:table-cell">
                               {member.role === "agent" && managerMember ? (
                                 <span className="text-sm">
-                                  {managerMember.userId.slice(0, 12)}... (ID: {managerMember.id})
+                                  {managerName}
                                 </span>
                               ) : (
                                 <span className="text-sm text-muted-foreground">—</span>
