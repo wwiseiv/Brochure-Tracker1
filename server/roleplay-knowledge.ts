@@ -402,3 +402,49 @@ export function getCoachingHint(userMessage: string, aiResponse: string, convers
   
   return null;
 }
+
+// Daily Edge integration for coaching prompts
+export function buildDailyEdgeCoachingContext(dailyEdgeContent: {
+  belief: string;
+  quote?: { content: string; source?: string };
+  insight?: { content: string };
+  challenge?: { content: string };
+  journeyMotivator?: { content: string };
+}): string {
+  if (!dailyEdgeContent || !dailyEdgeContent.belief) {
+    return '';
+  }
+
+  const beliefDescriptions: Record<string, string> = {
+    fulfilment: "finding meaning and purpose in sales, making a difference in customers' lives",
+    control: "taking responsibility for outcomes, being proactive rather than reactive",
+    resilience: "bouncing back from rejection, maintaining mental toughness and persistence",
+    influence: "understanding buyer psychology, building rapport, and ethical persuasion",
+    communication: "active listening, powerful storytelling, and connecting authentically"
+  };
+
+  let context = `\n\n--- TODAY'S MINDSET FOCUS: ${dailyEdgeContent.belief.toUpperCase()} ---\n`;
+  context += `Today's coaching theme focuses on ${beliefDescriptions[dailyEdgeContent.belief] || dailyEdgeContent.belief}.\n\n`;
+
+  if (dailyEdgeContent.quote) {
+    context += `Inspiring Quote: "${dailyEdgeContent.quote.content}"`;
+    if (dailyEdgeContent.quote.source) {
+      context += ` - ${dailyEdgeContent.quote.source}`;
+    }
+    context += '\n\n';
+  }
+
+  if (dailyEdgeContent.insight) {
+    context += `Research Insight: ${dailyEdgeContent.insight.content}\n\n`;
+  }
+
+  if (dailyEdgeContent.journeyMotivator) {
+    context += `Growth Journey: ${dailyEdgeContent.journeyMotivator.content}\n\n`;
+  }
+
+  context += `When providing feedback and coaching hints today, incorporate themes of ${dailyEdgeContent.belief} where relevant. `;
+  context += `Encourage the agent to embody these principles in their sales approach.\n`;
+  context += `--- END MINDSET FOCUS ---\n`;
+
+  return context;
+}

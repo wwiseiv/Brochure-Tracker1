@@ -45,7 +45,12 @@ import {
   Calendar,
   History,
   X,
+  Flame,
+  Quote,
+  Sparkles,
+  ChevronUp,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { RoleplayScenario, RoleplaySession } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -68,6 +73,347 @@ interface SessionFeedback {
 
 interface SessionWithMessages extends RoleplaySession {
   messages?: { id: number; role: string; content: string }[];
+}
+
+interface DailyEdgeContent {
+  id: number;
+  belief: string;
+  contentType: string;
+  content: string;
+  source?: string;
+  dayOfCycle: number;
+}
+
+interface DailyEdgeToday {
+  todaysBelief: string;
+  content: {
+    quote?: DailyEdgeContent;
+    insight?: DailyEdgeContent;
+    challenge?: DailyEdgeContent;
+    iconic_story?: DailyEdgeContent;
+    journey_motivator?: DailyEdgeContent;
+  };
+}
+
+interface DailyEdgeProgress {
+  totalViewed: number;
+  challengesCompleted: number;
+  streak: {
+    current: number;
+    longest: number;
+  };
+  beliefs: {
+    belief: string;
+    totalContent: number;
+    viewedContent: number;
+    completedChallenges: number;
+  }[];
+}
+
+const BELIEF_COLORS: Record<string, string> = {
+  fulfilment: "#7C5CFC",
+  control: "#10B981",
+  resilience: "#F59E0B",
+  influence: "#EC4899",
+  communication: "#3B82F6",
+};
+
+const BELIEF_LABELS: Record<string, string> = {
+  fulfilment: "Fulfilment",
+  control: "Control",
+  resilience: "Resilience",
+  influence: "Influence",
+  communication: "Communication",
+};
+
+function CircularProgress({ 
+  progress, 
+  size = 60, 
+  strokeWidth = 6,
+  color = "#7C5CFC",
+  label
+}: { 
+  progress: number; 
+  size?: number; 
+  strokeWidth?: number;
+  color?: string;
+  label: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (progress / 100) * circumference;
+  
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          className="text-muted stroke-current"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        <circle
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+          className="transition-all duration-500"
+        />
+      </svg>
+      <span className="text-xs text-muted-foreground text-center max-w-[60px] truncate">
+        {label}
+      </span>
+      <span className="text-xs font-medium">{Math.round(progress)}%</span>
+    </div>
+  );
+}
+
+function DailyEdgeSection() {
+  const { toast } = useToast();
+  const [isExpanded, setIsExpanded] = useState(true);
+  
+  const { data: todayData, isLoading: todayLoading } = useQuery<DailyEdgeToday>({
+    queryKey: ["/api/daily-edge/today"],
+  });
+  
+  const { data: progressData, isLoading: progressLoading } = useQuery<DailyEdgeProgress>({
+    queryKey: ["/api/daily-edge/progress"],
+  });
+  
+  const viewContentMutation = useMutation({
+    mutationFn: async (contentId: number) => {
+      const res = await apiRequest("POST", "/api/daily-edge/view", { contentId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-edge/progress"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to mark as viewed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const completeChallengemutation = useMutation({
+    mutationFn: async (contentId: number) => {
+      const res = await apiRequest("POST", "/api/daily-edge/challenge-complete", { contentId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-edge/progress"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-edge/today"] });
+      toast({
+        title: "Challenge completed!",
+        description: "Great job! Keep up the momentum.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to complete challenge",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleMarkViewed = (content: DailyEdgeContent | undefined) => {
+    if (content && !viewContentMutation.isPending) {
+      viewContentMutation.mutate(content.id);
+    }
+  };
+  
+  const handleCompleteChallenge = (content: DailyEdgeContent | undefined) => {
+    if (content && !completeChallengemutation.isPending) {
+      completeChallengemutation.mutate(content.id);
+    }
+  };
+  
+  if (todayLoading || progressLoading) {
+    return (
+      <Card className="m-4">
+        <div className="p-4 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      </Card>
+    );
+  }
+  
+  if (!todayData?.content) {
+    return null;
+  }
+  
+  const { quote, insight, challenge } = todayData.content;
+  const beliefColor = BELIEF_COLORS[todayData.todaysBelief] || "#7C5CFC";
+  const beliefLabel = BELIEF_LABELS[todayData.todaysBelief] || todayData.todaysBelief;
+  
+  return (
+    <div className="mx-4 mt-4 mb-2">
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <Card className="overflow-hidden border-2" style={{ borderColor: beliefColor + "40" }}>
+          <CollapsibleTrigger asChild>
+            <button
+              className="w-full p-4 text-left flex items-center justify-between"
+              data-testid="daily-edge-toggle"
+            >
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: beliefColor + "20" }}
+                >
+                  <Sparkles className="w-5 h-5" style={{ color: beliefColor }} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Daily Edge</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Today's Focus: {beliefLabel}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {progressData?.streak && progressData.streak.current > 0 && (
+                  <div className="flex items-center gap-1 text-amber-500">
+                    <Flame className="w-4 h-4" />
+                    <span className="text-sm font-medium">{progressData.streak.current}</span>
+                  </div>
+                )}
+                {isExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent>
+            <div className="px-4 pb-4 space-y-4 border-t pt-4">
+              {quote && (
+                <div 
+                  className="p-3 rounded-lg"
+                  style={{ backgroundColor: beliefColor + "10" }}
+                  onClick={() => handleMarkViewed(quote)}
+                  data-testid="daily-edge-quote"
+                >
+                  <div className="flex items-start gap-2">
+                    <Quote className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: beliefColor }} />
+                    <div>
+                      <p className="text-sm italic">"{quote.content}"</p>
+                      {quote.source && (
+                        <p className="text-xs text-muted-foreground mt-1">— {quote.source}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {insight && (
+                <div 
+                  className="p-3 rounded-lg bg-muted"
+                  onClick={() => handleMarkViewed(insight)}
+                  data-testid="daily-edge-insight"
+                >
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
+                    <div>
+                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">Research Insight</p>
+                      <p className="text-sm">{insight.content}</p>
+                      {insight.source && (
+                        <p className="text-xs text-muted-foreground mt-1">Source: {insight.source}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {challenge && (
+                <div 
+                  className="p-3 rounded-lg border-2"
+                  style={{ borderColor: beliefColor + "40" }}
+                  data-testid="daily-edge-challenge"
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="daily-challenge"
+                      className="mt-0.5"
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          handleCompleteChallenge(challenge);
+                        }
+                      }}
+                      disabled={completeChallengemutation.isPending}
+                      data-testid="checkbox-complete-challenge"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="daily-challenge" className="text-xs font-medium flex items-center gap-1" style={{ color: beliefColor }}>
+                        <Target className="w-3 h-3" />
+                        Today's Challenge
+                      </label>
+                      <p className="text-sm mt-1">{challenge.content}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {progressData?.beliefs && progressData.beliefs.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Award className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-medium">Your Belief Progress</span>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+                    {progressData.beliefs.map((bp) => {
+                      const progress = bp.totalContent > 0 
+                        ? (bp.viewedContent / bp.totalContent) * 100 
+                        : 0;
+                      return (
+                        <CircularProgress
+                          key={bp.belief}
+                          progress={progress}
+                          color={BELIEF_COLORS[bp.belief] || "#7C5CFC"}
+                          label={BELIEF_LABELS[bp.belief] || bp.belief}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {progressData && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1">
+                      <Target className="w-3 h-3" />
+                      {progressData.totalViewed} viewed
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Award className="w-3 h-3" />
+                      {progressData.challengesCompleted} challenges
+                    </span>
+                  </div>
+                  {progressData.streak && progressData.streak.longest > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-amber-500" />
+                      Best: {progressData.streak.longest} days
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    </div>
+  );
 }
 
 function SessionHistoryCard({ 
@@ -668,7 +1014,9 @@ export default function CoachPage() {
 
         <TabsContent value="new" className="flex-1 flex flex-col m-0">
           {!sessionId ? (
-            <div className="p-4 space-y-4 overflow-auto flex-1">
+            <div className="flex-1 overflow-auto">
+              <DailyEdgeSection />
+              <div className="p-4 pt-0 space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
                 <div className="grid grid-cols-2 gap-2 mb-4">
@@ -797,6 +1145,7 @@ export default function CoachPage() {
                   </>
                 )}
               </Button>
+              </div>
             </div>
           ) : showFeedback && feedback ? (
             <div className="p-4 space-y-4 overflow-auto flex-1">

@@ -38,6 +38,7 @@ import {
   getScenarioPrompt,
   getCoachingHint,
   ROLEPLAY_PERSONAS,
+  buildDailyEdgeCoachingContext,
 } from "./roleplay-knowledge";
 import { 
   insertRoleplaySessionSchema, 
@@ -3665,6 +3666,23 @@ Respond in JSON format:
         console.log('Training materials not available from database, using default materials');
       }
 
+      // Fetch today's Daily Edge content for mindset coaching
+      let dailyEdgeContext = '';
+      try {
+        const todaysEdge = await storage.getTodaysDailyEdge(userId);
+        if (todaysEdge && todaysEdge.content) {
+          dailyEdgeContext = buildDailyEdgeCoachingContext({
+            belief: todaysEdge.belief,
+            quote: todaysEdge.content.quote ? { content: todaysEdge.content.quote.content, source: todaysEdge.content.quote.source || undefined } : undefined,
+            insight: todaysEdge.content.insight ? { content: todaysEdge.content.insight.content } : undefined,
+            challenge: todaysEdge.content.challenge ? { content: todaysEdge.content.challenge.content } : undefined,
+            journeyMotivator: todaysEdge.content.journey_motivator ? { content: todaysEdge.content.journey_motivator.content } : undefined,
+          });
+        }
+      } catch (edgeError) {
+        console.log('Daily Edge content not available:', edgeError);
+      }
+
       let systemMessage: string;
 
       if (isCoachingMode) {
@@ -3672,6 +3690,7 @@ Respond in JSON format:
 
 ${SALES_TRAINING_KNOWLEDGE.substring(0, 8000)}
 ${driveKnowledge}
+${dailyEdgeContext}
 
 BUSINESS CONTEXT:
 ${businessContext}
@@ -3685,6 +3704,7 @@ YOUR ROLE AS COACH:
 - Reference specific techniques from the training materials when helpful
 - Keep responses focused and practical (2-4 sentences usually, more if they ask for detailed examples)
 - If they describe a situation, help them understand what to say and do
+- Incorporate today's mindset focus when giving encouragement or feedback
 
 You're their personal sales coach. Help them succeed!`;
       } else {
