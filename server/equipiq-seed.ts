@@ -1,0 +1,266 @@
+import { storage } from "./storage";
+
+const productCatalog = {
+  "vendors": [
+    {
+      "id": "swipesimple",
+      "name": "SwipeSimple",
+      "company": "CardFlight",
+      "website": "https://home.swipesimple.com",
+      "description": "Easy-to-use payment solutions for small businesses. Simple enough to get up and running in minutes, powerful enough to save time and money on day one.",
+      "target_market": "Small businesses, mobile merchants, service providers",
+      "pricing_model": "Hardware purchase + optional monthly SaaS",
+      "support": "Support Center online",
+      "key_differentiators": [
+        "Extreme ease of use",
+        "Fast setup (minutes)",
+        "Tap to Pay on iPhone",
+        "Strong mobile app ratings"
+      ]
+    },
+    {
+      "id": "dejavoo",
+      "name": "Dejavoo",
+      "company": "Dejavoo Systems",
+      "website": "https://dejavoo.io",
+      "description": "Modern payment solutions designed for growth and success. Affordable, fast, and secure terminals with the latest payment technology.",
+      "target_market": "All business types, ISO/agent friendly",
+      "pricing_model": "Terminal purchase + gateway/processing fees",
+      "support": "Sales, Technical, and Marketing support teams",
+      "key_differentiators": [
+        "Widest terminal selection (P, QD, Z lines)",
+        "Android and Linux options",
+        "iPOSpays omni-commerce gateway",
+        "SPIn integration API",
+        "White labeling available"
+      ]
+    },
+    {
+      "id": "mxpos",
+      "name": "MX POS",
+      "company": "Priority Commerce",
+      "website": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/",
+      "description": "World-class POS solutions tailored to your business. Restaurant, retail, and salon modules with 600+ features.",
+      "target_market": "Restaurants, retail stores, salons",
+      "pricing_model": "Free hardware program available + processing",
+      "support": "24/7 live support (7AM-12AM CST weekdays, 7AM-10:30PM weekends)",
+      "key_differentiators": [
+        "FREE hardware program",
+        "600+ features",
+        "Dedicated vertical solutions (Restaurant, Retail, Salon)",
+        "QuickBooks/Xero integration",
+        "e|tab online ordering",
+        "Cloud-based with local sync"
+      ]
+    },
+    {
+      "id": "hotsauce",
+      "name": "Hot Sauce POS",
+      "company": "HotSauce Technologies",
+      "website": "https://www.hotsaucepos.com",
+      "description": "Leading POS provider for hospitality - restaurants, bars, and nightclubs. Built for fast-paced service and simplicity.",
+      "target_market": "Restaurants, bars, nightclubs",
+      "pricing_model": "Upfront hardware + monthly license",
+      "support": "24/7 LIVE human support (pioneered this), face-to-face training",
+      "key_differentiators": [
+        "24/7 LIVE human support (pioneered)",
+        "On-premise system (works offline)",
+        "Real-time SQL Server data redundancy",
+        "Face-to-face installation within 48 hours",
+        "Spanish, Tagalog, Mandarin support",
+        "Designed specifically for bars/nightclubs"
+      ]
+    },
+    {
+      "id": "valor",
+      "name": "Valor PayTech",
+      "company": "Valor PayTech",
+      "website": "https://valorpaytech.com",
+      "description": "Unified payment solutions for ISOs & ISVs. Hardware matches any business style, from classic cool to modern sleek.",
+      "target_market": "ISOs, ISVs, all merchant types",
+      "pricing_model": "Terminal purchase + processing fees",
+      "support": "Partner portal, Knowledge Base, video library",
+      "key_differentiators": [
+        "ISO/ISV focused design",
+        "Engage My Customer marketing tools",
+        "Dual pricing / surcharge built-in",
+        "Valor Shield (chargeback protection)",
+        "Wide hardware selection",
+        "Strong partner program"
+      ]
+    },
+    {
+      "id": "fluidpay",
+      "name": "FluidPay",
+      "company": "Fluid Pay LLC",
+      "website": "https://www.fluidpay.com",
+      "description": "The partner-first payment gateway built exclusively for ISOs, VARs, and payment professionals. Never boards merchants directly.",
+      "target_market": "ISOs, VARs, payment professionals",
+      "pricing_model": "Gateway fees only",
+      "support": "99.5% uptime SLA, Level 1 PCI compliant",
+      "key_differentiators": [
+        "NON-COMPETE GUARANTEE (never boards merchants)",
+        "100% cloud-native (Google Cloud Platform)",
+        "True white-label available",
+        "Processor agnostic",
+        "20+ revenue-generating tools",
+        "AI fraud detection (AttackDog)"
+      ]
+    }
+  ],
+  "products": [
+    { "vendor_id": "swipesimple", "category": "hardware", "type": "all_in_one", "name": "SwipeSimple Terminal", "description": "The all-in-one credit card device that fits in your hand. Take payments and print receipts with a safe and convenient device.", "features": ["Built-in thermal printer", "WiFi and 4G connectivity", "EMV chip card reader", "NFC/contactless payments", "Magnetic stripe reader", "Long battery life"], "best_for": ["Mobile merchants", "Pop-up shops", "Service providers", "Small retail"], "url": "https://home.swipesimple.com/swipesimple-terminal" },
+    { "vendor_id": "swipesimple", "category": "hardware", "type": "pos_system", "name": "SwipeSimple Register", "description": "The easy-to-use POS system packed with time-saving features for growing businesses.", "features": ["Large touchscreen display", "Built-in receipt printer", "Inventory management", "Employee management", "Customer database", "Advanced reporting"], "best_for": ["Growing retail stores", "Cafes", "Quick service restaurants"], "url": "https://home.swipesimple.com/swipesimple-register" },
+    { "vendor_id": "swipesimple", "category": "hardware", "type": "mobile_reader", "name": "SwipeSimple Card Readers", "description": "Fast in-person payments with any mobile phone or tablet.", "features": ["Connects via Bluetooth", "Works with iOS and Android", "EMV chip reader", "NFC contactless", "Compact design"], "best_for": ["Ultra-mobile merchants", "Market vendors", "In-home services"], "url": "https://home.swipesimple.com/card-readers" },
+    { "vendor_id": "swipesimple", "category": "software", "type": "mobile_app", "name": "Tap to Pay on iPhone", "description": "Accept contactless payments right on your iPhone. No additional hardware needed.", "features": ["No hardware required", "iPhone only", "NFC contactless acceptance", "Apple Pay ready", "Instant setup"], "best_for": ["iPhone users", "Minimal hardware preference", "Occasional sellers"], "url": "https://home.swipesimple.com/tap-to-pay-on-iphone" },
+    { "vendor_id": "swipesimple", "category": "software", "type": "virtual_terminal", "name": "SwipeSimple Virtual Terminal", "description": "Take payments over the phone or at your computer.", "features": ["Web-based card entry", "No hardware needed", "Recurring payments", "Customer vault", "Invoice generation"], "best_for": ["Phone orders", "MOTO businesses", "B2B services"], "url": "https://home.swipesimple.com/virtual-terminal" },
+    { "vendor_id": "swipesimple", "category": "software", "type": "feature", "name": "SwipeSimple Invoicing", "description": "Bill customers via email or text message with professional invoices.", "features": ["Email invoices", "Text message invoices", "Payment tracking", "Automatic reminders"], "url": "https://home.swipesimple.com/invoices" },
+    { "vendor_id": "swipesimple", "category": "software", "type": "feature", "name": "SwipeSimple Text to Pay", "description": "Send payment requests via text message for quick collection.", "features": ["SMS payment links", "Instant delivery", "Mobile-optimized checkout"], "url": "https://home.swipesimple.com/text-to-pay" },
+    { "vendor_id": "swipesimple", "category": "software", "type": "feature", "name": "SwipeSimple Appointments", "description": "Simplify scheduling and boost customer interactions.", "features": ["Online booking", "Calendar management", "Automated reminders", "Payment at booking"], "url": "https://home.swipesimple.com/appointments" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "countertop", "name": "Dejavoo P1", "model": "P1", "description": "Robust countertop terminal with large touchscreen. Built for high-volume retail and restaurants.", "features": ["8-inch touchscreen", "Built-in thermal printer", "Android OS", "EMV + NFC + MSR", "WiFi + Ethernet", "Camera for QR codes"], "best_for": ["High-volume retail", "Full-service restaurants", "Multi-lane checkout"], "url": "https://dejavoo.io/products/p-terminals-family/p1-secure-android-countertop/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "wireless", "name": "Dejavoo P3", "model": "P3", "description": "All-in-one wireless terminal with keyboard and printer. Mobile and gateway-ready.", "features": ["5.5-inch touchscreen", "Built-in printer", "Physical keypad", "WiFi + 4G LTE", "Long battery life", "Android OS"], "best_for": ["Tableside payment", "Delivery drivers", "Mobile businesses", "Trade shows"], "url": "https://dejavoo.io/products/p-terminals-family/p3-secure-android-wireless/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "pin_pad", "name": "Dejavoo P5", "model": "P5", "description": "Multi-functional next-generation mPOS. Versatile and payment ready PIN pad.", "features": ["5-inch touchscreen", "Android OS", "EMV + NFC + MSR", "Optional printer dock", "Compact design"], "best_for": ["Retail checkout", "POS integration", "Small footprint needs"], "url": "https://dejavoo.io/products/p-terminals-family/p5-android-mpos-pinpad/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "wireless", "name": "Dejavoo P8", "model": "P8", "description": "Secure Android wireless terminal. Perfect for integrations and mobile payments.", "features": ["5.5-inch touchscreen", "No printer (compact)", "WiFi + 4G", "Gateway integration ready", "Android OS"], "best_for": ["Software integrations", "Mobile checkout", "Lightweight needs"], "url": "https://dejavoo.io/products/p-terminals-family/p8-secure-android-wireless/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "mobile", "name": "Dejavoo P12", "model": "P12", "description": "Payment power in the palm of your hand. Ideal for mobile checkout and quick service.", "features": ["2.4-inch display", "Ultra-compact", "Bluetooth + WiFi", "Long battery", "Keypad entry"], "best_for": ["Quick service", "Line busting", "Mobile vendors"], "url": "https://dejavoo.io/products/p-terminals-family/p12-mobile-payment-terminal/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "pin_pad", "name": "Dejavoo P17", "model": "P17", "description": "Secure and streamlined PIN Pad. ADA-compliant and designed for speed.", "features": ["4-inch touchscreen", "ADA compliant", "High-speed transactions", "Customer-facing", "Android OS"], "best_for": ["ADA compliance needs", "Grocery stores", "High-volume retail"], "url": "https://dejavoo.io/products/p-terminals-family/p17-android-pin-pad/" },
+    { "vendor_id": "dejavoo", "category": "hardware", "type": "wireless", "name": "Dejavoo P18", "model": "P18", "description": "Multifunctional POS with unique flip display. Customer-facing capability.", "features": ["5.5-inch flip display", "Customer-facing mode", "Built-in printer", "WiFi + 4G", "Android OS"], "best_for": ["Customer engagement", "Tip prompts", "Signature capture"], "url": "https://dejavoo.io/products/p-terminals-family/p18-secure-android-wireless/" },
+    { "vendor_id": "dejavoo", "category": "software", "type": "gateway", "name": "iPOSpays Gateway", "description": "Omni-commerce gateway platform for online and in-person payments.", "features": ["Hosted payment page (Checkout)", "Virtual terminal (Cloud POS)", "Recurring payments", "Payment links", "Tokenization", "L2/L3 data enrichment", "S.A.F.E. fraud protection"], "url": "https://dejavoo.io/software/ipospays-gateway/" },
+    { "vendor_id": "dejavoo", "category": "software", "type": "pos_software", "name": "DejaPayPro Cloud Register", "description": "Cloud-based register and store management for restaurants and retail.", "features": ["Restaurant features (table management, KDS)", "Retail features (inventory, barcode)", "Cloud sync", "Multi-terminal support"], "url": "https://dejavoo.io/software/dejapaypro/" },
+    { "vendor_id": "dejavoo", "category": "software", "type": "integration", "name": "SPIn (Secure Payment Interface)", "description": "Turnkey API for one-and-done POS integration.", "features": ["Simple API", "Semi-integrated mode", "PCI scope reduction", "Quick implementation"], "url": "https://dejavoo.io/software/spin/" },
+    { "vendor_id": "dejavoo", "category": "software", "type": "loyalty", "name": "Dejavoo Extra", "description": "Loyalty reimagined. Customer engagement and rewards program.", "features": ["Points program", "Customer tracking", "Marketing tools"], "url": "https://dejavoo.io/software/dejavoo-extra/" },
+    { "vendor_id": "mxpos", "category": "hardware", "type": "pos_system", "name": "MX POS All-in-One", "description": "Priority's own POS hardware with 15.6\" touchscreen, built-in printer, and optional customer display.", "features": ["15.6-inch touchscreen", "Built-in thermal printer", "Optional 10-inch customer display", "Windows 10", "Intel Celeron J6412", "8GB RAM, 128GB SSD", "Compact footprint"], "best_for": ["Restaurants", "Retail stores", "High-volume businesses"], "url": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/" },
+    { "vendor_id": "mxpos", "category": "hardware", "type": "mobile", "name": "PAX A920 Pro (MX POS)", "description": "Mobile Android terminal for tableside ordering and payments.", "features": ["Android OS", "Touchscreen", "Built-in printer", "WiFi + 4G", "Long battery"], "best_for": ["Tableside ordering", "Mobile checkout", "Delivery"], "url": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/" },
+    { "vendor_id": "mxpos", "category": "hardware", "type": "kiosk", "name": "MX POS Kiosk", "description": "21-inch vertical self-service kiosk with built-in printer and EMV cradle.", "features": ["21-inch vertical display", "Built-in receipt printer", "EMV device cradle (PAX S300 or A35)", "Self-service mode"], "best_for": ["Quick service restaurants", "Self-checkout", "Order ahead"], "url": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/" },
+    { "vendor_id": "mxpos", "category": "software", "type": "pos_software", "name": "MX POS Restaurant", "description": "Complete restaurant POS solution with KDS, online ordering, and table management.", "features": ["Kitchen Display System (KDS)", "Table management", "Online ordering (e|tab integration)", "Delivery integration (DoorDash, UberEats)", "Menu management", "Split checks", "Tip adjustment", "Gift cards (Factor4, GiftYa)"], "best_for": ["Full-service restaurants", "Quick service", "Cafes"], "url": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/" },
+    { "vendor_id": "mxpos", "category": "software", "type": "pos_software", "name": "MX POS Retail", "description": "All-in-one retail POS with inventory, barcode scanning, and EBT support.", "features": ["Inventory management", "Barcode scanning", "EBT/food stamps", "Employee scheduling", "Loyalty program", "Gift cards", "E-commerce (Wix integration)", "QuickBooks/Xero sync"], "best_for": ["Retail stores", "Convenience stores", "Grocery", "Liquor stores"], "url": "https://prioritycommerce.com/solutions/merchant-services/mx-pos/retail/" },
+    { "vendor_id": "mxpos", "category": "software", "type": "pos_software", "name": "MX POS Salon", "description": "Salon-specific POS with appointment management and commission tracking.", "features": ["Appointment management", "Online booking (e|tab)", "Commission tracking", "Customer profiles", "Service history", "Product sales tracking"], "best_for": ["Hair salons", "Nail salons", "Spas", "Barbershops"], "url": "https://prioritycommerce.com/resource-center/introducing-mx-salon/" },
+    { "vendor_id": "hotsauce", "category": "software", "type": "pos_software", "name": "Hot Sauce Table Service", "description": "Full-service restaurant solution for exceptional customer service and increased sales.", "features": ["Table management", "Split checks (by guest, item, payment)", "Check transfer between servers", "Course firing", "Manager functions (comps, discounts)", "Server sales monitoring", "Kitchen printing", "Tip adjustment"], "best_for": ["Full-service restaurants", "Fine dining", "Casual dining"], "url": "https://www.hotsaucepos.com" },
+    { "vendor_id": "hotsauce", "category": "software", "type": "pos_software", "name": "Hot Sauce Quick Service", "description": "Fast and efficient order entry for quick service restaurants and cafes.", "features": ["Speed-focused interface", "Cashier banking", "Dual cash drawer", "Menu timer (auto-switch breakfast/lunch/dinner)", "Kitchen display (KDS)", "Order consolidation"], "best_for": ["Fast food", "Cafes", "Food trucks", "Counter service"], "url": "https://www.hotsaucepos.com" },
+    { "vendor_id": "hotsauce", "category": "software", "type": "pos_software", "name": "Hot Sauce Fast Bar", "description": "Developed with bar owners for the simplest and fastest order entry in the industry.", "features": ["Tab management (swipe to open)", "Automatic tab alphabetization", "12 programmable hot keys", "Pricing levels (happy hour, lunch, dinner)", "Bottle service", "Quick close out", "Multi-terminal tab access", "2-3 second credit card approval"], "best_for": ["Bars", "Nightclubs", "Lounges", "Sports bars"], "url": "https://www.hotsaucepos.com" },
+    { "vendor_id": "hotsauce", "category": "software", "type": "pos_software", "name": "Hot Sauce Delivery Express", "description": "Manage delivery, carryout, and catering with customer tracking and driver management.", "features": ["Customer database (address, phone, order history)", "Driver management", "Delivery tracking", "Consolidated driver reports", "Integrates with Table Service or Quick Service"], "best_for": ["Pizza delivery", "Catering", "Takeout-focused restaurants"], "url": "https://www.hotsaucepos.com" },
+    { "vendor_id": "hotsauce", "category": "hardware", "type": "workstation", "name": "Hot Sauce Workstation", "description": "Complete terminal package with Elo touchscreen, EMV terminal, printer, and cash drawer.", "features": ["Elo touchscreen terminal", "Semi-integrated EMV payment", "Thermal receipt printer", "Cash drawer", "PAX A920 for pay-at-table (optional)"], "best_for": ["Restaurant installations", "Full workstation needs"], "url": "https://www.hotsaucepos.com" },
+    { "vendor_id": "valor", "category": "hardware", "type": "countertop", "name": "Valor VL100 Pro", "model": "VL100 Pro", "description": "Smart payment solution for stores. Budget-friendly and reliable countertop terminal.", "features": ["Touchscreen display", "Built-in printer", "EMV + NFC + MSR", "WiFi + Ethernet"], "best_for": ["Budget-conscious merchants", "Simple retail"], "url": "https://valorpaytech.com/what-we-do/hardware-products/countertop-pos/vl100-pro/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "countertop", "name": "Valor VP100", "model": "VP100", "description": "Countertop POS with Engage My Customer marketing capabilities.", "features": ["Touchscreen", "Built-in printer", "Engage My Customer ready", "EMV + NFC + MSR"], "best_for": ["Merchants wanting marketing tools", "Retail"], "url": "https://valorpaytech.com/what-we-do/hardware-products/countertop-pos/vp100/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "countertop", "name": "Valor VP350", "model": "VP350", "description": "Touchscreen POS for restaurants and retail. 5.5-inch display.", "features": ["5.5-inch touchscreen", "Built-in printer", "Android OS", "EMV + NFC + MSR"], "best_for": ["Restaurants", "Retail stores"], "url": "https://valorpaytech.com/what-we-do/hardware-products/countertop-pos/vp350/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "countertop", "name": "Valor VP550C", "model": "VP550C", "description": "Cloud-ready Next-Gen POS for business growth.", "features": ["Large touchscreen", "Cloud connectivity", "Built-in printer", "Android OS"], "best_for": ["Growing businesses", "Cloud-first merchants"], "url": "https://valorpaytech.com/what-we-do/hardware-products/countertop-pos/vp550c/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "pin_pad", "name": "Valor VL300", "model": "VL300", "description": "Budget-friendly, security-driven PIN pad with built-in NFC.", "features": ["Compact design", "NFC contactless", "EMV chip", "Customer-facing"], "best_for": ["POS integration", "Budget-conscious"], "url": "https://valorpaytech.com/what-we-do/hardware-products/pin-pad/vl300/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "pin_pad", "name": "Valor VP300", "model": "VP300", "description": "Small business PIN pad payment solution.", "features": ["Touchscreen", "EMV + NFC + MSR", "Customer-facing", "Compact"], "best_for": ["Small businesses", "Retail checkout"], "url": "https://valorpaytech.com/what-we-do/hardware-products/pin-pad/vp300/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "pin_pad", "name": "Valor VP300 Pro", "model": "VP300 Pro", "description": "Contactless mobile POS for pop-up and hospitality environments.", "features": ["Touchscreen", "Wireless", "Contactless focus", "Hospitality-ready"], "best_for": ["Pop-up shops", "Hospitality", "Events"], "url": "https://valorpaytech.com/what-we-do/hardware-products/pin-pad/vp300-pro/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "wireless", "name": "Valor VL110", "model": "VL110", "description": "Startup-friendly wireless terminal for mobile businesses.", "features": ["WiFi + 4G", "Built-in printer", "Compact", "Long battery"], "best_for": ["Startups", "Mobile businesses", "Delivery"], "url": "https://valorpaytech.com/what-we-do/hardware-products/wireless-pos/vl110/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "next_gen", "name": "Valor VL550", "model": "VL550", "description": "Next-gen POS terminal with signature capture.", "features": ["Large touchscreen", "Signature capture", "Built-in printer", "Android OS"], "best_for": ["Signature-required businesses", "Professional services"], "url": "https://valorpaytech.com/what-we-do/hardware-products/next-gen-pos/vl550/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "next_gen", "name": "Valor VP550", "model": "VP550", "description": "Flagship terminal accepting tap/dip/swipe plus QR codes.", "features": ["Large touchscreen", "QR code acceptance", "Built-in printer", "Android OS", "All payment types"], "best_for": ["Feature-rich needs", "QR payment acceptance"], "url": "https://valorpaytech.com/what-we-do/hardware-products/next-gen-pos/vp550/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "next_gen", "name": "Valor VP550E", "model": "VP550E", "description": "Extended enterprise Android POS with advanced features.", "features": ["Enterprise Android", "Extended features", "Built-in printer", "Large screen"], "best_for": ["Enterprise deployments", "Multi-location"], "url": "https://valorpaytech.com/what-we-do/hardware-products/next-gen-pos/vp550e/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "next_gen", "name": "Valor VP800", "model": "VP800", "description": "Future-proof POS terminal. Multi-Comm Hub for next generation businesses.", "features": ["Multi-comm hub", "Future-proof design", "Large touchscreen", "All connectivity options"], "best_for": ["Future-focused businesses", "Multi-comm needs"], "url": "https://valorpaytech.com/what-we-do/hardware-products/next-gen-pos/vp800/" },
+    { "vendor_id": "valor", "category": "hardware", "type": "mobile", "name": "Valor RCKT", "model": "RCKT", "description": "Easy mobile POS payment solution for small businesses.", "features": ["Ultra-compact", "Bluetooth connectivity", "iOS/Android compatible", "Long battery"], "best_for": ["Ultra-mobile", "Small businesses", "Occasional use"], "url": "https://valorpaytech.com/what-we-do/hardware-products/mobile-device/rckt/" },
+    { "vendor_id": "valor", "category": "software", "type": "gateway", "name": "Valor Payment Gateway", "description": "E-commerce gateway integrating with major shopping carts.", "features": ["Shopping cart plugins", "Hosted payment page", "API access", "Recurring billing"], "url": "https://valorpaytech.com/what-we-do/software-products/payment-gateway/" },
+    { "vendor_id": "valor", "category": "software", "type": "virtual_terminal", "name": "Valor Virtual Terminal", "description": "Web-based payment entry for phone and mail orders.", "features": ["MOTO processing", "Customer vault", "Recurring payments", "Invoice generation"], "url": "https://valorpaytech.com/what-we-do/software-products/virtual-terminal/" },
+    { "vendor_id": "valor", "category": "software", "type": "mobile_app", "name": "ValorPay", "description": "Mobile POS app for iOS and Android devices.", "features": ["iOS and Android", "Mobile payments", "Inventory", "Reporting"], "url": "https://valorpaytech.com/what-we-do/software-products/valorpay/" },
+    { "vendor_id": "valor", "category": "software", "type": "pricing", "name": "Valor Dual Pricing", "description": "Help merchants reduce processing costs with compliant surcharge programs.", "features": ["Cash vs card pricing", "Compliant program", "Automatic calculation", "Signage provided"], "url": "https://valorpaytech.com/what-we-do/software-products/dual-pricing/" },
+    { "vendor_id": "valor", "category": "software", "type": "security", "name": "The Vault", "description": "Secure tokenization for stored payment info and enhanced customer experience.", "features": ["Card tokenization", "Secure storage", "PCI compliance", "Recurring ready"], "url": "https://valorpaytech.com/what-we-do/software-products/the-vault/" },
+    { "vendor_id": "valor", "category": "software", "type": "security", "name": "Valor Shield", "description": "Chargeback protection and unauthorized activity prevention.", "features": ["Chargeback alerts", "Fraud prevention", "Dispute management"], "url": "https://valorpaytech.com/what-we-do/software-products/valor-shield/" },
+    { "vendor_id": "valor", "category": "software", "type": "marketing", "name": "Engage My Customer", "description": "Boost merchant revenue via smart customer engagement and marketing.", "features": ["Customer tracking", "Marketing campaigns", "Loyalty features", "Analytics"], "url": "https://valorpaytech.com/what-we-do/software-products/engage-my-customer/" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "gateway", "name": "FluidPay Gateway", "description": "Cloud-based payment gateway built on Google Cloud Platform. Non-compete guarantee.", "features": ["100% cloud-native", "Processor agnostic", "Private label available", "99.5% uptime SLA", "Level 1 PCI compliant"], "url": "https://www.fluidpay.com" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "virtual_terminal", "name": "FluidPay Virtual Terminal", "description": "Process payments from any device with internet connection worldwide.", "features": ["Web-based", "No software install", "MOTO processing", "Multi-user"], "url": "https://www.fluidpay.com/products/virtual-terminal-credit-card-ach" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "vault", "name": "FluidPay Customer Vault", "description": "Securely store payment methods with automatic account updater.", "features": ["Secure card storage", "Account updater", "Recurring ready", "PCI compliant"], "url": "https://www.fluidpay.com/products/customer-vault-save-payment-method" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "invoicing", "name": "FluidPay E-Invoicing", "description": "Send invoices via email and SMS with embedded secure payment links.", "features": ["Email invoices", "SMS invoices", "Secure payment links", "Automatic reminders"], "url": "https://www.fluidpay.com/products/e-invoicing" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "recurring", "name": "FluidPay Recurring Billing", "description": "Automated subscriptions and recurring payments from one dashboard.", "features": ["Subscription management", "Flexible schedules", "Failed payment retry", "Customer portal"], "url": "https://www.fluidpay.com/products/recurring-billing-subscription" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "pricing", "name": "FluidPay Cash Discount", "description": "Lower processing fees by up to 90% with compliant cash discounting.", "features": ["Up to 90% savings", "Compliant program", "Automatic calculation", "Signage support"], "url": "https://www.fluidpay.com/products/cash-discount-dti-cash-discount-program" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "pricing", "name": "FluidPay Dual Pricing", "description": "Show cash vs card price for transparent pricing.", "features": ["Dual price display", "Compliant", "Automatic calculation"], "url": "https://www.fluidpay.com/products/dual-pricing" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "pricing", "name": "FluidPay Surcharging", "description": "Add compliant surcharge to credit card transactions.", "features": ["Credit card surcharge", "Compliant program", "Automatic calculation"], "url": "https://www.fluidpay.com/products/surcharging" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "b2b", "name": "FluidPay Level 3 Processing", "description": "Reduced interchange rates for B2B transactions.", "features": ["Automatic data enrichment", "Reduced interchange", "B2B focused"], "url": "https://www.fluidpay.com/products/level-3-processing" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "batch", "name": "FluidPay Batch Processing", "description": "Process large volumes via CSV upload.", "features": ["CSV file upload", "Bulk processing", "Scheduled batches"], "url": "https://www.fluidpay.com/products/batch-processing" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "integration", "name": "FluidPay QuickBooks PaySync", "description": "Sync payments directly with QuickBooks.", "features": ["QuickBooks integration", "Automatic sync", "Invoice matching"], "url": "https://www.fluidpay.com/products/quickbooks-paysync" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "fraud", "name": "FluidPay AttackDog", "description": "AI-powered fraud detection using machine learning.", "features": ["AI/ML fraud detection", "Real-time analysis", "Pattern recognition"], "url": "https://www.fluidpay.com/products/attackdog" },
+    { "vendor_id": "fluidpay", "category": "software", "type": "fraud", "name": "FluidPay WatchDog", "description": "Customizable rule-based fraud filters.", "features": ["Custom rules", "Velocity checks", "Geolocation filters"], "url": "https://www.fluidpay.com/products/watchdog" }
+  ],
+  "businessTypes": [
+    { "code": "restaurant_fullservice", "name": "Full-Service Restaurant", "description": "Sit-down restaurants with table service", "keywords": ["restaurant", "dining", "table service", "sit-down", "full service"] },
+    { "code": "restaurant_qsr", "name": "Quick Service Restaurant", "description": "Fast food, counter service, cafes", "keywords": ["fast food", "counter", "quick service", "cafe", "qsr", "fast casual"] },
+    { "code": "bar_nightclub", "name": "Bar / Nightclub", "description": "Bars, nightclubs, lounges", "keywords": ["bar", "nightclub", "lounge", "pub", "tavern", "sports bar"] },
+    { "code": "retail", "name": "Retail Store", "description": "General retail, shops, boutiques", "keywords": ["retail", "store", "shop", "boutique", "merchandise"] },
+    { "code": "salon_spa", "name": "Salon / Spa", "description": "Hair salons, nail salons, spas, barbershops", "keywords": ["salon", "spa", "hair", "nail", "beauty", "barber"] },
+    { "code": "mobile_service", "name": "Mobile / Service", "description": "Mobile businesses, service providers, contractors", "keywords": ["mobile", "service", "contractor", "field service", "on-site"] },
+    { "code": "ecommerce", "name": "E-Commerce", "description": "Online-only businesses", "keywords": ["online", "ecommerce", "web", "internet", "digital"] },
+    { "code": "delivery", "name": "Delivery / Takeout", "description": "Pizza delivery, catering, takeout-focused", "keywords": ["delivery", "takeout", "catering", "to-go"] },
+    { "code": "grocery", "name": "Grocery / Convenience", "description": "Grocery stores, convenience stores, liquor stores", "keywords": ["grocery", "convenience", "liquor", "food market"] },
+    { "code": "professional", "name": "Professional Services", "description": "B2B, professional services, offices", "keywords": ["professional", "b2b", "office", "consulting", "services"] }
+  ]
+};
+
+export async function seedEquipIQData(): Promise<{ vendors: number; products: number; businessTypes: number }> {
+  console.log("Starting EquipIQ data seed...");
+  
+  let vendorCount = 0;
+  let productCount = 0;
+  let businessTypeCount = 0;
+
+  // Check if data already exists
+  const existingVendors = await storage.getEquipmentVendors();
+  if (existingVendors.length > 0) {
+    console.log(`EquipIQ data already exists (${existingVendors.length} vendors). Skipping seed.`);
+    return { vendors: existingVendors.length, products: 0, businessTypes: 0 };
+  }
+
+  // Seed vendors
+  for (const vendor of productCatalog.vendors) {
+    try {
+      await storage.createEquipmentVendor({
+        vendorId: vendor.id,
+        name: vendor.name,
+        company: vendor.company,
+        website: vendor.website,
+        description: vendor.description,
+        targetMarket: vendor.target_market,
+        pricingModel: vendor.pricing_model,
+        support: vendor.support,
+        keyDifferentiators: vendor.key_differentiators,
+        isActive: true,
+      });
+      vendorCount++;
+    } catch (error) {
+      console.error(`Error seeding vendor ${vendor.name}:`, error);
+    }
+  }
+  console.log(`Seeded ${vendorCount} vendors`);
+
+  // Seed products
+  for (const product of productCatalog.products) {
+    try {
+      await storage.createEquipmentProduct({
+        vendorId: product.vendor_id,
+        category: product.category,
+        type: product.type,
+        name: product.name,
+        model: (product as any).model || null,
+        description: product.description,
+        features: product.features,
+        bestFor: product.best_for || [],
+        url: product.url,
+        isActive: true,
+      });
+      productCount++;
+    } catch (error) {
+      console.error(`Error seeding product ${product.name}:`, error);
+    }
+  }
+  console.log(`Seeded ${productCount} products`);
+
+  // Seed business types
+  for (const bt of productCatalog.businessTypes) {
+    try {
+      await storage.createEquipmentBusinessType({
+        code: bt.code,
+        name: bt.name,
+        description: bt.description,
+        keywords: bt.keywords,
+      });
+      businessTypeCount++;
+    } catch (error) {
+      console.error(`Error seeding business type ${bt.name}:`, error);
+    }
+  }
+  console.log(`Seeded ${businessTypeCount} business types`);
+
+  console.log("EquipIQ data seed complete!");
+  return { vendors: vendorCount, products: productCount, businessTypes: businessTypeCount };
+}

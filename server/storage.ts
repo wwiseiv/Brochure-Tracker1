@@ -96,6 +96,21 @@ import {
   type InsertDailyEdgeStreak,
   DAILY_EDGE_BELIEFS,
   DAILY_EDGE_CONTENT_TYPES,
+  equipmentVendors,
+  equipmentProducts,
+  equipmentBusinessTypes,
+  equipmentRecommendationSessions,
+  equipmentQuizResults,
+  type EquipmentVendor,
+  type InsertEquipmentVendor,
+  type EquipmentProduct,
+  type InsertEquipmentProduct,
+  type EquipmentBusinessType,
+  type InsertEquipmentBusinessType,
+  type EquipmentRecommendationSession,
+  type InsertEquipmentRecommendationSession,
+  type EquipmentQuizResult,
+  type InsertEquipmentQuizResult,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
@@ -1532,6 +1547,97 @@ export class DatabaseStorage implements IStorage {
       
       return created;
     }
+  }
+
+  // ============================================
+  // EquipIQ - Equipment Recommendation System
+  // ============================================
+
+  async getEquipmentVendors(): Promise<EquipmentVendor[]> {
+    return db.select().from(equipmentVendors).where(eq(equipmentVendors.isActive, true));
+  }
+
+  async getEquipmentVendorById(vendorId: string): Promise<EquipmentVendor | undefined> {
+    const [vendor] = await db.select().from(equipmentVendors).where(eq(equipmentVendors.vendorId, vendorId));
+    return vendor;
+  }
+
+  async createEquipmentVendor(data: InsertEquipmentVendor): Promise<EquipmentVendor> {
+    const [vendor] = await db.insert(equipmentVendors).values(data).returning();
+    return vendor;
+  }
+
+  async getEquipmentProducts(vendorId?: string): Promise<EquipmentProduct[]> {
+    if (vendorId) {
+      return db.select().from(equipmentProducts)
+        .where(and(eq(equipmentProducts.vendorId, vendorId), eq(equipmentProducts.isActive, true)));
+    }
+    return db.select().from(equipmentProducts).where(eq(equipmentProducts.isActive, true));
+  }
+
+  async getEquipmentProductById(id: number): Promise<EquipmentProduct | undefined> {
+    const [product] = await db.select().from(equipmentProducts).where(eq(equipmentProducts.id, id));
+    return product;
+  }
+
+  async createEquipmentProduct(data: InsertEquipmentProduct): Promise<EquipmentProduct> {
+    const [product] = await db.insert(equipmentProducts).values(data).returning();
+    return product;
+  }
+
+  async searchEquipmentProducts(query: string): Promise<EquipmentProduct[]> {
+    const lowercaseQuery = query.toLowerCase();
+    return db.select().from(equipmentProducts)
+      .where(and(
+        eq(equipmentProducts.isActive, true),
+        sql`(
+          LOWER(${equipmentProducts.name}) LIKE ${'%' + lowercaseQuery + '%'} OR
+          LOWER(${equipmentProducts.description}) LIKE ${'%' + lowercaseQuery + '%'} OR
+          LOWER(${equipmentProducts.type}) LIKE ${'%' + lowercaseQuery + '%'} OR
+          LOWER(${equipmentProducts.category}) LIKE ${'%' + lowercaseQuery + '%'}
+        )`
+      ));
+  }
+
+  async getEquipmentBusinessTypes(): Promise<EquipmentBusinessType[]> {
+    return db.select().from(equipmentBusinessTypes);
+  }
+
+  async createEquipmentBusinessType(data: InsertEquipmentBusinessType): Promise<EquipmentBusinessType> {
+    const [bt] = await db.insert(equipmentBusinessTypes).values(data).returning();
+    return bt;
+  }
+
+  async createEquipmentRecommendationSession(data: InsertEquipmentRecommendationSession): Promise<EquipmentRecommendationSession> {
+    const [session] = await db.insert(equipmentRecommendationSessions).values(data).returning();
+    return session;
+  }
+
+  async getEquipmentRecommendationSessions(userId: string): Promise<EquipmentRecommendationSession[]> {
+    return db.select().from(equipmentRecommendationSessions)
+      .where(eq(equipmentRecommendationSessions.userId, userId))
+      .orderBy(desc(equipmentRecommendationSessions.createdAt));
+  }
+
+  async createEquipmentQuizResult(data: InsertEquipmentQuizResult): Promise<EquipmentQuizResult> {
+    const [result] = await db.insert(equipmentQuizResults).values(data).returning();
+    return result;
+  }
+
+  async getEquipmentQuizResults(userId: string): Promise<EquipmentQuizResult[]> {
+    return db.select().from(equipmentQuizResults)
+      .where(eq(equipmentQuizResults.userId, userId))
+      .orderBy(desc(equipmentQuizResults.completedAt));
+  }
+
+  async getEquipmentProductsByType(type: string): Promise<EquipmentProduct[]> {
+    return db.select().from(equipmentProducts)
+      .where(and(eq(equipmentProducts.type, type), eq(equipmentProducts.isActive, true)));
+  }
+
+  async getEquipmentProductsByCategory(category: string): Promise<EquipmentProduct[]> {
+    return db.select().from(equipmentProducts)
+      .where(and(eq(equipmentProducts.category, category), eq(equipmentProducts.isActive, true)));
   }
 }
 

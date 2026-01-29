@@ -971,3 +971,115 @@ export const insertDailyEdgeStreakSchema = createInsertSchema(dailyEdgeStreaks).
 });
 export type InsertDailyEdgeStreak = z.infer<typeof insertDailyEdgeStreakSchema>;
 export type DailyEdgeStreak = typeof dailyEdgeStreaks.$inferSelect;
+
+// ============================================
+// EquipIQ - Equipment Recommendation System
+// ============================================
+
+// Equipment vendors (SwipeSimple, Dejavoo, MX POS, etc.)
+export const equipmentVendors = pgTable("equipment_vendors", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vendorId: varchar("vendor_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  company: varchar("company", { length: 100 }),
+  website: varchar("website", { length: 255 }),
+  description: text("description"),
+  targetMarket: text("target_market"),
+  pricingModel: varchar("pricing_model", { length: 100 }),
+  support: text("support"),
+  keyDifferentiators: text("key_differentiators").array(),
+  logoUrl: varchar("logo_url", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEquipmentVendorSchema = createInsertSchema(equipmentVendors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEquipmentVendor = z.infer<typeof insertEquipmentVendorSchema>;
+export type EquipmentVendor = typeof equipmentVendors.$inferSelect;
+
+// Equipment products (terminals, POS systems, software)
+export const equipmentProducts = pgTable("equipment_products", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vendorId: varchar("vendor_id", { length: 50 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // hardware, software
+  type: varchar("type", { length: 50 }).notNull(), // countertop, wireless, mobile, pos_system, gateway, etc.
+  name: varchar("name", { length: 200 }).notNull(),
+  model: varchar("model", { length: 100 }),
+  description: text("description"),
+  features: text("features").array(),
+  bestFor: text("best_for").array(),
+  priceRange: varchar("price_range", { length: 100 }),
+  url: varchar("url", { length: 255 }),
+  imageUrl: varchar("image_url", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEquipmentProductSchema = createInsertSchema(equipmentProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEquipmentProduct = z.infer<typeof insertEquipmentProductSchema>;
+export type EquipmentProduct = typeof equipmentProducts.$inferSelect;
+
+// Equipment business types for matching
+export const equipmentBusinessTypes = pgTable("equipment_business_types", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  keywords: text("keywords").array(),
+});
+
+export const insertEquipmentBusinessTypeSchema = createInsertSchema(equipmentBusinessTypes).omit({
+  id: true,
+});
+export type InsertEquipmentBusinessType = z.infer<typeof insertEquipmentBusinessTypeSchema>;
+export type EquipmentBusinessType = typeof equipmentBusinessTypes.$inferSelect;
+
+// Equipment recommendation sessions (for tracking agent recommendations)
+export const equipmentRecommendationSessions = pgTable("equipment_recommendation_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  businessType: varchar("business_type", { length: 100 }),
+  monthlyVolume: varchar("monthly_volume", { length: 50 }),
+  mobilityNeeds: varchar("mobility_needs", { length: 50 }),
+  integrationNeeds: text("integration_needs").array(),
+  budgetPriority: varchar("budget_priority", { length: 50 }),
+  recommendedProducts: integer("recommended_products").array(),
+  aiResponse: text("ai_response"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEquipmentRecommendationSessionSchema = createInsertSchema(equipmentRecommendationSessions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEquipmentRecommendationSession = z.infer<typeof insertEquipmentRecommendationSessionSchema>;
+export type EquipmentRecommendationSession = typeof equipmentRecommendationSessions.$inferSelect;
+
+// Equipment training quiz results
+export const equipmentQuizResults = pgTable("equipment_quiz_results", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  vendorId: varchar("vendor_id", { length: 50 }),
+  difficulty: varchar("difficulty", { length: 20 }), // beginner, intermediate, advanced
+  totalQuestions: integer("total_questions").notNull(),
+  correctAnswers: integer("correct_answers").notNull(),
+  score: real("score").notNull(),
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+});
+
+export const insertEquipmentQuizResultSchema = createInsertSchema(equipmentQuizResults).omit({
+  id: true,
+  completedAt: true,
+});
+export type InsertEquipmentQuizResult = z.infer<typeof insertEquipmentQuizResultSchema>;
+export type EquipmentQuizResult = typeof equipmentQuizResults.$inferSelect;
