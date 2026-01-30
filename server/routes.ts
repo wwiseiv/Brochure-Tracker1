@@ -4610,6 +4610,87 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     }
   });
 
+  // Standalone TTS endpoint for listen buttons (ElevenLabs)
+  app.post("/api/tts", isAuthenticated, async (req: any, res) => {
+    try {
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+      if (!elevenLabsKey) {
+        console.error("ELEVENLABS_API_KEY is not configured");
+        return res.status(500).json({ error: "ElevenLabs not configured" });
+      }
+
+      // Rachel voice - clear, professional female voice
+      const voiceId = "21m00Tcm4TlvDq8ikWAM";
+
+      // Clean markdown formatting from text for natural TTS
+      const cleanTextForTTS = (input: string): string => {
+        return input
+          .replace(/\*\*([^*]+)\*\*/g, '$1')
+          .replace(/\*([^*]+)\*/g, '$1')
+          .replace(/__([^_]+)__/g, '$1')
+          .replace(/_([^_]+)_/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/#{1,6}\s*/g, '')
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/\n{3,}/g, '. ')
+          .replace(/\n/g, '. ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const cleanedText = cleanTextForTTS(text);
+      
+      // Limit text length to avoid excessive API costs
+      const maxLength = 5000;
+      const truncatedText = cleanedText.length > maxLength 
+        ? cleanedText.substring(0, maxLength) + "..."
+        : cleanedText;
+
+      const ttsResponse = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": elevenLabsKey,
+          },
+          body: JSON.stringify({
+            text: truncatedText,
+            model_id: "eleven_monolingual_v1",
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        }
+      );
+
+      if (!ttsResponse.ok) {
+        const errorText = await ttsResponse.text();
+        console.error("ElevenLabs API error:", ttsResponse.status, errorText);
+        return res.status(500).json({ error: "Failed to generate speech" });
+      }
+
+      const audioBuffer = await ttsResponse.arrayBuffer();
+      const base64Audio = Buffer.from(audioBuffer).toString("base64");
+
+      res.json({
+        audio: base64Audio,
+        format: "audio/mpeg",
+      });
+    } catch (error: any) {
+      console.error("TTS error:", error?.message || error);
+      res.status(500).json({ error: "Failed to generate speech" });
+    }
+  });
+
   app.post("/api/roleplay/sessions/:id/end", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
