@@ -51,6 +51,7 @@ import {
   ChevronUp,
   GraduationCap,
   ChevronRight,
+  FileSignature,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1427,6 +1428,24 @@ export default function CoachPage() {
                   </Card>
                 </Link>
               )}
+
+              {/* E-Sign Document Library Link */}
+              <Link href="/esign" className="block">
+                <Card className="p-4 hover-elevate cursor-pointer border-blue-500/30 bg-blue-500/5" data-testid="card-esign-documents">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <FileSignature className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">E-Sign Document Library</div>
+                        <div className="text-sm text-muted-foreground">Send merchant applications for e-signature</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
 
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
