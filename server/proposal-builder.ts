@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { proposalJobs, proposals, users } from "@shared/schema";
+import { proposalJobs, proposals, users, equipmentProducts } from "@shared/schema";
 import type { 
   ProposalJob, 
   ProposalJobStep, 
@@ -13,7 +13,7 @@ import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import { parsePDFProposal, type ParsedProposal } from "./proposal-generator";
 import { generateProposalImages } from "./proposal-images";
 import { generateEnhancedProposalPDF } from "./proposal-document";
-import { htmlRenderer } from "./renderers/html-renderer";
+import { htmlRenderer, type GeneratedImages } from "./renderers/html-renderer";
 
 const USE_VISUAL_RENDERER = process.env.USE_VISUAL_RENDERER === "true";
 
@@ -333,10 +333,28 @@ export async function executeProposalJob(
         
         if (USE_VISUAL_RENDERER) {
           console.log("[ProposalBuilder] Using visual HTML renderer for PDF generation");
+          
+          let equipmentData: { name: string; features: string[]; imageBase64?: string } | undefined;
+          if (currentJob.selectedEquipmentId) {
+            const [product] = await db.select().from(equipmentProducts).where(eq(equipmentProducts.id, currentJob.selectedEquipmentId));
+            if (product) {
+              equipmentData = {
+                name: product.name,
+                features: (product.features as string[]) || [],
+                imageBase64: product.imageUrl || undefined,
+              };
+              console.log("[ProposalBuilder] Using selected equipment:", product.name);
+            }
+          }
+          
+          const images = currentJob.generatedImages as GeneratedImages | undefined;
+          
           pdfBuffer = await htmlRenderer.generateProposal(
             currentJob.merchantScrapedData as MerchantScrapedData,
             currentJob.pricingComparison as PricingComparison,
-            currentJob.salespersonInfo as SalespersonInfo
+            currentJob.salespersonInfo as SalespersonInfo,
+            equipmentData,
+            images
           );
         } else {
           console.log("[ProposalBuilder] Using legacy PDF generator");

@@ -1,16 +1,23 @@
 import * as fs from "fs";
 import * as path from "path";
 import Handlebars from "handlebars";
-import puppeteer from "puppeteer";
 import type { PricingComparison, MerchantScrapedData, SalespersonInfo } from "@shared/schema";
 
 Handlebars.registerHelper("add", function (a: number, b: number) {
   return a + b;
 });
 
+export interface GeneratedImages {
+  heroBanner?: string | null;
+  comparisonBackground?: string | null;
+  trustVisual?: string | null;
+}
+
 export interface VisualProposalData {
   pcbancard_logo_url?: string;
   hero_image_url?: string;
+  comparison_background_url?: string;
+  trust_visual_url?: string;
   merchant_logo_url?: string;
   business_name: string;
   owner_name?: string;
@@ -99,7 +106,8 @@ export class HtmlRenderer {
     merchantData: MerchantScrapedData,
     pricingComparison: PricingComparison,
     salesperson: SalespersonInfo,
-    equipment?: { name: string; features: string[]; imageBase64?: string }
+    equipment?: { name: string; features: string[]; imageBase64?: string },
+    generatedImages?: GeneratedImages
   ): VisualProposalData {
     const current = pricingComparison.currentProcessor;
     const dp = pricingComparison.dualPricing;
@@ -107,6 +115,7 @@ export class HtmlRenderer {
 
     const dpMonthlySavings = dp?.monthlySavings || 0;
     const icpMonthlySavings = icp?.monthlySavings || 0;
+    const maxAnnualSavings = Math.max(dp?.annualSavings || 0, icp?.annualSavings || 0);
 
     return {
       business_name: merchantData.businessName || "Valued Merchant",
@@ -117,10 +126,11 @@ export class HtmlRenderer {
       business_description:
         merchantData.businessDescription ||
         `${merchantData.businessName || "This business"} is committed to providing excellent service to customers.`,
-      opportunity_statement: `By optimizing your payment processing, you could save up to $${this.formatCurrency(
-        Math.max(dp?.annualSavings || 0, icp?.annualSavings || 0)
-      )} annually while improving the customer experience.`,
+      opportunity_statement: `By optimizing your payment processing, you could save up to $${this.formatCurrency(maxAnnualSavings)} annually while improving the customer experience.`,
       merchant_logo_url: merchantData.logoBase64 || merchantData.logoUrl || undefined,
+      hero_image_url: generatedImages?.heroBanner || undefined,
+      comparison_background_url: generatedImages?.comparisonBackground || undefined,
+      trust_visual_url: generatedImages?.trustVisual || undefined,
       agent_name: salesperson.name,
       agent_title: salesperson.title,
       agent_phone: salesperson.phone,
@@ -184,9 +194,10 @@ export class HtmlRenderer {
     };
   }
 
-  async htmlToPdf(htmlContent: string): Promise<Buffer> {
+  async htmlToPdfWithPuppeteer(htmlContent: string): Promise<Buffer> {
     console.log("[HtmlRenderer] Launching Puppeteer...");
-    const browser = await puppeteer.launch({
+    const puppeteer = await import("puppeteer");
+    const browser = await puppeteer.default.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
@@ -210,10 +221,34 @@ export class HtmlRenderer {
         },
       });
 
-      console.log("[HtmlRenderer] PDF generated successfully");
+      console.log("[HtmlRenderer] PDF generated successfully with Puppeteer");
       return Buffer.from(pdfBuffer);
     } finally {
       await browser.close();
+    }
+  }
+
+  async htmlToPdfWithFallback(htmlContent: string): Promise<Buffer> {
+    console.log("[HtmlRenderer] Attempting PDF generation with html-pdf-node...");
+    try {
+      const htmlPdfNode = await import("html-pdf-node");
+      const options = { format: "Letter" as const, printBackground: true };
+      const file = { content: htmlContent };
+      const pdfBuffer = await htmlPdfNode.default.generatePdf(file, options);
+      console.log("[HtmlRenderer] PDF generated successfully with html-pdf-node");
+      return Buffer.from(pdfBuffer);
+    } catch (error) {
+      console.error("[HtmlRenderer] html-pdf-node failed:", error);
+      throw error;
+    }
+  }
+
+  async htmlToPdf(htmlContent: string): Promise<Buffer> {
+    try {
+      return await this.htmlToPdfWithPuppeteer(htmlContent);
+    } catch (puppeteerError) {
+      console.warn("[HtmlRenderer] Puppeteer failed, trying fallback:", puppeteerError);
+      return await this.htmlToPdfWithFallback(htmlContent);
     }
   }
 
@@ -221,14 +256,16 @@ export class HtmlRenderer {
     merchantData: MerchantScrapedData,
     pricingComparison: PricingComparison,
     salesperson: SalespersonInfo,
-    equipment?: { name: string; features: string[]; imageBase64?: string }
+    equipment?: { name: string; features: string[]; imageBase64?: string },
+    generatedImages?: GeneratedImages
   ): Promise<Buffer> {
     console.log("[HtmlRenderer] Preparing proposal data...");
     const proposalData = this.prepareDataFromProposal(
       merchantData,
       pricingComparison,
       salesperson,
-      equipment
+      equipment,
+      generatedImages
     );
 
     console.log("[HtmlRenderer] Rendering HTML...");
