@@ -24,7 +24,10 @@ import {
   Sparkles,
   FileCheck,
   Monitor,
-  X
+  X,
+  Zap,
+  Presentation,
+  ExternalLink
 } from "lucide-react";
 
 interface ParsedProposal {
@@ -182,6 +185,10 @@ export default function ProposalGeneratorPage() {
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(null);
   const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedRenderer, setSelectedRenderer] = useState<"replit" | "gamma">("replit");
+  const [outputFormat, setOutputFormat] = useState<"pdf" | "docx" | "pptx">("pdf");
+  const [gammaUrl, setGammaUrl] = useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
   const { data: proposals, isLoading: proposalsLoading } = useQuery<Proposal[]>({
@@ -233,12 +240,28 @@ export default function ProposalGeneratorPage() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async (data: { parsedData: ParsedProposal; equipment?: EquipmentProduct; useAI?: boolean }) => {
+    mutationFn: async (data: { 
+      parsedData: ParsedProposal; 
+      equipment?: EquipmentProduct; 
+      useAI?: boolean;
+      renderer?: "replit" | "gamma";
+      format?: "pdf" | "docx" | "pptx";
+    }) => {
       const res = await apiRequest("POST", "/api/proposals/generate", data);
       return res.json();
     },
     onSuccess: (data) => {
       setGeneratedProposalId(data.id);
+      if (data.gammaUrl) {
+        setGammaUrl(data.gammaUrl);
+      }
+      if (data.fallback) {
+        setUsedFallback(true);
+        toast({
+          title: "Used Fallback Renderer",
+          description: data.fallbackReason || "Gamma was unavailable, generated with local renderer instead",
+        });
+      }
       setStep("generated");
       toast({
         title: "Proposal Generated",
@@ -331,10 +354,14 @@ export default function ProposalGeneratorPage() {
 
   const handleGenerate = (useAI: boolean) => {
     if (parsedData) {
+      setUsedFallback(false);
+      setGammaUrl(null);
       generateMutation.mutate({
         parsedData,
         equipment: selectedEquipment || undefined,
         useAI,
+        renderer: selectedRenderer,
+        format: outputFormat,
       });
     }
   };
@@ -612,7 +639,7 @@ export default function ProposalGeneratorPage() {
           onClick={() => {
             setStep("upload");
             setParsedData(null);
-            setUploadedFile(null);
+            setUploadedFiles([]);
           }}
           data-testid="button-back-upload"
         >
@@ -696,6 +723,98 @@ export default function ProposalGeneratorPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Presentation className="w-5 h-5 text-primary" />
+            Output Method
+          </CardTitle>
+          <CardDescription>
+            Choose how to generate your proposal
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                selectedRenderer === "replit" ? "border-primary bg-primary/5" : "hover-elevate"
+              }`}
+              onClick={() => {
+                setSelectedRenderer("replit");
+                if (outputFormat === "pptx") setOutputFormat("pdf");
+              }}
+              data-testid="renderer-replit"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  selectedRenderer === "replit" ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}>
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Replit Native</p>
+                  <p className="text-sm text-muted-foreground">Fast DOCX or PDF generation</p>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-muted-foreground space-y-1">
+                <p>• Editable Word document</p>
+                <p>• No external API needed</p>
+                <p>• Instant generation</p>
+              </div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                selectedRenderer === "gamma" ? "border-primary bg-primary/5" : "hover-elevate"
+              }`}
+              onClick={() => {
+                setSelectedRenderer("gamma");
+                setOutputFormat("pdf");
+              }}
+              data-testid="renderer-gamma"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  selectedRenderer === "gamma" ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}>
+                  <Presentation className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Gamma Presentation</p>
+                  <p className="text-sm text-muted-foreground">AI-designed presentation</p>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-muted-foreground space-y-1">
+                <p>• Professional design</p>
+                <p>• Animated slides</p>
+                <p>• PDF or PPTX export</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Label className="mb-2 block">Output Format</Label>
+            <Select
+              value={outputFormat}
+              onValueChange={(val) => setOutputFormat(val as "pdf" | "docx" | "pptx")}
+            >
+              <SelectTrigger data-testid="select-format">
+                <SelectValue placeholder="Select format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pdf">PDF</SelectItem>
+                {selectedRenderer === "replit" && (
+                  <SelectItem value="docx">Word Document (DOCX)</SelectItem>
+                )}
+                {selectedRenderer === "gamma" && (
+                  <SelectItem value="pptx">PowerPoint (PPTX)</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex gap-4">
         <Button
           variant="outline"
@@ -753,6 +872,13 @@ export default function ProposalGeneratorPage() {
           <CardDescription className="text-center">
             Your professional proposal for {parsedData?.merchantName || parsedData?.preparedFor} is ready for download.
           </CardDescription>
+          {usedFallback && (
+            <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                Gamma was unavailable, generated with local renderer instead
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
@@ -790,13 +916,34 @@ export default function ProposalGeneratorPage() {
             </a>
           </div>
 
+          {gammaUrl && (
+            <a
+              href={gammaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+              data-testid="open-gamma"
+            >
+              <Button variant="outline" className="w-full h-auto py-4">
+                <div className="flex items-center gap-3">
+                  <Presentation className="w-8 h-8 text-purple-500" />
+                  <div className="text-left flex-1">
+                    <p className="font-medium">Open in Gamma</p>
+                    <p className="text-sm text-muted-foreground">Edit in Gamma's design platform</p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                </div>
+              </Button>
+            </a>
+          )}
+
           <Button
             variant="outline"
             className="w-full"
             onClick={() => {
               setStep("upload");
               setParsedData(null);
-              setUploadedFile(null);
+              setUploadedFiles([]);
               setSelectedEquipment(null);
               setGeneratedProposalId(null);
             }}

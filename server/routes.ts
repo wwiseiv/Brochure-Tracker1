@@ -5581,7 +5581,7 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       const membership = req.orgMembership as OrgMembershipInfo;
       const userId = req.user.claims.sub;
 
-      const { parsedData, useAI, selectedTerminalId } = req.body;
+      const { parsedData, useAI, selectedTerminalId, renderer = "replit", format = "pdf" } = req.body;
 
       if (!parsedData || !parsedData.merchantName) {
         return res.status(400).json({ error: "Parsed proposal data is required" });
@@ -5682,10 +5682,145 @@ Format your response as JSON:
         status: "draft",
       });
 
+      let gammaUrl: string | undefined;
+      let fallback = false;
+      let fallbackReason: string | undefined;
+
+      if (renderer === "gamma") {
+        try {
+          const { createGammaRenderer, isGammaConfigured } = await import("./gamma-renderer");
+          
+          if (isGammaConfigured()) {
+            const gammaRenderer = createGammaRenderer();
+            if (gammaRenderer) {
+              const gammaBlueprint = {
+                cover: {
+                  headline: blueprint.cover.headline,
+                  subheadline: blueprint.cover.subheadline,
+                  merchantName: blueprint.cover.merchantName,
+                  preparedBy: blueprint.cover.agentName,
+                  date: blueprint.cover.preparedDate,
+                },
+                executiveSummary: {
+                  opening: blueprint.executiveSummary.intro,
+                  keyFindings: [
+                    `Current monthly processing cost: $${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "N/A"}`,
+                    `Total monthly volume: $${parsedData.currentState?.totalVolume?.toLocaleString() || "N/A"}`,
+                    `Potential monthly savings: $${Math.max(blueprint.savingsComparison.dualPricingSavings || 0, blueprint.savingsComparison.interchangePlusSavings || 0).toLocaleString()}`,
+                  ],
+                  recommendation: blueprint.executiveSummary.recommendation,
+                },
+                currentSituation: {
+                  narrative: blueprint.executiveSummary.currentSituation,
+                  tableRows: [
+                    ["Visa", `$${parsedData.currentState?.cardBreakdown?.visa?.volume?.toLocaleString() || "0"}`, `${parsedData.currentState?.cardBreakdown?.visa?.ratePercent || 0}%`, `$${parsedData.currentState?.cardBreakdown?.visa?.totalCost?.toLocaleString() || "0"}`],
+                    ["Mastercard", `$${parsedData.currentState?.cardBreakdown?.mastercard?.volume?.toLocaleString() || "0"}`, `${parsedData.currentState?.cardBreakdown?.mastercard?.ratePercent || 0}%`, `$${parsedData.currentState?.cardBreakdown?.mastercard?.totalCost?.toLocaleString() || "0"}`],
+                    ["Discover", `$${parsedData.currentState?.cardBreakdown?.discover?.volume?.toLocaleString() || "0"}`, `${parsedData.currentState?.cardBreakdown?.discover?.ratePercent || 0}%`, `$${parsedData.currentState?.cardBreakdown?.discover?.totalCost?.toLocaleString() || "0"}`],
+                    ["Amex", `$${parsedData.currentState?.cardBreakdown?.amex?.volume?.toLocaleString() || "0"}`, `${parsedData.currentState?.cardBreakdown?.amex?.ratePercent || 0}%`, `$${parsedData.currentState?.cardBreakdown?.amex?.totalCost?.toLocaleString() || "0"}`],
+                  ],
+                  totalMonthly: `$${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "0"}`,
+                  effectiveRate: `${parsedData.currentState?.effectiveRatePercent?.toFixed(2) || "0"}%`,
+                },
+                optionDualPricing: parsedData.optionDualPricing ? {
+                  title: "Dual Pricing Program",
+                  tagline: "Eliminate Processing Costs Entirely",
+                  howItWorks: "Display separate cash and credit prices. Customers who pay with credit cover the processing fee, while cash customers enjoy a discount.",
+                  benefits: [
+                    "Eliminate up to 100% of processing fees",
+                    "Increase profit margins immediately",
+                    "Fully compliant with all regulations",
+                    "Simple signage and customer education",
+                  ],
+                  costs: {
+                    monthlyProgramFee: `$${parsedData.optionDualPricing?.monthlyProgramFee?.toFixed(2) || "64.95"}`,
+                    processingCost: "$0.00",
+                    totalMonthly: `$${parsedData.optionDualPricing?.totalMonthlyCost?.toFixed(2) || "64.95"}`,
+                  },
+                  savings: {
+                    monthly: `$${parsedData.optionDualPricing?.monthlySavings?.toLocaleString() || "0"}`,
+                    annual: `$${parsedData.optionDualPricing?.annualSavings?.toLocaleString() || "0"}`,
+                  },
+                } : undefined,
+                optionInterchangePlus: parsedData.optionInterchangePlus ? {
+                  title: "Interchange Plus Pricing",
+                  tagline: "Transparent, Competitive Rates",
+                  howItWorks: "Pay the true wholesale interchange rate plus a small fixed markup. No hidden fees, complete transparency.",
+                  benefits: [
+                    "Transparent pricing structure",
+                    "Lower rates on qualified transactions",
+                    "No annual fee increases",
+                    "Full statement transparency",
+                  ],
+                  costs: {
+                    rate: `${parsedData.optionInterchangePlus?.discountRatePercent || 0}%`,
+                    perTransaction: `$${parsedData.optionInterchangePlus?.perTransactionFee?.toFixed(2) || "0.10"}`,
+                    totalMonthly: `$${parsedData.optionInterchangePlus?.totalMonthlyCost?.toLocaleString() || "0"}`,
+                  },
+                  savings: {
+                    monthly: `$${parsedData.optionInterchangePlus?.monthlySavings?.toLocaleString() || "0"}`,
+                    annual: `$${parsedData.optionInterchangePlus?.annualSavings?.toLocaleString() || "0"}`,
+                  },
+                } : undefined,
+                comparisonTable: {
+                  rows: [
+                    ["Monthly Cost", `$${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "0"}`, `$${parsedData.optionDualPricing?.totalMonthlyCost?.toFixed(2) || "N/A"}`, `$${parsedData.optionInterchangePlus?.totalMonthlyCost?.toLocaleString() || "N/A"}`],
+                    ["Monthly Savings", "-", `$${parsedData.optionDualPricing?.monthlySavings?.toLocaleString() || "0"}`, `$${parsedData.optionInterchangePlus?.monthlySavings?.toLocaleString() || "0"}`],
+                    ["Annual Savings", "-", `$${parsedData.optionDualPricing?.annualSavings?.toLocaleString() || "0"}`, `$${parsedData.optionInterchangePlus?.annualSavings?.toLocaleString() || "0"}`],
+                  ],
+                },
+                equipment: equipment ? {
+                  title: "Recommended Equipment",
+                  terminalName: equipment.name,
+                  whyRecommended: equipment.whySelected,
+                  features: equipment.features,
+                } : undefined,
+                nextSteps: {
+                  steps: [
+                    "Review this proposal with your team",
+                    "Choose your preferred pricing option",
+                    "Sign the merchant agreement",
+                    "Schedule terminal installation",
+                  ],
+                  ctaPrimary: "Ready to start saving?",
+                  ctaSecondary: `Contact ${parsedData.agentName || "your PCBancard representative"} today to get started!`,
+                },
+                disclosures: [
+                  "Savings estimates based on provided statement data",
+                  "Actual savings may vary based on card mix and transaction patterns",
+                  "All rates subject to application approval",
+                ],
+              };
+
+              const result = await gammaRenderer.generateProposal(gammaBlueprint, {
+                exportAs: format === "pptx" ? "pptx" : "pdf",
+              });
+
+              if (result.success) {
+                gammaUrl = result.gammaUrl;
+              } else {
+                fallback = true;
+                fallbackReason = result.error || "Gamma generation failed";
+              }
+            }
+          } else {
+            fallback = true;
+            fallbackReason = "Gamma API not configured";
+          }
+        } catch (gammaError: any) {
+          console.error("[Proposals] Gamma generation failed:", gammaError.message);
+          fallback = true;
+          fallbackReason = gammaError.message || "Gamma generation failed";
+        }
+      }
+
       res.json({
         success: true,
+        id: proposal.id,
         proposal,
         blueprint,
+        gammaUrl,
+        fallback,
+        fallbackReason,
       });
     } catch (error: any) {
       console.error("[Proposals] Error generating proposal:", error);
