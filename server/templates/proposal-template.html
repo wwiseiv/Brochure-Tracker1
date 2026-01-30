@@ -725,9 +725,22 @@
       <h3>About {{business_name}}</h3>
       <p>{{business_description}}</p>
 
+      {{#if executive_summary}}
+      <div class="highlight-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0ea5e9;">
+        <p style="margin: 0; color: #0369a1;">{{executive_summary}}</p>
+      </div>
+      {{/if}}
+
       <div class="highlight-box">
         <strong>The Opportunity:</strong> {{opportunity_statement}}
       </div>
+
+      {{#if industry_insights}}
+      <div style="margin-top: 20px; padding: 16px; background: #fafafa; border-radius: 8px;">
+        <strong style="color: #6366f1;">Industry Insight:</strong>
+        <p style="margin: 8px 0 0; color: #475569;">{{industry_insights}}</p>
+      </div>
+      {{/if}}
     </div>
 
     <div class="section-header" style="margin-top: 40px;">
@@ -910,7 +923,15 @@
 
     <div class="cta-section">
       <h2>Ready to Start Saving?</h2>
+      {{#if closing_statement}}
+      <p>{{closing_statement}}</p>
+      {{else}}
       <p>Let's schedule a quick call to finalize your setup and get you saving.</p>
+      {{/if}}
+
+      {{#if urgency_message}}
+      <p style="font-size: 14px; font-style: italic; opacity: 0.9; margin-bottom: 24px;">{{urgency_message}}</p>
+      {{/if}}
 
       <div class="agent-contact">
         <p class="agent-name">{{agent_name}}</p>

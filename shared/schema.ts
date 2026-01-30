@@ -1349,6 +1349,7 @@ export type ProposalJobStep =
   | "parsing_documents"
   | "scraping_website"
   | "extracting_pricing"
+  | "ai_analysis"
   | "generating_images"
   | "building_document"
   | "finalizing";
@@ -1439,6 +1440,17 @@ export const proposalJobs = pgTable("proposal_jobs", {
     heroBanner?: string;
     comparisonBackground?: string;
     trustVisual?: string;
+  }>(),
+  
+  aiGeneratedContent: jsonb("ai_generated_content").$type<{
+    executiveSummary?: string;
+    opportunityStatement?: string;
+    recommendationSummary?: string;
+    recommendationReasons?: string[];
+    valuePropositions?: string[];
+    industryInsights?: string;
+    closingStatement?: string;
+    urgencyMessage?: string;
   }>(),
   
   selectedEquipmentId: integer("selected_equipment_id"),

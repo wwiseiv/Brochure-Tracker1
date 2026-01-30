@@ -13,6 +13,17 @@ export interface GeneratedImages {
   trustVisual?: string | null;
 }
 
+export interface AIContent {
+  executiveSummary?: string;
+  opportunityStatement?: string;
+  recommendationSummary?: string;
+  recommendationReasons?: string[];
+  valuePropositions?: string[];
+  industryInsights?: string;
+  closingStatement?: string;
+  urgencyMessage?: string;
+}
+
 export interface VisualProposalData {
   pcbancard_logo_url?: string;
   hero_image_url?: string;
@@ -25,7 +36,12 @@ export interface VisualProposalData {
   business_phone?: string;
   business_email?: string;
   business_description?: string;
+  executive_summary?: string;
   opportunity_statement?: string;
+  industry_insights?: string;
+  value_propositions?: string[];
+  closing_statement?: string;
+  urgency_message?: string;
   agent_name: string;
   agent_title: string;
   agent_phone: string;
@@ -107,7 +123,8 @@ export class HtmlRenderer {
     pricingComparison: PricingComparison,
     salesperson: SalespersonInfo,
     equipment?: { name: string; features: string[]; imageBase64?: string },
-    generatedImages?: GeneratedImages
+    generatedImages?: GeneratedImages,
+    aiContent?: AIContent
   ): VisualProposalData {
     const current = pricingComparison.currentProcessor;
     const dp = pricingComparison.dualPricing;
@@ -116,6 +133,9 @@ export class HtmlRenderer {
     const dpMonthlySavings = dp?.monthlySavings || 0;
     const icpMonthlySavings = icp?.monthlySavings || 0;
     const maxAnnualSavings = Math.max(dp?.annualSavings || 0, icp?.annualSavings || 0);
+
+    const defaultOpportunityStatement = `By optimizing your payment processing, you could save up to $${this.formatCurrency(maxAnnualSavings)} annually while improving the customer experience.`;
+    const defaultExecutiveSummary = `This proposal outlines a customized payment processing solution for ${merchantData.businessName || "your business"}. Based on our analysis of your current processing costs, we've identified significant savings opportunities.`;
 
     return {
       business_name: merchantData.businessName || "Valued Merchant",
@@ -126,7 +146,12 @@ export class HtmlRenderer {
       business_description:
         merchantData.businessDescription ||
         `${merchantData.businessName || "This business"} is committed to providing excellent service to customers.`,
-      opportunity_statement: `By optimizing your payment processing, you could save up to $${this.formatCurrency(maxAnnualSavings)} annually while improving the customer experience.`,
+      executive_summary: aiContent?.executiveSummary || defaultExecutiveSummary,
+      opportunity_statement: aiContent?.opportunityStatement || defaultOpportunityStatement,
+      industry_insights: aiContent?.industryInsights || undefined,
+      value_propositions: aiContent?.valuePropositions || undefined,
+      closing_statement: aiContent?.closingStatement || undefined,
+      urgency_message: aiContent?.urgencyMessage || undefined,
       merchant_logo_url: merchantData.logoBase64 || merchantData.logoUrl || undefined,
       hero_image_url: generatedImages?.heroBanner || undefined,
       comparison_background_url: generatedImages?.comparisonBackground || undefined,
@@ -158,10 +183,11 @@ export class HtmlRenderer {
       recommended_option:
         pricingComparison.recommendedOption === "dual_pricing" ? "Dual Pricing" : "Interchange Plus",
       recommendation_summary:
-        pricingComparison.recommendedOption === "dual_pricing"
+        aiContent?.recommendationSummary ||
+        (pricingComparison.recommendedOption === "dual_pricing"
           ? "Based on your business profile and processing volume, we recommend Dual Pricing for maximum savings with minimal operational changes."
-          : "Based on your processing patterns, Interchange Plus offers competitive savings while maintaining traditional pricing.",
-      recommendation_reasons: [
+          : "Based on your processing patterns, Interchange Plus offers competitive savings while maintaining traditional pricing."),
+      recommendation_reasons: aiContent?.recommendationReasons || [
         "Maximum savings potential with minimal operational changes",
         "Customers appreciate transparency and choice in payment options",
         "Fully automated system requires no manual price adjustments",
@@ -257,15 +283,20 @@ export class HtmlRenderer {
     pricingComparison: PricingComparison,
     salesperson: SalespersonInfo,
     equipment?: { name: string; features: string[]; imageBase64?: string },
-    generatedImages?: GeneratedImages
+    generatedImages?: GeneratedImages,
+    aiContent?: AIContent
   ): Promise<Buffer> {
     console.log("[HtmlRenderer] Preparing proposal data...");
+    if (aiContent) {
+      console.log("[HtmlRenderer] Using AI-generated content for proposal");
+    }
     const proposalData = this.prepareDataFromProposal(
       merchantData,
       pricingComparison,
       salesperson,
       equipment,
-      generatedImages
+      generatedImages,
+      aiContent
     );
 
     console.log("[HtmlRenderer] Rendering HTML...");

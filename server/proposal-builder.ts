@@ -13,7 +13,8 @@ import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import { parsePDFProposal, type ParsedProposal } from "./proposal-generator";
 import { generateProposalImages } from "./proposal-images";
 import { generateEnhancedProposalPDF } from "./proposal-document";
-import { htmlRenderer, type GeneratedImages } from "./renderers/html-renderer";
+import { htmlRenderer, type GeneratedImages, type AIContent } from "./renderers/html-renderer";
+import { generateProposalContent, type AIGeneratedContent } from "./services/proposal-ai-agent";
 
 const USE_VISUAL_RENDERER = process.env.USE_VISUAL_RENDERER === "true";
 
@@ -21,6 +22,7 @@ const ALL_STEPS: ProposalJobStep[] = [
   "parsing_documents",
   "scraping_website",
   "extracting_pricing",
+  "ai_analysis",
   "generating_images",
   "building_document",
   "finalizing",
@@ -42,6 +44,8 @@ function getStepDescription(step: ProposalJobStep): string {
       return "Fetching merchant logo and business info";
     case "extracting_pricing":
       return "Extracting pricing data for comparison";
+    case "ai_analysis":
+      return "AI analyzing data and generating proposal content";
     case "generating_images":
       return "Creating custom proposal images";
     case "building_document":
@@ -299,6 +303,48 @@ export async function executeProposalJob(
       throw error;
     }
 
+    // AI Analysis Step - Generate intelligent proposal content
+    await updateJobStep(jobId, "ai_analysis", "running", "AI analyzing merchant data and generating content...");
+    
+    let aiGeneratedContent: AIGeneratedContent | null = null;
+    try {
+      // Re-fetch job data to get latest pricing comparison
+      const jobForAI = await db.select().from(proposalJobs).where(eq(proposalJobs.id, jobId)).limit(1);
+      const currentJobForAI = jobForAI[0];
+      
+      if (currentJobForAI?.pricingComparison && currentJobForAI?.salespersonInfo) {
+        // Fetch equipment data if selected
+        let selectedEquipment: { name: string; features: string[] } | undefined;
+        if (currentJobForAI.selectedEquipmentId) {
+          const [product] = await db.select().from(equipmentProducts).where(eq(equipmentProducts.id, currentJobForAI.selectedEquipmentId));
+          if (product) {
+            selectedEquipment = {
+              name: product.name,
+              features: (product.features as string[]) || [],
+            };
+          }
+        }
+        
+        console.log("[ProposalBuilder] Invoking AI agent for content generation...");
+        aiGeneratedContent = await generateProposalContent({
+          merchantData,
+          pricingComparison: currentJobForAI.pricingComparison,
+          salesperson: currentJobForAI.salespersonInfo,
+          selectedEquipment,
+        });
+        
+        // Store AI-generated content
+        await updateJobData(jobId, { aiGeneratedContent });
+        await updateJobStep(jobId, "ai_analysis", "completed", "AI content generated successfully");
+        console.log("[ProposalBuilder] AI content generation complete");
+      } else {
+        await updateJobStep(jobId, "ai_analysis", "completed", "Proceeding with default content");
+      }
+    } catch (error) {
+      console.error("[ProposalBuilder] AI analysis error:", error);
+      await updateJobStep(jobId, "ai_analysis", "completed", "Proceeding with default content");
+    }
+
     await updateJobStep(jobId, "generating_images", "running", "Creating proposal images with AI...");
     
     try {
@@ -348,13 +394,15 @@ export async function executeProposalJob(
           }
           
           const images = currentJob.generatedImages as GeneratedImages | undefined;
+          const aiContent = currentJob.aiGeneratedContent as AIContent | undefined;
           
           pdfBuffer = await htmlRenderer.generateProposal(
             currentJob.merchantScrapedData as MerchantScrapedData,
             currentJob.pricingComparison as PricingComparison,
             currentJob.salespersonInfo as SalespersonInfo,
             equipmentData,
-            images
+            images,
+            aiContent
           );
         } else {
           console.log("[ProposalBuilder] Using legacy PDF generator");
