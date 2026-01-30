@@ -1,0 +1,1611 @@
+I'll build the complete Replit prompt with all 63 products from your EquipIQ page, with the correct manufacturer URLs for each device.
+
+---
+
+```
+Build a Node.js application that scrapes actual product images from manufacturer websites and generates accurate, consistent thumbnails for the EquipIQ page using Google's Gemini API (Nano Banana).
+
+## PROJECT SETUP
+
+```bash
+npm init -y
+npm install @google/generative-ai dotenv puppeteer sharp cheerio axios fs-extra
+```
+
+## Environment Variables (.env)
+```
+GEMINI_API_KEY=your_api_key_here
+```
+
+Get your API key from: https://aistudio.google.com/apikey
+
+---
+
+## COMPLETE PRODUCT DATA (equipiq-products.json)
+
+```json
+{
+  "brands": [
+    {
+      "name": "SwipeSimple",
+      "baseUrl": "https://swipesimple.com",
+      "products": [
+        {
+          "id": "swipesimple-terminal",
+          "name": "SwipeSimple Terminal",
+          "type": "hardware",
+          "category": "all in one",
+          "description": "The all-in-one credit card device that fits in your hand. Take payments and print receipts with a safe and convenient device.",
+          "productPageUrl": "https://swipesimple.com/terminal/",
+          "fallbackSearch": "SwipeSimple Terminal all-in-one payment device"
+        },
+        {
+          "id": "swipesimple-register",
+          "name": "SwipeSimple Register",
+          "type": "hardware",
+          "category": "pos system",
+          "description": "The easy-to-use POS system packed with time-saving features for growing businesses.",
+          "productPageUrl": "https://swipesimple.com/register/",
+          "fallbackSearch": "SwipeSimple Register POS system"
+        },
+        {
+          "id": "swipesimple-card-readers",
+          "name": "SwipeSimple Card Readers",
+          "type": "hardware",
+          "category": "mobile reader",
+          "description": "Fast in-person payments with any mobile phone or tablet.",
+          "productPageUrl": "https://swipesimple.com/card-readers/",
+          "fallbackSearch": "SwipeSimple B250 bluetooth card reader"
+        },
+        {
+          "id": "tap-to-pay-iphone",
+          "name": "Tap to Pay on iPhone",
+          "type": "software",
+          "category": "mobile app",
+          "description": "Accept contactless payments right on your iPhone. No additional hardware needed.",
+          "productPageUrl": "https://swipesimple.com/tap-to-pay/",
+          "fallbackSearch": "Tap to Pay on iPhone SwipeSimple"
+        },
+        {
+          "id": "swipesimple-virtual-terminal",
+          "name": "SwipeSimple Virtual Terminal",
+          "type": "software",
+          "category": "virtual terminal",
+          "description": "Take payments over the phone or at your computer.",
+          "productPageUrl": "https://swipesimple.com/virtual-terminal/",
+          "fallbackSearch": "SwipeSimple Virtual Terminal web payments"
+        },
+        {
+          "id": "swipesimple-invoicing",
+          "name": "SwipeSimple Invoicing",
+          "type": "software",
+          "category": "feature",
+          "description": "Bill customers via email or text message with professional invoices.",
+          "productPageUrl": "https://swipesimple.com/invoicing/",
+          "fallbackSearch": "SwipeSimple Invoicing software"
+        },
+        {
+          "id": "swipesimple-text-to-pay",
+          "name": "SwipeSimple Text to Pay",
+          "type": "software",
+          "category": "feature",
+          "description": "Send payment requests via text message for quick collection.",
+          "productPageUrl": "https://swipesimple.com/text-to-pay/",
+          "fallbackSearch": "SwipeSimple Text to Pay SMS payments"
+        },
+        {
+          "id": "swipesimple-appointments",
+          "name": "SwipeSimple Appointments",
+          "type": "software",
+          "category": "feature",
+          "description": "Simplify scheduling and boost customer interactions.",
+          "productPageUrl": "https://swipesimple.com/appointments/",
+          "fallbackSearch": "SwipeSimple Appointments scheduling"
+        }
+      ]
+    },
+    {
+      "name": "Dejavoo",
+      "baseUrl": "https://www.dejavoo.io",
+      "products": [
+        {
+          "id": "dejavoo-p1",
+          "name": "Dejavoo P1",
+          "type": "hardware",
+          "category": "countertop",
+          "description": "Robust countertop terminal with large touchscreen. Built for high-volume retail and restaurants.",
+          "productPageUrl": "https://www.dejavoo.io/p1",
+          "fallbackSearch": "Dejavoo P1 countertop payment terminal"
+        },
+        {
+          "id": "dejavoo-p3",
+          "name": "Dejavoo P3",
+          "type": "hardware",
+          "category": "wireless",
+          "description": "All-in-one wireless terminal with keyboard and printer. Mobile and gateway-ready.",
+          "productPageUrl": "https://www.dejavoo.io/p3",
+          "fallbackSearch": "Dejavoo P3 wireless terminal"
+        },
+        {
+          "id": "dejavoo-p5",
+          "name": "Dejavoo P5",
+          "type": "hardware",
+          "category": "pin pad",
+          "description": "Multi-functional next-generation mPOS. Versatile and payment ready PIN pad.",
+          "productPageUrl": "https://www.dejavoo.io/p5",
+          "fallbackSearch": "Dejavoo P5 PIN pad mPOS"
+        },
+        {
+          "id": "dejavoo-p8",
+          "name": "Dejavoo P8",
+          "type": "hardware",
+          "category": "wireless",
+          "description": "Secure Android wireless terminal. Perfect for integrations and mobile payments.",
+          "productPageUrl": "https://www.dejavoo.io/p8",
+          "fallbackSearch": "Dejavoo P8 Android wireless terminal"
+        },
+        {
+          "id": "dejavoo-p12",
+          "name": "Dejavoo P12",
+          "type": "hardware",
+          "category": "mobile",
+          "description": "Payment power in the palm of your hand. Ideal for mobile checkout and quick service.",
+          "productPageUrl": "https://www.dejavoo.io/p12",
+          "fallbackSearch": "Dejavoo P12 mobile terminal"
+        },
+        {
+          "id": "dejavoo-p17",
+          "name": "Dejavoo P17",
+          "type": "hardware",
+          "category": "pin pad",
+          "description": "Secure and streamlined PIN Pad. ADA-compliant and designed for speed.",
+          "productPageUrl": "https://www.dejavoo.io/p17",
+          "fallbackSearch": "Dejavoo P17 PIN pad ADA compliant"
+        },
+        {
+          "id": "dejavoo-p18",
+          "name": "Dejavoo P18",
+          "type": "hardware",
+          "category": "wireless",
+          "description": "Multifunctional POS with unique flip display. Customer-facing capability.",
+          "productPageUrl": "https://www.dejavoo.io/p18",
+          "fallbackSearch": "Dejavoo P18 flip display terminal"
+        },
+        {
+          "id": "ipospays-gateway",
+          "name": "iPOSpays Gateway",
+          "type": "software",
+          "category": "gateway",
+          "description": "Omni-commerce gateway platform for online and in-person payments.",
+          "productPageUrl": "https://www.dejavoo.io/ipospays",
+          "fallbackSearch": "iPOSpays Gateway Dejavoo"
+        },
+        {
+          "id": "dejapaypro-cloud-register",
+          "name": "DejaPayPro Cloud Register",
+          "type": "software",
+          "category": "pos software",
+          "description": "Cloud-based register and store management for restaurants and retail.",
+          "productPageUrl": "https://www.dejavoo.io/dejapaypro",
+          "fallbackSearch": "DejaPayPro Cloud Register POS"
+        },
+        {
+          "id": "spin-secure-payment-interface",
+          "name": "SPIn (Secure Payment Interface)",
+          "type": "software",
+          "category": "integration",
+          "description": "Turnkey API for one-and-done POS integration.",
+          "productPageUrl": "https://www.dejavoo.io/spin",
+          "fallbackSearch": "Dejavoo SPIn Secure Payment Interface API"
+        },
+        {
+          "id": "dejavoo-extra",
+          "name": "Dejavoo Extra",
+          "type": "software",
+          "category": "loyalty",
+          "description": "Loyalty reimagined. Customer engagement and rewards program.",
+          "productPageUrl": "https://www.dejavoo.io/extra",
+          "fallbackSearch": "Dejavoo Extra loyalty rewards program"
+        }
+      ]
+    },
+    {
+      "name": "MX POS",
+      "baseUrl": "https://prioritycommerce.com",
+      "products": [
+        {
+          "id": "mx-pos-all-in-one",
+          "name": "MX POS All-in-One",
+          "type": "hardware",
+          "category": "pos system",
+          "description": "Priority's own POS hardware with 15.6 inch touchscreen, built-in printer, and optional customer display.",
+          "productPageUrl": "https://prioritycommerce.com/mx-merchant-solutions/",
+          "fallbackSearch": "MX POS All-in-One Priority Commerce terminal"
+        },
+        {
+          "id": "pax-a920-pro-mx-pos",
+          "name": "PAX A920 Pro (MX POS)",
+          "type": "hardware",
+          "category": "mobile",
+          "description": "Mobile Android terminal for tableside ordering and payments.",
+          "productPageUrl": "https://www.pax.us/portfolio_page/a920pro/",
+          "fallbackSearch": "PAX A920 Pro mobile Android terminal"
+        },
+        {
+          "id": "mx-pos-kiosk",
+          "name": "MX POS Kiosk",
+          "type": "hardware",
+          "category": "kiosk",
+          "description": "21-inch vertical self-service kiosk with built-in printer and EMV cradle.",
+          "productPageUrl": "https://prioritycommerce.com/mx-merchant-solutions/",
+          "fallbackSearch": "MX POS Kiosk self-service 21 inch"
+        },
+        {
+          "id": "mx-pos-restaurant",
+          "name": "MX POS Restaurant",
+          "type": "software",
+          "category": "pos software",
+          "description": "Complete restaurant POS solution with KDS, online ordering, and table management.",
+          "productPageUrl": "https://prioritycommerce.com/mx-merchant-solutions/",
+          "fallbackSearch": "MX POS Restaurant software KDS"
+        },
+        {
+          "id": "mx-pos-retail",
+          "name": "MX POS Retail",
+          "type": "software",
+          "category": "pos software",
+          "description": "All-in-one retail POS with inventory, barcode scanning, and EBT support.",
+          "productPageUrl": "https://prioritycommerce.com/mx-merchant-solutions/",
+          "fallbackSearch": "MX POS Retail software inventory"
+        },
+        {
+          "id": "mx-pos-salon",
+          "name": "MX POS Salon",
+          "type": "software",
+          "category": "pos software",
+          "description": "Salon-specific POS with appointment management and commission tracking.",
+          "productPageUrl": "https://prioritycommerce.com/mx-merchant-solutions/",
+          "fallbackSearch": "MX POS Salon appointment management"
+        }
+      ]
+    },
+    {
+      "name": "Hot Sauce POS",
+      "baseUrl": "https://www.hotsaucepos.com",
+      "products": [
+        {
+          "id": "hot-sauce-table-service",
+          "name": "Hot Sauce Table Service",
+          "type": "software",
+          "category": "pos software",
+          "description": "Full-service restaurant solution for exceptional customer service and increased sales.",
+          "productPageUrl": "https://www.hotsaucepos.com/table-service/",
+          "fallbackSearch": "Hot Sauce POS Table Service restaurant"
+        },
+        {
+          "id": "hot-sauce-quick-service",
+          "name": "Hot Sauce Quick Service",
+          "type": "software",
+          "category": "pos software",
+          "description": "Fast and efficient order entry for quick service restaurants and cafes.",
+          "productPageUrl": "https://www.hotsaucepos.com/quick-service/",
+          "fallbackSearch": "Hot Sauce POS Quick Service QSR"
+        },
+        {
+          "id": "hot-sauce-fast-bar",
+          "name": "Hot Sauce Fast Bar",
+          "type": "software",
+          "category": "pos software",
+          "description": "Developed with bar owners for the simplest and fastest order entry in the industry.",
+          "productPageUrl": "https://www.hotsaucepos.com/bar/",
+          "fallbackSearch": "Hot Sauce POS Fast Bar"
+        },
+        {
+          "id": "hot-sauce-delivery-express",
+          "name": "Hot Sauce Delivery Express",
+          "type": "software",
+          "category": "pos software",
+          "description": "Manage delivery, carryout, and catering with customer tracking and driver management.",
+          "productPageUrl": "https://www.hotsaucepos.com/delivery/",
+          "fallbackSearch": "Hot Sauce POS Delivery Express"
+        },
+        {
+          "id": "hot-sauce-workstation",
+          "name": "Hot Sauce Workstation",
+          "type": "hardware",
+          "category": "workstation",
+          "description": "Complete terminal package with Elo touchscreen, EMV terminal, printer, and cash drawer.",
+          "productPageUrl": "https://www.hotsaucepos.com/hardware/",
+          "fallbackSearch": "Hot Sauce POS Workstation Elo touchscreen"
+        }
+      ]
+    },
+    {
+      "name": "Valor PayTech",
+      "baseUrl": "https://valorpaytech.com",
+      "products": [
+        {
+          "id": "valor-vl100-pro",
+          "name": "Valor VL100 Pro",
+          "type": "hardware",
+          "category": "countertop",
+          "description": "Smart payment solution for stores. Budget-friendly and reliable countertop terminal.",
+          "productPageUrl": "https://valorpaytech.com/products/vl100-pro/",
+          "fallbackSearch": "Valor VL100 Pro countertop terminal"
+        },
+        {
+          "id": "valor-vp100",
+          "name": "Valor VP100",
+          "type": "hardware",
+          "category": "countertop",
+          "description": "Countertop POS with Engage My Customer marketing capabilities.",
+          "productPageUrl": "https://valorpaytech.com/products/vp100/",
+          "fallbackSearch": "Valor VP100 countertop POS"
+        },
+        {
+          "id": "valor-vp350",
+          "name": "Valor VP350",
+          "type": "hardware",
+          "category": "countertop",
+          "description": "Touchscreen POS for restaurants and retail. 5.5-inch display.",
+          "productPageUrl": "https://valorpaytech.com/products/vp350/",
+          "fallbackSearch": "Valor VP350 touchscreen terminal"
+        },
+        {
+          "id": "valor-vp550c",
+          "name": "Valor VP550C",
+          "type": "hardware",
+          "category": "countertop",
+          "description": "Cloud-ready Next-Gen POS for business growth.",
+          "productPageUrl": "https://valorpaytech.com/products/vp550c/",
+          "fallbackSearch": "Valor VP550C cloud POS terminal"
+        },
+        {
+          "id": "valor-vl300",
+          "name": "Valor VL300",
+          "type": "hardware",
+          "category": "pin pad",
+          "description": "Budget-friendly, security-driven PIN pad with built-in NFC.",
+          "productPageUrl": "https://valorpaytech.com/products/vl300/",
+          "fallbackSearch": "Valor VL300 PIN pad NFC"
+        },
+        {
+          "id": "valor-vp300",
+          "name": "Valor VP300",
+          "type": "hardware",
+          "category": "pin pad",
+          "description": "Small business PIN pad payment solution.",
+          "productPageUrl": "https://valorpaytech.com/products/vp300/",
+          "fallbackSearch": "Valor VP300 PIN pad"
+        },
+        {
+          "id": "valor-vp300-pro",
+          "name": "Valor VP300 Pro",
+          "type": "hardware",
+          "category": "pin pad",
+          "description": "Contactless mobile POS for pop-up and hospitality environments.",
+          "productPageUrl": "https://valorpaytech.com/products/vp300-pro/",
+          "fallbackSearch": "Valor VP300 Pro contactless mobile"
+        },
+        {
+          "id": "valor-vl110",
+          "name": "Valor VL110",
+          "type": "hardware",
+          "category": "wireless",
+          "description": "Startup-friendly wireless terminal for mobile businesses.",
+          "productPageUrl": "https://valorpaytech.com/products/vl110/",
+          "fallbackSearch": "Valor VL110 wireless terminal"
+        },
+        {
+          "id": "valor-vl550",
+          "name": "Valor VL550",
+          "type": "hardware",
+          "category": "next gen",
+          "description": "Next-gen POS terminal with signature capture.",
+          "productPageUrl": "https://valorpaytech.com/products/vl550/",
+          "fallbackSearch": "Valor VL550 next gen terminal"
+        },
+        {
+          "id": "valor-vp550",
+          "name": "Valor VP550",
+          "type": "hardware",
+          "category": "next gen",
+          "description": "Flagship terminal accepting tap/dip/swipe plus QR codes.",
+          "productPageUrl": "https://valorpaytech.com/products/vp550/",
+          "fallbackSearch": "Valor VP550 flagship terminal QR"
+        },
+        {
+          "id": "valor-vp550e",
+          "name": "Valor VP550E",
+          "type": "hardware",
+          "category": "next gen",
+          "description": "Extended enterprise Android POS with advanced features.",
+          "productPageUrl": "https://valorpaytech.com/products/vp550e/",
+          "fallbackSearch": "Valor VP550E enterprise Android POS"
+        },
+        {
+          "id": "valor-vp800",
+          "name": "Valor VP800",
+          "type": "hardware",
+          "category": "next gen",
+          "description": "Future-proof POS terminal. Multi-Comm Hub for next generation businesses.",
+          "productPageUrl": "https://valorpaytech.com/products/vp800/",
+          "fallbackSearch": "Valor VP800 Multi-Comm Hub terminal"
+        },
+        {
+          "id": "valor-rckt",
+          "name": "Valor RCKT",
+          "type": "hardware",
+          "category": "mobile",
+          "description": "Easy mobile POS payment solution for small businesses.",
+          "productPageUrl": "https://valorpaytech.com/products/rckt/",
+          "fallbackSearch": "Valor RCKT mobile POS"
+        },
+        {
+          "id": "valor-payment-gateway",
+          "name": "Valor Payment Gateway",
+          "type": "software",
+          "category": "gateway",
+          "description": "E-commerce gateway integrating with major shopping carts.",
+          "productPageUrl": "https://valorpaytech.com/solutions/gateway/",
+          "fallbackSearch": "Valor Payment Gateway ecommerce"
+        },
+        {
+          "id": "valor-virtual-terminal",
+          "name": "Valor Virtual Terminal",
+          "type": "software",
+          "category": "virtual terminal",
+          "description": "Web-based payment entry for phone and mail orders.",
+          "productPageUrl": "https://valorpaytech.com/solutions/virtual-terminal/",
+          "fallbackSearch": "Valor Virtual Terminal web payments"
+        },
+        {
+          "id": "valorpay-app",
+          "name": "ValorPay",
+          "type": "software",
+          "category": "mobile app",
+          "description": "Mobile POS app for iOS and Android devices.",
+          "productPageUrl": "https://valorpaytech.com/solutions/valorpay-app/",
+          "fallbackSearch": "ValorPay mobile app iOS Android"
+        },
+        {
+          "id": "valor-dual-pricing",
+          "name": "Valor Dual Pricing",
+          "type": "software",
+          "category": "pricing",
+          "description": "Help merchants reduce processing costs with compliant surcharge programs.",
+          "productPageUrl": "https://valorpaytech.com/solutions/dual-pricing/",
+          "fallbackSearch": "Valor Dual Pricing surcharge program"
+        },
+        {
+          "id": "the-vault",
+          "name": "The Vault",
+          "type": "software",
+          "category": "security",
+          "description": "Secure tokenization for stored payment info and enhanced customer experience.",
+          "productPageUrl": "https://valorpaytech.com/solutions/vault/",
+          "fallbackSearch": "Valor The Vault tokenization"
+        },
+        {
+          "id": "valor-shield",
+          "name": "Valor Shield",
+          "type": "software",
+          "category": "security",
+          "description": "Chargeback protection and unauthorized activity prevention.",
+          "productPageUrl": "https://valorpaytech.com/solutions/shield/",
+          "fallbackSearch": "Valor Shield chargeback protection"
+        },
+        {
+          "id": "engage-my-customer",
+          "name": "Engage My Customer",
+          "type": "software",
+          "category": "marketing",
+          "description": "Boost merchant revenue via smart customer engagement and marketing.",
+          "productPageUrl": "https://valorpaytech.com/solutions/engage/",
+          "fallbackSearch": "Valor Engage My Customer marketing"
+        }
+      ]
+    },
+    {
+      "name": "FluidPay",
+      "baseUrl": "https://fluidpay.com",
+      "products": [
+        {
+          "id": "fluidpay-gateway",
+          "name": "FluidPay Gateway",
+          "type": "software",
+          "category": "gateway",
+          "description": "Cloud-based payment gateway built on Google Cloud Platform. Non-compete guarantee.",
+          "productPageUrl": "https://fluidpay.com/gateway/",
+          "fallbackSearch": "FluidPay Gateway Google Cloud"
+        },
+        {
+          "id": "fluidpay-virtual-terminal",
+          "name": "FluidPay Virtual Terminal",
+          "type": "software",
+          "category": "virtual terminal",
+          "description": "Process payments from any device with internet connection worldwide.",
+          "productPageUrl": "https://fluidpay.com/virtual-terminal/",
+          "fallbackSearch": "FluidPay Virtual Terminal"
+        },
+        {
+          "id": "fluidpay-customer-vault",
+          "name": "FluidPay Customer Vault",
+          "type": "software",
+          "category": "vault",
+          "description": "Securely store payment methods with automatic account updater.",
+          "productPageUrl": "https://fluidpay.com/customer-vault/",
+          "fallbackSearch": "FluidPay Customer Vault tokenization"
+        },
+        {
+          "id": "fluidpay-e-invoicing",
+          "name": "FluidPay E-Invoicing",
+          "type": "software",
+          "category": "invoicing",
+          "description": "Send invoices via email and SMS with embedded secure payment links.",
+          "productPageUrl": "https://fluidpay.com/invoicing/",
+          "fallbackSearch": "FluidPay E-Invoicing email SMS"
+        },
+        {
+          "id": "fluidpay-recurring-billing",
+          "name": "FluidPay Recurring Billing",
+          "type": "software",
+          "category": "recurring",
+          "description": "Automated subscriptions and recurring payments from one dashboard.",
+          "productPageUrl": "https://fluidpay.com/recurring-billing/",
+          "fallbackSearch": "FluidPay Recurring Billing subscriptions"
+        },
+        {
+          "id": "fluidpay-cash-discount",
+          "name": "FluidPay Cash Discount",
+          "type": "software",
+          "category": "pricing",
+          "description": "Lower processing fees by up to 90% with compliant cash discounting.",
+          "productPageUrl": "https://fluidpay.com/cash-discount/",
+          "fallbackSearch": "FluidPay Cash Discount program"
+        },
+        {
+          "id": "fluidpay-dual-pricing",
+          "name": "FluidPay Dual Pricing",
+          "type": "software",
+          "category": "pricing",
+          "description": "Show cash vs card price for transparent pricing.",
+          "productPageUrl": "https://fluidpay.com/dual-pricing/",
+          "fallbackSearch": "FluidPay Dual Pricing cash card"
+        },
+        {
+          "id": "fluidpay-surcharging",
+          "name": "FluidPay Surcharging",
+          "type": "software",
+          "category": "pricing",
+          "description": "Add compliant surcharge to credit card transactions.",
+          "productPageUrl": "https://fluidpay.com/surcharging/",
+          "fallbackSearch": "FluidPay Surcharging credit card"
+        },
+        {
+          "id": "fluidpay-level-3-processing",
+          "name": "FluidPay Level 3 Processing",
+          "type": "software",
+          "category": "b2b",
+          "description": "Reduced interchange rates for B2B transactions.",
+          "productPageUrl": "https://fluidpay.com/level-3/",
+          "fallbackSearch": "FluidPay Level 3 Processing B2B interchange"
+        },
+        {
+          "id": "fluidpay-batch-processing",
+          "name": "FluidPay Batch Processing",
+          "type": "software",
+          "category": "batch",
+          "description": "Process large volumes via CSV upload.",
+          "productPageUrl": "https://fluidpay.com/batch-processing/",
+          "fallbackSearch": "FluidPay Batch Processing CSV"
+        },
+        {
+          "id": "fluidpay-quickbooks-paysync",
+          "name": "FluidPay QuickBooks PaySync",
+          "type": "software",
+          "category": "integration",
+          "description": "Sync payments directly with QuickBooks.",
+          "productPageUrl": "https://fluidpay.com/quickbooks/",
+          "fallbackSearch": "FluidPay QuickBooks PaySync integration"
+        },
+        {
+          "id": "fluidpay-attackdog",
+          "name": "FluidPay AttackDog",
+          "type": "software",
+          "category": "fraud",
+          "description": "AI-powered fraud detection using machine learning.",
+          "productPageUrl": "https://fluidpay.com/fraud-prevention/",
+          "fallbackSearch": "FluidPay AttackDog AI fraud detection"
+        },
+        {
+          "id": "fluidpay-watchdog",
+          "name": "FluidPay WatchDog",
+          "type": "software",
+          "category": "fraud",
+          "description": "Customizable rule-based fraud filters.",
+          "productPageUrl": "https://fluidpay.com/fraud-prevention/",
+          "fallbackSearch": "FluidPay WatchDog fraud filters"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## MAIN APPLICATION (index.js)
+
+```javascript
+require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const puppeteer = require('puppeteer');
+const axios = require('axios');
+const sharp = require('sharp');
+const fs = require('fs-extra');
+const path = require('path');
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const CONFIG = {
+  outputDir: './output/thumbnails',
+  referenceDir: './output/reference-images',
+  hardwareDir: './output/thumbnails/hardware',
+  softwareDir: './output/thumbnails/software',
+  thumbnailSize: { width: 800, height: 600 },
+  delayBetweenRequests: 3000,
+  maxRetries: 2
+};
+
+// ============================================
+// PROMPT TEMPLATES BY PRODUCT TYPE
+// ============================================
+
+const PROMPT_TEMPLATES = {
+  // HARDWARE - Physical terminals need product photography style
+  hardware: {
+    countertop: (product, brand) => `
+      Look at this reference image of the ${product.name} by ${brand}.
+      Generate a NEW professional product photograph that accurately depicts this EXACT payment terminal model.
+      
+      The image must match:
+      - Exact form factor, shape, and proportions of the ${product.name}
+      - Screen size, position, and bezel style
+      - Button/keypad layout specific to this model
+      - Color scheme and brand styling of ${brand}
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white gradient background
+      - Professional studio lighting with soft shadows
+      - Device at 3/4 angle showing screen and keypad
+      - Screen displays: "$47.50" with green "Approved" text
+      - Photorealistic commercial product photography
+      - Sharp focus, high resolution
+      - No hands, floating product shot
+      
+      This must look like the ACTUAL ${product.name}, not a generic terminal.
+    `,
+    
+    wireless: (product, brand) => `
+      Look at this reference image of the ${product.name} wireless terminal by ${brand}.
+      Generate a NEW professional product photograph of this EXACT portable payment device.
+      
+      Match precisely:
+      - The ${product.name}'s specific design and form factor
+      - Screen size and touch interface
+      - Button placement and styling
+      - ${brand} brand aesthetics
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white background with soft gradient
+      - Studio lighting emphasizing portability
+      - Slight angle to show screen and side profile
+      - Screen shows active payment: "$32.75 Processing..."
+      - Photorealistic, commercial catalog quality
+      - Highlight the wireless/mobile nature
+    `,
+    
+    'pin pad': (product, brand) => `
+      Look at this reference image of the ${product.name} PIN pad by ${brand}.
+      Generate a NEW professional product photo of this EXACT PIN entry device.
+      
+      Match precisely:
+      - The ${product.name}'s compact form factor
+      - Keypad layout and button style
+      - Display size and position
+      - NFC/contactless indicator lights
+      - ${brand} design language
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - White background, professional lighting
+      - Angle showing keypad and small display clearly
+      - Display shows "Enter PIN" prompt
+      - Emphasize the secure, professional appearance
+      - Commercial product photography quality
+    `,
+    
+    mobile: (product, brand) => `
+      Look at this reference image of the ${product.name} mobile terminal by ${brand}.
+      Generate a NEW professional product photo of this EXACT handheld payment device.
+      
+      Match precisely:
+      - The ${product.name}'s handheld design
+      - Touchscreen size and interface
+      - Built-in printer location (if visible)
+      - ${brand} styling and colors
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white background
+      - Show the device's portability and sleek design
+      - Screen displays payment confirmation
+      - Photorealistic, emphasize mobility
+    `,
+    
+    'pos system': (product, brand) => `
+      Look at this reference image of the ${product.name} POS system by ${brand}.
+      Generate a NEW professional product photo of this complete point-of-sale system.
+      
+      Match precisely:
+      - Main display size and design
+      - Customer-facing screen (if included)
+      - Integrated printer and peripherals
+      - Overall system footprint and layout
+      - ${brand} design aesthetics
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white/gray studio background
+      - Angle showing full system with all components
+      - Main screen shows POS interface with order items
+      - Professional commercial photography
+      - Emphasize the complete solution
+    `,
+    
+    kiosk: (product, brand) => `
+      Look at this reference image of the ${product.name} self-service kiosk by ${brand}.
+      Generate a NEW professional product photo of this EXACT kiosk system.
+      
+      Match precisely:
+      - Large touchscreen display size and mounting
+      - Overall kiosk structure and height
+      - Built-in printer and card reader positions
+      - ${brand} branding elements
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean environment background
+      - Full kiosk visible showing scale
+      - Screen displays ordering interface
+      - Professional architectural product photography
+    `,
+    
+    workstation: (product, brand) => `
+      Look at this reference image of the ${product.name} workstation by ${brand}.
+      Generate a NEW professional product photo of this complete POS workstation setup.
+      
+      Include all components:
+      - Touchscreen monitor
+      - Payment terminal
+      - Receipt printer
+      - Cash drawer (if shown)
+      - ${brand} styling throughout
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean desk/counter environment
+      - All components arranged professionally
+      - Screen shows active POS software
+      - Commercial photography quality
+    `,
+    
+    'mobile reader': (product, brand) => `
+      Look at this reference image of the ${product.name} card reader by ${brand}.
+      Generate a NEW professional product photo of this compact mobile reader.
+      
+      Match precisely:
+      - Small form factor and design
+      - Card slot and LED indicators
+      - ${brand} styling
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white background
+      - Show reader next to smartphone for scale
+      - Emphasize compact, portable design
+      - Commercial product photography
+    `,
+    
+    'all in one': (product, brand) => `
+      Look at this reference image of the ${product.name} all-in-one device by ${brand}.
+      Generate a NEW professional product photo of this versatile payment device.
+      
+      Match precisely:
+      - Integrated screen and printer
+      - Compact all-in-one form factor
+      - ${brand} design language
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white background
+      - Angle showing screen and receipt output
+      - Screen displays payment confirmation
+      - Photorealistic commercial quality
+    `,
+    
+    'next gen': (product, brand) => `
+      Look at this reference image of the ${product.name} next-generation terminal by ${brand}.
+      Generate a NEW professional product photo of this advanced payment device.
+      
+      Match precisely:
+      - Modern, sleek design aesthetic
+      - Large touchscreen interface
+      - Advanced features visible (QR scanner, NFC)
+      - ${brand} premium styling
+      
+      Product: ${product.description}
+      
+      Photography style:
+      - Clean white gradient background
+      - Angle emphasizing modern design
+      - Screen shows advanced payment UI
+      - High-end commercial photography
+    `
+  },
+  
+  // SOFTWARE - Need UI mockups and dashboard visualizations
+  software: {
+    gateway: (product, brand) => `
+      Create a professional software interface mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design a modern payment gateway dashboard showing:
+      - Transaction overview with charts/graphs
+      - Recent payments list
+      - Integration status indicators
+      - ${brand} logo and color scheme
+      
+      Display on a modern laptop or desktop monitor.
+      Clean desk environment, professional business setting.
+      Modern UI design with ${brand} branding.
+      Sharp, readable interface elements.
+    `,
+    
+    'virtual terminal': (product, brand) => `
+      Create a professional software interface mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design a clean virtual terminal interface showing:
+      - Payment amount entry field
+      - Card information input form
+      - Customer details section
+      - Process Payment button
+      - ${brand} branding and colors
+      
+      Display on a modern browser window on laptop.
+      Professional office environment.
+      Modern, user-friendly UI design.
+    `,
+    
+    'pos software': (product, brand) => `
+      Create a professional POS software interface mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design a point-of-sale interface showing:
+      - Menu items or product grid
+      - Current order with line items
+      - Payment options
+      - ${brand} styling
+      
+      Display on a touchscreen POS monitor.
+      Clean retail/restaurant environment.
+      Modern touch-friendly UI design.
+    `,
+    
+    'mobile app': (product, brand) => `
+      Create a professional mobile app mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design a mobile payment app interface showing:
+      - Payment amount entry
+      - Card reader connection status
+      - Transaction history
+      - ${brand} app branding
+      
+      Display on a modern iPhone or Android device.
+      Clean white background.
+      Modern mobile UI design.
+    `,
+    
+    feature: (product, brand) => `
+      Create a professional software feature mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design an interface showing this specific feature:
+      - Clean, focused UI for the feature
+      - Key functionality visible
+      - ${brand} styling and colors
+      
+      Display on laptop or mobile device as appropriate.
+      Professional, modern design.
+    `,
+    
+    integration: (product, brand) => `
+      Create a professional integration diagram or interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Show:
+      - API or integration dashboard
+      - Connection status indicators
+      - ${brand} branding
+      
+      Modern technical interface design.
+      Clean, professional appearance.
+    `,
+    
+    loyalty: (product, brand) => `
+      Create a professional loyalty program interface mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Customer rewards dashboard
+      - Points balance and history
+      - Engagement metrics
+      - ${brand} branding
+      
+      Modern, engaging UI design.
+      Display on tablet or desktop.
+    `,
+    
+    vault: (product, brand) => `
+      Create a professional secure storage interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Secure customer vault dashboard
+      - Stored payment methods (masked)
+      - Security indicators
+      - ${brand} styling
+      
+      Professional, trust-inspiring design.
+      Emphasize security visually.
+    `,
+    
+    invoicing: (product, brand) => `
+      Create a professional invoicing interface mockup for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Invoice creation form
+      - Send options (email/SMS)
+      - Invoice history
+      - ${brand} branding
+      
+      Clean, professional business design.
+      Display on laptop screen.
+    `,
+    
+    recurring: (product, brand) => `
+      Create a professional recurring billing interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Subscription management dashboard
+      - Payment schedules
+      - Customer list
+      - ${brand} styling
+      
+      Modern SaaS-style interface.
+      Professional business design.
+    `,
+    
+    pricing: (product, brand) => `
+      Create a professional pricing program interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Cash vs Card pricing comparison
+      - Savings calculator or display
+      - Program settings
+      - ${brand} branding
+      
+      Clear, informative design.
+      Professional appearance.
+    `,
+    
+    b2b: (product, brand) => `
+      Create a professional B2B processing interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Level 2/3 data entry fields
+      - Transaction details
+      - Interchange savings display
+      - ${brand} styling
+      
+      Professional enterprise design.
+      Business-focused interface.
+    `,
+    
+    batch: (product, brand) => `
+      Create a professional batch processing interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - File upload area
+      - Processing progress
+      - Results summary
+      - ${brand} branding
+      
+      Clean, functional design.
+      Professional appearance.
+    `,
+    
+    fraud: (product, brand) => `
+      Create a professional fraud prevention dashboard for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Risk score indicators
+      - Fraud alerts or blocked transactions
+      - Rule configuration
+      - ${brand} styling
+      
+      Modern security-focused design.
+      Professional, trust-inspiring.
+    `,
+    
+    security: (product, brand) => `
+      Create a professional security feature interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Security dashboard
+      - Protection status
+      - Activity monitoring
+      - ${brand} branding
+      
+      Trust-inspiring, professional design.
+      Emphasize protection visually.
+    `,
+    
+    marketing: (product, brand) => `
+      Create a professional marketing tool interface for ${product.name} by ${brand}.
+      
+      ${product.description}
+      
+      Design showing:
+      - Customer engagement dashboard
+      - Campaign metrics
+      - Customer insights
+      - ${brand} styling
+      
+      Modern marketing platform design.
+      Engaging, professional appearance.
+    `
+  }
+};
+
+// Get appropriate prompt template
+function getPromptTemplate(product, brand) {
+  const typeTemplates = PROMPT_TEMPLATES[product.type] || PROMPT_TEMPLATES.software;
+  const categoryTemplate = typeTemplates[product.category] || typeTemplates[Object.keys(typeTemplates)[0]];
+  return categoryTemplate(product, brand);
+}
+
+// ============================================
+// SCRAPING FUNCTIONS
+// ============================================
+
+async function scrapeProductPage(product, brand) {
+  console.log(`🔍 Scraping: ${product.name} from ${product.productPageUrl}`);
+  
+  let browser;
+  try {
+    browser = await puppeteer.launch({ 
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1920, height: 1080 });
+    
+    await page.goto(product.productPageUrl, { 
+      waitUntil: 'networkidle2',
+      timeout: 30000 
+    });
+    
+    // Wait for images
+    await page.waitForSelector('img', { timeout: 10000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 2000)); // Extra wait for lazy loading
+    
+    // Extract images with multiple strategies
+    const imageData = await page.evaluate((productName, brandName) => {
+      const images = [];
+      const seen = new Set();
+      
+      // Strategy 1: Product-specific selectors
+      const productSelectors = [
+        `img[alt*="${productName}"]`,
+        `img[alt*="${brandName}"]`,
+        'img[class*="product"]',
+        'img[class*="hero"]',
+        'img[class*="device"]',
+        'img[class*="terminal"]',
+        'img[class*="featured"]',
+        '.product-image img',
+        '.hero-image img',
+        '.product-photo img',
+        '[data-product] img',
+        '.gallery img',
+        'main img',
+        'article img',
+        '.content img'
+      ];
+      
+      for (const selector of productSelectors) {
+        try {
+          document.querySelectorAll(selector).forEach(img => {
+            let src = img.src || img.dataset.src || img.dataset.lazySrc || img.getAttribute('data-original');
+            
+            if (src && !seen.has(src)) {
+              // Skip common non-product images
+              const lowerSrc = src.toLowerCase();
+              if (lowerSrc.includes('logo') || 
+                  lowerSrc.includes('icon') || 
+                  lowerSrc.includes('avatar') ||
+                  lowerSrc.includes('banner') ||
+                  lowerSrc.includes('background') ||
+                  lowerSrc.includes('sprite') ||
+                  lowerSrc.includes('social') ||
+                  lowerSrc.includes('footer') ||
+                  lowerSrc.includes('header-bg') ||
+                  src.includes('1x1') ||
+                  src.includes('pixel')) {
+                return;
+              }
+              
+              seen.add(src);
+              const rect = img.getBoundingClientRect();
+              images.push({
+                src: src,
+                alt: img.alt || '',
+                width: img.naturalWidth || img.width || rect.width,
+                height: img.naturalHeight || img.height || rect.height,
+                area: (img.naturalWidth || rect.width) * (img.naturalHeight || rect.height)
+              });
+            }
+          });
+        } catch (e) {}
+      }
+      
+      // Sort by image area (largest first)
+      images.sort((a, b) => b.area - a.area);
+      
+      return {
+        images: images.slice(0, 10),
+        pageTitle: document.title
+      };
+    }, product.name, brand);
+    
+    await browser.close();
+    
+    // Filter for reasonably sized images
+    const validImages = imageData.images.filter(img => img.width > 150 && img.height > 150);
+    
+    if (validImages.length > 0) {
+      return {
+        success: true,
+        primaryImage: validImages[0],
+        allImages: validImages,
+        pageTitle: imageData.pageTitle
+      };
+    }
+    
+    return { success: false, error: 'No suitable product images found' };
+    
+  } catch (error) {
+    if (browser) await browser.close();
+    console.error(`❌ Scrape failed for ${product.name}: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+async function downloadImage(url, filepath) {
+  try {
+    // Handle relative URLs
+    if (url.startsWith('//')) url = 'https:' + url;
+    
+    const response = await axios({
+      url: url,
+      responseType: 'arraybuffer',
+      timeout: 20000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/*'
+      }
+    });
+    
+    await sharp(response.data)
+      .png()
+      .toFile(filepath);
+    
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================
+// IMAGE GENERATION
+// ============================================
+
+async function generateWithReference(product, brand, referenceImagePath) {
+  console.log(`🎨 Generating with reference: ${product.name}`);
+  
+  try {
+    const imageBuffer = await fs.readFile(referenceImagePath);
+    const base64Image = imageBuffer.toString('base64');
+    
+    const prompt = getPromptTemplate(product, brand);
+    
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseModalities: ["image", "text"],
+      }
+    });
+    
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: base64Image
+        }
+      },
+      { text: prompt }
+    ]);
+    
+    const response = result.response;
+    
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return {
+          success: true,
+          imageData: part.inlineData.data,
+          method: 'reference-based'
+        };
+      }
+    }
+    
+    throw new Error('No image in response');
+    
+  } catch (error) {
+    console.error(`❌ Reference generation failed: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+async function generateWithoutReference(product, brand) {
+  console.log(`🎨 Generating without reference: ${product.name}`);
+  
+  try {
+    const prompt = getPromptTemplate(product, brand);
+    
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseModalities: ["image", "text"],
+      }
+    });
+    
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return {
+          success: true,
+          imageData: part.inlineData.data,
+          method: 'prompt-only'
+        };
+      }
+    }
+    
+    throw new Error('No image in response');
+    
+  } catch (error) {
+    console.error(`❌ Prompt-only generation failed: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+async function saveThumbnail(imageData, product) {
+  const typeDir = product.type === 'hardware' ? CONFIG.hardwareDir : CONFIG.softwareDir;
+  const filename = `${product.id}.png`;
+  const filepath = path.join(typeDir, filename);
+  
+  const buffer = Buffer.from(imageData, 'base64');
+  
+  await sharp(buffer)
+    .resize(CONFIG.thumbnailSize.width, CONFIG.thumbnailSize.height, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    })
+    .png()
+    .toFile(filepath);
+  
+  return { filename, filepath };
+}
+
+// ============================================
+// MAIN PROCESSING
+// ============================================
+
+async function processProduct(product, brand) {
+  console.log(`\n${'─'.repeat(50)}`);
+  console.log(`📦 ${brand} > ${product.name} (${product.type}/${product.category})`);
+  console.log(`${'─'.repeat(50)}`);
+  
+  // Step 1: Try to scrape reference image
+  const scrapeResult = await scrapeProductPage(product, brand);
+  
+  let generationResult;
+  
+  if (scrapeResult.success && scrapeResult.primaryImage) {
+    // Download reference
+    const refFilename = `${product.id}-ref.png`;
+    const refFilepath = path.join(CONFIG.referenceDir, refFilename);
+    
+    const downloadResult = await downloadImage(scrapeResult.primaryImage.src, refFilepath);
+    
+    if (downloadResult.success) {
+      console.log(`📥 Reference saved: ${refFilename}`);
+      
+      // Generate with reference
+      generationResult = await generateWithReference(product, brand, refFilepath);
+    }
+  }
+  
+  // Fallback to prompt-only if reference failed
+  if (!generationResult || !generationResult.success) {
+    console.log(`⚠️ Falling back to prompt-only generation`);
+    generationResult = await generateWithoutReference(product, brand);
+  }
+  
+  // Save thumbnail
+  if (generationResult.success) {
+    const saved = await saveThumbnail(generationResult.imageData, product);
+    console.log(`✅ Thumbnail saved: ${saved.filename}`);
+    
+    return {
+      product: product.name,
+      id: product.id,
+      brand: brand,
+      type: product.type,
+      category: product.category,
+      success: true,
+      method: generationResult.method,
+      filename: saved.filename
+    };
+  }
+  
+  return {
+    product: product.name,
+    id: product.id,
+    brand: brand,
+    type: product.type,
+    category: product.category,
+    success: false,
+    error: generationResult.error
+  };
+}
+
+async function main() {
+  console.log('═'.repeat(60));
+  console.log('🚀 EQUIPIQ THUMBNAIL GENERATOR');
+  console.log('📸 Scrape → Reference → Generate Accurate Thumbnails');
+  console.log('═'.repeat(60));
+  
+  // Create directories
+  await fs.ensureDir(CONFIG.outputDir);
+  await fs.ensureDir(CONFIG.referenceDir);
+  await fs.ensureDir(CONFIG.hardwareDir);
+  await fs.ensureDir(CONFIG.softwareDir);
+  
+  // Load product data
+  const data = await fs.readJson('./equipiq-products.json');
+  
+  const results = [];
+  let totalProcessed = 0;
+  const totalProducts = data.brands.reduce((sum, b) => sum + b.products.length, 0);
+  
+  // Process each brand
+  for (const brand of data.brands) {
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`🏢 BRAND: ${brand.name} (${brand.products.length} products)`);
+    console.log(`${'═'.repeat(60)}`);
+    
+    for (const product of brand.products) {
+      totalProcessed++;
+      console.log(`\n[${totalProcessed}/${totalProducts}]`);
+      
+      const result = await processProduct(product, brand.name);
+      results.push(result);
+      
+      // Rate limiting
+      await new Promise(r => setTimeout(r, CONFIG.delayBetweenRequests));
+    }
+  }
+  
+  // Generate manifest
+  const manifest = {
+    generated: new Date().toISOString(),
+    stats: {
+      total: results.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      hardware: results.filter(r => r.success && r.type === 'hardware').length,
+      software: results.filter(r => r.success && r.type === 'software').length,
+      referenceBasedCount: results.filter(r => r.method === 'reference-based').length,
+      promptOnlyCount: results.filter(r => r.method === 'prompt-only').length
+    },
+    brands: data.brands.map(brand => ({
+      name: brand.name,
+      products: results
+        .filter(r => r.brand === brand.name && r.success)
+        .map(r => ({
+          id: r.id,
+          name: r.product,
+          type: r.type,
+          category: r.category,
+          filename: r.filename,
+          path: r.type === 'hardware' 
+            ? `/images/equipiq/hardware/${r.filename}`
+            : `/images/equipiq/software/${r.filename}`
+        }))
+    }))
+  };
+  
+  await fs.writeJson(
+    path.join(CONFIG.outputDir, 'manifest.json'),
+    manifest,
+    { spaces: 2 }
+  );
+  
+  // Summary
+  console.log('\n' + '═'.repeat(60));
+  console.log('📊 GENERATION COMPLETE');
+  console.log('═'.repeat(60));
+  console.log(`✅ Successful: ${manifest.stats.successful}/${manifest.stats.total}`);
+  console.log(`   🔧 Hardware: ${manifest.stats.hardware}`);
+  console.log(`   💻 Software: ${manifest.stats.software}`);
+  console.log(`   🖼️  Reference-based: ${manifest.stats.referenceBasedCount}`);
+  console.log(`   📝 Prompt-only: ${manifest.stats.promptOnlyCount}`);
+  console.log(`❌ Failed: ${manifest.stats.failed}`);
+  console.log('═'.repeat(60));
+  console.log(`📁 Hardware thumbnails: ${CONFIG.hardwareDir}`);
+  console.log(`📁 Software thumbnails: ${CONFIG.softwareDir}`);
+  console.log(`📁 Reference images: ${CONFIG.referenceDir}`);
+  console.log(`📄 Manifest: ${CONFIG.outputDir}/manifest.json`);
+  console.log('═'.repeat(60));
+  
+  // List failures
+  const failures = results.filter(r => !r.success);
+  if (failures.length > 0) {
+    console.log('\n⚠️ FAILED ITEMS:');
+    failures.forEach(f => console.log(`   ❌ ${f.brand} > ${f.product}: ${f.error}`));
+  }
+}
+
+main().catch(console.error);
+```
+
+---
+
+## OUTPUT STRUCTURE
+
+```
+/output
+├── /thumbnails
+│   ├── /hardware
+│   │   ├── swipesimple-terminal.png
+│   │   ├── dejavoo-p1.png
+│   │   ├── dejavoo-p3.png
+│   │   ├── valor-vl100-pro.png
+│   │   ├── valor-vp550.png
+│   │   └── ... (all 32 hardware items)
+│   │
+│   ├── /software
+│   │   ├── swipesimple-virtual-terminal.png
+│   │   ├── ipospays-gateway.png
+│   │   ├── fluidpay-gateway.png
+│   │   ├── valor-dual-pricing.png
+│   │   └── ... (all 31 software items)
+│   │
+│   └── manifest.json
+│
+└── /reference-images
+    ├── dejavoo-p1-ref.png
+    ├── valor-vl100-pro-ref.png
+    └── ... (scraped originals for verification)
+```
+
+---
+
+## USAGE ON YOUR EQUIPIQ PAGE
+
+```javascript
+// Load manifest and render thumbnails
+fetch('/images/equipiq/manifest.json')
+  .then(r => r.json())
+  .then(data => {
+    data.brands.forEach(brand => {
+      const brandSection = document.createElement('div');
+      brandSection.className = 'brand-section';
+      brandSection.innerHTML = `<h2>${brand.name}</h2>`;
+      
+      brand.products.forEach(product => {
+        const card = `
+          <div class="product-card ${product.type}">
+            <img src="${product.path}" alt="${product.name}" loading="lazy">
+            <h3>${product.name}</h3>
+            <span class="category">${product.category}</span>
+          </div>
+        `;
+        brandSection.innerHTML += card;
+      });
+      
+      document.getElementById('equipiq-grid').appendChild(brandSection);
+    });
+  });
+```
+
+---
+
+## COST ESTIMATE
+
+- 63 products × ~$0.02/image = **~$1.26 total**
+
+---
+
+## RUN IT
+
+```bash
+node index.js
+```
+
+The script will process all 63 products across all 6 brands, showing progress and generation method for each.
+
+---
+
+Want me to adjust any of the product URLs, add more devices, or modify the prompt templates for specific categories?

@@ -1,0 +1,241 @@
+I'll fetch that Gamma API documentation and go through all the pages to build you a comprehensive Replit prompt. Let me pull the content now.I've thoroughly reviewed all the Gamma API documentation pages. Now I'll create a comprehensive Replit prompt that covers everything:
+
+---
+
+```
+You are building and testing an application that integrates with the Gamma API (v1.0). Review this complete specification and ensure the implementation is correct, handles all edge cases, and follows best practices.
+
+## GAMMA API COMPLETE SPECIFICATION
+
+### BASE URL & AUTHENTICATION
+- Base URL: https://public-api.gamma.app/v1.0/
+- Authentication: API Key via header `X-API-KEY: sk-gamma-xxxxxxxx`
+- API keys are generated at https://gamma.app/settings (Pro, Ultra, Teams, or Business plans required)
+
+### AVAILABLE ENDPOINTS
+
+#### 1. GENERATE API (Create from scratch)
+**POST /generations**
+
+Required parameters:
+- `inputText` (string): The content to generate from. Can be a few words or up to 100,000 tokens (~400,000 chars). Use `\n---\n` for manual card breaks.
+
+Optional parameters:
+- `textMode`: "generate" | "condense" | "preserve"
+  - generate: Rewrites and expands content
+  - condense: Summarizes content
+  - preserve: Keeps exact text, may add structure
+  
+- `format`: "presentation" | "document" | "social" | "webpage"
+
+- `themeId` (string): Theme ID from GET /themes endpoint or copied from app
+
+- `numCards` (integer): 1-60 for Pro, 1-75 for Ultra
+
+- `cardSplit`: "auto" | "inputTextBreaks"
+  - auto: Divides by numCards
+  - inputTextBreaks: Splits at `\n---\n` markers (ignores numCards)
+
+- `additionalInstructions` (string, 1-500 chars): Extra generation guidance
+
+- `folderIds` (array of strings): Folder IDs to store gamma in
+
+- `exportAs`: "pdf" | "pptx" (generates downloadable file URL)
+
+- `textOptions` (object):
+  - `amount`: "brief" | "medium" | "detailed" | "extensive"
+  - `tone` (string, 1-500 chars): e.g., "professional, inspiring"
+  - `audience` (string, 1-500 chars): e.g., "executives, decision-makers"
+  - `language` (string): ISO code like "en", supports 60+ languages
+
+- `imageOptions` (object):
+  - `source`: "aiGenerated" | "pictographic" | "stock"
+  - `model`: "imagen-4-pro" | "flux-1-pro" | (others - see docs)
+  - `style` (string, 1-500 chars): e.g., "photorealistic", "minimal, line art"
+
+- `cardOptions` (object):
+  - `dimensions`: 
+    - For presentations: "fluid" | "16x9" | "4x3"
+    - For documents: "fluid" | "pageless" | "letter" | "a4"
+  - `headerFooter` (object):
+    - `topLeft`, `topRight`, `bottomLeft`, `bottomRight`: { type, source, size }
+    - `hideFromFirstCard` (boolean)
+    - `hideFromLastCard` (boolean)
+
+- `sharingOptions` (object):
+  - `workspaceAccess`: "noAccess" | "view" | "comment" | "edit" | "fullAccess"
+  - `externalAccess`: "noAccess" | "view" | "comment" | "edit" | "fullAccess"
+  - `emailOptions`: { recipients: ["email@example.com"], access: "view" | "comment" | "edit" }
+
+#### 2. CREATE FROM TEMPLATE API
+**POST /generations/from-template**
+
+Required parameters:
+- `gammaId` (string): Template ID (format: "g_abcdef123456ghi")
+
+Optional parameters:
+- `prompt` (string): Instructions for modifying the template
+- `themeId`, `folderIds`, `exportAs`, `imageOptions`, `sharingOptions` (same as Generate API)
+
+Note: Image settings inherit from template unless overridden
+
+#### 3. GET GENERATION STATUS
+**GET /generations/{generationId}**
+
+Poll at ~5 second intervals. Response statuses:
+- "pending": Still processing
+- "completed": Success - includes gammaUrl and export URLs
+- "failed": Error occurred
+
+Success response includes:
+- `gammaUrl`: Link to view/edit the gamma
+- `pdfUrl` / `pptxUrl`: Download links (temporary - download immediately)
+- `credits`: { deducted, remaining }
+
+#### 4. LIST THEMES
+**GET /themes**
+
+Query parameters:
+- `limit` (integer): Results per page
+- `cursor` (string): Pagination cursor
+- `search` (string): Filter by name
+
+Response includes:
+- `id`, `name`, `type` ("standard" | "custom")
+- `colorKeywords`, `toneKeywords`
+- `hasMore`, `nextCursor` for pagination
+
+#### 5. LIST FOLDERS
+**GET /folders**
+
+Same pagination parameters as themes.
+Response includes folder `id` and `name`.
+
+---
+
+## TESTING REQUIREMENTS
+
+### 1. API INTEGRATION TESTS
+Verify each endpoint works correctly:
+
+```javascript
+// Test Generate API
+const generateTest = {
+  inputText: "Test presentation about AI trends",
+  textMode: "generate",
+  format: "presentation",
+  numCards: 5,
+  textOptions: {
+    amount: "medium",
+    tone: "professional",
+    language: "en"
+  },
+  imageOptions: {
+    source: "aiGenerated",
+    model: "imagen-4-pro",
+    style: "modern, clean"
+  }
+};
+
+// Test Create from Template
+const templateTest = {
+  gammaId: "g_your_template_id",
+  prompt: "Adapt this for a technical audience"
+};
+```
+
+### 2. ERROR HANDLING
+Test and handle these scenarios:
+- Invalid API key (401)
+- Missing required parameters (400)
+- Invalid parameter values (400)
+- No credits remaining (402/specific error message)
+- Rate limiting
+- Generation timeout
+- Network failures
+
+### 3. POLLING IMPLEMENTATION
+```javascript
+async function pollForCompletion(generationId, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const response = await fetch(
+      `https://public-api.gamma.app/v1.0/generations/${generationId}`,
+      { headers: { 'X-API-KEY': API_KEY } }
+    );
+    const data = await response.json();
+    
+    if (data.status === 'completed') return data;
+    if (data.status === 'failed') throw new Error('Generation failed');
+    
+    await new Promise(r => setTimeout(r, 5000)); // 5 second intervals
+  }
+  throw new Error('Polling timeout');
+}
+```
+
+### 4. INPUT VALIDATION
+Before API calls, validate:
+- inputText is not empty
+- numCards is within allowed range (1-60 or 1-75)
+- Character limits: additionalInstructions, tone, audience, style (all 1-500)
+- textMode/format/cardSplit values are valid enums
+- JSON escaping is applied to inputText if needed
+
+### 5. UI/UX REQUIREMENTS
+- Show loading state during generation (can take 30+ seconds)
+- Display credit usage/remaining after generation
+- Provide clear error messages for API failures
+- Download export files immediately (URLs expire)
+- Allow theme selection via fetched themes list
+- Handle pagination for themes/folders lists
+
+### 6. EDGE CASES TO TEST
+- Empty inputText
+- Very long inputText (near 100k token limit)
+- Special characters requiring JSON escaping
+- Card splits with `\n---\n` markers
+- Image URLs embedded in inputText
+- Multiple folder assignments
+- Email sharing with multiple recipients
+- Conflicting parameters (e.g., condense mode with preserve instructions)
+
+---
+
+## IMPLEMENTATION CHECKLIST
+
+□ API key securely stored (environment variable, not hardcoded)
+□ All endpoints correctly implemented
+□ Request headers properly set (Content-Type: application/json, X-API-KEY)
+□ Polling mechanism with proper intervals and timeout
+□ All parameter validations in place
+□ Error handling for all failure scenarios
+□ Loading states and user feedback
+□ Export file download handling
+□ Pagination for list endpoints
+□ Input sanitization and JSON escaping
+□ Credit tracking/display
+□ Responsive UI for all form inputs
+
+---
+
+## RUN THESE TESTS
+
+1. Make a simple generation request and verify it completes
+2. Test each format type: presentation, document, social, webpage
+3. Test each textMode: generate, condense, preserve
+4. Verify theme fetching and selection works
+5. Test export functionality (PDF and PPTX)
+6. Test error handling with invalid inputs
+7. Test polling timeout handling
+8. Verify all form validations work
+9. Test sharing options functionality
+10. Check responsive design and loading states
+
+Fix any issues found. After fixes, re-test to confirm nothing broke.
+
+BEGIN TESTING NOW.
+```
+
+---
+
+Want me to also create a test file or example implementation code for Replit to reference?

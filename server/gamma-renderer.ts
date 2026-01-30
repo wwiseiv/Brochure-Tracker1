@@ -146,15 +146,16 @@ export class GammaRenderer {
       const generationId = await this.startGeneration({
         inputText,
         format: "presentation",
+        textMode: "generate",
         numCards,
         themeId,
         exportAs,
         cardOptions: {
           dimensions: "16x9",
         },
-        contentOptions: {
-          textDensity: "medium",
-          tone: ["professional", "confident"],
+        textOptions: {
+          amount: "medium",
+          tone: "professional, confident",
         },
       });
 
@@ -335,11 +336,12 @@ ${blueprint.disclosures.map((d) => `• ${d}`).join("\n")}
   private async startGeneration(params: {
     inputText: string;
     format: string;
+    textMode: string;
     numCards: number;
     themeId: string;
     exportAs: string | null;
     cardOptions: { dimensions: string };
-    contentOptions: { textDensity: string; tone: string[] };
+    textOptions: { amount: string; tone: string };
   }): Promise<string> {
     const response = await fetch(`${GAMMA_BASE_URL}/generations`, {
       method: "POST",
