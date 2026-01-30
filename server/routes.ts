@@ -6452,5 +6452,350 @@ Generate the following content in JSON format:
     }
   });
 
+  // ============================================
+  // E-Signature Document Library Routes
+  // ============================================
+  const { esignService } = await import("./esign/esign-service");
+
+  // Get document templates
+  app.get("/api/esign/templates", isAuthenticated, async (_req: any, res) => {
+    try {
+      const templates = esignService.getDocumentTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching templates:", error);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  // Get document packages
+  app.get("/api/esign/packages", isAuthenticated, async (_req: any, res) => {
+    try {
+      const packages = esignService.getDocumentPackages();
+      res.json(packages);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching packages:", error);
+      res.status(500).json({ error: "Failed to fetch packages" });
+    }
+  });
+
+  // Get single template by ID
+  app.get("/api/esign/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const template = esignService.getDocumentTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching template:", error);
+      res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+
+  // Get package by ID with its documents
+  app.get("/api/esign/packages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const pkg = esignService.getDocumentPackage(req.params.id);
+      if (!pkg) {
+        return res.status(404).json({ error: "Package not found" });
+      }
+      const documents = esignService.getPackageTemplates(req.params.id);
+      res.json({ ...pkg, documents });
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching package:", error);
+      res.status(500).json({ error: "Failed to fetch package" });
+    }
+  });
+
+  // Get available providers
+  app.get("/api/esign/providers", isAuthenticated, async (_req: any, res) => {
+    try {
+      const providers = esignService.getAvailableProviders();
+      res.json({ providers });
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching providers:", error);
+      res.status(500).json({ error: "Failed to fetch providers" });
+    }
+  });
+
+  // Create new e-signature request
+  app.post("/api/esign/requests", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      
+      const request = await esignService.createRequest({
+        orgId: membership.orgId,
+        agentId: userId,
+        merchantId: req.body.merchantId || null,
+        documentIds: req.body.documentIds || [],
+        packageId: req.body.packageId || null,
+        merchantName: req.body.merchantName || null,
+        merchantEmail: req.body.merchantEmail || null,
+        merchantPhone: req.body.merchantPhone || null,
+        fieldValues: req.body.fieldValues || {},
+        signers: req.body.signers || []
+      });
+      
+      res.json(request);
+    } catch (error: any) {
+      console.error("[E-Sign] Error creating request:", error);
+      res.status(500).json({ error: "Failed to create request" });
+    }
+  });
+
+  // Get all e-signature requests for user
+  app.get("/api/esign/requests", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      
+      let requests;
+      if (membership.role === "master_admin") {
+        requests = await esignService.getOrgRequests(membership.orgId);
+      } else {
+        requests = await esignService.getAgentRequests(userId);
+      }
+      
+      res.json(requests);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching requests:", error);
+      res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  // Get single e-signature request
+  app.get("/api/esign/requests/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const request = await esignService.getRequest(id);
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      
+      // Check permissions
+      if (request.orgId !== membership.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      if (membership.role !== "master_admin" && request.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(request);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching request:", error);
+      res.status(500).json({ error: "Failed to fetch request" });
+    }
+  });
+
+  // Get requests for merchant
+  app.get("/api/esign/merchants/:merchantId/requests", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const requests = await esignService.getMerchantRequests(merchantId);
+      res.json(requests);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching merchant requests:", error);
+      res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  // Update e-signature request
+  app.patch("/api/esign/requests/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const request = await esignService.getRequest(id);
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      
+      // Check permissions
+      if (request.orgId !== membership.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      if (membership.role !== "master_admin" && request.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const updated = await esignService.updateRequest(id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[E-Sign] Error updating request:", error);
+      res.status(500).json({ error: "Failed to update request" });
+    }
+  });
+
+  // Update field values
+  app.patch("/api/esign/requests/:id/fields", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const updated = await esignService.updateFieldValues(id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[E-Sign] Error updating fields:", error);
+      res.status(500).json({ error: "Failed to update fields" });
+    }
+  });
+
+  // Add signer to request
+  app.post("/api/esign/requests/:id/signers", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const updated = await esignService.addSigner(id, {
+        name: req.body.name,
+        email: req.body.email,
+        role: req.body.role
+      });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[E-Sign] Error adding signer:", error);
+      res.status(500).json({ error: "Failed to add signer" });
+    }
+  });
+
+  // Remove signer from request
+  app.delete("/api/esign/requests/:id/signers/:signerId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const updated = await esignService.removeSigner(id, req.params.signerId);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[E-Sign] Error removing signer:", error);
+      res.status(500).json({ error: "Failed to remove signer" });
+    }
+  });
+
+  // Send for signature
+  app.post("/api/esign/requests/:id/send", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const result = await esignService.sendForSignature({
+        requestId: id,
+        provider: req.body.provider || "signnow",
+        subject: req.body.subject,
+        message: req.body.message,
+        expirationDays: req.body.expirationDays
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      const request = await esignService.getRequest(id);
+      res.json(request);
+    } catch (error: any) {
+      console.error("[E-Sign] Error sending for signature:", error);
+      res.status(500).json({ error: "Failed to send for signature" });
+    }
+  });
+
+  // Void request
+  app.post("/api/esign/requests/:id/void", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const updated = await esignService.voidRequest(id);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[E-Sign] Error voiding request:", error);
+      res.status(500).json({ error: "Failed to void request" });
+    }
+  });
+
+  // Check status
+  app.get("/api/esign/requests/:id/status", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const status = await esignService.checkStatus(id);
+      res.json(status);
+    } catch (error: any) {
+      console.error("[E-Sign] Error checking status:", error);
+      res.status(500).json({ error: "Failed to check status" });
+    }
+  });
+
+  // Download signed document
+  app.get("/api/esign/requests/:id/download", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid request ID" });
+      }
+      
+      const result = await esignService.downloadSignedDocument(id);
+      if (result.error) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ url: result.url });
+    } catch (error: any) {
+      console.error("[E-Sign] Error downloading document:", error);
+      res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
+  // Get statistics
+  app.get("/api/esign/stats", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const stats = await esignService.getStats(membership.orgId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("[E-Sign] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   return httpServer;
 }
