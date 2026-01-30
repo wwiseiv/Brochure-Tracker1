@@ -16,6 +16,11 @@ import {
 } from "docx";
 import * as fs from "fs";
 import * as path from "path";
+import { createRequire } from "module";
+
+// Use createRequire to load CommonJS modules properly
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 export interface CardBreakdown {
   volume: number;
@@ -268,9 +273,6 @@ function isDualPricingProposal(text: string): boolean {
 }
 
 export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposal> {
-  // Dynamic import to avoid ESM/CJS interop issues
-  const pdfParseModule = await import("pdf-parse");
-  const pdfParse = pdfParseModule.default || pdfParseModule;
   const data = await pdfParse(pdfBuffer);
   const text = data.text;
   
@@ -405,8 +407,6 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
   
   if (ext === 'pdf') {
     // Use PDF parser
-    const pdfParseModule = await import("pdf-parse");
-    const pdfParse = pdfParseModule.default || pdfParseModule;
     const data = await pdfParse(buffer);
     text = data.text;
   } else if (ext === 'doc' || ext === 'docx') {
