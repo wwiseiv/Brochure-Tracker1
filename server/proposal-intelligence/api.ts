@@ -155,4 +155,88 @@ router.post("/test-model", isAuthenticated, ensureOrgMembership(), async (req: a
   }
 });
 
+import { calculateInterchange, calculateSavings } from "./plugins/interchange-calculator";
+import { 
+  getAllRates, 
+  ASSESSMENT_FEES, 
+  AVERAGE_RATES_BY_CATEGORY,
+  DUAL_PRICING_INFO 
+} from "./data/interchange-rates";
+
+router.post("/calculate-interchange", isAuthenticated, ensureOrgMembership(), (req: any, res) => {
+  try {
+    const { 
+      monthlyVolume = 50000, 
+      averageTicket = 50, 
+      category = "retail", 
+      isCardPresent = true 
+    } = req.body;
+
+    const calculation = calculateInterchange(
+      monthlyVolume, 
+      averageTicket, 
+      category, 
+      isCardPresent
+    );
+
+    res.json({
+      success: true,
+      calculation,
+      dualPricingInfo: DUAL_PRICING_INFO
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Calculation failed" 
+    });
+  }
+});
+
+router.post("/calculate-savings", isAuthenticated, ensureOrgMembership(), (req: any, res) => {
+  try {
+    const { 
+      currentEffectiveRate, 
+      monthlyVolume, 
+      proposedProgram = "dual_pricing" 
+    } = req.body;
+
+    if (!currentEffectiveRate || !monthlyVolume) {
+      return res.status(400).json({ 
+        error: "Missing required fields: currentEffectiveRate, monthlyVolume" 
+      });
+    }
+
+    const savings = calculateSavings(currentEffectiveRate, monthlyVolume, proposedProgram);
+
+    res.json({
+      success: true,
+      savings,
+      comparison: {
+        currentMonthlyCost: (monthlyVolume * currentEffectiveRate / 100).toFixed(2),
+        proposedMonthlyCost: (monthlyVolume * savings.proposedRate / 100).toFixed(2),
+        proposedProgram
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Calculation failed" 
+    });
+  }
+});
+
+router.get("/interchange-rates", (req, res) => {
+  res.json({
+    rates: getAllRates(),
+    assessmentFees: ASSESSMENT_FEES,
+    averageRatesByCategory: AVERAGE_RATES_BY_CATEGORY,
+    dualPricingInfo: DUAL_PRICING_INFO,
+    lastUpdated: "2025-04-11",
+    sources: [
+      "Visa USA Interchange Reimbursement Fees (October 2025)",
+      "Mastercard U.S. Region Interchange Programs (April 2025)",
+      "Discover Interchange Program Guide (April 2025)",
+      "American Express OptBlue Pricing Guide (April 2025)"
+    ]
+  });
+});
+
 export default router;

@@ -14,6 +14,29 @@ export const ProposalGeneratorPlugin: ProposalPlugin = {
     console.log("[ProposalGenerator] Generating proposal content...");
 
     const { merchantData, enrichedData, salesperson, pricingData } = context;
+    const interchangeCalc = (context as any).interchangeCalculation;
+    const savingsAnalysis = (context as any).savingsAnalysis;
+
+    const interchangeContext = interchangeCalc ? `
+INTERCHANGE ANALYSIS (Calculated from official card brand rate tables):
+- Monthly Processing Volume: $${interchangeCalc.monthlyVolume.toLocaleString()}
+- Average Transaction: $${interchangeCalc.averageTicket}
+- Estimated Transactions/Month: ${interchangeCalc.transactionCount}
+- Current Effective Rate: ${savingsAnalysis?.currentEffectiveRate || interchangeCalc.effectiveRate}%
+- Wholesale Interchange Cost: $${interchangeCalc.totalWholesaleCost.toLocaleString()}/month
+
+CARD BRAND BREAKDOWN:
+- Visa: $${interchangeCalc.breakdown.visa.cost} (${interchangeCalc.breakdown.visa.rate}% avg)
+- Mastercard: $${interchangeCalc.breakdown.mastercard.cost} (${interchangeCalc.breakdown.mastercard.rate}% avg)
+- Discover: $${interchangeCalc.breakdown.discover.cost} (${interchangeCalc.breakdown.discover.rate}% avg)
+- Amex: $${interchangeCalc.breakdown.amex.cost} (${interchangeCalc.breakdown.amex.rate}% avg)
+- Debit: $${interchangeCalc.breakdown.debit.cost} (${interchangeCalc.breakdown.debit.rate}% avg)
+
+DUAL PRICING SAVINGS OPPORTUNITY:
+- Service Fee Collection (3.5%): $${interchangeCalc.dualPricingSavings.serviceFeeCollected}/month
+- Net Cost to Merchant: $${interchangeCalc.dualPricingSavings.netCostToMerchant}/month
+- ANNUAL SAVINGS: $${interchangeCalc.dualPricingSavings.annualSavings}
+` : "";
 
     const prompt = `Generate a professional, persuasive proposal for:
 
@@ -24,7 +47,7 @@ MERCHANT INFORMATION:
 ${merchantData.address ? `- Location: ${merchantData.address}` : ""}
 ${merchantData.monthlyVolume ? `- Monthly Volume: $${merchantData.monthlyVolume.toLocaleString()}` : ""}
 ${merchantData.averageTicket ? `- Average Ticket: $${merchantData.averageTicket}` : ""}
-
+${interchangeContext}
 ${enrichedData.businessDescription ? `BUSINESS DESCRIPTION:\n${enrichedData.businessDescription}\n` : ""}
 ${enrichedData.services?.length ? `SERVICES: ${enrichedData.services.join(", ")}\n` : ""}
 
@@ -35,13 +58,13 @@ SALES REP:
 REP NOTES:
 ${merchantData.repNotes || "None provided"}
 
-Generate a proposal with these sections:
-1. Executive Summary (personalized to their business)
-2. Current State Analysis (pain points in payment processing)
-3. Proposed Solution (Dual Pricing or Interchange Plus recommendation)
-4. Projected Savings (conservative estimates)
-5. Why PCBancard (value proposition)
-6. Next Steps
+Generate a proposal with these sections. Use the EXACT savings numbers provided above:
+1. Executive Summary (personalized to their business, mention specific annual savings)
+2. Current State Analysis (pain points in payment processing, current effective rate)
+3. Proposed Solution (Dual Pricing recommendation with how it works)
+4. Projected Savings (use the EXACT numbers from interchange analysis above)
+5. Why PCBancard (value proposition - local support, no hidden fees, free equipment)
+6. Next Steps (clear call to action)
 
 Return as JSON:
 {
