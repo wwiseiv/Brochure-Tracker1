@@ -13,6 +13,9 @@ import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import { parsePDFProposal, type ParsedProposal } from "./proposal-generator";
 import { generateProposalImages } from "./proposal-images";
 import { generateEnhancedProposalPDF } from "./proposal-document";
+import { htmlRenderer } from "./renderers/html-renderer";
+
+const USE_VISUAL_RENDERER = process.env.USE_VISUAL_RENDERER === "true";
 
 const ALL_STEPS: ProposalJobStep[] = [
   "parsing_documents",
@@ -326,20 +329,31 @@ export async function executeProposalJob(
       const currentJob = job[0];
       
       if (currentJob?.pricingComparison && currentJob?.merchantScrapedData && currentJob?.salespersonInfo) {
-        const pdfBuffer = await generateEnhancedProposalPDF({
-          merchantData: currentJob.merchantScrapedData as MerchantScrapedData,
-          pricingComparison: currentJob.pricingComparison as PricingComparison,
-          salesperson: currentJob.salespersonInfo as SalespersonInfo,
-          generatedImages: currentJob.generatedImages as any,
-        });
+        let pdfBuffer: Buffer;
         
-        // Store PDF in memory or save to file system
-        // For now, we'll encode as base64 and store temporarily
+        if (USE_VISUAL_RENDERER) {
+          console.log("[ProposalBuilder] Using visual HTML renderer for PDF generation");
+          pdfBuffer = await htmlRenderer.generateProposal(
+            currentJob.merchantScrapedData as MerchantScrapedData,
+            currentJob.pricingComparison as PricingComparison,
+            currentJob.salespersonInfo as SalespersonInfo
+          );
+        } else {
+          console.log("[ProposalBuilder] Using legacy PDF generator");
+          pdfBuffer = await generateEnhancedProposalPDF({
+            merchantData: currentJob.merchantScrapedData as MerchantScrapedData,
+            pricingComparison: currentJob.pricingComparison as PricingComparison,
+            salesperson: currentJob.salespersonInfo as SalespersonInfo,
+            generatedImages: currentJob.generatedImages as any,
+          });
+        }
+        
         const pdfBase64 = pdfBuffer.toString('base64');
         const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
         
         await updateJobData(jobId, { pdfUrl: pdfDataUrl });
-        await updateJobStep(jobId, "building_document", "completed", "Proposal document generated");
+        await updateJobStep(jobId, "building_document", "completed", 
+          USE_VISUAL_RENDERER ? "Visual proposal document generated" : "Proposal document generated");
       } else {
         await updateJobStep(jobId, "building_document", "completed", "Document structure ready (missing data)");
       }
