@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { BottomNav } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
+import { ListenButton } from "@/components/ListenButton";
 import {
   GraduationCap,
   BookOpen,
@@ -406,7 +407,13 @@ export default function PresentationTrainingPage() {
               <Card className="p-4 bg-primary/5 border-primary/20" data-testid="section-what-youll-learn">
                 <div className="flex items-center gap-2 mb-3">
                   <GraduationCap className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">What You'll Learn</h3>
+                  <h3 className="font-semibold flex-1">What You'll Learn</h3>
+                  <ListenButton
+                    text={currentLesson.psychology 
+                      ? `Master the "${currentLesson.title}" technique and understand the psychology behind it. Learn when to apply this approach and avoid common pitfalls that can derail your presentation.`
+                      : `In this lesson, you'll learn the key elements of "${currentLesson.title}" and how to effectively deliver this part of the presentation to maximize engagement and conversion.`
+                    }
+                  />
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {currentLesson.psychology 
@@ -423,16 +430,19 @@ export default function PresentationTrainingPage() {
                       <BookOpen className="w-5 h-5 text-primary" />
                       <h3 className="font-semibold">The Script</h3>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copyScript}
-                      className="gap-1.5"
-                      data-testid="button-copy-script"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <ListenButton text={currentLesson.scriptText} />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyScript}
+                        className="gap-1.5"
+                        data-testid="button-copy-script"
+                      >
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </Button>
+                    </div>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap leading-relaxed">
                     {currentLesson.scriptText}
@@ -444,12 +454,13 @@ export default function PresentationTrainingPage() {
                 <Card className="p-4" data-testid="section-psychology">
                   <div className="flex items-center gap-2 mb-3">
                     <Brain className="w-5 h-5 text-purple-500" />
-                    <h3 className="font-semibold">Why It Works</h3>
+                    <h3 className="font-semibold flex-1">Why It Works</h3>
                     {currentLesson.mechanism && (
-                      <Badge variant="secondary" className="ml-auto">
+                      <Badge variant="secondary">
                         {currentLesson.mechanism}
                       </Badge>
                     )}
+                    <ListenButton text={currentLesson.psychology} />
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {currentLesson.psychology}
@@ -461,7 +472,8 @@ export default function PresentationTrainingPage() {
                 <Card className="p-4" data-testid="section-timing">
                   <div className="flex items-center gap-2 mb-3">
                     <Clock className="w-5 h-5 text-blue-500" />
-                    <h3 className="font-semibold">When to Use This</h3>
+                    <h3 className="font-semibold flex-1">When to Use This</h3>
+                    <ListenButton text={currentLesson.timing} />
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {currentLesson.timing}
@@ -473,7 +485,8 @@ export default function PresentationTrainingPage() {
                 <Card className="p-4" data-testid="section-mistakes">
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="w-5 h-5 text-amber-500" />
-                    <h3 className="font-semibold">Common Mistakes</h3>
+                    <h3 className="font-semibold flex-1">Common Mistakes</h3>
+                    <ListenButton text={currentLesson.commonMistakes} />
                   </div>
                   <ul className="space-y-2">
                     {parseCommonMistakes(currentLesson.commonMistakes).map((mistake, idx) => (
@@ -493,7 +506,8 @@ export default function PresentationTrainingPage() {
                 <Card className="p-4" data-testid="section-practice">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="w-5 h-5 text-green-500" />
-                    <h3 className="font-semibold">Practice This</h3>
+                    <h3 className="font-semibold flex-1">Practice This</h3>
+                    <ListenButton text={currentLesson.practicePrompt} />
                   </div>
                   <p className="text-sm mb-4 font-medium">{currentLesson.practicePrompt}</p>
                   <DictationInput
