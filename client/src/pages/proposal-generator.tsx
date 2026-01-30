@@ -364,19 +364,29 @@ export default function ProposalGeneratorPage() {
   ];
 
   const isValidFile = (file: File) => {
-    return supportedMimeTypes.includes(file.type) || 
+    const validType = supportedMimeTypes.includes(file.type) || 
       /\.(pdf|doc|docx|xls|xlsx)$/i.test(file.name);
+    return validType && file.size > 0;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles = files.filter(isValidFile);
-    const invalidCount = files.length - validFiles.length;
+    const emptyFiles = files.filter(f => f.size === 0);
+    const invalidTypeFiles = files.filter(f => f.size > 0 && !isValidFile(f));
     
-    if (invalidCount > 0) {
+    if (emptyFiles.length > 0) {
       toast({
-        title: "Some files skipped",
-        description: `${invalidCount} unsupported file(s) were not added`,
+        title: "Empty files skipped",
+        description: `${emptyFiles.length} file(s) with 0 bytes were not added`,
+        variant: "destructive",
+      });
+    }
+    
+    if (invalidTypeFiles.length > 0) {
+      toast({
+        title: "Unsupported files skipped",
+        description: `${invalidTypeFiles.length} file(s) with unsupported format were not added`,
         variant: "destructive",
       });
     }
@@ -405,12 +415,21 @@ export default function ProposalGeneratorPage() {
     
     const files = Array.from(e.dataTransfer.files || []);
     const validFiles = files.filter(isValidFile);
-    const invalidCount = files.length - validFiles.length;
+    const emptyFiles = files.filter(f => f.size === 0);
+    const invalidTypeFiles = files.filter(f => f.size > 0 && !isValidFile(f));
     
-    if (invalidCount > 0) {
+    if (emptyFiles.length > 0) {
       toast({
-        title: "Some files skipped",
-        description: `${invalidCount} unsupported file(s) were not added`,
+        title: "Empty files skipped",
+        description: `${emptyFiles.length} file(s) with 0 bytes were not added`,
+        variant: "destructive",
+      });
+    }
+    
+    if (invalidTypeFiles.length > 0) {
+      toast({
+        title: "Unsupported files skipped",
+        description: `${invalidTypeFiles.length} file(s) with unsupported format were not added`,
         variant: "destructive",
       });
     }

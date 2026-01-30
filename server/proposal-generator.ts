@@ -19,6 +19,11 @@ import * as path from "path";
 
 // Helper function to parse PDF using pdf-parse with proper lazy loading
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
+  // Check for empty buffer before attempting to parse
+  if (!buffer || buffer.length === 0) {
+    throw new Error("The uploaded file is empty (0 bytes). Please upload a valid PDF file.");
+  }
+  
   try {
     // pdf-parse v2.x uses a class-based API
     const { PDFParse } = await import("pdf-parse");
