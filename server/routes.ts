@@ -64,6 +64,7 @@ import { researchBusiness } from "./business-research";
 import { generateProposalImages, type ProposalImages } from "./proposal-images";
 import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./proposal-builder";
 import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
+import proposalIntelligenceRouter from "./proposal-intelligence/api";
 import fs from "fs";
 import path from "path";
 
@@ -137,6 +138,9 @@ export async function registerRoutes(
   
   // Setup object storage routes
   registerObjectStorageRoutes(app);
+
+  // Setup Proposal Intelligence API routes
+  app.use("/api/proposal-intelligence", proposalIntelligenceRouter);
 
   // Seed Daily Edge content if not already present
   seedDailyEdgeContent().catch((error) => {

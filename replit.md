@@ -73,7 +73,34 @@ Preferred communication style: Simple, everyday language.
 
 ### AI/ML
 - **Gemini AI**: For transcription, summarization, lead scoring, and role-play feedback.
+- **Claude AI (Anthropic)**: For high-quality proposal generation and compliance analysis via Proposal Intelligence Service.
+- **OpenAI**: Fallback provider for AI operations.
 - **ElevenLabs TTS**: For AI voice responses in role-play.
+
+### Proposal Intelligence Service (New Architecture)
+The Proposal Intelligence Service is a modular, plugin-based AI platform for generating merchant proposals.
+
+**Core Engine** (`server/proposal-intelligence/core/`):
+- `orchestrator.ts`: Workflow orchestration (validate → enrich → reason → compile)
+- `plugin-manager.ts`: Plugin registration, feature flags, stage execution
+- `model-router.ts`: Multi-model AI routing (Claude, Gemini, OpenAI) with automatic fallback
+- `types.ts`: Type definitions for ProposalContext, MerchantData, AuditEntry, etc.
+
+**Plugins** (`server/proposal-intelligence/plugins/`):
+- `field-validation.ts`: Data integrity validation with confidence scoring
+- `web-scraper.ts`: Website scraping for merchant enrichment (description, services, logo)
+- `proposal-generator.ts`: AI-powered proposal content generation
+
+**API Endpoints** (`/api/proposal-intelligence/`):
+- `POST /generate`: Generate a proposal (requires authentication)
+- `GET /status`: Get platform status and available plugins
+- `POST /plugins/:id/toggle`: Enable/disable plugins
+- `POST /test-model`: Test AI model connectivity
+
+**Design Principles**:
+1. Feature Isolation: Every capability is a plugin
+2. Model Independence: LLMs are "drivers," not dependencies
+3. Governance First: Full audit logging with citations and attribution
 
 ### Client Libraries
 - **html5-qrcode**: QR code scanning.
