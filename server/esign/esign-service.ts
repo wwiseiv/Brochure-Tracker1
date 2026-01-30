@@ -473,7 +473,7 @@ export class ESignatureService {
     return Buffer.from(pdfBytes);
   }
 
-  // SignNow implementation - Full API integration using freeform invite
+  // SignNow implementation - Full API integration with field creation
   private async sendToSignNow(
     config: ProviderConfig,
     request: EsignRequest,
@@ -490,7 +490,8 @@ export class ESignatureService {
         return { success: false, error: "No signers specified" };
       }
 
-      console.log("[SignNow] Starting document upload and invite process...");
+      const primarySigner = signers[0];
+      console.log("[SignNow] Starting document upload and invite process for:", primarySigner.email);
 
       // Step 1: Generate PDF
       const pdfBuffer = await this.generateSigningPDF(request);
@@ -524,19 +525,87 @@ export class ESignatureService {
       const documentId = uploadResult.id;
       console.log("[SignNow] Document uploaded, ID:", documentId);
 
-      // Step 3: Send freeform invite - signer will place their own signature
-      // This is the simplest and most reliable approach
-      const primarySigner = signers[0];
-      
-      // Freeform invite format - empty role_id means signer places signature anywhere
-      const invitePayload = {
-        to: primarySigner.email,
-        from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com",
-        subject: options.subject || `Please sign: ${request.merchantName}`,
-        message: options.message || "Please review and sign this document."
+      // Step 3: Add signature and text fields to document
+      // This is REQUIRED because our PDFs don't have native fillable fields
+      const fieldsPayload = {
+        fields: [
+          {
+            type: "text",
+            x: 140,
+            y: 160,
+            width: 260,
+            height: 20,
+            page_number: 0,
+            role: "Signer 1",
+            required: true,
+            label: "Printed Name",
+            prefilled_text: primarySigner.name || ""
+          },
+          {
+            type: "signature",
+            x: 130,
+            y: 200,
+            width: 270,
+            height: 40,
+            page_number: 0,
+            role: "Signer 1",
+            required: true,
+            label: "Signature"
+          },
+          {
+            type: "date",
+            x: 460,
+            y: 200,
+            width: 100,
+            height: 20,
+            page_number: 0,
+            role: "Signer 1",
+            required: true,
+            label: "Date",
+            lock_to_sign_date: true
+          }
+        ]
       };
 
-      console.log("[SignNow] Sending freeform invite with payload:", JSON.stringify(invitePayload));
+      console.log("[SignNow] Adding fields to document...");
+      
+      const fieldsResponse = await fetch(`https://api.signnow.com/document/${documentId}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(fieldsPayload)
+      });
+
+      const fieldsText = await fieldsResponse.text();
+      console.log("[SignNow] Add fields response status:", fieldsResponse.status);
+      console.log("[SignNow] Add fields response:", fieldsText);
+
+      if (!fieldsResponse.ok) {
+        console.warn("[SignNow] Failed to add fields, continuing with invite anyway...");
+      }
+
+      // Step 4: Send role-based invite with correct format
+      const invitePayload = {
+        to: [
+          {
+            email: primarySigner.email,
+            role: "Signer 1",
+            role_id: "",
+            order: 1,
+            reassign: "0",
+            decline_by_signature: "0",
+            reminder: 3,
+            expiration_days: options.expirationDays || 30,
+            subject: options.subject || `PCBancard - Please Sign: ${request.merchantName}`,
+            message: options.message || "Please review and sign the attached document."
+          }
+        ],
+        from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com"
+      };
+
+      console.log("[SignNow] Sending role-based invite:", JSON.stringify(invitePayload));
       
       const inviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
         method: "POST",
@@ -550,57 +619,24 @@ export class ESignatureService {
       const inviteText = await inviteResponse.text();
       console.log("[SignNow] Invite response status:", inviteResponse.status);
       console.log("[SignNow] Invite response body:", inviteText);
-
-      let inviteResult: any;
-      try {
-        inviteResult = JSON.parse(inviteText);
-      } catch {
-        inviteResult = { raw: inviteText };
-      }
       
       if (!inviteResponse.ok) {
-        console.error("[SignNow] Invite failed:", inviteResult);
-        
-        // Try alternative invite format if first attempt fails
-        console.log("[SignNow] Trying alternative invite format...");
-        const altInvitePayload = {
-          to: [{ email: primarySigner.email }],
-          from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com",
-          subject: options.subject || `Please sign: ${request.merchantName}`,
-          message: options.message || "Please review and sign this document."
-        };
-        
-        const altInviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(altInvitePayload)
-        });
-        
-        const altInviteText = await altInviteResponse.text();
-        console.log("[SignNow] Alt invite response status:", altInviteResponse.status);
-        console.log("[SignNow] Alt invite response body:", altInviteText);
-        
-        if (!altInviteResponse.ok) {
-          // Use Claude to debug the error
-          try {
-            const debugAdvice = await debugSignNowError(
-              { status: altInviteResponse.status, body: altInviteText },
-              altInvitePayload
-            );
-            console.log("[SignNow] Claude debug advice:", debugAdvice);
-          } catch (debugErr) {
-            console.error("[SignNow] Claude debug failed:", debugErr);
-          }
-          
-          return { 
-            success: false, 
-            externalRequestId: documentId,
-            error: `Failed to send invite: ${altInviteText}` 
-          };
+        // Use Claude to debug the error
+        try {
+          const debugAdvice = await debugSignNowError(
+            { status: inviteResponse.status, body: inviteText },
+            invitePayload
+          );
+          console.log("[SignNow] Claude debug advice:", debugAdvice);
+        } catch (debugErr) {
+          console.error("[SignNow] Claude debug failed:", debugErr);
         }
+        
+        return { 
+          success: false, 
+          externalRequestId: documentId,
+          error: `Failed to send invite: ${inviteText}` 
+        };
       }
 
       console.log("[SignNow] Invite sent successfully to:", primarySigner.email);
