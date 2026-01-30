@@ -3,11 +3,12 @@ import type { AnalysisResult } from "./statement-analysis";
 export interface TalkingPoints {
   opening: string;
   keyFacts: string[];
-  redFlagScripts: Array<{ issue: string; script: string }>;
+  redFlagScripts: Array<{ issue: string; script: string; severity?: string; impact?: string }>;
   questions: string[];
-  objections: Record<string, string>;
-  valueProps: string[];
+  objections: Record<string, { objection: string; response: string }>;
+  valueProps: Array<{ title: string; detail: string }>;
   dualPricingPitch: string;
+  interchangePlusPitch: string;
   closing: string;
 }
 
@@ -45,7 +46,9 @@ I can show you how to save $${monthlySavings.toLocaleString()} per month - that'
 
   const redFlagScripts = redFlags.map(flag => ({
     issue: flag.issue,
-    script: `"I noticed ${flag.detail.toLowerCase()}. This alone is costing you an extra $${flag.savings.toLocaleString()} that you could be saving."`
+    script: `"I noticed ${flag.detail.toLowerCase()}. This alone is costing you an extra $${flag.savings.toLocaleString()} that you could be saving."`,
+    severity: flag.severity,
+    impact: `$${flag.savings.toLocaleString()}/mo`
   }));
 
   const questions = [
@@ -58,53 +61,106 @@ I can show you how to save $${monthlySavings.toLocaleString()} per month - that'
     "Do you know what you're paying in hidden fees like PCI compliance or statement fees?"
   ];
 
-  const objections: Record<string, string> = {
-    "I'm under contract": `"I understand. Here's what I suggest - let's look at your termination clause together. 
+  const objections: Record<string, { objection: string; response: string }> = {
+    "contract": {
+      objection: "I'm locked into a contract",
+      response: `"I understand. Here's what I suggest - let's look at your termination clause together. 
 Often the savings we provide pay off any termination fee within 2-3 months.
 With $${topSavings.toFixed(0)} in annual savings, even a $500 termination fee is worthwhile.
-Plus, PCBancard may help cover that fee to earn your business."`,
+Plus, PCBancard may help cover that fee to earn your business."`
+    },
 
-    "I'm happy with my current processor": `"I'm glad they've been reliable for you. But being happy doesn't mean you're getting the best deal.
+    "happy": {
+      objection: "I'm happy with my current processor",
+      response: `"I'm glad they've been reliable for you. But being happy doesn't mean you're getting the best deal.
 You're currently paying $${costAnalysis.processorMarkup.toFixed(0)} per month MORE than necessary.
 That's real money leaving your business - $${topSavings.toFixed(0)} per year.
-Wouldn't you rather keep that money working for you?"`,
+Wouldn't you rather keep that money working for you?"`
+    },
 
-    "I don't have time to switch": `"I completely understand you're busy. That's why we handle everything.
+    "noTime": {
+      objection: "I don't have time to switch",
+      response: `"I completely understand you're busy. That's why we handle everything.
 The actual switch takes about 15 minutes of your time.
 We do the paperwork, we set up your terminal, we train your staff.
-For 15 minutes, you'll save $${topSavings.toFixed(0)} this year. That's a pretty good hourly rate!"`,
+For 15 minutes, you'll save $${topSavings.toFixed(0)} this year. That's a pretty good hourly rate!"`
+    },
 
-    "I need to think about it": `"Of course, this is an important decision. But while you're thinking, consider this:
+    "thinkAboutIt": {
+      objection: "I need to think about it",
+      response: `"Of course, this is an important decision. But while you're thinking, consider this:
 Every month you wait costs you $${monthlySavings.toFixed(0)} in unnecessary fees.
 By this time next month, that's money you won't get back.
-What specific questions can I answer right now to help you decide?"`,
+What specific questions can I answer right now to help you decide?"`
+    },
 
-    "Your rates will probably go up later": `"I understand that concern - a lot of processors do that. Here's how we're different:
+    "ratesWillIncrease": {
+      objection: "Your rates will probably go up later",
+      response: `"I understand that concern - a lot of processors do that. Here's how we're different:
 PCBancard uses interchange-plus pricing, which means you always pay TRUE interchange plus our small markup.
 Interchange is set by Visa and Mastercard, not us. Our markup is locked in your agreement.
-The only way your rate changes is if the card brands change interchange - and that happens to everyone equally."`,
+The only way your rate changes is if the card brands change interchange - and that happens to everyone equally."`
+    },
 
-    "I've been with them for years": `"Loyalty is admirable, but is it being rewarded? 
+    "loyalty": {
+      objection: "I've been with them for years",
+      response: `"Loyalty is admirable, but is it being rewarded? 
 After all these years, they're still charging you ${costAnalysis.processorMarkupRate}% above cost.
 Long-term customers should get BETTER rates, not worse.
-Let me show you what loyalty looks like with PCBancard - transparent pricing from day one."`,
+Let me show you what loyalty looks like with PCBancard - transparent pricing from day one."`
+    },
 
-    "Let me talk to my current processor first": `"That's fair. When you call them, ask specifically:
+    "talkToProcessor": {
+      objection: "Let me talk to my current processor first",
+      response: `"That's fair. When you call them, ask specifically:
 'What is my all-in effective rate?' and 'What is your markup above interchange?'
 If they can't give you clear answers, that tells you something.
 I'll leave you my analysis so you can compare. Call me after you talk to them."`
+    },
+
+    "tooGoodToBeTrue": {
+      objection: "This sounds too good to be true",
+      response: `"I appreciate your skepticism - you SHOULD ask tough questions about something this important.
+Let me explain exactly where these savings come from. It's not magic:
+First, your current processor is charging you ${costAnalysis.processorMarkupRate}% above interchange. We charge just 0.20%.
+Second, with dual pricing, the customer pays a small service fee for using their card.
+I'm not promising anything I can't deliver. These numbers are based on YOUR actual statement."`
+    }
   };
 
-  const valueProps = [
-    "Interchange-plus pricing with complete transparency",
-    "No hidden fees or junk fees",
-    "Free PCI compliance - no monthly PCI fees",
-    "Free terminal with our dual pricing program",
-    "24/7 US-based customer support",
-    "No long-term contract required",
-    "Month-to-month with no cancellation fees",
-    "Same-day funding available",
-    "Local representative (that's me!) for ongoing support"
+  const valueProps: Array<{ title: string; detail: string }> = [
+    {
+      title: "Transparent Interchange-Plus Pricing",
+      detail: "See exactly what interchange you pay - no hidden markups or bundled rates"
+    },
+    {
+      title: "No Junk Fees",
+      detail: "No annual fees, no PCI non-compliance fees, no statement fees, no batch fees"
+    },
+    {
+      title: "Free PCI Compliance Assistance",
+      detail: "We help you complete your PCI questionnaire at no additional cost"
+    },
+    {
+      title: "Free Terminal with Dual Pricing",
+      detail: "Dejavoo P1 or P3 terminal included with our free equipment program"
+    },
+    {
+      title: "No Long-Term Contract",
+      detail: "Month-to-month agreement with no early termination fees"
+    },
+    {
+      title: "US-Based Support",
+      detail: "Real people answering the phone, not overseas call centers"
+    },
+    {
+      title: "Next-Day Funding Available",
+      detail: "Get your money faster with next-day deposit options"
+    },
+    {
+      title: "Dual Pricing Program",
+      detail: "Pass processing costs to card users, keep your cash price competitive"
+    }
   ];
 
   const dualPricingPitch = `"Let me tell you about our Dual Pricing program - this is a game-changer for businesses like yours.
@@ -119,7 +175,22 @@ you'd pay just $20/month in account fees.
 That's $${savings.dualPricing.monthlySavings.toLocaleString()} per month back in YOUR pocket.
 $${savings.dualPricing.annualSavings.toLocaleString()} per year.
 
-And it's 100% legal and compliant when done correctly - we handle all the signage and disclosures."`;
+And it's 100% legal and compliant when done correctly - we handle all the signage and disclosures.
+
+About 85% of our new merchants choose dual pricing once they understand it. Would you like me to show you exactly how it would look in your business?"`;
+
+  const interchangePlusPitch = `"If dual pricing isn't the right fit for your business, we also offer Interchange-Plus pricing - and it's still significantly better than what you're paying now.
+
+With Interchange-Plus, you pay the TRUE wholesale interchange cost - exactly what Visa and Mastercard charge - plus a small, transparent markup of just 0.20% and $0.10 per transaction.
+
+Your true interchange cost is ${costAnalysis.trueWholesaleRate}%. Add our markup, and your all-in effective rate would be around ${(costAnalysis.trueWholesaleRate + 0.25).toFixed(2)}%.
+
+That's a savings of $${savings.interchangePlus.monthlySavings.toLocaleString()} per month compared to what you're paying now.
+$${savings.interchangePlus.annualSavings.toLocaleString()} per year.
+
+No hidden fees, no junk fees, no surprises. Just honest, transparent pricing.
+
+The best part? You'll get a detailed statement every month showing exactly what you paid in interchange versus our markup. Complete transparency."`;
 
   const recommendedProgram = savings.dualPricing.annualSavings > savings.interchangePlus.annualSavings 
     ? 'dual pricing' 
@@ -147,6 +218,7 @@ What questions do you have before we get you started?"`;
     objections,
     valueProps,
     dualPricingPitch,
+    interchangePlusPitch,
     closing
   };
 }

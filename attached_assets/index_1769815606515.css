@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+/* Print styles */
+@media print {
+  header, footer, button, .no-print {
+    display: none !important;
+  }
+  
+  .bg-white {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+  
+  body {
+    background: white !important;
+  }
+}
