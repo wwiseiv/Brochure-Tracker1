@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Merchant } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +105,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function ESignDocumentLibrary() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,6 +115,33 @@ export default function ESignDocumentLibrary() {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [merchantName, setMerchantName] = useState("");
   const [merchantEmail, setMerchantEmail] = useState("");
+  const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
+
+  // Parse merchantId from URL query string
+  const urlParams = new URLSearchParams(searchString);
+  const merchantIdParam = urlParams.get("merchantId");
+
+  // Fetch merchant data if merchantId is provided
+  const { data: merchantFromUrl } = useQuery<Merchant>({
+    queryKey: ["/api/merchants", merchantIdParam],
+    enabled: !!merchantIdParam
+  });
+
+  // Auto-populate merchant data and open dialog when coming from merchant page
+  useEffect(() => {
+    if (merchantFromUrl && merchantIdParam) {
+      setMerchantName(merchantFromUrl.businessName);
+      setMerchantEmail(merchantFromUrl.email || "");
+      setSelectedMerchantId(merchantFromUrl.id);
+      setShowNewRequestDialog(true);
+      // Select default package
+      const defaultPkg = packages.find(p => p.isDefault);
+      if (defaultPkg) {
+        setSelectedPackage(defaultPkg.id);
+        setSelectedDocuments(defaultPkg.documentTemplateIds);
+      }
+    }
+  }, [merchantFromUrl, merchantIdParam, packages]);
 
   // Fetch templates
   const { data: templates = [], isLoading: loadingTemplates } = useQuery<DocumentTemplate[]>({
@@ -146,6 +175,7 @@ export default function ESignDocumentLibrary() {
     mutationFn: async (data: {
       merchantName: string;
       merchantEmail: string;
+      merchantId?: number;
       packageId?: string;
       documentIds?: string[];
     }) => {
@@ -177,6 +207,7 @@ export default function ESignDocumentLibrary() {
     setSelectedDocuments([]);
     setMerchantName("");
     setMerchantEmail("");
+    setSelectedMerchantId(null);
   };
 
   // Filter templates by category and search
@@ -228,6 +259,7 @@ export default function ESignDocumentLibrary() {
     createRequestMutation.mutate({
       merchantName,
       merchantEmail,
+      merchantId: selectedMerchantId || undefined,
       packageId: selectedPackage || undefined,
       documentIds: selectedDocuments
     });
