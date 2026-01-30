@@ -223,9 +223,25 @@ export class HtmlRenderer {
   async htmlToPdfWithPuppeteer(htmlContent: string): Promise<Buffer> {
     console.log("[HtmlRenderer] Launching Puppeteer...");
     const puppeteer = await import("puppeteer");
+    
+    // Try to find system chromium first
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
+      (await (async () => {
+        try {
+          const { execSync } = await import("child_process");
+          const path = execSync("which chromium").toString().trim();
+          console.log("[HtmlRenderer] Using system chromium at:", path);
+          return path;
+        } catch {
+          console.log("[HtmlRenderer] System chromium not found, using bundled");
+          return undefined;
+        }
+      })());
+    
     const browser = await puppeteer.default.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      executablePath,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
     });
 
     try {

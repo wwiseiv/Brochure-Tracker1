@@ -425,7 +425,9 @@ export async function executeProposalJob(
       }
     } catch (error) {
       console.error("[ProposalBuilder] Document generation error:", error);
-      await updateJobStep(jobId, "building_document", "completed", "Proceeding without full document");
+      const errorMessage = error instanceof Error ? error.message : "Unknown PDF generation error";
+      await updateJobStep(jobId, "building_document", "failed", `PDF generation failed: ${errorMessage}`);
+      throw new Error(`PDF generation failed: ${errorMessage}`);
     }
 
     await updateJobStep(jobId, "finalizing", "running", "Saving proposal...");
