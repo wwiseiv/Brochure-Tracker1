@@ -5899,11 +5899,16 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       const membership = req.orgMembership as OrgMembershipInfo;
       const userId = req.user.claims.sub;
 
-      const { parsedData, useAI, selectedTerminalId, renderer = "replit", format = "pdf", intakeData } = req.body;
+      const { parsedData, useAI, selectedTerminalId, selectedTerminalIds, selectedEquipmentDetails, renderer = "replit", format = "pdf", intakeData } = req.body;
 
       if (!parsedData || !parsedData.merchantName) {
         return res.status(400).json({ error: "Parsed proposal data is required" });
       }
+
+      // Support both single ID (legacy) and array of IDs (new multi-select)
+      const equipmentIds: number[] = selectedTerminalIds?.length > 0 
+        ? selectedTerminalIds 
+        : (selectedTerminalId ? [selectedTerminalId] : []);
 
       // Optionally call business research if website is provided
       let researchData: { businessDescription?: string; industryType?: string } | undefined;
@@ -5933,19 +5938,37 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
 
       const { generateProposalBlueprint, generateProposalPDF, generateProposalDOCX } = await import("./proposal-generator");
 
+      // Handle multiple equipment selections (or legacy single selection)
       let equipment: { name: string; features: string[]; whySelected: string } | undefined;
-      if (selectedTerminalId) {
-        const products = await storage.getEquipmentProducts();
-        const terminal = products.find(p => p.id === selectedTerminalId);
-        if (terminal) {
+      let allEquipment: Array<{ id: number; name: string; category: string; type: string; features: string[]; priceRange?: string }> = [];
+      
+      const products = await storage.getEquipmentProducts();
+      
+      if (equipmentIds.length > 0) {
+        // Use selected equipment from the EquipIQ catalog
+        allEquipment = products
+          .filter(p => equipmentIds.includes(p.id))
+          .map(p => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            type: p.type,
+            features: p.features || [],
+            priceRange: p.priceRange || undefined,
+          }));
+        
+        // For backward compatibility, set the primary equipment to the first hardware item
+        const primaryHardware = allEquipment.find(e => e.category === "hardware") || allEquipment[0];
+        if (primaryHardware) {
+          const product = products.find(p => p.id === primaryHardware.id);
           equipment = {
-            name: terminal.name,
-            features: terminal.features || [],
-            whySelected: `Based on your monthly volume of $${parsedData.currentState?.totalVolume?.toLocaleString() || "N/A"}, ${terminal.name} is recommended for its ${terminal.bestFor?.join(", ") || "versatile features"}.`,
+            name: primaryHardware.name,
+            features: primaryHardware.features,
+            whySelected: `Selected from EquipIQ catalog. ${product?.bestFor?.join(", ") || "Versatile solution for your business needs."}`,
           };
         }
       } else {
-        const products = await storage.getEquipmentProducts();
+        // Auto-recommend based on volume if no equipment selected
         const volume = parsedData.currentState?.totalVolume || 0;
         let recommended = products.find(p => p.isActive && p.category === "hardware");
         if (volume > 50000) {
@@ -5959,6 +5982,14 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
             features: recommended.features || [],
             whySelected: `Recommended based on your processing volume and business needs.`,
           };
+          allEquipment = [{
+            id: recommended.id,
+            name: recommended.name,
+            category: recommended.category,
+            type: recommended.type,
+            features: recommended.features || [],
+            priceRange: recommended.priceRange || undefined,
+          }];
         }
       }
 
@@ -6100,8 +6131,8 @@ Generate the following content in JSON format:
         currentState: parsedData.currentState,
         optionInterchangePlus: parsedData.optionInterchangePlus,
         optionDualPricing: parsedData.optionDualPricing,
-        selectedTerminalId: equipment ? selectedTerminalId : undefined,
-        terminalName: equipment?.name,
+        selectedTerminalId: equipmentIds.length > 0 ? equipmentIds[0] : undefined,
+        terminalName: allEquipment.length > 0 ? allEquipment.map(e => e.name).join(", ") : equipment?.name,
         terminalFeatures: equipment?.features,
         whySelected: equipment?.whySelected,
         proposalBlueprint: blueprint,

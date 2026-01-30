@@ -45,7 +45,11 @@ import {
   PlayCircle,
   Image as ImageIcon,
   FileOutput,
-  CheckCircle2
+  CheckCircle2,
+  Search,
+  Filter,
+  Package,
+  Cpu
 } from "lucide-react";
 
 interface ParsedProposal {
@@ -87,11 +91,24 @@ interface ParsedProposal {
 
 interface EquipmentProduct {
   id: number;
-  name: string;
+  vendorId: string;
+  category: string;
   type: string;
+  name: string;
+  model?: string;
   description: string;
   features: string[];
+  bestFor?: string[];
   priceRange: string;
+  url?: string;
+  imageUrl?: string;
+}
+
+interface EquipmentVendor {
+  id: number;
+  vendorId: string;
+  name: string;
+  logoUrl?: string;
 }
 
 interface Proposal {
@@ -168,6 +185,7 @@ const STEP_LABELS: Record<ProposalJobStep, { label: string; icon: typeof FileTex
   parsing_documents: { label: "Parsing Documents", icon: FileText },
   scraping_website: { label: "Scraping Website", icon: Globe },
   extracting_pricing: { label: "Extracting Pricing", icon: DollarSign },
+  ai_analysis: { label: "AI Analysis", icon: Sparkles },
   generating_images: { label: "Generating Images", icon: ImageIcon },
   building_document: { label: "Building Document", icon: FileOutput },
   finalizing: { label: "Finalizing", icon: CheckCircle2 },
@@ -177,6 +195,7 @@ const ALL_STEPS: ProposalJobStep[] = [
   "parsing_documents",
   "scraping_website",
   "extracting_pricing",
+  "ai_analysis",
   "generating_images",
   "building_document",
   "finalizing",
@@ -240,8 +259,13 @@ export default function ProposalGeneratorPage() {
   
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [parsedData, setParsedData] = useState<ParsedProposal | null>(null);
-  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentProduct | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentProduct[]>([]);
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(null);
+  
+  // Equipment selection filters
+  const [equipmentSearch, setEquipmentSearch] = useState("");
+  const [equipmentCategory, setEquipmentCategory] = useState<"all" | "hardware" | "software">("all");
+  const [equipmentVendorFilter, setEquipmentVendorFilter] = useState<string>("all");
   const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
   const [isDragging, setIsDragging] = useState(false);
   const [selectedRenderer, setSelectedRenderer] = useState<"replit" | "gamma">("replit");
@@ -328,10 +352,44 @@ export default function ProposalGeneratorPage() {
   const { data: equipment } = useQuery<EquipmentProduct[]>({
     queryKey: ["/api/equipiq/products"],
   });
+
+  const { data: vendors } = useQuery<EquipmentVendor[]>({
+    queryKey: ["/api/equipiq/vendors"],
+  });
   
   const { data: myPermissions, isLoading: permissionsLoading } = useQuery<{ canAccessProposals?: boolean }>({
     queryKey: ["/api/me/permissions"],
   });
+
+  // Filter equipment based on search, category, and vendor
+  const filteredEquipment = equipment?.filter(eq => {
+    const matchesSearch = !equipmentSearch || 
+      eq.name.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
+      eq.description?.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
+      eq.type.toLowerCase().includes(equipmentSearch.toLowerCase());
+    const matchesCategory = equipmentCategory === "all" || eq.category === equipmentCategory;
+    const matchesVendor = equipmentVendorFilter === "all" || eq.vendorId === equipmentVendorFilter;
+    return matchesSearch && matchesCategory && matchesVendor;
+  }) || [];
+
+  // Group filtered equipment by vendor for display
+  const equipmentByVendor = filteredEquipment.reduce((acc, eq) => {
+    const vendorName = vendors?.find(v => v.vendorId === eq.vendorId)?.name || eq.vendorId;
+    if (!acc[vendorName]) acc[vendorName] = [];
+    acc[vendorName].push(eq);
+    return acc;
+  }, {} as Record<string, EquipmentProduct[]>);
+
+  const toggleEquipmentSelection = (eq: EquipmentProduct) => {
+    setSelectedEquipment(prev => {
+      const isSelected = prev.some(e => e.id === eq.id);
+      if (isSelected) {
+        return prev.filter(e => e.id !== eq.id);
+      } else {
+        return [...prev, eq];
+      }
+    });
+  };
 
   const parseMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -384,7 +442,8 @@ export default function ProposalGeneratorPage() {
   const generateMutation = useMutation({
     mutationFn: async (data: { 
       parsedData: ParsedProposal; 
-      selectedTerminalId?: number; 
+      selectedTerminalIds?: number[];
+      selectedEquipmentDetails?: EquipmentProduct[];
       useAI?: boolean;
       renderer?: "replit" | "gamma";
       format?: "pdf" | "docx" | "pptx";
@@ -712,7 +771,8 @@ export default function ProposalGeneratorPage() {
       setGammaUrl(null);
       generateMutation.mutate({
         parsedData,
-        selectedTerminalId: selectedEquipment?.id,
+        selectedTerminalIds: selectedEquipment.map(eq => eq.id),
+        selectedEquipmentDetails: selectedEquipment,
         useAI,
         renderer: selectedRenderer,
         format: outputFormat,
@@ -1844,62 +1904,160 @@ export default function ProposalGeneratorPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Monitor className="w-5 h-5 text-primary" />
-            Terminal Selection
+            Equipment & Software Selection
           </CardTitle>
           <CardDescription>
-            Choose a recommended terminal for the merchant (optional)
+            Select equipment and software from the EquipIQ library (optional - select multiple items)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div
-              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                selectedEquipment === null ? "border-primary bg-primary/5" : "hover-elevate"
-              }`}
-              onClick={() => setSelectedEquipment(null)}
-              data-testid="equipment-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  selectedEquipment === null ? "border-primary bg-primary" : "border-muted-foreground"
-                }`}>
-                  {selectedEquipment === null && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+            {/* Selected Items Summary */}
+            {selectedEquipment.length > 0 && (
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Selected ({selectedEquipment.length})</p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedEquipment([])}
+                    data-testid="button-clear-equipment"
+                  >
+                    Clear All
+                  </Button>
                 </div>
-                <div>
-                  <p className="font-medium">No Equipment</p>
-                  <p className="text-sm text-muted-foreground">Generate proposal without equipment recommendation</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedEquipment.map(eq => (
+                    <Badge key={eq.id} variant="secondary" className="flex items-center gap-1">
+                      {eq.name}
+                      <X 
+                        className="w-3 h-3 cursor-pointer" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleEquipmentSelection(eq);
+                        }}
+                      />
+                    </Badge>
+                  ))}
                 </div>
+              </div>
+            )}
+
+            {/* Search and Filters */}
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search equipment by name, type, or description..."
+                  value={equipmentSearch}
+                  onChange={(e) => setEquipmentSearch(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-equipment-search"
+                />
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {/* Category Tabs */}
+                <div className="flex rounded-lg border p-1 gap-1">
+                  <Button
+                    variant={equipmentCategory === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setEquipmentCategory("all")}
+                    data-testid="button-category-all"
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={equipmentCategory === "hardware" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setEquipmentCategory("hardware")}
+                    data-testid="button-category-hardware"
+                  >
+                    <Cpu className="w-4 h-4 mr-1" />
+                    Hardware
+                  </Button>
+                  <Button
+                    variant={equipmentCategory === "software" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setEquipmentCategory("software")}
+                    data-testid="button-category-software"
+                  >
+                    <Package className="w-4 h-4 mr-1" />
+                    Software
+                  </Button>
+                </div>
+
+                {/* Vendor Filter */}
+                <Select value={equipmentVendorFilter} onValueChange={setEquipmentVendorFilter}>
+                  <SelectTrigger className="w-40" data-testid="select-vendor-filter">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="All Vendors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Vendors</SelectItem>
+                    {vendors?.map(v => (
+                      <SelectItem key={v.vendorId} value={v.vendorId}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {equipment?.filter(eq => eq.type === "countertop" || eq.type === "wireless").slice(0, 6).map((eq) => (
-              <div
-                key={eq.id}
-                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                  selectedEquipment?.id === eq.id ? "border-primary bg-primary/5" : "hover-elevate"
-                }`}
-                onClick={() => setSelectedEquipment(eq)}
-                data-testid={`equipment-${eq.id}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    selectedEquipment?.id === eq.id ? "border-primary bg-primary" : "border-muted-foreground"
-                  }`}>
-                    {selectedEquipment?.id === eq.id && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{eq.name}</p>
-                      <Badge variant="outline">{eq.type}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{eq.description}</p>
-                    {eq.priceRange && (
-                      <p className="text-sm font-medium text-primary mt-1">{eq.priceRange}</p>
-                    )}
-                  </div>
+            {/* Equipment List by Vendor */}
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {Object.keys(equipmentByVendor).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p>No equipment found matching your filters</p>
                 </div>
-              </div>
-            ))}
+              ) : (
+                Object.entries(equipmentByVendor).map(([vendorName, products]) => (
+                  <div key={vendorName}>
+                    <p className="text-sm font-semibold text-muted-foreground mb-2 sticky top-0 bg-background py-1">
+                      {vendorName} ({products.length})
+                    </p>
+                    <div className="grid gap-2">
+                      {products.map((eq) => {
+                        const isSelected = selectedEquipment.some(e => e.id === eq.id);
+                        return (
+                          <div
+                            key={eq.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              isSelected ? "border-primary bg-primary/5" : "hover-elevate"
+                            }`}
+                            onClick={() => toggleEquipmentSelection(eq)}
+                            data-testid={`equipment-${eq.id}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? "border-primary bg-primary" : "border-muted-foreground"
+                              }`}>
+                                {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-medium">{eq.name}</p>
+                                  <Badge variant="outline" className="text-xs">{eq.type}</Badge>
+                                  <Badge variant={eq.category === "hardware" ? "default" : "secondary"} className="text-xs">
+                                    {eq.category}
+                                  </Badge>
+                                </div>
+                                {eq.description && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{eq.description}</p>
+                                )}
+                                {eq.priceRange && (
+                                  <p className="text-sm font-medium text-primary mt-1">{eq.priceRange}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -2125,7 +2283,7 @@ export default function ProposalGeneratorPage() {
               setStep("upload");
               setParsedData(null);
               setUploadedFiles([]);
-              setSelectedEquipment(null);
+              setSelectedEquipment([]);
               setGeneratedProposalId(null);
               setAgentFirstName("");
               setAgentLastName("");
