@@ -502,12 +502,16 @@ export class ESignatureService {
         contentType: "application/pdf"
       });
 
+      // Get form-data headers (including boundary)
+      const formHeaders = formData.getHeaders();
+      
       const uploadResponse = await fetch("https://api.signnow.com/document", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${accessToken}`
+          "Authorization": `Bearer ${accessToken}`,
+          ...formHeaders
         },
-        body: formData as any
+        body: formData.getBuffer()
       });
 
       const uploadResult = await uploadResponse.json() as any;
