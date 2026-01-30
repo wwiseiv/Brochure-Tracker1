@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{business_name}} - Payment Processing Proposal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1a1a2e;
+      line-height: 1.6;
+      background: #ffffff;
+    }
+
+    .page {
+      width: 8.5in;
+      min-height: 11in;
+      padding: 0.5in;
+      page-break-after: always;
+    }
+
+    .page:last-child {
+      page-break-after: avoid;
+    }
+
+    /* ========== COVER PAGE ========== */
+    .cover-page {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 10in;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .cover-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .pcbancard-logo {
+      height: 40px;
+    }
+
+    .cover-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 60px 40px;
+    }
+
+    .hero-image {
+      width: 100%;
+      max-width: 600px;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 16px;
+      margin-bottom: 40px;
+      box-shadow: 0 20px 40px rgba(30, 58, 95, 0.15);
+    }
+
+    .merchant-logo {
+      max-height: 80px;
+      max-width: 200px;
+      margin-bottom: 24px;
+    }
+
+    .cover-title {
+      font-size: 36px;
+      font-weight: 800;
+      color: #7C5CFC;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .cover-subtitle {
+      font-size: 20px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .cover-footer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      padding-top: 40px;
+      border-top: 2px solid #7C5CFC;
+    }
+
+    .cover-section h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .cover-section p {
+      font-size: 14px;
+      color: #334155;
+      margin: 2px 0;
+    }
+
+    .cover-section .name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #7C5CFC;
+    }
+
+    /* ========== SECTION HEADERS ========== */
+    .section-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid #7C5CFC;
+    }
+
+    .section-number {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #7C5CFC 0%, #6244c9 100%);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      margin-right: 16px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #7C5CFC;
+    }
+
+    /* ========== EXECUTIVE SUMMARY ========== */
+    .executive-summary {
+      padding: 32px;
+      background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+      border-radius: 16px;
+      margin-bottom: 32px;
+      border-left: 4px solid #7C5CFC;
+    }
+
+    .executive-summary h3 {
+      font-size: 18px;
+      color: #7C5CFC;
+      margin-bottom: 12px;
+    }
+
+    .executive-summary p {
+      font-size: 15px;
+      color: #334155;
+    }
+
+    .highlight-box {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .highlight-box strong {
+      color: #7C5CFC;
+    }
+
+    /* ========== SAVINGS CARDS ========== */
+    .savings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 32px 0;
+    }
+
+    .savings-card {
+      padding: 32px;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .savings-card::before {
+      content: '';
+      position: absolute;
+      top: -50px;
+      right: -50px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      opacity: 0.15;
+    }
+
+    .savings-card.dual-pricing {
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      border: 1px solid #a7f3d0;
+    }
+
+    .savings-card.dual-pricing::before {
+      background: #10b981;
+    }
+
+    .savings-card.interchange-plus {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border: 1px solid #93c5fd;
+    }
+
+    .savings-card.interchange-plus::before {
+      background: #3b82f6;
+    }
+
+    .savings-card .card-label {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .savings-card.dual-pricing .card-label {
+      color: #059669;
+    }
+
+    .savings-card.interchange-plus .card-label {
+      color: #2563eb;
+    }
+
+    .savings-card .savings-amount {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .savings-card.dual-pricing .savings-amount {
+      color: #047857;
+    }
+
+    .savings-card.interchange-plus .savings-amount {
+      color: #1d4ed8;
+    }
+
+    .savings-card .savings-period {
+      font-size: 16px;
+      opacity: 0.8;
+    }
+
+    .savings-card .monthly-detail {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .savings-card .monthly-detail strong {
+      color: #334155;
+    }
+
+    /* ========== DATA TABLES ========== */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .data-table thead {
+      background: linear-gradient(135deg, #7C5CFC 0%, #6244c9 100%);
+      color: white;
+    }
+
+    .data-table th {
+      padding: 16px 20px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-table td {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .data-table tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .data-table tbody tr:hover {
+      background: #f1f5f9;
+    }
+
+    .data-table .number {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-weight: 600;
+    }
+
+    .data-table .positive {
+      color: #059669;
+    }
+
+    .data-table .negative {
+      color: #dc2626;
+    }
+
+    /* ========== COMPARISON TABLE ========== */
+    .comparison-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 32px 0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+
+    .comparison-table thead {
+      background: #7C5CFC;
+      color: white;
+    }
+
+    .comparison-table th {
+      padding: 20px 24px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .comparison-table th:first-child {
+      text-align: left;
+    }
+
+    .comparison-table td {
+      padding: 20px 24px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 15px;
+    }
+
+    .comparison-table td:first-child {
+      text-align: left;
+      font-weight: 500;
+      color: #475569;
+    }
+
+    .comparison-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .comparison-table .current-col {
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .comparison-table .dp-col {
+      background: #ecfdf5;
+      color: #047857;
+      font-weight: 700;
+    }
+
+    .comparison-table .icp-col {
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+
+    .comparison-table .winner {
+      position: relative;
+    }
+
+    .comparison-table .winner::after {
+      content: 'BEST';
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      font-size: 9px;
+      background: #fbbf24;
+      color: #78350f;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    /* ========== RECOMMENDATION BOX ========== */
+    .recommendation-box {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 2px solid #f59e0b;
+      border-radius: 16px;
+      padding: 32px;
+      margin: 32px 0;
+    }
+
+    .recommendation-box h3 {
+      color: #92400e;
+      font-size: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .recommendation-box p {
+      color: #78350f;
+      font-size: 15px;
+    }
+
+    .recommendation-reasons {
+      margin-top: 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .reason-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    .reason-number {
+      width: 24px;
+      height: 24px;
+      background: #f59e0b;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .reason-text {
+      font-size: 14px;
+      color: #78350f;
+    }
+
+    /* ========== EQUIPMENT SECTION ========== */
+    .equipment-card {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 32px;
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 32px;
+      margin: 24px 0;
+      border: 1px solid #e2e8f0;
+    }
+
+    .equipment-image {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+
+    .equipment-placeholder {
+      width: 100%;
+      height: 150px;
+      background: #e2e8f0;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .equipment-details h3 {
+      font-size: 24px;
+      color: #7C5CFC;
+      margin-bottom: 8px;
+    }
+
+    .equipment-details .tagline {
+      color: #64748b;
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #475569;
+    }
+
+    .feature-list li::before {
+      content: '\2713';
+      color: #10b981;
+      font-weight: bold;
+    }
+
+    /* ========== TIMELINE ========== */
+    .timeline {
+      margin: 32px 0;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 80px 40px 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .timeline-day {
+      text-align: right;
+      font-weight: 700;
+      color: #7C5CFC;
+      font-size: 14px;
+    }
+
+    .timeline-dot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .timeline-dot::before {
+      content: '';
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(135deg, #7C5CFC 0%, #3b82f6 100%);
+      border-radius: 50%;
+      border: 3px solid #e0f2fe;
+    }
+
+    .timeline-dot::after {
+      content: '';
+      width: 2px;
+      flex: 1;
+      background: #cbd5e1;
+      margin-top: 8px;
+    }
+
+    .timeline-item:last-child .timeline-dot::after {
+      display: none;
+    }
+
+    .timeline-content {
+      background: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .timeline-content h4 {
+      color: #7C5CFC;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .timeline-content p {
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    /* ========== CTA SECTION ========== */
+    .cta-section {
+      background: linear-gradient(135deg, #7C5CFC 0%, #5b3fd4 100%);
+      color: white;
+      padding: 48px;
+      border-radius: 20px;
+      text-align: center;
+      margin: 40px 0;
+    }
+
+    .cta-section h2 {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .cta-section p {
+      font-size: 16px;
+      opacity: 0.9;
+      margin-bottom: 32px;
+    }
+
+    .agent-contact {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .agent-contact p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .agent-contact .agent-name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    /* ========== DISCLOSURES ========== */
+    .disclosures {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      margin-top: 40px;
+    }
+
+    .disclosures h4 {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .disclosures ul {
+      list-style: none;
+    }
+
+    .disclosures li {
+      font-size: 12px;
+      color: #94a3b8;
+      padding: 6px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .disclosures li:last-child {
+      border-bottom: none;
+    }
+
+    /* ========== PRINT STYLES ========== */
+    @media print {
+      .page {
+        page-break-after: always;
+      }
+
+      body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1: COVER ==================== -->
+  <div class="page cover-page">
+    <div class="cover-header">
+      {{#if pcbancard_logo_url}}
+      <img src="{{pcbancard_logo_url}}" alt="PCBancard" class="pcbancard-logo">
+      {{else}}
+      <span style="font-size: 18px; font-weight: 700; color: #7C5CFC;">PCBancard</span>
+      {{/if}}
+      <span style="font-size: 12px; color: #94a3b8;">Confidential Proposal</span>
+    </div>
+
+    <div class="cover-hero">
+      {{#if hero_image_url}}
+      <img src="{{hero_image_url}}" alt="Hero" class="hero-image">
+      {{/if}}
+
+      {{#if merchant_logo_url}}
+      <img src="{{merchant_logo_url}}" alt="{{business_name}}" class="merchant-logo">
+      {{/if}}
+
+      <h1 class="cover-title">Custom Payment Processing Proposal</h1>
+      <p class="cover-subtitle">Prepared exclusively for {{business_name}}</p>
+    </div>
+
+    <div class="cover-footer">
+      <div class="cover-section">
+        <h4>Prepared For</h4>
+        <p class="name">{{business_name}}</p>
+        {{#if owner_name}}<p>{{owner_name}}</p>{{/if}}
+        {{#if business_address}}<p>{{business_address}}</p>{{/if}}
+        {{#if business_phone}}<p>{{business_phone}}</p>{{/if}}
+        {{#if business_email}}<p>{{business_email}}</p>{{/if}}
+      </div>
+      <div class="cover-section" style="text-align: right;">
+        <h4>Prepared By</h4>
+        <p class="name">{{agent_name}}</p>
+        <p>{{agent_title}}</p>
+        <p>{{agent_phone}}</p>
+        <p>{{agent_email}}</p>
+        <p style="margin-top: 12px; color: #94a3b8;">{{proposal_date}}</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== PAGE 2: EXECUTIVE SUMMARY ==================== -->
+  <div class="page">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <h2 class="section-title">Executive Summary</h2>
+    </div>
+
+    <div class="executive-summary">
+      <h3>About {{business_name}}</h3>
+      <p>{{business_description}}</p>
+
+      <div class="highlight-box">
+        <strong>The Opportunity:</strong> {{opportunity_statement}}
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-top: 40px;">
+      <div class="section-number">2</div>
+      <h2 class="section-title">Your Potential Savings</h2>
+    </div>
+
+    <div class="savings-grid">
+      <div class="savings-card dual-pricing">
+        <div class="card-label">Dual Pricing</div>
+        <div class="savings-amount">${{dp_annual_savings}}</div>
+        <div class="savings-period">potential annual savings</div>
+        <div class="monthly-detail">
+          Monthly cost: <strong>${{dp_monthly_cost}}</strong><br>
+          Monthly savings: <strong>${{dp_monthly_savings}}</strong>
+        </div>
+      </div>
+
+      <div class="savings-card interchange-plus">
+        <div class="card-label">Interchange Plus</div>
+        <div class="savings-amount">${{icp_annual_savings}}</div>
+        <div class="savings-period">potential annual savings</div>
+        <div class="monthly-detail">
+          Monthly cost: <strong>${{icp_monthly_cost}}</strong><br>
+          Monthly savings: <strong>${{icp_monthly_savings}}</strong>
+        </div>
+      </div>
+    </div>
+
+    <p style="text-align: center; color: #64748b; font-size: 14px; margin-top: 24px;">
+      Based on your current monthly volume of <strong>${{current_monthly_volume}}</strong>
+      and processing fees of <strong>${{current_monthly_fees}}</strong>
+    </p>
+  </div>
+
+
+  <!-- ==================== PAGE 3: COMPARISON ==================== -->
+  <div class="page">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <h2 class="section-title">Current Processing Snapshot</h2>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Current Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Monthly Processing Volume</td>
+          <td class="number">${{current_monthly_volume}}</td>
+        </tr>
+        <tr>
+          <td>Monthly Transactions</td>
+          <td class="number">{{current_transactions}}</td>
+        </tr>
+        <tr>
+          <td>Average Ticket Size</td>
+          <td class="number">${{current_avg_ticket}}</td>
+        </tr>
+        <tr>
+          <td>Current Monthly Fees</td>
+          <td class="number negative">${{current_monthly_fees}}</td>
+        </tr>
+        <tr>
+          <td>Effective Rate</td>
+          <td class="number">{{current_effective_rate}}%</td>
+        </tr>
+        <tr>
+          <td>Annual Processing Cost</td>
+          <td class="number negative">${{current_annual_fees}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-header" style="margin-top: 48px;">
+      <div class="section-number">4</div>
+      <h2 class="section-title">Side-by-Side Comparison</h2>
+    </div>
+
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Current</th>
+          <th>Dual Pricing</th>
+          <th>Interchange+</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Monthly Cost</td>
+          <td class="current-col">${{current_monthly_fees}}</td>
+          <td class="dp-col {{#if dp_is_winner}}winner{{/if}}">${{dp_monthly_cost}}</td>
+          <td class="icp-col">${{icp_monthly_cost}}</td>
+        </tr>
+        <tr>
+          <td>Annual Cost</td>
+          <td class="current-col">${{current_annual_fees}}</td>
+          <td class="dp-col">${{dp_annual_cost}}</td>
+          <td class="icp-col">${{icp_annual_cost}}</td>
+        </tr>
+        <tr>
+          <td>Monthly Savings</td>
+          <td class="current-col">-</td>
+          <td class="dp-col">${{dp_monthly_savings}}</td>
+          <td class="icp-col">${{icp_monthly_savings}}</td>
+        </tr>
+        <tr>
+          <td>Annual Savings</td>
+          <td class="current-col">-</td>
+          <td class="dp-col">${{dp_annual_savings}}</td>
+          <td class="icp-col">${{icp_annual_savings}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="recommendation-box">
+      <h3>Our Recommendation: {{recommended_option}}</h3>
+      <p>{{recommendation_summary}}</p>
+
+      <div class="recommendation-reasons">
+        {{#each recommendation_reasons}}
+        <div class="reason-item">
+          <div class="reason-number">{{add @index 1}}</div>
+          <div class="reason-text">{{this}}</div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== PAGE 4: EQUIPMENT & NEXT STEPS ==================== -->
+  <div class="page">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <h2 class="section-title">Recommended Equipment</h2>
+    </div>
+
+    <div class="equipment-card">
+      {{#if equipment_image_url}}
+      <img src="{{equipment_image_url}}" alt="{{equipment_name}}" class="equipment-image">
+      {{else}}
+      <div class="equipment-placeholder">Equipment Image</div>
+      {{/if}}
+
+      <div class="equipment-details">
+        <h3>{{equipment_name}}</h3>
+        <p class="tagline">{{equipment_tagline}}</p>
+
+        <ul class="feature-list">
+          {{#each equipment_features}}
+          <li>{{this}}</li>
+          {{/each}}
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-top: 48px;">
+      <div class="section-number">6</div>
+      <h2 class="section-title">Implementation Timeline</h2>
+    </div>
+
+    <div class="timeline">
+      {{#each timeline_steps}}
+      <div class="timeline-item">
+        <div class="timeline-day">{{this.day}}</div>
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <h4>{{this.title}}</h4>
+          <p>{{this.description}}</p>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+
+    <div class="cta-section">
+      <h2>Ready to Start Saving?</h2>
+      <p>Let's schedule a quick call to finalize your setup and get you saving.</p>
+
+      <div class="agent-contact">
+        <p class="agent-name">{{agent_name}}</p>
+        <p>{{agent_title}}</p>
+        <p>{{agent_phone}} | {{agent_email}}</p>
+      </div>
+    </div>
+
+    <div class="disclosures">
+      <h4>Compliance & Disclosures</h4>
+      <ul>
+        {{#each disclosures}}
+        <li>{{this}}</li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+
+</body>
+</html>
