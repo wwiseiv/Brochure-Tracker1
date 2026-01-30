@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,7 +30,11 @@ import {
   X,
   Zap,
   Presentation,
-  ExternalLink
+  ExternalLink,
+  User,
+  ChevronDown,
+  Store,
+  AlertTriangle
 } from "lucide-react";
 
 interface ParsedProposal {
@@ -121,6 +128,8 @@ interface ServerParsedProposal {
     annualSavings: number;
   };
   proposalType: string;
+  extractionWarnings?: string[];
+  extractionStatus?: "success" | "partial" | "needs_review";
 }
 
 function transformParsedData(server: ServerParsedProposal): ParsedProposal {
@@ -191,6 +200,66 @@ export default function ProposalGeneratorPage() {
   const [usedFallback, setUsedFallback] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
+  // Agent Information (REQUIRED)
+  const [agentFirstName, setAgentFirstName] = useState("");
+  const [agentLastName, setAgentLastName] = useState("");
+  const [agentTitle, setAgentTitle] = useState("Account Executive");
+  const [agentPhone, setAgentPhone] = useState("");
+  const [agentEmail, setAgentEmail] = useState("");
+
+  // Merchant Information (OPTIONAL)
+  const [businessName, setBusinessName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [businessWebsite, setBusinessWebsite] = useState("");
+  const [industryGuess, setIndustryGuess] = useState("");
+  const [currentProcessor, setCurrentProcessor] = useState("");
+  const [repNotes, setRepNotes] = useState("");
+
+  // Form section states
+  const [agentInfoOpen, setAgentInfoOpen] = useState(true);
+  const [merchantInfoOpen, setMerchantInfoOpen] = useState(false);
+
+  // Form validation
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Extraction warnings from PDF parsing
+  const [extractionWarnings, setExtractionWarnings] = useState<string[]>([]);
+
+  const validateAgentInfo = () => {
+    const errors: Record<string, string> = {};
+    if (!agentFirstName.trim()) errors.agentFirstName = "First name is required";
+    if (!agentLastName.trim()) errors.agentLastName = "Last name is required";
+    if (!agentPhone.trim()) errors.agentPhone = "Phone number is required";
+    if (!agentEmail.trim()) errors.agentEmail = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(agentEmail)) errors.agentEmail = "Invalid email format";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const getIntakeFormData = () => ({
+    agent: {
+      firstName: agentFirstName,
+      lastName: agentLastName,
+      title: agentTitle,
+      phone: agentPhone,
+      email: agentEmail,
+    },
+    merchant: {
+      businessName,
+      ownerName,
+      businessAddress,
+      businessPhone,
+      businessEmail,
+      businessWebsite,
+      industryGuess,
+      currentProcessor,
+      repNotes,
+    },
+  });
+
   const { data: proposals, isLoading: proposalsLoading } = useQuery<Proposal[]>({
     queryKey: ["/api/proposals"],
   });
@@ -221,8 +290,16 @@ export default function ProposalGeneratorPage() {
     },
     onSuccess: (results) => {
       if (results.length > 0) {
-        const transformedData = transformParsedData(results[0].data);
+        const serverData = results[0].data as ServerParsedProposal;
+        const transformedData = transformParsedData(serverData);
         setParsedData(transformedData);
+        
+        if (serverData.extractionWarnings && serverData.extractionWarnings.length > 0) {
+          setExtractionWarnings(serverData.extractionWarnings);
+        } else {
+          setExtractionWarnings([]);
+        }
+        
         setStep("review");
         toast({
           title: "PDFs Parsed Successfully",
@@ -246,6 +323,7 @@ export default function ProposalGeneratorPage() {
       useAI?: boolean;
       renderer?: "replit" | "gamma";
       format?: "pdf" | "docx" | "pptx";
+      intakeData?: ReturnType<typeof getIntakeFormData>;
     }) => {
       const res = await apiRequest("POST", "/api/proposals/generate", data);
       return res.json();
@@ -347,6 +425,15 @@ export default function ProposalGeneratorPage() {
   };
 
   const handleParse = () => {
+    if (!validateAgentInfo()) {
+      toast({
+        title: "Missing Required Fields",
+        description: "Please fill in all required agent information",
+        variant: "destructive",
+      });
+      setAgentInfoOpen(true);
+      return;
+    }
     if (uploadedFiles.length > 0) {
       parseMutation.mutate(uploadedFiles);
     }
@@ -362,6 +449,7 @@ export default function ProposalGeneratorPage() {
         useAI,
         renderer: selectedRenderer,
         format: outputFormat,
+        intakeData: getIntakeFormData(),
       });
     }
   };
@@ -385,6 +473,243 @@ export default function ProposalGeneratorPage() {
 
   const renderUploadStep = () => (
     <div className="space-y-6">
+      <Card>
+        <Collapsible open={agentInfoOpen} onOpenChange={setAgentInfoOpen}>
+          <CardHeader className="pb-3">
+            <CollapsibleTrigger className="flex items-center justify-between w-full" data-testid="toggle-agent-info">
+              <CardTitle className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Agent Information
+                <Badge variant="destructive" className="ml-2 text-xs">Required</Badge>
+              </CardTitle>
+              <ChevronDown className={`w-5 h-5 transition-transform ${agentInfoOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CardDescription>
+              Your contact information for the proposal
+            </CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agent-first-name">
+                    First Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="agent-first-name"
+                    placeholder="John"
+                    value={agentFirstName}
+                    onChange={(e) => setAgentFirstName(e.target.value)}
+                    className={formErrors.agentFirstName ? "border-destructive" : ""}
+                    data-testid="input-agent-first-name"
+                  />
+                  {formErrors.agentFirstName && (
+                    <p className="text-xs text-destructive">{formErrors.agentFirstName}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agent-last-name">
+                    Last Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="agent-last-name"
+                    placeholder="Smith"
+                    value={agentLastName}
+                    onChange={(e) => setAgentLastName(e.target.value)}
+                    className={formErrors.agentLastName ? "border-destructive" : ""}
+                    data-testid="input-agent-last-name"
+                  />
+                  {formErrors.agentLastName && (
+                    <p className="text-xs text-destructive">{formErrors.agentLastName}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agent-title">Title</Label>
+                <Input
+                  id="agent-title"
+                  placeholder="Account Executive"
+                  value={agentTitle}
+                  onChange={(e) => setAgentTitle(e.target.value)}
+                  data-testid="input-agent-title"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agent-phone">
+                    Phone <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="agent-phone"
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={agentPhone}
+                    onChange={(e) => setAgentPhone(e.target.value)}
+                    className={formErrors.agentPhone ? "border-destructive" : ""}
+                    data-testid="input-agent-phone"
+                  />
+                  {formErrors.agentPhone && (
+                    <p className="text-xs text-destructive">{formErrors.agentPhone}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agent-email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="agent-email"
+                    type="email"
+                    placeholder="john.smith@company.com"
+                    value={agentEmail}
+                    onChange={(e) => setAgentEmail(e.target.value)}
+                    className={formErrors.agentEmail ? "border-destructive" : ""}
+                    data-testid="input-agent-email"
+                  />
+                  {formErrors.agentEmail && (
+                    <p className="text-xs text-destructive">{formErrors.agentEmail}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
+      <Card>
+        <Collapsible open={merchantInfoOpen} onOpenChange={setMerchantInfoOpen}>
+          <CardHeader className="pb-3">
+            <CollapsibleTrigger className="flex items-center justify-between w-full" data-testid="toggle-merchant-info">
+              <CardTitle className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-primary" />
+                Merchant Information
+                <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+              </CardTitle>
+              <ChevronDown className={`w-5 h-5 transition-transform ${merchantInfoOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CardDescription>
+              Pre-fill merchant details if known (can be extracted from PDF)
+            </CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="business-name">Business Name</Label>
+                  <Input
+                    id="business-name"
+                    placeholder="ABC Restaurant LLC"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    data-testid="input-business-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="owner-name">Owner Name</Label>
+                  <Input
+                    id="owner-name"
+                    placeholder="Jane Doe"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    data-testid="input-owner-name"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="business-address">Business Address</Label>
+                <Input
+                  id="business-address"
+                  placeholder="123 Main St, City, State 12345"
+                  value={businessAddress}
+                  onChange={(e) => setBusinessAddress(e.target.value)}
+                  data-testid="input-business-address"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="business-phone">Business Phone</Label>
+                  <Input
+                    id="business-phone"
+                    type="tel"
+                    placeholder="(555) 987-6543"
+                    value={businessPhone}
+                    onChange={(e) => setBusinessPhone(e.target.value)}
+                    data-testid="input-business-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="business-email">Business Email</Label>
+                  <Input
+                    id="business-email"
+                    type="email"
+                    placeholder="info@abcrestaurant.com"
+                    value={businessEmail}
+                    onChange={(e) => setBusinessEmail(e.target.value)}
+                    data-testid="input-business-email"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="business-website">
+                  Business Website
+                  <span className="text-xs text-muted-foreground ml-2">(triggers research)</span>
+                </Label>
+                <Input
+                  id="business-website"
+                  type="url"
+                  placeholder="https://www.abcrestaurant.com"
+                  value={businessWebsite}
+                  onChange={(e) => setBusinessWebsite(e.target.value)}
+                  data-testid="input-business-website"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="industry-guess">Industry Type</Label>
+                  <Input
+                    id="industry-guess"
+                    placeholder="Restaurant, Retail, Medical, etc."
+                    value={industryGuess}
+                    onChange={(e) => setIndustryGuess(e.target.value)}
+                    data-testid="input-industry-guess"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="current-processor">Current Processor</Label>
+                  <Select value={currentProcessor} onValueChange={setCurrentProcessor}>
+                    <SelectTrigger id="current-processor" data-testid="select-current-processor">
+                      <SelectValue placeholder="Select processor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="square">Square</SelectItem>
+                      <SelectItem value="toast">Toast</SelectItem>
+                      <SelectItem value="clover">Clover</SelectItem>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="paypal">PayPal</SelectItem>
+                      <SelectItem value="firstdata">First Data</SelectItem>
+                      <SelectItem value="worldpay">Worldpay</SelectItem>
+                      <SelectItem value="heartland">Heartland</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="unknown">Unknown</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-notes">Rep Notes</Label>
+                <Textarea
+                  id="rep-notes"
+                  placeholder="Additional notes about the merchant, their pain points, or specific needs..."
+                  value={repNotes}
+                  onChange={(e) => setRepNotes(e.target.value)}
+                  rows={3}
+                  data-testid="input-rep-notes"
+                />
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -525,6 +850,22 @@ export default function ProposalGeneratorPage() {
 
   const renderReviewStep = () => (
     <div className="space-y-6">
+      {extractionWarnings.length > 0 && (
+        <Alert variant="warning" data-testid="alert-extraction-warnings">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Data Extraction Warnings</AlertTitle>
+          <AlertDescription>
+            <p className="mb-2">Some data may need manual review:</p>
+            <ul className="list-disc list-inside space-y-1">
+              {extractionWarnings.map((warning, index) => (
+                <li key={index} className="text-sm">{warning}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm">You can still proceed, but please verify the extracted values are accurate.</p>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -946,6 +1287,23 @@ export default function ProposalGeneratorPage() {
               setUploadedFiles([]);
               setSelectedEquipment(null);
               setGeneratedProposalId(null);
+              setAgentFirstName("");
+              setAgentLastName("");
+              setAgentTitle("Account Executive");
+              setAgentPhone("");
+              setAgentEmail("");
+              setBusinessName("");
+              setOwnerName("");
+              setBusinessAddress("");
+              setBusinessPhone("");
+              setBusinessEmail("");
+              setBusinessWebsite("");
+              setIndustryGuess("");
+              setCurrentProcessor("");
+              setRepNotes("");
+              setFormErrors({});
+              setAgentInfoOpen(true);
+              setMerchantInfoOpen(false);
             }}
             data-testid="button-new-proposal"
           >

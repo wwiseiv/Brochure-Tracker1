@@ -86,6 +86,16 @@ export interface ProposalBlueprintForGamma {
     ctaSecondary: string;
   };
   disclosures: string[];
+  dualPricingExplanation?: string;
+  interchangePlusExplanation?: string;
+  implementationPlan?: string[];
+  whyPCBancard?: string;
+  complianceDisclosure?: string;
+  images?: {
+    heroImage?: string;
+    industryImage?: string;
+    logoUrl?: string;
+  };
 }
 
 export class GammaRenderer {
@@ -279,6 +289,22 @@ ${blueprint.equipment.features.map((f) => `• ${f}`).join("\n")}
       `.trim());
     }
 
+    if (blueprint.whyPCBancard) {
+      sections.push(`
+# Why PCBancard?
+
+${blueprint.whyPCBancard}
+      `.trim());
+    }
+
+    if (blueprint.implementationPlan && blueprint.implementationPlan.length > 0) {
+      sections.push(`
+# Implementation Plan
+
+${blueprint.implementationPlan.map((step, i) => `${i + 1}. ${step}`).join("\n")}
+      `.trim());
+    }
+
     sections.push(`
 # Getting Started
 
@@ -288,6 +314,14 @@ ${blueprint.nextSteps.steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}
 
 ${blueprint.nextSteps.ctaSecondary}
     `.trim());
+
+    if (blueprint.complianceDisclosure) {
+      sections.push(`
+# Compliance & Legal
+
+${blueprint.complianceDisclosure}
+      `.trim());
+    }
 
     sections.push(`
 # Important Disclosures

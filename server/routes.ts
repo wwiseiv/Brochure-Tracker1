@@ -60,6 +60,8 @@ import {
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
+import { researchBusiness } from "./business-research";
+import { generateProposalImages, type ProposalImages } from "./proposal-images";
 import fs from "fs";
 import path from "path";
 
@@ -5557,6 +5559,26 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
     },
   });
 
+  app.post("/api/proposals/research", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { websiteUrl, businessName, industryGuess } = req.body;
+
+      if (!websiteUrl || typeof websiteUrl !== "string") {
+        return res.status(400).json({ error: "websiteUrl is required" });
+      }
+
+      const research = await researchBusiness(websiteUrl, businessName, industryGuess);
+
+      res.json(research);
+    } catch (error: any) {
+      console.error("[Proposals] Error researching business:", error);
+      res.status(500).json({
+        researchStatus: "failed",
+        error: error.message || "Unknown error occurred",
+      });
+    }
+  });
+
   app.post("/api/proposals/parse", isAuthenticated, ensureOrgMembership(), pdfUpload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
@@ -5581,10 +5603,36 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       const membership = req.orgMembership as OrgMembershipInfo;
       const userId = req.user.claims.sub;
 
-      const { parsedData, useAI, selectedTerminalId, renderer = "replit", format = "pdf" } = req.body;
+      const { parsedData, useAI, selectedTerminalId, renderer = "replit", format = "pdf", intakeData } = req.body;
 
       if (!parsedData || !parsedData.merchantName) {
         return res.status(400).json({ error: "Parsed proposal data is required" });
+      }
+
+      // Optionally call business research if website is provided
+      let researchData: { businessDescription?: string; industryType?: string } | undefined;
+      if (intakeData?.merchant?.businessWebsite) {
+        try {
+          researchData = await researchBusiness(intakeData.merchant.businessWebsite);
+        } catch (researchError: any) {
+          console.log("[Proposals] Business research failed, continuing without it:", researchError.message);
+        }
+      }
+
+      // Generate industry-specific images for the proposal
+      const industryType = intakeData?.merchant?.industryGuess || researchData?.industryType || "general business";
+      let proposalImages: ProposalImages | undefined;
+      try {
+        proposalImages = await generateProposalImages(industryType, parsedData.merchantName);
+        if (proposalImages.generationStatus !== "complete") {
+          console.log("[Proposals] Image generation status:", proposalImages.generationStatus, proposalImages.errors);
+        }
+      } catch (imageError: any) {
+        console.log("[Proposals] Image generation failed, continuing without images:", imageError.message);
+        proposalImages = {
+          generationStatus: "failed",
+          errors: [imageError.message || "Unknown error"],
+        };
       }
 
       const { generateProposalBlueprint, generateProposalPDF, generateProposalDOCX } = await import("./proposal-generator");
@@ -5623,32 +5671,64 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       if (useAI) {
         try {
           const client = getAIIntegrationsClient();
-          const aiPrompt = `You are a professional proposal writer for PCBancard, a payment processing company. Based on the following merchant analysis, enhance the proposal content to be more persuasive and professional.
+          const aiPrompt = `You are the PCBancard Proposal Generator. Create comprehensive, business-specific proposal content.
 
-Merchant: ${parsedData.merchantName}
-Current Monthly Cost: $${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "N/A"}
-Recommended Option: ${blueprint.savingsComparison.recommendedOption === "dual_pricing" ? "Dual Pricing" : "Interchange Plus"}
-Estimated Monthly Savings: $${Math.max(blueprint.savingsComparison.dualPricingSavings || 0, blueprint.savingsComparison.interchangePlusSavings || 0).toLocaleString()}
+CRITICAL RULES:
+1. ALL NUMBERS must come from the spreadsheet data provided — never invent data
+2. If volume > 0 but fees = 0, say "Not enough data provided" — NEVER "$0 fees"
+3. Use "3 to 4%" when describing typical card acceptance costs
+4. Include this EXACT Dual Pricing wording for dual pricing proposals:
+   "With dual pricing, you offer two prices—one for cash, one for cards. It's fully automated"
+5. Every section must reference the business type AND at least 2 spreadsheet numbers
+6. If data is missing, say "Not provided" — do not guess
 
-Generate:
-1. A compelling executive summary intro (2-3 sentences)
-2. A strong recommendation statement (2-3 sentences)
-3. A persuasive call to action (2-3 sentences)
+MERCHANT DATA:
+- Business Name: ${parsedData.merchantName || "Not provided"}
+- Owner: ${intakeData?.merchant?.ownerName || "Not provided"}
+- Industry: ${intakeData?.merchant?.industryGuess || researchData?.industryType || "General Business"}
+- Website: ${intakeData?.merchant?.businessWebsite || "Not provided"}
+- Current Processor: ${intakeData?.merchant?.currentProcessor || "Unknown"}
+- Rep Notes: ${intakeData?.merchant?.repNotes || "None"}
 
-Format your response as JSON:
+BUSINESS RESEARCH:
+${researchData?.businessDescription || "No additional research available."}
+
+SPREADSHEET DATA:
+- Monthly Card Volume: $${parsedData.currentState?.totalVolume?.toLocaleString() || "Not provided"}
+- Current Monthly Processing Fees: $${parsedData.currentState?.totalMonthlyCost?.toLocaleString() || "Not provided"}
+- Effective Rate: ${parsedData.currentState?.effectiveRatePercent?.toFixed(2) || "Not provided"}%
+- Dual Pricing Monthly Cost: $${parsedData.optionDualPricing?.totalMonthlyCost?.toLocaleString() || "N/A"}
+- Dual Pricing Monthly Savings: $${parsedData.optionDualPricing?.monthlySavings?.toLocaleString() || "N/A"}
+- Interchange+ Monthly Cost: $${parsedData.optionInterchangePlus?.totalMonthlyCost?.toLocaleString() || "N/A"}
+- Interchange+ Monthly Savings: $${parsedData.optionInterchangePlus?.monthlySavings?.toLocaleString() || "N/A"}
+
+AGENT INFO:
+- Name: ${intakeData?.agent?.firstName || ""} ${intakeData?.agent?.lastName || ""}
+- Title: ${intakeData?.agent?.title || "Account Executive"}
+- Phone: ${intakeData?.agent?.phone || ""}
+- Email: ${intakeData?.agent?.email || ""}
+
+Generate the following content in JSON format:
+
 {
-  "intro": "...",
-  "recommendation": "...",
-  "callToAction": "..."
+  "executiveSummary": "200+ words about this specific business, their industry, and the problem we're solving. Reference at least 3 numbers from the data.",
+  "currentSituationNarrative": "150+ words explaining why card processing is silently draining their profits. Be specific to their industry.",
+  "dualPricingExplanation": "150+ words explaining dual pricing for this specific business type. Include the exact wording required.",
+  "interchangePlusExplanation": "100+ words explaining interchange plus as an alternative option.",
+  "recommendation": "200+ words with 3 clear reasons why we recommend ${blueprint.savingsComparison.recommendedOption === "dual_pricing" ? "Dual Pricing" : "Interchange Plus"}. Include annual savings projection.",
+  "whyPCBancard": "100+ words about PCBancard's unique value proposition.",
+  "implementationPlan": ["Step 1: ...", "Step 2: ...", "Step 3: ...", "Step 4: ...", "Step 5: ..."],
+  "callToAction": "75+ words compelling them to take action NOW. Include the agent's direct contact info.",
+  "complianceDisclosure": "Standard compliance text about dual pricing legality and PCBancard support."
 }`;
 
           const response = await client.chat.completions.create({
             model: "gpt-4.1-mini",
             messages: [
-              { role: "system", content: "You are a professional B2B sales proposal writer. Be persuasive but professional. Focus on value and savings." },
+              { role: "system", content: "You are a professional B2B sales proposal writer for PCBancard. Be persuasive but professional. Focus on value and savings. Always use real numbers from the data provided - never invent figures." },
               { role: "user", content: aiPrompt },
             ],
-            max_completion_tokens: 500,
+            max_completion_tokens: 2000,
             temperature: 0.7,
           });
 
@@ -5656,13 +5736,63 @@ Format your response as JSON:
           const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const aiEnhancements = JSON.parse(jsonMatch[0]);
-            if (aiEnhancements.intro) blueprint.executiveSummary.intro = aiEnhancements.intro;
-            if (aiEnhancements.recommendation) blueprint.executiveSummary.recommendation = aiEnhancements.recommendation;
-            if (aiEnhancements.callToAction) blueprint.callToAction = aiEnhancements.callToAction;
+            
+            // Apply comprehensive AI-generated content directly to the blueprint
+            if (aiEnhancements.executiveSummary) {
+              blueprint.executiveSummary.intro = aiEnhancements.executiveSummary;
+            }
+            if (aiEnhancements.currentSituationNarrative) {
+              blueprint.executiveSummary.currentSituation = aiEnhancements.currentSituationNarrative;
+            }
+            if (aiEnhancements.recommendation) {
+              blueprint.executiveSummary.recommendation = aiEnhancements.recommendation;
+            }
+            if (aiEnhancements.callToAction) {
+              blueprint.callToAction = aiEnhancements.callToAction;
+            }
+            
+            // Apply additional AI content directly to blueprint fields
+            if (aiEnhancements.dualPricingExplanation) {
+              blueprint.dualPricingExplanation = aiEnhancements.dualPricingExplanation;
+            }
+            if (aiEnhancements.interchangePlusExplanation) {
+              blueprint.interchangePlusExplanation = aiEnhancements.interchangePlusExplanation;
+            }
+            if (aiEnhancements.whyPCBancard) {
+              blueprint.whyPCBancard = aiEnhancements.whyPCBancard;
+            }
+            if (aiEnhancements.implementationPlan && Array.isArray(aiEnhancements.implementationPlan)) {
+              // Convert string array to ImplementationStep array if needed
+              const steps = aiEnhancements.implementationPlan.map((step: string | any, index: number) => {
+                if (typeof step === 'string') {
+                  return {
+                    step: index + 1,
+                    title: step.replace(/^Step \d+:\s*/i, '').split(' - ')[0] || `Step ${index + 1}`,
+                    description: step.replace(/^Step \d+:\s*/i, ''),
+                    timeline: `Day ${index + 1}`,
+                  };
+                }
+                return step;
+              });
+              blueprint.implementationPlan = steps;
+            }
+            if (aiEnhancements.complianceDisclosure) {
+              blueprint.complianceDisclosure = aiEnhancements.complianceDisclosure;
+            }
           }
         } catch (aiError: any) {
           console.error("[Proposals] AI enhancement failed:", aiError.message);
         }
+      }
+
+      // Store proposal images in the blueprint for renderers
+      if (proposalImages && proposalImages.generationStatus !== "failed") {
+        (blueprint as any).images = {
+          heroBanner: proposalImages.heroBanner,
+          comparisonBackground: proposalImages.comparisonBackground,
+          trustVisual: proposalImages.trustVisual,
+          generationStatus: proposalImages.generationStatus,
+        };
       }
 
       const proposal = await storage.createProposal({
