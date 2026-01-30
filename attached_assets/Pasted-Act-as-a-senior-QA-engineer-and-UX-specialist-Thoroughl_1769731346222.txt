@@ -1,0 +1,40 @@
+Act as a senior QA engineer and UX specialist. Thoroughly test this application and identify all errors, bugs, and UI/UX issues. Follow this systematic approach:
+
+## 1. CODE REVIEW & ERROR DETECTION
+- Scan all files for syntax errors, undefined variables, and broken imports
+- Check for console errors, warnings, and uncaught exceptions
+- Identify any API calls that may fail or return unexpected data
+- Look for memory leaks, infinite loops, or performance bottlenecks
+- Verify all dependencies are properly installed and compatible
+
+## 2. FUNCTIONAL TESTING
+- Test every button, link, and interactive element
+- Verify all forms submit correctly and validate input properly
+- Check that all conditional logic and state management works as expected
+- Test edge cases: empty states, error states, loading states
+- Confirm data persists correctly (if applicable)
+
+## 3. UI/UX AUDIT
+- Check for visual inconsistencies (spacing, alignment, colors, typography)
+- Verify responsive design works across mobile, tablet, and desktop breakpoints
+- Ensure all text is readable and properly contrasted
+- Look for missing hover/focus/active states on interactive elements
+- Check that loading indicators and feedback exist where users expect them
+- Identify any confusing navigation or unclear user flows
+
+## 4. ACCESSIBILITY CHECK
+- Verify proper heading hierarchy and semantic HTML
+- Check that all images have alt text
+- Ensure keyboard navigation works throughout
+- Verify sufficient color contrast ratios
+
+## 5. OUTPUT FORMAT
+For each issue found, provide:
+- **Location**: File name and line number (or UI location)
+- **Severity**: Critical / High / Medium / Low
+- **Description**: What's wrong
+- **Fix**: The exact code or change needed to resolve it
+
+Start by running the app, then systematically work through each section. Fix critical and high-severity issues first, then address medium and low issues. After making fixes, re-test to confirm the issues are resolved and no new issues were introduced.
+
+Begin testing now.
