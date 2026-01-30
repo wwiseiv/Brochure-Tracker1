@@ -4,6 +4,9 @@ import type { ProposalRequest } from "./core/orchestrator";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { ensureOrgMembership } from "../rbac";
 import { z } from "zod";
+import { analyzeStatement, type StatementData } from "./services/statement-analysis";
+import { generateTalkingPoints, generateCompetitorInsights } from "./services/talking-points";
+import { getAIStatementAnalysis, generateProposalContent } from "./services/ai-analyzer";
 
 const router = Router();
 
@@ -237,6 +240,149 @@ router.get("/interchange-rates", (req, res) => {
       "American Express OptBlue Pricing Guide (April 2025)"
     ]
   });
+});
+
+const statementAnalysisSchema = z.object({
+  processorName: z.string().optional(),
+  merchantName: z.string().optional(),
+  totalVolume: z.number().min(1, "Monthly volume is required"),
+  totalTransactions: z.number().min(1, "Transaction count is required"),
+  averageTicket: z.number().optional(),
+  totalFees: z.number().min(0, "Total fees is required"),
+  merchantType: z.enum(["retail", "restaurant", "qsr", "supermarket", "ecommerce", "service", "lodging", "healthcare", "b2b", "government", "education"]).optional(),
+  fees: z.object({
+    interchange: z.number().optional(),
+    assessments: z.number().optional(),
+    processorMarkup: z.number().optional(),
+    monthlyFees: z.number().optional(),
+    pciFees: z.number().optional(),
+    equipmentFees: z.number().optional(),
+    otherFees: z.number().optional(),
+    annual: z.number().optional()
+  }).optional(),
+  cardMix: z.object({
+    visa: z.object({ volume: z.number(), transactions: z.number() }).optional(),
+    mastercard: z.object({ volume: z.number(), transactions: z.number() }).optional(),
+    discover: z.object({ volume: z.number(), transactions: z.number() }).optional(),
+    amex: z.object({ volume: z.number(), transactions: z.number() }).optional(),
+    debit: z.object({ volume: z.number(), transactions: z.number() }).optional()
+  }).optional(),
+  qualificationBreakdown: z.object({
+    qualified: z.object({ volume: z.number(), rate: z.number() }).optional(),
+    midQualified: z.object({ volume: z.number(), rate: z.number() }).optional(),
+    nonQualified: z.object({ volume: z.number(), rate: z.number() }).optional()
+  }).optional(),
+  useAI: z.boolean().optional()
+});
+
+router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const parsed = statementAnalysisSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.format() 
+      });
+    }
+
+    const data = parsed.data;
+    
+    const statementData: StatementData = {
+      processorName: data.processorName,
+      merchantName: data.merchantName,
+      totalVolume: data.totalVolume,
+      totalTransactions: data.totalTransactions,
+      averageTicket: data.averageTicket,
+      merchantType: data.merchantType || "retail",
+      fees: {
+        ...data.fees,
+        totalFees: data.totalFees
+      },
+      cardMix: data.cardMix,
+      qualificationBreakdown: data.qualificationBreakdown
+    };
+
+    const analysis = analyzeStatement(statementData);
+    const talkingPoints = generateTalkingPoints(analysis);
+    
+    let competitorInsights = null;
+    if (data.processorName) {
+      competitorInsights = generateCompetitorInsights(data.processorName);
+    }
+
+    let aiAnalysis = null;
+    if (data.useAI) {
+      try {
+        aiAnalysis = await getAIStatementAnalysis(statementData, analysis, talkingPoints);
+      } catch (error) {
+        console.error("[StatementAnalysis] AI analysis failed:", error);
+      }
+    }
+
+    res.json({
+      success: true,
+      analysis,
+      talkingPoints,
+      competitorInsights,
+      aiAnalysis,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[StatementAnalysis] Error:", error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Analysis failed" 
+    });
+  }
+});
+
+router.post("/quick-analysis", isAuthenticated, ensureOrgMembership(), (req: any, res) => {
+  try {
+    const { totalVolume, totalTransactions, totalFees, merchantType = "retail" } = req.body;
+
+    if (!totalVolume || !totalTransactions || totalFees === undefined) {
+      return res.status(400).json({ 
+        error: "Required: totalVolume, totalTransactions, totalFees" 
+      });
+    }
+
+    const statementData: StatementData = {
+      totalVolume,
+      totalTransactions,
+      merchantType,
+      fees: { totalFees }
+    };
+
+    const analysis = analyzeStatement(statementData);
+    const talkingPoints = generateTalkingPoints(analysis);
+
+    res.json({
+      success: true,
+      summary: analysis.summary,
+      costAnalysis: analysis.costAnalysis,
+      savings: analysis.savings,
+      redFlags: analysis.redFlags,
+      keyTalkingPoints: {
+        opening: talkingPoints.opening,
+        dualPricingPitch: talkingPoints.dualPricingPitch,
+        closing: talkingPoints.closing
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Quick analysis failed" 
+    });
+  }
+});
+
+router.get("/competitor-insights/:processorName", isAuthenticated, (req: any, res) => {
+  const { processorName } = req.params;
+  
+  if (!processorName) {
+    return res.status(400).json({ error: "Processor name is required" });
+  }
+
+  const insights = generateCompetitorInsights(processorName);
+  res.json({ processorName, insights });
 });
 
 export default router;
