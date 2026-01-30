@@ -6706,6 +6706,7 @@ Generate the following content in JSON format:
   app.post("/api/esign/requests/:id/send", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log("[E-Sign] Received send request for ID:", id, "body:", JSON.stringify(req.body));
       
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid request ID" });
@@ -6719,14 +6720,17 @@ Generate the following content in JSON format:
         expirationDays: req.body.expirationDays
       });
       
+      console.log("[E-Sign] Send result:", JSON.stringify(result));
+      
       if (!result.success) {
+        console.error("[E-Sign] Send failed:", result.error);
         return res.status(400).json({ error: result.error });
       }
       
       const request = await esignService.getRequest(id);
       res.json(request);
     } catch (error: any) {
-      console.error("[E-Sign] Error sending for signature:", error);
+      console.error("[E-Sign] Error sending for signature:", error?.message || error);
       res.status(500).json({ error: "Failed to send for signature" });
     }
   });
