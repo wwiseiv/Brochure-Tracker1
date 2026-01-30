@@ -16,11 +16,18 @@ import {
 } from "docx";
 import * as fs from "fs";
 import * as path from "path";
-import { createRequire } from "module";
 
-// Use createRequire to load CommonJS modules properly
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+// Helper function to parse PDF using pdf-parse with proper lazy loading
+async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
+  // pdf-parse v2.x uses a class-based API
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: buffer });
+  const textResult = await parser.getText();
+  // Combine all page texts into a single string
+  const text = textResult.pages.map((page: any) => page.text).join("\n");
+  await parser.destroy();
+  return { text };
+}
 
 export interface CardBreakdown {
   volume: number;
@@ -273,7 +280,7 @@ function isDualPricingProposal(text: string): boolean {
 }
 
 export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposal> {
-  const data = await pdfParse(pdfBuffer);
+  const data = await parsePdfBuffer(pdfBuffer);
   const text = data.text;
   
   const merchantName = extractMerchantName(text);
@@ -407,7 +414,7 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
   
   if (ext === 'pdf') {
     // Use PDF parser
-    const data = await pdfParse(buffer);
+    const data = await parsePdfBuffer(buffer);
     text = data.text;
   } else if (ext === 'doc' || ext === 'docx') {
     // Use mammoth for Word docs
