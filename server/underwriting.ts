@@ -27,7 +27,7 @@ export const BUSINESS_RISK_MAPPING: Record<string, BusinessRiskProfile> = {
       "Valid Bank Account",
       "Valid Government ID",
     ],
-    notes: "High transaction volume, card-present environment. Excellent fit for PayLo dual pricing.",
+    notes: "High transaction volume, card-present environment. Excellent fit for Dual Pricing.",
   },
   retail: {
     level: "level1",
@@ -40,7 +40,7 @@ export const BUSINESS_RISK_MAPPING: Record<string, BusinessRiskProfile> = {
       "Valid Bank Account",
       "Valid Government ID",
     ],
-    notes: "Standard retail with 70%+ card-present transactions. Great candidate for PayLo.",
+    notes: "Standard retail with 70%+ card-present transactions. Great candidate for Dual Pricing.",
   },
   service: {
     level: "level1",
@@ -53,7 +53,7 @@ export const BUSINESS_RISK_MAPPING: Record<string, BusinessRiskProfile> = {
       "Valid Bank Account",
       "Valid Government ID",
     ],
-    notes: "Service-based businesses with in-person payments. Good fit for PayLo.",
+    notes: "Service-based businesses with in-person payments. Good fit for Dual Pricing.",
   },
   salon: {
     level: "level1",
@@ -80,7 +80,7 @@ export const BUSINESS_RISK_MAPPING: Record<string, BusinessRiskProfile> = {
       "Valid Bank Account",
       "Valid Government ID",
     ],
-    notes: "Auto shops have higher average tickets. PayLo savings can be significant.",
+    notes: "Auto shops have higher average tickets. Dual Pricing savings can be significant.",
   },
   convenience: {
     level: "level1",
@@ -226,7 +226,7 @@ export const UNDERWRITING_AI_CONTEXT = `
 - Monthly volume < $250,000
 - Examples: Restaurants, retail stores, salons, auto shops, service businesses
 - Minimal requirements: Application, SSN, bank account, ID
-- SCORING: These are ideal PayLo candidates. Score higher.
+- SCORING: These are ideal Dual Pricing candidates. Score higher.
 
 ### LEVEL 2 - MODERATE RISK
 - Higher transaction amounts (>$2,500) or volumes (>$250K/month)
@@ -264,7 +264,7 @@ When analyzing notes, look for:
 - Payment patterns (cash vs card volume)
 - Business pain points (processing fees, equipment needs)
 - Owner engagement level
-- Tip handling needs (increases value of PayLo)
+- Tip handling needs (increases value of Dual Pricing)
 - High transaction volume (higher savings potential)
 `;
 
@@ -289,7 +289,7 @@ export function generateAgentSuggestions(
       suggestions.push("Level 2 merchant: Will need 3 months of processing and bank statements");
     }
   } else {
-    suggestions.push("Cold lead - may need nurturing. Consider educational approach about PayLo benefits.");
+    suggestions.push("Cold lead - may need nurturing. Consider educational approach about Dual Pricing benefits.");
   }
   
   // Business-type specific suggestions
@@ -299,7 +299,7 @@ export function generateAgentSuggestions(
       suggestions.push("Calculate their annual savings based on transaction volume");
       break;
     case "salon":
-      suggestions.push("Discuss how PayLo handles tips on card transactions");
+      suggestions.push("Discuss how Dual Pricing handles tips on card transactions");
       suggestions.push("Beauty businesses love loyalty programs - mention the Profit Flywheel");
       break;
     case "auto":

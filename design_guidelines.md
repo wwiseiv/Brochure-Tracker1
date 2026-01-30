@@ -163,7 +163,7 @@
 
 **Image treatment:**
 - Rounded avatars (rounded-full)
-- Illustrations: Minimal line-art style, SignaPay blue accent
+- Illustrations: Minimal line-art style, PCBancard purple accent
 - Icons: Heroicons library (outline style for navigation, solid for status)
 
 ---

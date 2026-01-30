@@ -1,15 +1,15 @@
 export const SALES_TRAINING_KNOWLEDGE = `
-# PCBancard PayLo Sales Training Knowledge Base
+# PCBancard Dual Pricing Sales Training Knowledge Base
 
 ## PRODUCT KNOWLEDGE
 
-### What is PayLo (Dual Pricing)?
-PayLo is PCBancard's dual pricing program where merchants display two prices: a cash price and a card price. The system automatically calculates and shows both prices, allowing customers to choose how they want to pay. This eliminates 3-4% in processing fees on BOTH credit AND debit cards (unlike surcharging which only works on credit).
+### What is Dual Pricing?
+Dual Pricing is PCBancard's program where merchants display two prices: a cash price and a card price. The system automatically calculates and shows both prices, allowing customers to choose how they want to pay. This eliminates 3-4% in processing fees on BOTH credit AND debit cards (unlike surcharging which only works on credit).
 
 ### The Three Ways to Stop Losing Money on Processing:
 1. **Interchange Plus** - Pay the true cost the card networks charge plus a small fixed fee. Good for white-glove brands where one clean price matters.
 2. **Surcharging** - Add a fee to credit card transactions only. Problem: You CANNOT surcharge debit cards (federal law prohibits it). Debit is 30-40% of transactions, so you still pay those fees.
-3. **Dual Pricing (PayLo)** - Display cash and card prices. Customers choose. You keep what you earned on ALL card types.
+3. **Dual Pricing** - Display cash and card prices. Customers choose. You keep what you earned on ALL card types.
 
 ### Key Stats and Numbers:
 - Average processing fee: 3-4% per transaction

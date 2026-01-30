@@ -1,11 +1,11 @@
-// PCBancard PayLo Sales Script - Used for AI-powered email generation
-// This script provides context about the PCBancard PayLo dual pricing program
+// PCBancard Dual Pricing Sales Script - Used for AI-powered email generation
+// This script provides context about the PCBancard Dual Pricing program
 // for crafting personalized follow-up emails to merchants
 
 export const SIGNAPAY_SALES_SCRIPT = `
-## PCBancard PayLo Overview
+## PCBancard Dual Pricing Overview
 
-PCBancard PayLo is a dual pricing program that helps business owners stop losing 3-4% of every card transaction to processing fees.
+PCBancard Dual Pricing is a program that helps business owners stop losing 3-4% of every card transaction to processing fees.
 
 ### The Problem
 - Every card transaction (dip, tap, swipe) takes 3-4% off the top
@@ -16,9 +16,9 @@ PCBancard PayLo is a dual pricing program that helps business owners stop losing
 ### Three Solutions
 1. **Interchange-Plus**: Pay true cost + small fixed fee. Transparent pricing.
 2. **Surcharging**: Add fee to credit cards (but can't surcharge debit - federal law)
-3. **Dual Pricing (PayLo)**: Show cash price and card price. Customer chooses. Works on credit AND debit.
+3. **Dual Pricing**: Show cash price and card price. Customer chooses. Works on credit AND debit.
 
-### PayLo Benefits
+### Dual Pricing Benefits
 - Fully automated - system does the math
 - Customers see both prices and choose how to pay
 - Clear signage keeps you compliant

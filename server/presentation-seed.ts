@@ -56,7 +56,7 @@ const lessonsData: { moduleNumber: number; lesson: Omit<InsertPresentationLesson
       videoId: "V1-V8",
       paragraphId: "Overview",
       mechanism: "Persuasion Architecture",
-      scriptText: "The Propelr Video Brochure Series operates as a closed-loop conversion system, not a collection of informational videos. Each video functions as a stage gate in a precise psychological journey: V1 → V2 → V3 → V4 → [V5/V6/V7] → V8. Problem → Vision → Process → Safety → Fit → Community.",
+      scriptText: "The PCBancard Video Brochure Series operates as a closed-loop conversion system, not a collection of informational videos. Each video functions as a stage gate in a precise psychological journey: V1 → V2 → V3 → V4 → [V5/V6/V7] → V8. Problem → Vision → Process → Safety → Fit → Community.",
       psychology: "This presentation uses a systematic approach to belief installation. Each video installs specific beliefs that build upon the previous. By the time a merchant watches all videos, they have been guided through problem awareness, vision of transformation, process clarity, safety confirmation, solution fit, and community alignment.",
       timing: "Before any field work, understand this architecture. It will help you know exactly where each merchant is in their journey and what they need next.",
       commonMistakes: "Jumping to solution before establishing problem awareness. Rushing through videos without letting emotions land. Treating this as information delivery instead of belief installation.",

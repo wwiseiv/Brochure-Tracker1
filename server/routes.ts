@@ -3820,7 +3820,7 @@ Consider:
 - Contact info availability
 - Notes/voice notes presence (more info = better)
 - Time since drop (fresher = better)
-- PayLo dual pricing potential
+- Dual Pricing potential
 - Tip handling needs
 
 Respond in JSON format:
@@ -5498,7 +5498,7 @@ The PCBancard presentation uses proven psychological principles:
 2. Problem Statement - Quantify the fee losses
 3. Story Proof - Real merchant success stories
 4. Solution Options - Present the three pricing options
-5. Dual Pricing Details - Deep dive into PayLo
+5. Dual Pricing Details - Deep dive into Dual Pricing program
 6. Process & Protection - How switching works, 90-day promise
 7. Fit Check - Ensure solution fits their business
 8. Close & Community - Action steps and referral opportunity
