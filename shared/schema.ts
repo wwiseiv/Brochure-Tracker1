@@ -1476,3 +1476,199 @@ export const insertProposalJobSchema = createInsertSchema(proposalJobs).omit({
 });
 export type InsertProposalJob = z.infer<typeof insertProposalJobSchema>;
 export type ProposalJob = typeof proposalJobs.$inferSelect;
+
+// ============================================
+// E-Signature Document Library
+// ============================================
+
+// Document categories
+export const ESIGN_DOCUMENT_CATEGORIES = ["application", "equipment", "compliance", "addendum", "internal"] as const;
+export type ESignDocumentCategory = typeof ESIGN_DOCUMENT_CATEGORIES[number];
+
+// Form field types
+export const ESIGN_FIELD_TYPES = ["text", "number", "email", "phone", "date", "select", "checkbox", "signature", "ssn", "ein", "currency", "percentage", "textarea"] as const;
+export type ESignFieldType = typeof ESIGN_FIELD_TYPES[number];
+
+// E-signature providers
+export const ESIGN_PROVIDERS = ["signnow", "docusign", "hellosign", "pandadoc"] as const;
+export type ESignProvider = typeof ESIGN_PROVIDERS[number];
+
+// E-signature request statuses
+export const ESIGN_STATUSES = ["draft", "pending_send", "sent", "viewed", "partially_signed", "completed", "declined", "expired", "voided"] as const;
+export type ESignStatus = typeof ESIGN_STATUSES[number];
+
+// Signer roles
+export const SIGNER_ROLES = ["merchant_owner", "merchant_officer", "guarantor", "agent"] as const;
+export type SignerRole = typeof SIGNER_ROLES[number];
+
+// Signer statuses
+export const SIGNER_STATUSES = ["pending", "sent", "viewed", "signed", "declined"] as const;
+export type SignerStatus = typeof SIGNER_STATUSES[number];
+
+// E-signature document templates (stored in DB for customization)
+export const esignDocumentTemplates = pgTable("esign_document_templates", {
+  id: varchar("id", { length: 100 }).primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).notNull(),
+  thumbnailPath: varchar("thumbnail_path", { length: 255 }),
+  pdfPath: varchar("pdf_path", { length: 255 }),
+  pageIndex: integer("page_index"),
+  formFields: jsonb("form_fields").$type<{
+    id: string;
+    fieldName: string;
+    label: string;
+    type: ESignFieldType;
+    required: boolean;
+    placeholder?: string;
+    defaultValue?: string;
+    options?: { value: string; label: string }[];
+    mappedFrom?: string;
+  }[]>().default([]),
+  isRequired: boolean("is_required").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEsignDocumentTemplateSchema = createInsertSchema(esignDocumentTemplates).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEsignDocumentTemplate = z.infer<typeof insertEsignDocumentTemplateSchema>;
+export type EsignDocumentTemplate = typeof esignDocumentTemplates.$inferSelect;
+
+// E-signature document packages (predefined sets of documents)
+export const esignDocumentPackages = pgTable("esign_document_packages", {
+  id: varchar("id", { length: 100 }).primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  documentTemplateIds: text("document_template_ids").array().default([]),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEsignDocumentPackageSchema = createInsertSchema(esignDocumentPackages).omit({
+  createdAt: true,
+});
+export type InsertEsignDocumentPackage = z.infer<typeof insertEsignDocumentPackageSchema>;
+export type EsignDocumentPackage = typeof esignDocumentPackages.$inferSelect;
+
+// E-signature requests (actual signing sessions)
+export const esignRequests = pgTable("esign_requests", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  agentId: varchar("agent_id").notNull(),
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  
+  // Document info
+  documentIds: text("document_ids").array().default([]),
+  packageId: varchar("package_id", { length: 100 }),
+  
+  // Merchant info snapshot
+  merchantName: varchar("merchant_name", { length: 255 }),
+  merchantEmail: varchar("merchant_email", { length: 255 }),
+  merchantPhone: varchar("merchant_phone", { length: 30 }),
+  
+  // Form field values (filled by user)
+  fieldValues: jsonb("field_values").$type<Record<string, any>>().default({}),
+  
+  // E-signature provider info
+  provider: varchar("provider", { length: 50 }),
+  externalRequestId: varchar("external_request_id", { length: 255 }),
+  
+  // Status tracking
+  status: varchar("status", { length: 30 }).default("draft").notNull(),
+  
+  // Signers info
+  signers: jsonb("signers").$type<{
+    id: string;
+    name: string;
+    email: string;
+    role: SignerRole;
+    status: SignerStatus;
+    signedAt?: string;
+    ipAddress?: string;
+  }[]>().default([]),
+  
+  // Signed document URL
+  signedDocumentUrl: text("signed_document_url"),
+  
+  // Timestamps
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const esignRequestsRelations = relations(esignRequests, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [esignRequests.orgId],
+    references: [organizations.id],
+  }),
+  merchant: one(merchants, {
+    fields: [esignRequests.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const insertEsignRequestSchema = createInsertSchema(esignRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  sentAt: true,
+  viewedAt: true,
+  completedAt: true,
+});
+export type InsertEsignRequest = z.infer<typeof insertEsignRequestSchema>;
+export type EsignRequest = typeof esignRequests.$inferSelect;
+
+// Extended merchant type for e-signature with full address info
+export interface EsignMerchantRecord {
+  id: string;
+  businessName: string;
+  dbaName?: string;
+  corporateLegalName?: string;
+  businessAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  mailingAddress?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  businessPhone: string;
+  businessEmail: string;
+  businessWebsite?: string;
+  federalTaxId?: string;
+  businessType?: string;
+  ownershipType?: string;
+  yearsInBusiness?: number;
+  averageTicket?: number;
+  annualVolume?: number;
+  owner: {
+    firstName: string;
+    lastName: string;
+    fullName?: string;
+    email: string;
+    phone: string;
+    dateOfBirth?: string;
+    ssn?: string;
+    homeAddress?: {
+      street: string;
+      city: string;
+      state: string;
+      zip: string;
+    };
+    ownershipPercentage?: number;
+  };
+  status: string;
+}
