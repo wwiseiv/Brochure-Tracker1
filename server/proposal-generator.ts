@@ -19,14 +19,33 @@ import * as path from "path";
 
 // Helper function to parse PDF using pdf-parse with proper lazy loading
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
-  // pdf-parse v2.x uses a class-based API
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
-  const textResult = await parser.getText();
-  // Combine all page texts into a single string
-  const text = textResult.pages.map((page: any) => page.text).join("\n");
-  await parser.destroy();
-  return { text };
+  try {
+    // pdf-parse v2.x uses a class-based API
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    const textResult = await parser.getText();
+    
+    // Handle different response formats
+    let text = "";
+    if (textResult && textResult.pages && Array.isArray(textResult.pages)) {
+      text = textResult.pages.map((page: any) => page?.text || "").join("\n");
+    } else if (typeof textResult === "string") {
+      text = textResult;
+    } else if (textResult && typeof textResult.text === "string") {
+      text = textResult.text;
+    }
+    
+    await parser.destroy();
+    
+    if (!text || text.trim().length === 0) {
+      console.warn("PDF parsing returned empty text");
+    }
+    
+    return { text };
+  } catch (error) {
+    console.error("PDF parsing error:", error);
+    throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 }
 
 export interface CardBreakdown {
@@ -582,14 +601,14 @@ export async function generateProposalBlueprint(
       agentTitle: parsedData.agentTitle || "Account Executive",
     },
     executiveSummary: {
-      intro: `Thank you for the opportunity to review your current payment processing. We've analyzed your monthly volume of $${parsedData.currentState.totalVolume.toLocaleString()} and identified significant savings opportunities.`,
-      currentSituation: `Currently, you're paying approximately $${parsedData.currentState.totalMonthlyCost.toLocaleString()} per month in processing fees, with an effective rate of ${parsedData.currentState.effectiveRatePercent.toFixed(2)}%.`,
+      intro: `Thank you for the opportunity to review your current payment processing. We've analyzed your monthly volume of $${(parsedData.currentState?.totalVolume || 0).toLocaleString()} and identified significant savings opportunities.`,
+      currentSituation: `Currently, you're paying approximately $${(parsedData.currentState?.totalMonthlyCost || 0).toLocaleString()} per month in processing fees, with an effective rate of ${(parsedData.currentState?.effectiveRatePercent || 0).toFixed(2)}%.`,
       recommendation: recommendedOption === "dual_pricing"
         ? `We recommend our Dual Pricing program, which can save you up to $${maxSavings.toLocaleString()} per month ($${annualSavings.toLocaleString()} annually) by allowing customers to choose between cash and credit pricing.`
         : `We recommend our Interchange Plus pricing model, which provides transparent pricing and can save you $${maxSavings.toLocaleString()} per month ($${annualSavings.toLocaleString()} annually).`,
     },
     savingsComparison: {
-      currentCost: parsedData.currentState.totalMonthlyCost,
+      currentCost: parsedData.currentState?.totalMonthlyCost || 0,
       dualPricingCost: parsedData.optionDualPricing?.totalMonthlyCost,
       dualPricingSavings: parsedData.optionDualPricing?.monthlySavings,
       interchangePlusCost: parsedData.optionInterchangePlus?.totalMonthlyCost,
