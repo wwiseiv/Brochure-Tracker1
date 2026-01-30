@@ -1025,25 +1025,38 @@ export default function ProposalGeneratorPage() {
         </CardContent>
       </Card>
 
-      <Button
-        className="w-full"
-        size="lg"
-        onClick={handleStartBuild}
-        disabled={startBuildMutation.isPending || (!dualPricingFile && !interchangePlusFile)}
-        data-testid="button-start-build"
-      >
-        {startBuildMutation.isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Starting Build...
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-4 h-4 mr-2" />
-            Generate Proposal with AI
-          </>
-        )}
-      </Button>
+      {/* Sticky footer with action button */}
+      <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 z-40">
+        <div className="max-w-2xl mx-auto">
+          {(!dualPricingFile && !interchangePlusFile) && (
+            <p className="text-sm text-center text-muted-foreground mb-2">
+              Upload at least one pricing PDF to continue
+            </p>
+          )}
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handleStartBuild}
+            disabled={startBuildMutation.isPending || (!dualPricingFile && !interchangePlusFile)}
+            data-testid="button-start-build"
+          >
+            {startBuildMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Starting Build...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Proposal with AI
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+      
+      {/* Spacer for the sticky footer */}
+      <div className="h-24" />
     </div>
   );
 
@@ -1745,6 +1758,40 @@ export default function ProposalGeneratorPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Sticky footer with guidance for Manual Upload */}
+      <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 z-40">
+        <div className="max-w-2xl mx-auto">
+          {uploadedFiles.length === 0 ? (
+            <p className="text-sm text-center text-muted-foreground">
+              Upload a pricing PDF above to get started
+            </p>
+          ) : (
+            <Button 
+              onClick={handleParse}
+              disabled={parseMutation.isPending}
+              className="w-full"
+              size="lg"
+              data-testid="button-parse-pdf-footer"
+            >
+              {parseMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Parsing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Parse {uploadedFiles.length} PDF{uploadedFiles.length > 1 ? 's' : ''} and Continue
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {/* Spacer for sticky footer */}
+      <div className="h-20" />
     </div>
   );
 
