@@ -93,10 +93,22 @@ async function updateJobData(jobId: number, data: Partial<ProposalJob>) {
     .where(eq(proposalJobs.id, jobId));
 }
 
+export interface MerchantFormData {
+  businessName?: string | null;
+  ownerName?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  industry?: string | null;
+  repNotes?: string | null;
+}
+
 export interface ProposalBuildInput {
   userId: string;
   organizationId?: number;
   merchantWebsiteUrl?: string;
+  merchantFormData?: MerchantFormData;
   salesperson: SalespersonInfo;
   selectedEquipmentId?: number;
   outputFormat: "pdf" | "docx";
@@ -149,35 +161,60 @@ export async function executeProposalJob(
 
     await updateJobStep(jobId, "scraping_website", "running", "Fetching merchant website...");
     
+    // Start with form data as priority, then fallback to parsed/scraped data
+    const formData = input.merchantFormData;
     let merchantData: MerchantScrapedData = {
       logoUrl: null,
       logoBase64: null,
-      businessName: parsedDualPricing?.merchantName || parsedInterchangePlus?.merchantName || "Merchant",
+      businessName: formData?.businessName || parsedDualPricing?.merchantName || parsedInterchangePlus?.merchantName || "Merchant",
       businessDescription: null,
-      address: null,
-      phone: null,
-      industry: null,
-      websiteUrl: input.merchantWebsiteUrl || null,
+      address: formData?.address || null,
+      phone: formData?.phone || null,
+      industry: formData?.industry || null,
+      websiteUrl: formData?.website || input.merchantWebsiteUrl || null,
+      // Extended fields for PDF rendering
+      ownerName: formData?.ownerName || null,
+      email: formData?.email || null,
     };
 
+    console.log("[ProposalBuilder] Initial merchant data from form:", {
+      businessName: merchantData.businessName,
+      ownerName: (merchantData as any).ownerName,
+      address: merchantData.address,
+      phone: merchantData.phone,
+      email: (merchantData as any).email,
+    });
+
     try {
-      if (input.merchantWebsiteUrl) {
-        const scraped = await scrapeMerchantWebsite(input.merchantWebsiteUrl);
+      const websiteUrl = formData?.website || input.merchantWebsiteUrl;
+      if (websiteUrl) {
+        console.log("[ProposalBuilder] Scraping website:", websiteUrl);
+        const scraped = await scrapeMerchantWebsite(websiteUrl);
         
         if (scraped.success && scraped.data) {
+          console.log("[ProposalBuilder] Scraped data:", {
+            logoUrl: scraped.data.logoUrl,
+            businessName: scraped.data.businessName,
+            industry: scraped.data.industry,
+          });
+          
+          // Merge: form data takes priority over scraped data
           merchantData = {
             logoUrl: scraped.data.logoUrl,
             logoBase64: null,
-            businessName: scraped.data.businessName || merchantData.businessName,
+            businessName: formData?.businessName || scraped.data.businessName || merchantData.businessName,
             businessDescription: scraped.data.businessDescription,
-            address: scraped.data.address,
-            phone: scraped.data.phone,
-            industry: scraped.data.industry,
-            websiteUrl: input.merchantWebsiteUrl,
+            address: formData?.address || scraped.data.address || null,
+            phone: formData?.phone || scraped.data.phone || null,
+            industry: formData?.industry || scraped.data.industry || null,
+            websiteUrl: websiteUrl,
+            ownerName: formData?.ownerName || null,
+            email: formData?.email || null,
           };
 
           if (scraped.data.logoUrl) {
             merchantData.logoBase64 = await fetchLogoAsBase64(scraped.data.logoUrl);
+            console.log("[ProposalBuilder] Logo fetched:", merchantData.logoBase64 ? "Success" : "Failed");
           }
         }
       }

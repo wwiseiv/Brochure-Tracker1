@@ -433,10 +433,20 @@ export default function ProposalGeneratorPage() {
       if (merchantWebsiteUrl) {
         formData.append("merchantWebsiteUrl", merchantWebsiteUrl);
       }
+      // Salesperson info
       formData.append("salespersonName", `${agentFirstName} ${agentLastName}`.trim());
       formData.append("salespersonTitle", agentTitle);
       formData.append("salespersonEmail", agentEmail);
       formData.append("salespersonPhone", agentPhone);
+      // Merchant info (from form)
+      if (businessName) formData.append("merchantBusinessName", businessName);
+      if (ownerName) formData.append("merchantOwnerName", ownerName);
+      if (businessAddress) formData.append("merchantAddress", businessAddress);
+      if (businessPhone) formData.append("merchantPhone", businessPhone);
+      if (businessEmail) formData.append("merchantEmail", businessEmail);
+      if (businessWebsite) formData.append("merchantWebsite", businessWebsite);
+      if (industryGuess) formData.append("merchantIndustry", industryGuess);
+      if (repNotes) formData.append("repNotes", repNotes);
       formData.append("outputFormat", "pdf");
 
       const res = await fetch("/api/proposals/build", {

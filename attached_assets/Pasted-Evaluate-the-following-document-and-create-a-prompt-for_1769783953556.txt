@@ -1,0 +1,122 @@
+Evaluate the following document and create a prompt for Replit to tell it what’s missing. First of all, it did not scrape the business’s website to capture their logo and to put it into the proposal. It did not put the business’s owner name, address, email, or phone number where it said it was prepared for them. It did not put the agent’s name, the agent’s email address, or phone number. It just put their title. The current processing snapshot has none of the numbers. The proposal does not illustrate a side-by-side comparison of dual pricing and interchange pricing, even though that’s what the documents were that were uploaded. It does mention equipment, but it does not talk about the actual volume. It says dollar sign NA, so it didn’t capture that information. It’s missing a bunch of data.
+
+I filled out all of the information for the merchant, but it didn’t capture any of it. It didn’t even go to their website or scrape any data. It didn’t even include the information. I’m including the screenshot of the pages where I filled it out. It was absolutely complete.
+
+The screenshots I’m including are just blank, but before I submitted it to Replit, it was all filled out with the Merchant’s information that I obtained here, including the website address
+
+https://www.bobsmufflerservice.com/
+
+The Merchant had a logo that could’ve been taken. I just took it. I’m showing it right here.
+
+What’s missing (confirmed in the generated PDF)
+1.	No merchant logo pulled from the website
+
+```
+•	Cover shows only PCBancard branding; there’s no Cowtown Corner logo inserted anywhere.  ￼
+
+2.	“Prepared For” section did not populate merchant contact details
+
+•	Page 1 shows only “Cowtown Corner” (no owner name, address, phone, email in the header block).  ￼
+
+3.	Agent contact info didn’t populate correctly
+
+•	Page 1 “Prepared By” is generic: “PCBancard Representative / Account Executive” (no agent name, phone, email).  ￼
+•	Page 4 includes “contact William Wise… at 317-331-8472” but the email is missing/truncated (“via email at Contact: …”).  ￼
+
+4.	Current Processing Snapshot has no numbers (it’s all zeroed)
+
+•	The “Current Processing Snapshot” table shows $0 volume, 0 transactions, $0 fees, 0.00% effective rate, etc.  ￼
+
+5.	No side-by-side Dual Pricing vs Interchange+ comparison from the uploaded spreadsheets
+
+•	“Options Comparison” doesn’t show dual pricing vs interchange-plus pricing outputs; it’s basically empty/zeroed.  ￼
+
+6.	Volume-dependent sections are broken
+
+•	Equipment section says: “Based on your monthly volume of $N/A…” which means the volume wasn’t captured.  ￼
+•	“NaN% reduction” appears in the savings claim, which indicates a divide-by-zero / missing-data bug.  ￼
+
+7.	Formatting/data integrity issues
+
+•	Implementation Plan rows are truncated mid-sentence (suggesting table layout or overflow issues).  ￼
+```
+
+⸻
+
+Copy/paste prompt for Replit (tell it exactly what to fix)
+
+You are working on my Replit proposal generator. Evaluate the generated PDF output and fix the pipeline so the proposal is fully data-driven and correctly populated. The current output is missing critical fields and shows zeros/NA/NaN.
+
+GOALS
+
+- Generate a 2–4 page proposal that correctly injects merchant + agent contact info, scrapes the merchant logo from their website when provided, parses the two uploaded pricing spreadsheets (Dual Pricing + Interchange Plus), and renders a real side-by-side comparison with correct numbers (no $0, $N/A, or NaN).
+
+WHAT IS BROKEN (MUST FIX)
+
+1. Website scraping for merchant logo is not working.
+- When website_url is provided, scrape and download a usable merchant logo and place it on the cover page near “Prepared exclusively for <Business>”.
+- Use a robust fallback chain: (a) <meta property="og:logo"> or common logo selectors, (b) header/nav img with “logo” in class/id/alt, (c) favicon as last resort.
+- Store the downloaded image locally during generation and embed it into the PDF. If no logo found, omit the logo block (do not hallucinate).
+1. “Prepared For” block is not populated with merchant owner/contact details.
+- The header must include:
+  Business Name
+  Owner Name (if provided)
+  Business Address (if provided)
+  Business Phone (if provided)
+  Business Email (if provided)
+  Website (if provided)
+- If any fields are missing, hide those lines cleanly (no blank placeholders).
+1. “Prepared By” block is not populated with agent details.
+- Must include:
+  Agent First + Last Name
+  Title
+  Agent Phone
+  Agent Email
+- Do not show generic “PCBancard Representative” unless no agent name is provided.
+- The “Next Steps” section must also include the same agent name/phone/email without truncation.
+1. Spreadsheet parsing is failing, resulting in $0, 0 transactions, $N/A, and NaN%.
+- Parse BOTH uploaded spreadsheets and extract the numeric outputs needed for:
+  Monthly processing volume
+  Monthly transactions
+  Avg ticket
+  Current monthly fees
+  Current effective rate
+  Annual processing cost
+- Then compute proposal outputs for BOTH options:
+  Option A: Dual Pricing (merchant net cost or cost shift, plus any fixed fees)
+  Option B: Interchange Plus (total estimated monthly cost, effective rate)
+- Ensure calculations handle missing/zero values safely:
+  - Never output NaN or Infinity. If denominator is 0, show “—” and add a “Missing data” note.
+  - If spreadsheets lack required fields, stop and prompt the user for the missing inputs (don’t guess).
+1. The proposal must include a side-by-side comparison section (required).
+- Add a table with BOTH options and the current processor:
+  Current Processor: Monthly Cost, Effective Rate
+  Dual Pricing: Monthly Cost, Effective Rate, Monthly Savings, Annual Savings
+  Interchange Plus: Monthly Cost, Effective Rate, Monthly Savings, Annual Savings
+- Add a short narrative explaining the numbers and assumptions.
+- If you can’t compute a field, label it clearly as missing and explain what input is required.
+1. Equipment recommendation must be volume-aware (no “$N/A”).
+- If monthly volume is known, choose the recommended device based on volume + business type rules.
+- If volume is missing, present 2–3 equipment options with “recommended when volume is known” and prompt for volume.
+1. Fix formatting/layout issues (truncated tables).
+- Implementation Plan rows must not cut off mid-sentence. Adjust table column widths, wrapping, or font size so all text renders properly.
+
+INPUT COLLECTION (ADD IF MISSING)
+Before generation, ensure the app collects:
+
+- Merchant: business_name, owner_name, website_url, address, phone, email (all optional but must map into the PDF)
+- Agent: agent_first_name, agent_last_name, agent_title, agent_phone, agent_email (agent name/phone/email must map into the PDF)
+- Uploads: dual_pricing_spreadsheet + interchange_plus_spreadsheet (required for side-by-side pricing)
+
+ACCEPTANCE TESTS (MUST PASS)
+
+- If website_url exists and logo is found, merchant logo appears on cover.
+- Prepared For block shows owner/address/phone/email when provided.
+- Prepared By and Next Steps show agent full name + phone + email.
+- Processing snapshot shows real non-zero values when spreadsheets contain data.
+- Options Comparison includes Current vs Dual Pricing vs Interchange+ with real numbers.
+- No “$0” / “$N/A” / “NaN%” unless inputs are truly missing—then show “—” and explain missing input.
+- No truncated table text in Implementation Plan.
+
+Deliver updated code and identify exactly where you fixed: scraping, field mapping, spreadsheet parsing, calculations, and PDF rendering.
+I’m also attaching the documents I uploaded to Replit that it was supposed to create the proposal from.  They are examples

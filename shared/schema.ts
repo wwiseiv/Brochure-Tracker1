@@ -1373,6 +1373,8 @@ export interface MerchantScrapedData {
   phone: string | null;
   industry: string | null;
   websiteUrl: string | null;
+  ownerName?: string | null;
+  email?: string | null;
 }
 
 export interface SalespersonInfo {

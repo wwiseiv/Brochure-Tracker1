@@ -5729,24 +5729,58 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
         salespersonTitle, 
         salespersonEmail, 
         salespersonPhone,
+        // Merchant info from form
+        merchantBusinessName,
+        merchantOwnerName,
+        merchantAddress,
+        merchantPhone,
+        merchantEmail,
+        merchantWebsite,
+        merchantIndustry,
+        repNotes,
         selectedEquipmentId,
         outputFormat = "pdf"
       } = req.body;
+
+      console.log("[Proposals] Received form data:", {
+        salespersonName,
+        salespersonTitle,
+        salespersonEmail,
+        salespersonPhone,
+        merchantBusinessName,
+        merchantOwnerName,
+        merchantWebsiteUrl,
+        merchantWebsite,
+        dualPricingFile: !!dualPricingFile,
+        interchangePlusFile: !!interchangePlusFile,
+      });
 
       if (!dualPricingFile && !interchangePlusFile) {
         return res.status(400).json({ error: "At least one cost analysis file is required" });
       }
 
+      const merchantFormData = {
+        businessName: merchantBusinessName || null,
+        ownerName: merchantOwnerName || null,
+        address: merchantAddress || null,
+        phone: merchantPhone || null,
+        email: merchantEmail || null,
+        website: merchantWebsite || merchantWebsiteUrl || null,
+        industry: merchantIndustry || null,
+        repNotes: repNotes || null,
+      };
+
       const jobId = await createProposalJob({
         userId,
         organizationId: membership.organizationId,
-        merchantWebsiteUrl,
+        merchantWebsiteUrl: merchantWebsiteUrl || merchantWebsite,
         salesperson: {
           name: salespersonName || "PCBancard Representative",
           title: salespersonTitle || "Account Executive",
           email: salespersonEmail || "",
           phone: salespersonPhone || "",
         },
+        merchantFormData,
         selectedEquipmentId: selectedEquipmentId ? parseInt(selectedEquipmentId) : undefined,
         outputFormat: outputFormat as "pdf" | "docx",
       });
@@ -5755,13 +5789,14 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       executeProposalJob(jobId, {
         userId,
         organizationId: membership.organizationId,
-        merchantWebsiteUrl,
+        merchantWebsiteUrl: merchantWebsiteUrl || merchantWebsite,
         salesperson: {
           name: salespersonName || "PCBancard Representative",
           title: salespersonTitle || "Account Executive",
           email: salespersonEmail || "",
           phone: salespersonPhone || "",
         },
+        merchantFormData,
         selectedEquipmentId: selectedEquipmentId ? parseInt(selectedEquipmentId) : undefined,
         outputFormat: outputFormat as "pdf" | "docx",
         dualPricingBuffer: dualPricingFile?.buffer,
