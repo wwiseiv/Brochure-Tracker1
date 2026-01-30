@@ -383,7 +383,16 @@ export default function ESignDocumentLibrary() {
             ) : (
               <div className="grid gap-4">
                 {filteredTemplates.map(template => (
-                  <Card key={template.id} className="hover-elevate cursor-pointer" data-testid={`card-template-${template.id}`}>
+                  <Card 
+                    key={template.id} 
+                    className="hover-elevate cursor-pointer" 
+                    data-testid={`card-template-${template.id}`}
+                    onClick={() => {
+                      setSelectedDocuments([template.id]);
+                      setSelectedPackage("");
+                      setShowNewRequestDialog(true);
+                    }}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-14 bg-muted rounded flex items-center justify-center flex-shrink-0">

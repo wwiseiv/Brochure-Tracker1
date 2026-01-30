@@ -7,6 +7,8 @@ import { eq, and, desc } from "drizzle-orm";
 import { esignRequests, esignDocumentTemplates, esignDocumentPackages, type EsignRequest, type InsertEsignRequest, type ESignProvider, type SignerRole, type ESignStatus, type SignerStatus } from "@shared/schema";
 import { documentTemplates, documentPackages, getDocumentById, getPackageById, getPackageDocuments, type DocumentTemplate, type DocumentPackage } from "./document-library";
 import { mapMerchantToFormFields, validateForm, generateId } from "./form-utils";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import FormData from "form-data";
 
 // Provider configuration (from environment)
 interface ProviderConfig {
@@ -359,7 +361,118 @@ export class ESignatureService {
     }
   }
 
-  // SignNow implementation
+  // Generate PDF for signing
+  private async generateSigningPDF(request: EsignRequest): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([612, 792]); // Letter size
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    const documentIds = request.documentIds as string[] || [];
+    const documentNames = documentIds.map(id => {
+      const doc = getDocumentById(id);
+      return doc?.name || id;
+    }).join(", ");
+    
+    // Header
+    page.drawText("PCBancard E-Signature Document", {
+      x: 50,
+      y: 742,
+      size: 18,
+      font: boldFont,
+      color: rgb(0.1, 0.1, 0.4)
+    });
+    
+    // Document info
+    page.drawText(`Document(s): ${documentNames}`, {
+      x: 50,
+      y: 700,
+      size: 12,
+      font
+    });
+    
+    page.drawText(`Merchant: ${request.merchantName}`, {
+      x: 50,
+      y: 680,
+      size: 12,
+      font
+    });
+    
+    page.drawText(`Date: ${new Date().toLocaleDateString()}`, {
+      x: 50,
+      y: 660,
+      size: 12,
+      font
+    });
+    
+    // Divider line
+    page.drawLine({
+      start: { x: 50, y: 640 },
+      end: { x: 562, y: 640 },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7)
+    });
+    
+    // Agreement text
+    const agreementText = `By signing this document, I acknowledge that I have reviewed and agree to the terms and conditions of the ${documentNames} agreement(s) with PCBancard.`;
+    
+    page.drawText(agreementText, {
+      x: 50,
+      y: 600,
+      size: 11,
+      font,
+      maxWidth: 500
+    });
+    
+    // Signature section
+    page.drawText("Signature:", {
+      x: 50,
+      y: 200,
+      size: 12,
+      font: boldFont
+    });
+    
+    // Signature line
+    page.drawLine({
+      start: { x: 130, y: 200 },
+      end: { x: 400, y: 200 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("Date:", {
+      x: 420,
+      y: 200,
+      size: 12,
+      font: boldFont
+    });
+    
+    page.drawLine({
+      start: { x: 460, y: 200 },
+      end: { x: 560, y: 200 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("Print Name:", {
+      x: 50,
+      y: 160,
+      size: 12,
+      font: boldFont
+    });
+    
+    page.drawLine({
+      start: { x: 140, y: 160 },
+      end: { x: 400, y: 160 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
+
+  // SignNow implementation - Full API integration
   private async sendToSignNow(
     config: ProviderConfig,
     request: EsignRequest,
@@ -372,27 +485,125 @@ export class ESignatureService {
       }
 
       const signers = request.signers as Signer[] || [];
-      
-      // For now, create a simple document sending request
-      // In production, you would:
-      // 1. Upload the document template
-      // 2. Create signature fields
-      // 3. Send invite to signers
-      
-      // Demo mode - return success with demo IDs
-      // Full implementation would use SignNow's document and envelope APIs
-      const externalRequestId = `signnow_${Date.now()}_${request.id}`;
-      
-      console.log("[SignNow] Request created:", {
-        requestId: request.id,
-        signers: signers.length,
-        documents: (request.documentIds as string[])?.length || 0
+      if (signers.length === 0) {
+        return { success: false, error: "No signers specified" };
+      }
+
+      console.log("[SignNow] Starting document upload and invite process...");
+
+      // Step 1: Generate PDF
+      const pdfBuffer = await this.generateSigningPDF(request);
+      console.log("[SignNow] PDF generated, size:", pdfBuffer.length, "bytes");
+
+      // Step 2: Upload document to SignNow
+      const formData = new FormData();
+      formData.append("file", pdfBuffer, {
+        filename: `esign_${request.id}_${Date.now()}.pdf`,
+        contentType: "application/pdf"
       });
+
+      const uploadResponse = await fetch("https://api.signnow.com/document", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: formData as any
+      });
+
+      const uploadResult = await uploadResponse.json() as any;
+      
+      if (!uploadResult.id) {
+        console.error("[SignNow] Upload failed:", uploadResult);
+        return { success: false, error: uploadResult.error || "Failed to upload document" };
+      }
+
+      const documentId = uploadResult.id;
+      console.log("[SignNow] Document uploaded, ID:", documentId);
+
+      // Step 3: Add signature field to document
+      const fieldsResponse = await fetch(`https://api.signnow.com/document/${documentId}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          fields: [
+            {
+              x: 130,
+              y: 560, // Y is inverted in SignNow (from bottom)
+              width: 270,
+              height: 30,
+              page_number: 0,
+              role: "Signer 1",
+              required: true,
+              type: "signature"
+            },
+            {
+              x: 460,
+              y: 560,
+              width: 100,
+              height: 20,
+              page_number: 0,
+              role: "Signer 1",
+              required: true,
+              type: "date"
+            },
+            {
+              x: 140,
+              y: 600,
+              width: 260,
+              height: 20,
+              page_number: 0,
+              role: "Signer 1",
+              required: true,
+              type: "text",
+              prefilled_text: signers[0]?.name || ""
+            }
+          ]
+        })
+      });
+
+      const fieldsResult = await fieldsResponse.json() as any;
+      console.log("[SignNow] Fields added:", fieldsResult.id ? "success" : fieldsResult);
+
+      // Step 4: Send invite to signer
+      const primarySigner = signers[0];
+      const inviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          to: [{
+            email: primarySigner.email,
+            role: "Signer 1",
+            role_id: "",
+            order: 1,
+            subject: options.subject,
+            message: options.message
+          }],
+          from: "wwiseiv@gmail.com",
+          subject: options.subject,
+          message: options.message
+        })
+      });
+
+      const inviteResult = await inviteResponse.json() as any;
+      
+      if (inviteResult.error) {
+        console.error("[SignNow] Invite failed:", inviteResult);
+        return { success: false, error: inviteResult.error };
+      }
+
+      console.log("[SignNow] Invite sent successfully to:", primarySigner.email);
+      console.log("[SignNow] Invite result:", inviteResult);
 
       return {
         success: true,
-        externalRequestId,
-        signingUrl: `https://app.signnow.com/webapp/document/${externalRequestId}`
+        externalRequestId: documentId,
+        signingUrl: `https://app.signnow.com/webapp/document/${documentId}`
       };
     } catch (error) {
       console.error("[SignNow] Error sending document:", error);
