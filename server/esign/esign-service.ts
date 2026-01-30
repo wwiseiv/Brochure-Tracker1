@@ -524,85 +524,95 @@ export class ESignatureService {
       const documentId = uploadResult.id;
       console.log("[SignNow] Document uploaded, ID:", documentId);
 
-      // Step 3: Add signature field to document
+      // Step 3: Add signature fields to document using texts/signatures format
+      // SignNow requires unique field names and specific structure
+      const fieldsPayload = {
+        texts: [
+          {
+            page_number: 0,
+            x: 140,
+            y: 600,
+            size: 12,
+            width: 260,
+            height: 20,
+            required: true,
+            role: "Signer 1",
+            name: "printed_name",
+            prefilled_text: signers[0]?.name || ""
+          }
+        ],
+        signatures: [
+          {
+            page_number: 0,
+            x: 130,
+            y: 560,
+            width: 270,
+            height: 30,
+            required: true,
+            role: "Signer 1",
+            name: "signature_1"
+          }
+        ]
+      };
+
+      console.log("[SignNow] Adding fields with payload:", JSON.stringify(fieldsPayload));
+      
       const fieldsResponse = await fetch(`https://api.signnow.com/document/${documentId}`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          fields: [
-            {
-              x: 130,
-              y: 560, // Y is inverted in SignNow (from bottom)
-              width: 270,
-              height: 30,
-              page_number: 0,
-              role: "Signer 1",
-              required: true,
-              type: "signature"
-            },
-            {
-              x: 460,
-              y: 560,
-              width: 100,
-              height: 20,
-              page_number: 0,
-              role: "Signer 1",
-              required: true,
-              type: "date"
-            },
-            {
-              x: 140,
-              y: 600,
-              width: 260,
-              height: 20,
-              page_number: 0,
-              role: "Signer 1",
-              required: true,
-              type: "text",
-              prefilled_text: signers[0]?.name || ""
-            }
-          ]
-        })
+        body: JSON.stringify(fieldsPayload)
       });
 
       const fieldsResult = await fieldsResponse.json() as any;
-      console.log("[SignNow] Fields added:", fieldsResult.id ? "success" : fieldsResult);
+      console.log("[SignNow] Fields response status:", fieldsResponse.status);
+      console.log("[SignNow] Fields result:", JSON.stringify(fieldsResult));
 
-      // Step 4: Send invite to signer
+      // Step 4: Send invite to signer using freeform invite (no template roles required)
       const primarySigner = signers[0];
+      
+      // Use simple freeform invite format
+      const invitePayload = {
+        to: [
+          {
+            email: primarySigner.email,
+            role: "Signer 1",
+            order: 1
+          }
+        ],
+        from: process.env.SIGNNOW_EMAIL || "signatures@pcbancard.com",
+        subject: options.subject || `Please sign: ${request.merchantName}`,
+        message: options.message || "Please review and sign this document."
+      };
+
+      console.log("[SignNow] Sending invite with payload:", JSON.stringify(invitePayload));
+      
       const inviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          to: [{
-            email: primarySigner.email,
-            role: "Signer 1",
-            role_id: "",
-            order: 1,
-            subject: options.subject,
-            message: options.message
-          }],
-          from: "wwiseiv@gmail.com",
-          subject: options.subject,
-          message: options.message
-        })
+        body: JSON.stringify(invitePayload)
       });
 
       const inviteResult = await inviteResponse.json() as any;
+      console.log("[SignNow] Invite response status:", inviteResponse.status);
+      console.log("[SignNow] Invite result:", JSON.stringify(inviteResult));
       
-      if (inviteResult.error) {
+      if (!inviteResponse.ok || inviteResult.error) {
         console.error("[SignNow] Invite failed:", inviteResult);
-        return { success: false, error: inviteResult.error };
+        // Document was uploaded but invite failed - still return partial success
+        return { 
+          success: false, 
+          externalRequestId: documentId,
+          error: inviteResult.error || inviteResult.message || "Failed to send invite" 
+        };
       }
 
       console.log("[SignNow] Invite sent successfully to:", primarySigner.email);
-      console.log("[SignNow] Invite result:", inviteResult);
 
       return {
         success: true,
