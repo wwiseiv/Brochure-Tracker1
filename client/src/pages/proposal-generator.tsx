@@ -2174,7 +2174,7 @@ export default function ProposalGeneratorPage() {
             </div>
           </div>
         </header>
-        <main className="container px-4 py-6 max-w-2xl">
+        <main className="container px-4 py-6 max-w-2xl mx-auto">
           <Card className="p-8 text-center">
             <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
@@ -2211,7 +2211,7 @@ export default function ProposalGeneratorPage() {
         </div>
       </header>
 
-      <main className="container px-4 py-6 max-w-2xl">
+      <main className="container px-4 py-6 max-w-2xl mx-auto">
         <Tabs value={workflowMode} onValueChange={(v) => setWorkflowMode(v as "manual" | "agentic")} className="mb-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="agentic" data-testid="tab-agentic">
