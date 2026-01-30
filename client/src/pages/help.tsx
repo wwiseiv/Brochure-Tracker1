@@ -54,7 +54,9 @@ import {
   Lightbulb,
   Send,
   Search,
-  X
+  X,
+  FileSignature,
+  GraduationCap
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -713,6 +715,81 @@ export default function HelpPage() {
     },
   ];
 
+  const esignFeatures: HelpItem[] = [
+    {
+      title: "E-Signature Library",
+      description: "Access all merchant applications, equipment agreements, and compliance documents. Click any template to start a new signature request.",
+      link: "/esign",
+      icon: <FileSignature className="w-5 h-5 text-emerald-600" />,
+    },
+    {
+      title: "Send for Signature",
+      description: "Add signers with their email addresses, then send documents via SignNow. Merchants receive professional email invitations to sign.",
+      link: "/esign",
+      icon: <Send className="w-5 h-5 text-emerald-600" />,
+    },
+    {
+      title: "Track Signatures",
+      description: "Monitor signature status in real-time: Draft, Sent, Viewed, Signed, or Declined. Get notified when documents are completed.",
+      link: "/esign",
+      icon: <Eye className="w-5 h-5 text-emerald-600" />,
+    },
+    {
+      title: "Auto-Fill Fields",
+      description: "Merchant information auto-populates into document fields. Less typing means faster processing and fewer errors.",
+      link: "/esign",
+      icon: <Zap className="w-5 h-5 text-emerald-600" />,
+    },
+  ];
+
+  const proposalFeatures: HelpItem[] = [
+    {
+      title: "Generate Proposals",
+      description: "Upload pricing PDFs (Dual Pricing or Interchange Plus), and AI extracts rates, fees, and savings to create professional proposals.",
+      link: "/coach",
+      icon: <FileText className="w-5 h-5 text-violet-600" />,
+    },
+    {
+      title: "Equipment Selection",
+      description: "Choose from 63+ products across 6 vendors. Search and filter by category to find the perfect equipment for each merchant.",
+      link: "/coach",
+      icon: <Package className="w-5 h-5 text-violet-600" />,
+    },
+    {
+      title: "One-Page PDF Output",
+      description: "Generate branded, professional proposals with savings breakdown, equipment pricing, and agent contact info.",
+      link: "/coach",
+      icon: <Download className="w-5 h-5 text-violet-600" />,
+    },
+  ];
+
+  const presentationFeatures: HelpItem[] = [
+    {
+      title: "8 Training Modules",
+      description: "Master the PCBancard Dual Pricing presentation with structured lessons covering the complete sales process.",
+      link: "/coach",
+      icon: <GraduationCap className="w-5 h-5 text-teal-600" />,
+    },
+    {
+      title: "25 Interactive Lessons",
+      description: "Learn persuasion psychology: anchoring, loss aversion, social proof, story proof techniques, and closing strategies.",
+      link: "/coach",
+      icon: <Lightbulb className="w-5 h-5 text-teal-600" />,
+    },
+    {
+      title: "Voice Dictation Support",
+      description: "Practice speaking your pitch with voice input. AI provides feedback on your delivery and content.",
+      link: "/coach",
+      icon: <Mic className="w-5 h-5 text-teal-600" />,
+    },
+    {
+      title: "Quizzes & Progress Tracking",
+      description: "Test your knowledge with module quizzes. Track completion progress and earn achievements.",
+      link: "/coach",
+      icon: <Target className="w-5 h-5 text-teal-600" />,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
@@ -770,6 +847,9 @@ export default function HelpPage() {
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
             { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
             { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
+            { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users" },
+            { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users" },
+            { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users" },
             { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users" },

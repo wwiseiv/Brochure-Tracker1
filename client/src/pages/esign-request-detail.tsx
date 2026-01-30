@@ -350,21 +350,21 @@ export default function ESignRequestDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <Label className="text-muted-foreground">Merchant</Label>
-                <p className="font-medium">{request.merchantName}</p>
+                <Label className="text-muted-foreground text-xs">Merchant</Label>
+                <p className="font-medium truncate">{request.merchantName}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground">Email</Label>
-                <p className="font-medium">{request.merchantEmail || "Not provided"}</p>
+                <Label className="text-muted-foreground text-xs">Email</Label>
+                <p className="font-medium truncate">{request.merchantEmail || "Not provided"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground">Created</Label>
+                <Label className="text-muted-foreground text-xs">Created</Label>
                 <p className="font-medium">{formatDate(request.createdAt)}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground">Status</Label>
+                <Label className="text-muted-foreground text-xs">Status</Label>
                 <div className="flex items-center gap-2">
                   <Badge className={STATUS_COLORS[request.status]}>
                     {formatStatus(request.status)}
@@ -430,10 +430,10 @@ export default function ESignRequestDetailPage() {
               <CardTitle>Form Fields</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {formFields.map(field => (
                   <div key={field.fieldName} className="space-y-1">
-                    <Label>
+                    <Label className="text-sm">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </Label>
@@ -491,18 +491,18 @@ export default function ESignRequestDetailPage() {
             {request.signers && request.signers.length > 0 ? (
               <div className="space-y-3">
                 {request.signers.map((signer) => (
-                  <div key={signer.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
+                  <div key={signer.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3 min-w-0">
                       {getSignerStatusIcon(signer.status)}
-                      <div>
-                        <p className="font-medium">{signer.name}</p>
-                        <p className="text-sm text-muted-foreground">{signer.email}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{signer.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{signer.email}</p>
                       </div>
-                      <Badge variant="outline" className="ml-2">
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
                         {SIGNER_ROLES.find(r => r.value === signer.role)?.label || signer.role}
                       </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <Badge className={STATUS_COLORS[signer.status] || STATUS_COLORS.draft}>
                         {formatStatus(signer.status)}
                       </Badge>
