@@ -61,6 +61,7 @@ interface Product {
   bestFor: string[] | null;
   priceRange: string | null;
   url: string | null;
+  imageUrl: string | null;
 }
 
 interface Message {
@@ -525,9 +526,26 @@ export default function EquipIQPage() {
                               >
                                 <CardContent className="p-4">
                                   <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                      <Icon className="w-5 h-5 text-primary" />
-                                    </div>
+                                    {product.imageUrl ? (
+                                      <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-muted">
+                                        <img 
+                                          src={product.imageUrl} 
+                                          alt={product.name}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                          }}
+                                        />
+                                        <div className="hidden w-full h-full flex items-center justify-center bg-primary/10">
+                                          <Icon className="w-6 h-6 text-primary" />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                        <Icon className="w-5 h-5 text-primary" />
+                                      </div>
+                                    )}
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
@@ -819,6 +837,15 @@ export default function EquipIQPage() {
           </DialogHeader>
           {selectedProduct && (
             <div className="space-y-4">
+              {selectedProduct.imageUrl && (
+                <div className="w-full h-40 rounded-lg overflow-hidden bg-muted">
+                  <img 
+                    src={selectedProduct.imageUrl} 
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">{selectedProduct.description}</p>
               
               {selectedProduct.features && selectedProduct.features.length > 0 && (
