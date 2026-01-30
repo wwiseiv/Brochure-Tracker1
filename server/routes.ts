@@ -62,6 +62,8 @@ import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
 import { researchBusiness } from "./business-research";
 import { generateProposalImages, type ProposalImages } from "./proposal-images";
+import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./proposal-builder";
+import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import fs from "fs";
 import path from "path";
 
@@ -5595,6 +5597,184 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
     } catch (error: any) {
       console.error("[Proposals] Error parsing file:", error);
       res.status(500).json({ error: "Failed to parse file: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Scrape merchant website for logo and business info
+  app.post("/api/proposals/scrape-website", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { websiteUrl } = req.body;
+      
+      if (!websiteUrl) {
+        return res.status(400).json({ error: "Website URL is required" });
+      }
+
+      const scraped = await scrapeMerchantWebsite(websiteUrl);
+      
+      let logoBase64 = null;
+      if (scraped.success && scraped.data.logoUrl) {
+        logoBase64 = await fetchLogoAsBase64(scraped.data.logoUrl);
+      }
+
+      res.json({
+        success: scraped.success,
+        data: {
+          ...scraped.data,
+          logoBase64,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Proposals] Error scraping website:", error);
+      res.status(500).json({ error: "Failed to scrape website: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Start agentic proposal build job
+  app.post("/api/proposals/build", isAuthenticated, ensureOrgMembership(), pdfUpload.fields([
+    { name: 'dualPricingFile', maxCount: 1 },
+    { name: 'interchangePlusFile', maxCount: 1 },
+  ]), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const dualPricingFile = files?.dualPricingFile?.[0];
+      const interchangePlusFile = files?.interchangePlusFile?.[0];
+      
+      const { 
+        merchantWebsiteUrl, 
+        salespersonName, 
+        salespersonTitle, 
+        salespersonEmail, 
+        salespersonPhone,
+        selectedEquipmentId,
+        outputFormat = "pdf"
+      } = req.body;
+
+      if (!dualPricingFile && !interchangePlusFile) {
+        return res.status(400).json({ error: "At least one cost analysis file is required" });
+      }
+
+      const jobId = await createProposalJob({
+        userId,
+        organizationId: membership.organizationId,
+        merchantWebsiteUrl,
+        salesperson: {
+          name: salespersonName || "PCBancard Representative",
+          title: salespersonTitle || "Account Executive",
+          email: salespersonEmail || "",
+          phone: salespersonPhone || "",
+        },
+        selectedEquipmentId: selectedEquipmentId ? parseInt(selectedEquipmentId) : undefined,
+        outputFormat: outputFormat as "pdf" | "docx",
+      });
+
+      // Execute job in background
+      executeProposalJob(jobId, {
+        userId,
+        organizationId: membership.organizationId,
+        merchantWebsiteUrl,
+        salesperson: {
+          name: salespersonName || "PCBancard Representative",
+          title: salespersonTitle || "Account Executive",
+          email: salespersonEmail || "",
+          phone: salespersonPhone || "",
+        },
+        selectedEquipmentId: selectedEquipmentId ? parseInt(selectedEquipmentId) : undefined,
+        outputFormat: outputFormat as "pdf" | "docx",
+        dualPricingBuffer: dualPricingFile?.buffer,
+        interchangePlusBuffer: interchangePlusFile?.buffer,
+        dualPricingFileName: dualPricingFile?.originalname,
+        interchangePlusFileName: interchangePlusFile?.originalname,
+      }).catch(error => {
+        console.error("[Proposals] Background job failed:", error);
+      });
+
+      res.json({ 
+        success: true, 
+        jobId,
+        message: "Proposal build started"
+      });
+    } catch (error: any) {
+      console.error("[Proposals] Error starting build:", error);
+      res.status(500).json({ error: "Failed to start proposal build: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Get proposal job status
+  app.get("/api/proposals/build/:jobId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const jobId = parseInt(req.params.jobId);
+      
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await getProposalJobStatus(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Verify ownership
+      if (job.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Proposals] Error getting job status:", error);
+      res.status(500).json({ error: "Failed to get job status: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Download proposal job PDF
+  app.get("/api/proposals/build/:jobId/download", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const jobId = parseInt(req.params.jobId);
+      
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await getProposalJobStatus(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Verify ownership
+      if (job.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (job.status !== "completed") {
+        return res.status(400).json({ error: "Proposal not yet completed" });
+      }
+
+      if (!job.pdfUrl) {
+        return res.status(404).json({ error: "PDF not generated" });
+      }
+
+      // If it's a data URL, extract and send the PDF
+      if (job.pdfUrl.startsWith("data:application/pdf;base64,")) {
+        const base64Data = job.pdfUrl.replace("data:application/pdf;base64,", "");
+        const pdfBuffer = Buffer.from(base64Data, "base64");
+        
+        const merchantName = (job.merchantScrapedData as any)?.businessName || "proposal";
+        const filename = `${merchantName.replace(/[^a-zA-Z0-9]/g, "_")}_proposal.pdf`;
+        
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(pdfBuffer);
+      } else {
+        // If it's a regular URL, redirect
+        res.redirect(job.pdfUrl);
+      }
+    } catch (error: any) {
+      console.error("[Proposals] Error downloading PDF:", error);
+      res.status(500).json({ error: "Failed to download PDF: " + (error.message || "Unknown error") });
     }
   });
 

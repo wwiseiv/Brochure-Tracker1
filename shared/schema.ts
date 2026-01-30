@@ -1340,3 +1340,124 @@ export const insertProposalSchema = createInsertSchema(proposals).omit({
 });
 export type InsertProposal = z.infer<typeof insertProposalSchema>;
 export type Proposal = typeof proposals.$inferSelect;
+
+// ============================================
+// Proposal Jobs - Agentic Workflow Tracking
+// ============================================
+
+export type ProposalJobStep = 
+  | "parsing_documents"
+  | "scraping_website"
+  | "extracting_pricing"
+  | "generating_images"
+  | "building_document"
+  | "finalizing";
+
+export type ProposalJobStatus = "pending" | "running" | "completed" | "failed";
+
+export interface ProposalJobStepStatus {
+  step: ProposalJobStep;
+  status: ProposalJobStatus;
+  message: string;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+export interface MerchantScrapedData {
+  logoUrl: string | null;
+  logoBase64: string | null;
+  businessName: string | null;
+  businessDescription: string | null;
+  address: string | null;
+  phone: string | null;
+  industry: string | null;
+  websiteUrl: string | null;
+}
+
+export interface SalespersonInfo {
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  photoUrl?: string;
+}
+
+export interface PricingComparison {
+  currentProcessor: {
+    monthlyVolume: number;
+    monthlyTransactions: number;
+    avgTicket: number;
+    monthlyFees: number;
+    effectiveRate: number;
+    annualCost: number;
+    cardBreakdown: {
+      visa: { volume: number; cost: number };
+      mastercard: { volume: number; cost: number };
+      discover: { volume: number; cost: number };
+      amex: { volume: number; cost: number };
+    };
+  };
+  dualPricing?: {
+    monthlyFees: number;
+    monthlySavings: number;
+    annualSavings: number;
+    savingsPercent: number;
+    programFee: number;
+  };
+  interchangePlus?: {
+    monthlyFees: number;
+    monthlySavings: number;
+    annualSavings: number;
+    savingsPercent: number;
+    discountRate: number;
+    perTxFee: number;
+  };
+  recommendedOption: "dual_pricing" | "interchange_plus";
+}
+
+export const proposalJobs = pgTable("proposal_jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  currentStep: varchar("current_step", { length: 100 }),
+  
+  steps: jsonb("steps").$type<ProposalJobStepStatus[]>().default([]),
+  
+  merchantWebsiteUrl: varchar("merchant_website_url", { length: 500 }),
+  merchantScrapedData: jsonb("merchant_scraped_data").$type<MerchantScrapedData>(),
+  
+  salespersonInfo: jsonb("salesperson_info").$type<SalespersonInfo>(),
+  
+  pricingComparison: jsonb("pricing_comparison").$type<PricingComparison>(),
+  
+  generatedImages: jsonb("generated_images").$type<{
+    heroBanner?: string;
+    comparisonBackground?: string;
+    trustVisual?: string;
+  }>(),
+  
+  selectedEquipmentId: integer("selected_equipment_id"),
+  outputFormat: varchar("output_format", { length: 10 }).default("pdf"),
+  
+  proposalId: integer("proposal_id").references(() => proposals.id),
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  docxUrl: varchar("docx_url", { length: 500 }),
+  
+  errors: text("errors").array().default([]),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertProposalJobSchema = createInsertSchema(proposalJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+export type InsertProposalJob = z.infer<typeof insertProposalJobSchema>;
+export type ProposalJob = typeof proposalJobs.$inferSelect;
