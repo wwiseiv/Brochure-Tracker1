@@ -1310,6 +1310,19 @@ export default function TeamManagementPage() {
                   data-testid="switch-can-access-sequences"
                 />
               </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Proposal Generator</Label>
+                  <p className="text-xs text-muted-foreground">Generate professional proposals</p>
+                </div>
+                <Switch
+                  checked={memberPermissions.canAccessProposals}
+                  onCheckedChange={() => togglePermission("canAccessProposals")}
+                  disabled={updatePermissionsMutation.isPending}
+                  data-testid="switch-can-access-proposals"
+                />
+              </div>
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">

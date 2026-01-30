@@ -54,7 +54,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { RoleplayScenario, RoleplaySession } from "@shared/schema";
+import type { RoleplayScenario, RoleplaySession, UserPermissions } from "@shared/schema";
 import { format } from "date-fns";
 
 interface Message {
@@ -203,6 +203,10 @@ function DailyEdgeSection() {
   
   const { data: progressData, isLoading: progressLoading } = useQuery<DailyEdgeProgress>({
     queryKey: ["/api/daily-edge/progress"],
+  });
+  
+  const { data: myPermissions } = useQuery<UserPermissions>({
+    queryKey: ["/api/me/permissions"],
   });
   
   // Scroll to bottom when messages change
@@ -1400,23 +1404,25 @@ export default function CoachPage() {
                 </Card>
               </Link>
 
-              {/* Proposal Generator Link */}
-              <Link href="/proposal-generator">
-                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Sparkles className="w-5 h-5 text-primary" />
+              {/* Proposal Generator Link - only show if user has permission */}
+              {myPermissions?.canAccessProposals !== false && (
+                <Link href="/proposal-generator">
+                  <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Sparkles className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-semibold">Proposal Generator</div>
+                          <div className="text-sm text-muted-foreground">Create professional sales proposals</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold">Proposal Generator</div>
-                        <div className="text-sm text-muted-foreground">Create professional sales proposals</div>
-                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                </Card>
-              </Link>
+                  </Card>
+                </Link>
+              )}
 
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>

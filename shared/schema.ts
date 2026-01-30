@@ -124,6 +124,7 @@ export const userPermissions = pgTable("user_permissions", {
   canManageReferrals: boolean("can_manage_referrals").default(true).notNull(),
   canViewDailyEdge: boolean("can_view_daily_edge").default(true).notNull(),
   canAccessSequences: boolean("can_access_sequences").default(true).notNull(),
+  canAccessProposals: boolean("can_access_proposals").default(true).notNull(),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

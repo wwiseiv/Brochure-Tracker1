@@ -267,6 +267,10 @@ export default function ProposalGeneratorPage() {
   const { data: equipment } = useQuery<EquipmentProduct[]>({
     queryKey: ["/api/equipiq/products"],
   });
+  
+  const { data: myPermissions, isLoading: permissionsLoading } = useQuery<{ canAccessProposals?: boolean }>({
+    queryKey: ["/api/me/permissions"],
+  });
 
   const parseMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -1332,6 +1336,44 @@ export default function ProposalGeneratorPage() {
       </Card>
     </div>
   );
+
+  // Check permission - show access denied if user doesn't have access
+  if (!permissionsLoading && myPermissions?.canAccessProposals === false) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+          <div className="container flex items-center gap-4 h-14 px-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/coach")}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="font-semibold">Proposal Generator</h1>
+              <p className="text-xs text-muted-foreground">Create professional proposals</p>
+            </div>
+          </div>
+        </header>
+        <main className="container px-4 py-6 max-w-2xl">
+          <Card className="p-8 text-center">
+            <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground mb-4">
+              You don't have permission to access the Proposal Generator.
+              Contact your administrator to request access.
+            </p>
+            <Button onClick={() => navigate("/coach")} data-testid="button-return-coach">
+              Return to Coach
+            </Button>
+          </Card>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
