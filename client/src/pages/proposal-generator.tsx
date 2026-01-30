@@ -1070,9 +1070,9 @@ export default function ProposalGeneratorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {agenticJobId && (
+            {currentJobId && (
               <a
-                href={`/api/proposals/build/${agenticJobId}/download`}
+                href={`/api/proposals/build/${currentJobId}/download`}
                 download
                 className="block"
                 data-testid="download-agentic-pdf"
@@ -1108,7 +1108,7 @@ export default function ProposalGeneratorPage() {
               </a>
             )}
 
-            {!agenticJobId && !jobStatus?.docxUrl && jobStatus?.proposalId && (
+            {!currentJobId && !jobStatus?.docxUrl && jobStatus?.proposalId && (
               <>
                 <a
                   href={`/api/proposals/${jobStatus.proposalId}/download/pdf`}
