@@ -9,6 +9,7 @@ import { documentTemplates, documentPackages, getDocumentById, getPackageById, g
 import { mapMerchantToFormFields, validateForm, generateId } from "./form-utils";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import FormData from "form-data";
+import { debugSignNowError } from "../claude-helper";
 
 // Provider configuration (from environment)
 interface ProviderConfig {
@@ -583,6 +584,17 @@ export class ESignatureService {
         console.log("[SignNow] Alt invite response body:", altInviteText);
         
         if (!altInviteResponse.ok) {
+          // Use Claude to debug the error
+          try {
+            const debugAdvice = await debugSignNowError(
+              { status: altInviteResponse.status, body: altInviteText },
+              altInvitePayload
+            );
+            console.log("[SignNow] Claude debug advice:", debugAdvice);
+          } catch (debugErr) {
+            console.error("[SignNow] Claude debug failed:", debugErr);
+          }
+          
           return { 
             success: false, 
             externalRequestId: documentId,
