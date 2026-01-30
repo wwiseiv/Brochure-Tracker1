@@ -1,11 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { Home, QrCode, User, Store, MessageSquare, Lightbulb } from "lucide-react";
+import { Home, QrCode, User, Store, MessageSquare, FileSignature } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: Home, label: "Home" },
   { path: "/scan", icon: QrCode, label: "Scan" },
+  { path: "/esign", icon: FileSignature, label: "E-Sign" },
   { path: "/coach", icon: MessageSquare, label: "Coach" },
-  { path: "/equipiq", icon: Lightbulb, label: "EquipIQ" },
   { path: "/merchants", icon: Store, label: "Merchants" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
