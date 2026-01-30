@@ -472,14 +472,13 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
     const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
     
     result.optionDualPricing = {
-      cashDiscountPercent: 4.0,
-      monthlyFee: dpMonthlyFee,
+      merchantDiscountRate: 0,
+      perTransactionFee: 0,
+      monthlyProgramFee: dpMonthlyFee,
       projectedCosts: {
-        visaCost: 0,
-        mastercardCost: 0,
-        discoverCost: 0,
-        amexCost: 0,
-        monthlyDualPricingFee: dpMonthlyFee,
+        processingCost: 0,
+        dualPricingMonthly: dpMonthlyFee,
+        creditPassthrough: fees.creditPassthrough,
         otherFees: fees.statementFee + fees.pciNonCompliance,
       },
       totalMonthlyCost: dpMonthlyFee + fees.statementFee + fees.pciNonCompliance,
