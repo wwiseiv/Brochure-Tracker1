@@ -39,11 +39,13 @@ export async function generateEnhancedProposalPDF(config: EnhancedProposalConfig
   const contentWidth = pageWidth - (margin * 2);
 
   const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const safeValue = isNaN(value) || value === null || value === undefined ? 0 : value;
+    return `$${safeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
+    const safeValue = isNaN(value) || value === null || value === undefined ? 0 : value;
+    return `${safeValue.toFixed(2)}%`;
   };
 
   const wrapText = (text: string, maxWidth: number, fontSize: number, usedFont: PDFFont = font): string[] => {
@@ -243,6 +245,24 @@ export async function generateEnhancedProposalPDF(config: EnhancedProposalConfig
     });
   }
 
+  // Merchant contact details
+  if (config.merchantData.ownerName) {
+    page1.drawText(`Owner: ${config.merchantData.ownerName}`, { x: margin, y, size: 11, font, color: TEXT_COLOR });
+    y -= 16;
+  }
+  if (config.merchantData.address) {
+    page1.drawText(config.merchantData.address, { x: margin, y, size: 11, font, color: GRAY_COLOR });
+    y -= 16;
+  }
+  if (config.merchantData.phone) {
+    page1.drawText(`Phone: ${config.merchantData.phone}`, { x: margin, y, size: 11, font, color: GRAY_COLOR });
+    y -= 16;
+  }
+  if (config.merchantData.email) {
+    page1.drawText(`Email: ${config.merchantData.email}`, { x: margin, y, size: 11, font, color: GRAY_COLOR });
+    y -= 16;
+  }
+
   if (config.merchantData.businessDescription) {
     const descLines = wrapText(config.merchantData.businessDescription, contentWidth - 120, 11);
     for (const line of descLines.slice(0, 2)) {
@@ -268,6 +288,15 @@ export async function generateEnhancedProposalPDF(config: EnhancedProposalConfig
   page1.drawText(config.salesperson.title, { x: margin, y, size: 12, font, color: GRAY_COLOR });
   y -= 18;
   page1.drawText("PCBancard", { x: margin, y, size: 12, font: boldFont, color: PRIMARY_COLOR });
+  y -= 18;
+  if (config.salesperson.phone) {
+    page1.drawText(config.salesperson.phone, { x: margin, y, size: 11, font, color: GRAY_COLOR });
+    y -= 14;
+  }
+  if (config.salesperson.email) {
+    page1.drawText(config.salesperson.email, { x: margin, y, size: 11, font, color: GRAY_COLOR });
+    y -= 14;
+  }
 
   addPageFooter(page1, 1, 3);
 

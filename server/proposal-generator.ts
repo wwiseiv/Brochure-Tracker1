@@ -344,16 +344,31 @@ export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposa
   const data = await parsePdfBuffer(pdfBuffer);
   const text = data.text;
   
+  // Debug: Log first 500 chars of extracted text
+  console.log("[PDFParser] Extracted text sample (first 500 chars):", text.substring(0, 500));
+  console.log("[PDFParser] Total text length:", text.length);
+  
   const merchantName = extractMerchantName(text);
   const preparedDate = extractDate(text);
   const agentInfo = extractAgentInfo(text);
   const proposalType = isDualPricingProposal(text) ? "dual_pricing" : "interchange_plus";
+  
+  console.log("[PDFParser] Merchant name:", merchantName);
+  console.log("[PDFParser] Proposal type:", proposalType);
   
   const currentVisa = extractCardData(text, "visa", "current");
   const currentMC = extractCardData(text, "mastercard", "current");
   const currentDiscover = extractCardData(text, "discover", "current");
   const currentAmex = extractCardData(text, "amex", "current");
   const fees = extractFees(text);
+  
+  console.log("[PDFParser] Card data:", {
+    visa: currentVisa,
+    mc: currentMC,
+    discover: currentDiscover,
+    amex: currentAmex,
+  });
+  console.log("[PDFParser] Fees:", fees);
   
   const totalVolume = currentVisa.volume + currentMC.volume + currentDiscover.volume + currentAmex.volume;
   const totalTransactions = currentVisa.transactions + currentMC.transactions + currentDiscover.transactions + currentAmex.transactions;
@@ -362,6 +377,8 @@ export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposa
   const currentProcessingFees = extractTotalProcessingFees(text);
   const totalMonthlyCost = currentProcessingFees + fees.statementFee + fees.pciNonCompliance + 
     fees.creditPassthrough + fees.otherFees + fees.batchHeader;
+  
+  console.log("[PDFParser] Totals:", { totalVolume, totalTransactions, currentProcessingFees, totalMonthlyCost });
   
   const effectiveRate = totalVolume > 0 ? (totalMonthlyCost / totalVolume) * 100 : 0;
   
