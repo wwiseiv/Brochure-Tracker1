@@ -929,12 +929,16 @@ export async function generateProposalBlueprint(
     },
     recommendationReasons: recommendedOption === "dual_pricing" 
       ? [
-          `Maximum Savings: Dual Pricing can reduce your monthly processing costs by up to $${maxSavings.toLocaleString()}, representing a ${((maxSavings / monthlyFees) * 100).toFixed(0)}% reduction in fees.`,
+          monthlyFees > 0 
+            ? `Maximum Savings: Dual Pricing can reduce your monthly processing costs by up to $${maxSavings.toLocaleString()}, representing a ${((maxSavings / monthlyFees) * 100).toFixed(0)}% reduction in fees.`
+            : `Maximum Savings: Dual Pricing can significantly reduce your monthly processing costs through our transparent pricing model.`,
           "Customer Choice: Customers appreciate transparency and the option to pay less with cash, leading to increased customer satisfaction and loyalty.",
           "Competitive Advantage: Join thousands of businesses that have already adopted this proven pricing model to boost their bottom line."
         ]
       : [
-          `Significant Savings: Interchange Plus pricing will save you $${maxSavings.toLocaleString()} per month through our competitive rates and transparent pricing.`,
+          monthlyFees > 0
+            ? `Significant Savings: Interchange Plus pricing will save you $${maxSavings.toLocaleString()} per month through our competitive rates and transparent pricing.`
+            : `Significant Savings: Interchange Plus pricing will save you money through our competitive rates and transparent pricing.`,
           "Complete Transparency: See exactly what you're paying with itemized statements that show interchange costs separately from your markup.",
           "Predictable Costs: With a fixed markup over interchange, your processing costs become more predictable and easier to budget."
         ],
