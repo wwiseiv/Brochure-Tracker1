@@ -1020,22 +1020,24 @@ export default function MerchantDetailPage() {
 
         <section>
           <h2 className="text-lg font-semibold mb-3">E-Sign Documents</h2>
-          <a href={`/esign?merchantId=${merchantId}`}>
-            <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-esign-for-merchant">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileSignature className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">Send Documents for E-Signature</p>
-                  <p className="text-sm text-muted-foreground">
-                    Merchant applications, equipment agreements, and compliance forms
-                  </p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <Card 
+            className="p-4 hover-elevate cursor-pointer" 
+            data-testid="card-esign-for-merchant"
+            onClick={() => navigate(`/esign?merchantId=${merchantId}`)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FileSignature className="w-5 h-5 text-blue-600" />
               </div>
-            </Card>
-          </a>
+              <div className="flex-1">
+                <p className="font-medium">Send Documents for E-Signature</p>
+                <p className="text-sm text-muted-foreground">
+                  Merchant applications, equipment agreements, and compliance forms
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
         </section>
 
         <section>

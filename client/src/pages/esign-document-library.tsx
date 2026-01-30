@@ -121,28 +121,6 @@ export default function ESignDocumentLibrary() {
   const urlParams = new URLSearchParams(searchString);
   const merchantIdParam = urlParams.get("merchantId");
 
-  // Fetch merchant data if merchantId is provided
-  const { data: merchantFromUrl } = useQuery<Merchant>({
-    queryKey: ["/api/merchants", merchantIdParam],
-    enabled: !!merchantIdParam
-  });
-
-  // Auto-populate merchant data and open dialog when coming from merchant page
-  useEffect(() => {
-    if (merchantFromUrl && merchantIdParam) {
-      setMerchantName(merchantFromUrl.businessName);
-      setMerchantEmail(merchantFromUrl.email || "");
-      setSelectedMerchantId(merchantFromUrl.id);
-      setShowNewRequestDialog(true);
-      // Select default package
-      const defaultPkg = packages.find(p => p.isDefault);
-      if (defaultPkg) {
-        setSelectedPackage(defaultPkg.id);
-        setSelectedDocuments(defaultPkg.documentTemplateIds);
-      }
-    }
-  }, [merchantFromUrl, merchantIdParam, packages]);
-
   // Fetch templates
   const { data: templates = [], isLoading: loadingTemplates } = useQuery<DocumentTemplate[]>({
     queryKey: ["/api/esign/templates"]
@@ -169,6 +147,28 @@ export default function ESignDocumentLibrary() {
   }>({
     queryKey: ["/api/esign/stats"]
   });
+
+  // Fetch merchant data if merchantId is provided
+  const { data: merchantFromUrl } = useQuery<Merchant>({
+    queryKey: ["/api/merchants", merchantIdParam],
+    enabled: !!merchantIdParam
+  });
+
+  // Auto-populate merchant data and open dialog when coming from merchant page
+  useEffect(() => {
+    if (merchantFromUrl && merchantIdParam) {
+      setMerchantName(merchantFromUrl.businessName);
+      setMerchantEmail(merchantFromUrl.email || "");
+      setSelectedMerchantId(merchantFromUrl.id);
+      setShowNewRequestDialog(true);
+      // Select default package
+      const defaultPkg = packages.find(p => p.isDefault);
+      if (defaultPkg) {
+        setSelectedPackage(defaultPkg.id);
+        setSelectedDocuments(defaultPkg.documentTemplateIds);
+      }
+    }
+  }, [merchantFromUrl, merchantIdParam, packages]);
 
   // Create request mutation
   const createRequestMutation = useMutation({
