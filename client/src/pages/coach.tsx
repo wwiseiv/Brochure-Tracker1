@@ -894,6 +894,10 @@ export default function CoachPage() {
   const objectionsMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const objectionsAudioChunksRef = useRef<Blob[]>([]);
 
+  const { data: myPermissions } = useQuery<UserPermissions>({
+    queryKey: ["/api/me/permissions"],
+  });
+
   const handleBack = () => {
     if (window.history.length > 2) {
       window.history.back();
@@ -1385,9 +1389,9 @@ export default function CoachPage() {
             <div className="flex-1 overflow-auto">
               <div className="max-w-4xl mx-auto">
                 <DailyEdgeSection />
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-3">
               {/* Presentation Training Link */}
-              <Link href="/presentation-training">
+              <Link href="/presentation-training" className="block">
                 <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-presentation-training">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -1406,7 +1410,7 @@ export default function CoachPage() {
 
               {/* Proposal Generator Link - only show if user has permission */}
               {myPermissions?.canAccessProposals !== false && (
-                <Link href="/proposal-generator">
+                <Link href="/proposal-generator" className="block">
                   <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
