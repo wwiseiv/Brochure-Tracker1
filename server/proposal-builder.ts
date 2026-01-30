@@ -377,7 +377,32 @@ export async function executeProposalJob(
       if (currentJob?.pricingComparison && currentJob?.merchantScrapedData && currentJob?.salespersonInfo) {
         let pdfBuffer: Buffer;
         
-        if (USE_VISUAL_RENDERER) {
+        const proposalStyle = currentJob.proposalStyle || "one-page";
+        
+        if (proposalStyle === "one-page") {
+          console.log("[ProposalBuilder] Using one-page proposal template");
+          
+          let equipmentItems: { name: string; price?: number; description?: string }[] = [];
+          if (currentJob.selectedEquipmentId) {
+            const [product] = await db.select().from(equipmentProducts).where(eq(equipmentProducts.id, currentJob.selectedEquipmentId));
+            if (product) {
+              const priceValue = product.priceRange ? parseFloat(product.priceRange.replace(/[^0-9.]/g, '')) : 295;
+              equipmentItems.push({
+                name: product.name,
+                price: priceValue,
+                description: `Pay $${priceValue} upfront or opt for our free terminal program with a warranty.`
+              });
+              console.log("[ProposalBuilder] Using selected equipment:", product.name);
+            }
+          }
+          
+          pdfBuffer = await htmlRenderer.generateOnePageProposal(
+            currentJob.merchantScrapedData as MerchantScrapedData,
+            currentJob.pricingComparison as PricingComparison,
+            currentJob.salespersonInfo as SalespersonInfo,
+            equipmentItems.length > 0 ? equipmentItems : undefined
+          );
+        } else if (USE_VISUAL_RENDERER || proposalStyle === "multi-page") {
           console.log("[ProposalBuilder] Using visual HTML renderer for PDF generation");
           
           let equipmentData: { name: string; features: string[]; imageBase64?: string } | undefined;

@@ -73,12 +73,32 @@ export interface VisualProposalData {
   disclosures: string[];
 }
 
+export interface OnePageProposalData {
+  business_name: string;
+  merchant_image_url?: string;
+  agent_name: string;
+  agent_phone: string;
+  agent_email: string;
+  agent_photo_url?: string;
+  surcharge_savings?: string;
+  dp_annual_savings: string;
+  icp_annual_savings: string;
+  terminal_name?: string;
+  terminal_price?: string;
+  equipment_items?: { name: string; description: string }[];
+  qr_code_url?: string;
+  pcbancard_logo_url?: string;
+}
+
 export class HtmlRenderer {
   private templatePath: string;
+  private onePageTemplatePath: string;
   private template: Handlebars.TemplateDelegate | null = null;
+  private onePageTemplate: Handlebars.TemplateDelegate | null = null;
 
   constructor() {
     this.templatePath = path.join(process.cwd(), "server", "templates", "proposal-template.html");
+    this.onePageTemplatePath = path.join(process.cwd(), "server", "templates", "one-page-proposal.html");
   }
 
   private loadTemplate(): Handlebars.TemplateDelegate {
@@ -89,8 +109,21 @@ export class HtmlRenderer {
     return this.template;
   }
 
+  private loadOnePageTemplate(): Handlebars.TemplateDelegate {
+    if (!this.onePageTemplate) {
+      const templateSource = fs.readFileSync(this.onePageTemplatePath, "utf8");
+      this.onePageTemplate = Handlebars.compile(templateSource);
+    }
+    return this.onePageTemplate;
+  }
+
   renderHtml(proposalData: VisualProposalData): string {
     const template = this.loadTemplate();
+    return template(proposalData);
+  }
+
+  renderOnePageHtml(proposalData: OnePageProposalData): string {
+    const template = this.loadOnePageTemplate();
     return template(proposalData);
   }
 
@@ -317,6 +350,62 @@ export class HtmlRenderer {
 
     console.log("[HtmlRenderer] Rendering HTML...");
     const html = this.renderHtml(proposalData);
+
+    console.log("[HtmlRenderer] Converting to PDF...");
+    return this.htmlToPdf(html);
+  }
+
+  prepareOnePageData(
+    merchantData: MerchantScrapedData,
+    pricingComparison: PricingComparison,
+    salesperson: SalespersonInfo,
+    equipment?: { name: string; price?: number; description?: string }[],
+    surchargeAnnualSavings?: number,
+  ): OnePageProposalData {
+    const dp = pricingComparison.dualPricing;
+    const icp = pricingComparison.interchangePlus;
+
+    const equipmentItems = equipment?.map(eq => ({
+      name: eq.name,
+      description: eq.description || `Pay $${eq.price || 295} upfront or opt for our free terminal program with a warranty.`
+    }));
+
+    return {
+      business_name: merchantData.businessName || "Valued Merchant",
+      merchant_image_url: merchantData.logoBase64 || merchantData.logoUrl || undefined,
+      agent_name: salesperson.name,
+      agent_phone: salesperson.phone,
+      agent_email: salesperson.email,
+      agent_photo_url: salesperson.photoUrl || undefined,
+      surcharge_savings: surchargeAnnualSavings ? this.formatCurrency(surchargeAnnualSavings) : undefined,
+      dp_annual_savings: this.formatCurrency(dp?.annualSavings || 0),
+      icp_annual_savings: this.formatCurrency(icp?.annualSavings || 0),
+      terminal_name: equipment?.[0]?.name || "Dejavoo P1 Terminal",
+      terminal_price: equipment?.[0]?.price?.toString() || "295",
+      equipment_items: equipmentItems,
+      qr_code_url: undefined,
+      pcbancard_logo_url: undefined,
+    };
+  }
+
+  async generateOnePageProposal(
+    merchantData: MerchantScrapedData,
+    pricingComparison: PricingComparison,
+    salesperson: SalespersonInfo,
+    equipment?: { name: string; price?: number; description?: string }[],
+    surchargeAnnualSavings?: number,
+  ): Promise<Buffer> {
+    console.log("[HtmlRenderer] Preparing one-page proposal data...");
+    const proposalData = this.prepareOnePageData(
+      merchantData,
+      pricingComparison,
+      salesperson,
+      equipment,
+      surchargeAnnualSavings
+    );
+
+    console.log("[HtmlRenderer] Rendering one-page HTML...");
+    const html = this.renderOnePageHtml(proposalData);
 
     console.log("[HtmlRenderer] Converting to PDF...");
     return this.htmlToPdf(html);

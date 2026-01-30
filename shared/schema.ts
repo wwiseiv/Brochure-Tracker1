@@ -1455,6 +1455,7 @@ export const proposalJobs = pgTable("proposal_jobs", {
   
   selectedEquipmentId: integer("selected_equipment_id"),
   outputFormat: varchar("output_format", { length: 10 }).default("pdf"),
+  proposalStyle: varchar("proposal_style", { length: 20 }).default("one-page"),
   
   proposalId: integer("proposal_id").references(() => proposals.id),
   pdfUrl: text("pdf_url"),

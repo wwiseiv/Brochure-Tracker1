@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{business_name}} - Exclusive Offer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1a1a2e;
+      line-height: 1.5;
+      background: #ffffff;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      padding: 0.4in 0.5in;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 38px;
+      font-weight: 800;
+      font-style: italic;
+      text-align: center;
+      color: #1a1a2e;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .header-title .highlight {
+      color: #7C5CFC;
+    }
+
+    .top-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .offerings-section h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+      text-decoration: underline;
+    }
+
+    .offerings-section ul {
+      list-style: disc;
+      padding-left: 20px;
+      font-size: 13px;
+      color: #374151;
+    }
+
+    .offerings-section li {
+      margin-bottom: 4px;
+    }
+
+    .merchant-image {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .merchant-image-placeholder {
+      width: 100%;
+      height: 160px;
+      background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      font-style: italic;
+      text-decoration: underline;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: #374151;
+    }
+
+    .check-icon {
+      color: #22c55e;
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: -1px;
+    }
+
+    .check-item strong {
+      color: #1a1a2e;
+    }
+
+    .savings-amount {
+      color: #dc2626;
+      font-weight: 700;
+    }
+
+    .top-recommendation {
+      color: #7C5CFC;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .features-section {
+      margin-bottom: 16px;
+    }
+
+    .features-section h3 {
+      font-size: 14px;
+      font-weight: 700;
+      font-style: italic;
+      text-decoration: underline;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      gap: 20px;
+    }
+
+    .features-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #374151;
+    }
+
+    .feature-item .check-icon {
+      color: #22c55e;
+    }
+
+    .qr-section {
+      text-align: center;
+    }
+
+    .qr-code {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 8px;
+    }
+
+    .qr-placeholder {
+      width: 120px;
+      height: 120px;
+      background: #f3f4f6;
+      border: 2px dashed #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px;
+      font-size: 10px;
+      color: #9ca3af;
+    }
+
+    .qr-text {
+      font-size: 12px;
+      font-style: italic;
+      color: #7C5CFC;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .footer-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .agent-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .agent-photo {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #e5e7eb;
+    }
+
+    .agent-photo-placeholder {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 20px;
+    }
+
+    .agent-details h4 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 2px;
+    }
+
+    .agent-details .title {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .agent-details .contact {
+      font-size: 12px;
+      color: #374151;
+    }
+
+    .branding-section {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .pcbancard-logo {
+      height: 40px;
+    }
+
+    .pcbancard-text {
+      font-size: 24px;
+      font-weight: 700;
+      color: #7C5CFC;
+    }
+
+    .website {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .page {
+        page-break-after: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1 class="header-title">
+      Exclusive Offer for<br>
+      <span class="highlight">{{business_name}}</span>
+    </h1>
+
+    <div class="top-section">
+      <div class="offerings-section">
+        <h3>Presentation of offerings:</h3>
+        <ul>
+          <li>Options for reducing your processing fees</li>
+          <li>Equipment recommendations and cost</li>
+          <li>Value-ads of processing with PCBancard</li>
+        </ul>
+      </div>
+      <div class="merchant-image-container">
+        {{#if merchant_image_url}}
+        <img src="{{merchant_image_url}}" alt="{{business_name}}" class="merchant-image">
+        {{else}}
+        <div class="merchant-image-placeholder">Business Image</div>
+        {{/if}}
+      </div>
+    </div>
+
+    <div class="two-column">
+      <div class="savings-section">
+        <h3 class="section-title">Breakdown of Savings:</h3>
+        
+        {{#if surcharge_savings}}
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>Surcharge Program:</strong> <span class="savings-amount">${{surcharge_savings}}</span><br>
+            in annual savings
+          </div>
+        </div>
+        {{/if}}
+
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>Dual Pricing Program:</strong> <span class="savings-amount">${{dp_annual_savings}}</span> in annual savings
+            <span class="top-recommendation">(our top recommendation)</span>
+          </div>
+        </div>
+
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>Traditional Program:</strong> <span class="savings-amount">${{icp_annual_savings}}</span><br>
+            in annual savings
+          </div>
+        </div>
+      </div>
+
+      <div class="equipment-section">
+        <h3 class="section-title">Equipment Recommendations:</h3>
+        
+        {{#each equipment_items}}
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>{{name}}:</strong> {{description}}
+          </div>
+        </div>
+        {{/each}}
+
+        {{#unless equipment_items}}
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>{{terminal_name}}:</strong> Pay ${{terminal_price}} upfront or opt for our free terminal program with a warranty.
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">☑️</span>
+          <div>
+            <strong>Cloud POS Gateway:</strong> $15/month for backend processing, including easy payment links and over-the-phone card entry.
+          </div>
+        </div>
+        {{/unless}}
+      </div>
+    </div>
+
+    <div class="features-section">
+      <h3>Features of processing with PCBancard:</h3>
+      <div class="features-grid">
+        <div class="features-list">
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Next-day or instant funding options</span>
+          </div>
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Full PCI compliance handled for you</span>
+          </div>
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Donate to a local charity via your processing</span>
+          </div>
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Free marketing audit</span>
+          </div>
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Quick access to capital advances when needed</span>
+          </div>
+          <div class="feature-item">
+            <span class="check-icon">☑️</span>
+            <span>Free Payroll for your business</span>
+          </div>
+        </div>
+        <div class="qr-section">
+          {{#if qr_code_url}}
+          <img src="{{qr_code_url}}" alt="QR Code" class="qr-code">
+          {{else}}
+          <div class="qr-placeholder">QR Code</div>
+          {{/if}}
+          <p class="qr-text">Scan the Code<br>to Watch Your<br>Custom Offer<br>Video!</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-section">
+      <div class="agent-info">
+        {{#if agent_photo_url}}
+        <img src="{{agent_photo_url}}" alt="{{agent_name}}" class="agent-photo">
+        {{else}}
+        <div class="agent-photo-placeholder">👤</div>
+        {{/if}}
+        <div class="agent-details">
+          <h4>{{agent_name}}</h4>
+          <p class="title">Local Payments Expert and<br>Trusted Business Advisor</p>
+          <p class="contact">{{agent_phone}}<br>{{agent_email}}</p>
+        </div>
+      </div>
+      <div class="branding-section">
+        {{#if pcbancard_logo_url}}
+        <img src="{{pcbancard_logo_url}}" alt="PCBancard" class="pcbancard-logo">
+        {{else}}
+        <div class="pcbancard-text">PCBancard</div>
+        {{/if}}
+        <p class="website">www.pcbancard.com</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
