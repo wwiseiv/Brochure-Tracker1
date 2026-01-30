@@ -2421,7 +2421,7 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
         console.error("Failed to parse AI response as JSON:", parseError);
         // Fallback: create a basic response from the content
         parsedResponse = {
-          subject: `${emailType.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())} - ${businessName}`,
+          subject: `${emailType.replace("_", " ").replace(/\b\w/g, (c: string) => c.toUpperCase())} - ${businessName}`,
           body: responseContent
         };
       }
@@ -5217,9 +5217,9 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
   });
 
   // AI-powered equipment recommendation chat
-  app.post("/api/equipiq/recommend", isAuthenticated, async (req, res) => {
+  app.post("/api/equipiq/recommend", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || "anonymous";
       const parseResult = equipIQRecommendSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
@@ -5336,9 +5336,9 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   });
 
   // Get user's recommendation history
-  app.get("/api/equipiq/recommendations", isAuthenticated, async (req, res) => {
+  app.get("/api/equipiq/recommendations", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || "anonymous";
       const sessions = await storage.getEquipmentRecommendationSessions(userId);
       res.json(sessions);
     } catch (error) {
@@ -5348,9 +5348,9 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   });
 
   // Get user's quiz results
-  app.get("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
+  app.get("/api/equipiq/quiz-results", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || "anonymous";
       const results = await storage.getEquipmentQuizResults(userId);
       res.json(results);
     } catch (error) {
@@ -5360,9 +5360,9 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
   });
 
   // Submit quiz result
-  app.post("/api/equipiq/quiz-results", isAuthenticated, async (req, res) => {
+  app.post("/api/equipiq/quiz-results", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || "anonymous";
       const parseResult = equipIQQuizResultSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
@@ -5772,7 +5772,7 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
 
       const jobId = await createProposalJob({
         userId,
-        organizationId: membership.organizationId,
+        organizationId: membership.organization.id,
         merchantWebsiteUrl: merchantWebsiteUrl || merchantWebsite,
         salesperson: {
           name: salespersonName || "PCBancard Representative",
@@ -5788,7 +5788,7 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
       // Execute job in background
       executeProposalJob(jobId, {
         userId,
-        organizationId: membership.organizationId,
+        organizationId: membership.organization.id,
         merchantWebsiteUrl: merchantWebsiteUrl || merchantWebsite,
         salesperson: {
           name: salespersonName || "PCBancard Representative",
@@ -6354,7 +6354,7 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: "Proposal not found" });
       }
 
-      const { generateProposalPDF, generateProposalDOCX, ProposalBlueprint, ParsedProposal } = await import("./proposal-generator");
+      const { generateProposalPDF, generateProposalDOCX } = await import("./proposal-generator");
 
       const blueprint = proposal.proposalBlueprint as any;
       const parsedData = {

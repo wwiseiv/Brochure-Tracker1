@@ -131,7 +131,7 @@ export class ESignatureService {
 
   // Create a new e-signature request
   async createRequest(data: InsertEsignRequest): Promise<EsignRequest> {
-    const [request] = await db.insert(esignRequests).values(data).returning();
+    const [request] = await db.insert(esignRequests).values(data as any).returning();
     return request;
   }
 
