@@ -319,7 +319,7 @@ export default function ProposalGeneratorPage() {
   const generateMutation = useMutation({
     mutationFn: async (data: { 
       parsedData: ParsedProposal; 
-      equipment?: EquipmentProduct; 
+      selectedTerminalId?: number; 
       useAI?: boolean;
       renderer?: "replit" | "gamma";
       format?: "pdf" | "docx" | "pptx";
@@ -445,7 +445,7 @@ export default function ProposalGeneratorPage() {
       setGammaUrl(null);
       generateMutation.mutate({
         parsedData,
-        equipment: selectedEquipment || undefined,
+        selectedTerminalId: selectedEquipment?.id,
         useAI,
         renderer: selectedRenderer,
         format: outputFormat,

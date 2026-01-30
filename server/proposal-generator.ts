@@ -386,57 +386,73 @@ export async function parsePDFProposal(pdfBuffer: Buffer): Promise<ParsedProposa
     proposalType,
   };
   
-  if (proposalType === "dual_pricing") {
-    const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
-    const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
-    
-    result.optionDualPricing = {
-      merchantDiscountRate: 0,
-      perTransactionFee: 0,
-      monthlyProgramFee: dpMonthlyFee,
-      projectedCosts: {
-        processingCost: 0,
-        dualPricingMonthly: dpMonthlyFee,
-        creditPassthrough: 0,
-        otherFees: 0,
-      },
-      totalMonthlyCost: dpMonthlyFee,
-      monthlySavings: savings.monthly,
-      savingsPercent: savings.percent,
-      annualSavings: savings.yearly,
-    };
-  } else {
-    const proposedRateMatch = text.match(/Proposed.*?(\d+\.?\d*)%/i);
-    const proposedRate = proposedRateMatch ? parseNumber(proposedRateMatch[1]) : 2.0;
-    
-    const proposedFeeMatch = text.match(/\$?(0\.\d+)\s+\d+\s+\$?[\d.]+.*?Proposed/i);
-    const proposedFee = proposedFeeMatch ? parseNumber(proposedFeeMatch[1]) : 0.15;
-    
-    const proposedTotalMatch = text.match(/TOTAL:\s+\$?([\d,]+\.?\d*).*?(?:On\s+File|Statement)/i);
-    const proposedTotal = proposedTotalMatch ? parseNumber(proposedTotalMatch[1]) : 0;
-    
-    const onFileMatch = text.match(/On\s+File\s+Fee\s+\$?([\d,]+\.?\d*)/i);
-    const onFileFee = onFileMatch ? parseNumber(onFileMatch[1]) : 9.95;
-    
-    result.optionInterchangePlus = {
-      discountRatePercent: proposedRate,
-      perTransactionFee: proposedFee,
-      projectedCosts: {
-        visaCost: currentVisa.volume * (proposedRate / 100) + currentVisa.transactions * proposedFee,
-        mastercardCost: currentMC.volume * (proposedRate / 100) + currentMC.transactions * proposedFee,
-        discoverCost: currentDiscover.volume * (proposedRate / 100) + currentDiscover.transactions * proposedFee,
-        amexCost: currentAmex.volume * (proposedRate / 100) + currentAmex.transactions * proposedFee,
-        transactionFees: totalTransactions * proposedFee,
-        onFileFee: onFileFee,
-        creditPassthrough: fees.creditPassthrough,
-        otherFees: 0,
-      },
-      totalMonthlyCost: proposedTotal > 0 ? proposedTotal + onFileFee + fees.creditPassthrough : savings.monthly,
-      monthlySavings: savings.monthly,
-      savingsPercent: savings.percent,
-      annualSavings: savings.yearly,
-    };
-  }
+  // ALWAYS calculate both options for comparison display
+  // Dual Pricing Option
+  const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
+  const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
+  const dpTotalMonthlyCost = dpMonthlyFee;
+  const dpMonthlySavings = totalMonthlyCost - dpTotalMonthlyCost;
+  const dpSavingsPercent = totalMonthlyCost > 0 ? (dpMonthlySavings / totalMonthlyCost) * 100 : 0;
+  
+  result.optionDualPricing = {
+    merchantDiscountRate: 0,
+    perTransactionFee: 0,
+    monthlyProgramFee: dpMonthlyFee,
+    projectedCosts: {
+      processingCost: 0,
+      dualPricingMonthly: dpMonthlyFee,
+      creditPassthrough: 0,
+      otherFees: 0,
+    },
+    totalMonthlyCost: dpTotalMonthlyCost,
+    monthlySavings: dpMonthlySavings > 0 ? dpMonthlySavings : savings.monthly,
+    savingsPercent: dpSavingsPercent > 0 ? dpSavingsPercent : savings.percent,
+    annualSavings: dpMonthlySavings > 0 ? dpMonthlySavings * 12 : savings.yearly,
+  };
+  
+  // Interchange Plus Option
+  const proposedRateMatch = text.match(/Proposed.*?(\d+\.?\d*)%/i);
+  const proposedRate = proposedRateMatch ? parseNumber(proposedRateMatch[1]) : 2.0;
+  
+  const proposedFeeMatch = text.match(/\$?(0\.\d+)\s+\d+\s+\$?[\d.]+.*?Proposed/i);
+  const proposedFee = proposedFeeMatch ? parseNumber(proposedFeeMatch[1]) : 0.15;
+  
+  const proposedTotalMatch = text.match(/TOTAL:\s+\$?([\d,]+\.?\d*).*?(?:On\s+File|Statement)/i);
+  const proposedTotal = proposedTotalMatch ? parseNumber(proposedTotalMatch[1]) : 0;
+  
+  const onFileMatch = text.match(/On\s+File\s+Fee\s+\$?([\d,]+\.?\d*)/i);
+  const onFileFee = onFileMatch ? parseNumber(onFileMatch[1]) : 9.95;
+  
+  // Calculate IC+ costs
+  const icVisaCost = currentVisa.volume * (proposedRate / 100) + currentVisa.transactions * proposedFee;
+  const icMCCost = currentMC.volume * (proposedRate / 100) + currentMC.transactions * proposedFee;
+  const icDiscoverCost = currentDiscover.volume * (proposedRate / 100) + currentDiscover.transactions * proposedFee;
+  const icAmexCost = currentAmex.volume * (proposedRate / 100) + currentAmex.transactions * proposedFee;
+  const icTransactionFees = totalTransactions * proposedFee;
+  const icTotalCost = proposedTotal > 0 
+    ? proposedTotal + onFileFee + fees.creditPassthrough 
+    : icVisaCost + icMCCost + icDiscoverCost + icAmexCost + onFileFee + fees.creditPassthrough;
+  const icMonthlySavings = totalMonthlyCost - icTotalCost;
+  const icSavingsPercent = totalMonthlyCost > 0 ? (icMonthlySavings / totalMonthlyCost) * 100 : 0;
+  
+  result.optionInterchangePlus = {
+    discountRatePercent: proposedRate,
+    perTransactionFee: proposedFee,
+    projectedCosts: {
+      visaCost: icVisaCost,
+      mastercardCost: icMCCost,
+      discoverCost: icDiscoverCost,
+      amexCost: icAmexCost,
+      transactionFees: icTransactionFees,
+      onFileFee: onFileFee,
+      creditPassthrough: fees.creditPassthrough,
+      otherFees: 0,
+    },
+    totalMonthlyCost: icTotalCost,
+    monthlySavings: icMonthlySavings > 0 ? icMonthlySavings : savings.monthly,
+    savingsPercent: icSavingsPercent > 0 ? icSavingsPercent : savings.percent,
+    annualSavings: icMonthlySavings > 0 ? icMonthlySavings * 12 : savings.yearly,
+  };
   
   return result;
 }
@@ -682,56 +698,72 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
     proposalType,
   };
   
-  if (proposalType === "dual_pricing") {
-    const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
-    const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
-    
-    result.optionDualPricing = {
-      merchantDiscountRate: 0,
-      perTransactionFee: 0,
-      monthlyProgramFee: dpMonthlyFee,
-      projectedCosts: {
-        processingCost: 0,
-        dualPricingMonthly: dpMonthlyFee,
-        creditPassthrough: fees.creditPassthrough,
-        otherFees: fees.statementFee + fees.pciNonCompliance,
-      },
-      totalMonthlyCost: dpMonthlyFee + fees.statementFee + fees.pciNonCompliance,
-      monthlySavings: savings.monthly,
-      savingsPercent: savings.percent,
-      annualSavings: savings.yearly,
-    };
-  } else {
-    const proposedRateMatch = text.match(/(?:Proposed|New)\s+(?:Discount\s+)?Rate[:\s]+(\d+\.?\d*)%/i);
-    const proposedFeeMatch = text.match(/(?:Proposed|New)\s+(?:Per\s+)?(?:Transaction|Auth)\s+Fee[:\s]+\$?(\d+\.?\d*)/i);
-    const proposedTotalMatch = text.match(/(?:Projected|Proposed|New)\s+(?:Total|Monthly)\s+(?:Cost)?[:\s]+\$?([\d,]+\.?\d*)/i);
-    
-    const proposedRate = proposedRateMatch ? parseFloat(proposedRateMatch[1]) : 0.25;
-    const proposedFee = proposedFeeMatch ? parseFloat(proposedFeeMatch[1]) : 0.10;
-    const proposedTotal = proposedTotalMatch ? parseNumber(proposedTotalMatch[1]) : 0;
-    
-    const onFileMatch = text.match(/On\s+File\s+Fee\s+\$?([\d,]+\.?\d*)/i);
-    const onFileFee = onFileMatch ? parseNumber(onFileMatch[1]) : 9.95;
-    
-    result.optionInterchangePlus = {
-      discountRatePercent: proposedRate,
-      perTransactionFee: proposedFee,
-      projectedCosts: {
-        visaCost: currentVisa.volume * (proposedRate / 100) + currentVisa.transactions * proposedFee,
-        mastercardCost: currentMC.volume * (proposedRate / 100) + currentMC.transactions * proposedFee,
-        discoverCost: currentDiscover.volume * (proposedRate / 100) + currentDiscover.transactions * proposedFee,
-        amexCost: currentAmex.volume * (proposedRate / 100) + currentAmex.transactions * proposedFee,
-        transactionFees: totalTransactions * proposedFee,
-        onFileFee: onFileFee,
-        creditPassthrough: fees.creditPassthrough,
-        otherFees: 0,
-      },
-      totalMonthlyCost: proposedTotal > 0 ? proposedTotal + onFileFee + fees.creditPassthrough : savings.monthly,
-      monthlySavings: savings.monthly,
-      savingsPercent: savings.percent,
-      annualSavings: savings.yearly,
-    };
-  }
+  // ALWAYS calculate both options for comparison display
+  // Dual Pricing Option
+  const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
+  const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
+  const dpTotalCost = dpMonthlyFee + fees.statementFee + fees.pciNonCompliance;
+  const dpMonthlySavings = totalMonthlyCost - dpTotalCost;
+  const dpSavingsPercent = totalMonthlyCost > 0 ? (dpMonthlySavings / totalMonthlyCost) * 100 : 0;
+  
+  result.optionDualPricing = {
+    merchantDiscountRate: 0,
+    perTransactionFee: 0,
+    monthlyProgramFee: dpMonthlyFee,
+    projectedCosts: {
+      processingCost: 0,
+      dualPricingMonthly: dpMonthlyFee,
+      creditPassthrough: fees.creditPassthrough,
+      otherFees: fees.statementFee + fees.pciNonCompliance,
+    },
+    totalMonthlyCost: dpTotalCost,
+    monthlySavings: dpMonthlySavings > 0 ? dpMonthlySavings : savings.monthly,
+    savingsPercent: dpSavingsPercent > 0 ? dpSavingsPercent : savings.percent,
+    annualSavings: dpMonthlySavings > 0 ? dpMonthlySavings * 12 : savings.yearly,
+  };
+  
+  // Interchange Plus Option
+  const proposedRateMatch = text.match(/(?:Proposed|New)\s+(?:Discount\s+)?Rate[:\s]+(\d+\.?\d*)%/i);
+  const proposedFeeMatch = text.match(/(?:Proposed|New)\s+(?:Per\s+)?(?:Transaction|Auth)\s+Fee[:\s]+\$?(\d+\.?\d*)/i);
+  const proposedTotalMatch = text.match(/(?:Projected|Proposed|New)\s+(?:Total|Monthly)\s+(?:Cost)?[:\s]+\$?([\d,]+\.?\d*)/i);
+  
+  const proposedRate = proposedRateMatch ? parseFloat(proposedRateMatch[1]) : 0.25;
+  const proposedFee = proposedFeeMatch ? parseFloat(proposedFeeMatch[1]) : 0.10;
+  const proposedTotal = proposedTotalMatch ? parseNumber(proposedTotalMatch[1]) : 0;
+  
+  const onFileMatch = text.match(/On\s+File\s+Fee\s+\$?([\d,]+\.?\d*)/i);
+  const onFileFee = onFileMatch ? parseNumber(onFileMatch[1]) : 9.95;
+  
+  // Calculate IC+ costs
+  const icVisaCost = currentVisa.volume * (proposedRate / 100) + currentVisa.transactions * proposedFee;
+  const icMCCost = currentMC.volume * (proposedRate / 100) + currentMC.transactions * proposedFee;
+  const icDiscoverCost = currentDiscover.volume * (proposedRate / 100) + currentDiscover.transactions * proposedFee;
+  const icAmexCost = currentAmex.volume * (proposedRate / 100) + currentAmex.transactions * proposedFee;
+  const icTransactionFees = totalTransactions * proposedFee;
+  const icTotalCost = proposedTotal > 0 
+    ? proposedTotal + onFileFee + fees.creditPassthrough 
+    : icVisaCost + icMCCost + icDiscoverCost + icAmexCost + onFileFee + fees.creditPassthrough;
+  const icMonthlySavings = totalMonthlyCost - icTotalCost;
+  const icSavingsPercent = totalMonthlyCost > 0 ? (icMonthlySavings / totalMonthlyCost) * 100 : 0;
+  
+  result.optionInterchangePlus = {
+    discountRatePercent: proposedRate,
+    perTransactionFee: proposedFee,
+    projectedCosts: {
+      visaCost: icVisaCost,
+      mastercardCost: icMCCost,
+      discoverCost: icDiscoverCost,
+      amexCost: icAmexCost,
+      transactionFees: icTransactionFees,
+      onFileFee: onFileFee,
+      creditPassthrough: fees.creditPassthrough,
+      otherFees: 0,
+    },
+    totalMonthlyCost: icTotalCost,
+    monthlySavings: icMonthlySavings > 0 ? icMonthlySavings : savings.monthly,
+    savingsPercent: icSavingsPercent > 0 ? icSavingsPercent : savings.percent,
+    annualSavings: icMonthlySavings > 0 ? icMonthlySavings * 12 : savings.yearly,
+  };
   
   const validation = validateExtractedData(result);
   result.extractionWarnings = validation.warnings;
@@ -1165,6 +1197,37 @@ export async function generateProposalPDF(
     console.log("Could not load logo:", logoError);
   }
   
+  // Helper to embed base64 images
+  const embedBase64Image = async (base64Url: string | undefined) => {
+    if (!base64Url) return null;
+    try {
+      const matches = base64Url.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+      if (!matches) return null;
+      const [, format, data] = matches;
+      const imageBytes = Buffer.from(data, 'base64');
+      if (format === 'png') {
+        return await pdfDoc.embedPng(imageBytes);
+      } else {
+        return await pdfDoc.embedJpg(imageBytes);
+      }
+    } catch (err) {
+      console.log("Could not embed base64 image:", err);
+      return null;
+    }
+  };
+  
+  // Embed proposal images
+  let heroBannerImage: any = null;
+  let comparisonBgImage: any = null;
+  let trustImage: any = null;
+  if (blueprint.images) {
+    [heroBannerImage, comparisonBgImage, trustImage] = await Promise.all([
+      embedBase64Image(blueprint.images.heroBanner),
+      embedBase64Image(blueprint.images.comparisonBackground),
+      embedBase64Image(blueprint.images.trustVisual),
+    ]);
+  }
+  
   const wrapText = (text: string, maxWidth: number, fontSize: number, usedFont = font): string[] => {
     const words = text.split(" ");
     const lines: string[] = [];
@@ -1218,7 +1281,20 @@ export async function generateProposalPDF(
       width: logoWidth,
       height: logoHeight,
     });
-    y -= logoHeight + 60;
+    y -= logoHeight + 40;
+  }
+  
+  // Add hero banner image if available
+  if (heroBannerImage) {
+    const bannerWidth = contentWidth;
+    const bannerHeight = Math.min((heroBannerImage.height / heroBannerImage.width) * bannerWidth, 150);
+    page1.drawImage(heroBannerImage, {
+      x: margin,
+      y: y - bannerHeight,
+      width: bannerWidth,
+      height: bannerHeight,
+    });
+    y -= bannerHeight + 30;
   }
   
   page1.drawText(blueprint.cover.headline, {
@@ -1237,7 +1313,7 @@ export async function generateProposalPDF(
     font,
     color: grayColor,
   });
-  y -= 80;
+  y -= 60;
   
   page1.drawRectangle({ x: margin, y: y - 5, width: contentWidth, height: 2, color: primaryColor });
   y -= 40;
