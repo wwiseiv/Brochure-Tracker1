@@ -26,7 +26,6 @@ import {
   Users,
   FileSignature,
   AlertCircle,
-  ArrowLeft,
   Loader2,
   FilePlus2
 } from "lucide-react";
@@ -284,14 +283,6 @@ export default function ESignDocumentLibrary() {
       <div className="flex-shrink-0 bg-background border-b">
         <div className="p-4">
           <div className="flex items-center gap-2 mb-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation("/coach")}
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
             <div>
               <h1 className="text-2xl font-bold">E-Sign Document Library</h1>
               <p className="text-muted-foreground">Send merchant applications and agreements for electronic signature</p>
