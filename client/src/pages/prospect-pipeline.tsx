@@ -58,9 +58,19 @@ import {
   Wrench,
   MessageSquare,
   Check,
+  ClipboardList,
+  Paperclip,
+  PhoneOutgoing,
+  CalendarPlus,
+  ChevronDown,
+  ChevronUp,
+  Video,
+  Users,
+  FileQuestion,
 } from "lucide-react";
 import { format } from "date-fns";
-import type { Deal } from "@shared/schema";
+import type { Deal, DealActivity, DealAttachment } from "@shared/schema";
+import { Label } from "@/components/ui/label";
 
 const DEAL_STAGE_CONFIG: Record<string, { label: string; color: string; icon: any; phase: string }> = {
   prospect: { label: "Prospect", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300", icon: Search, phase: "Prospecting" },
@@ -105,6 +115,12 @@ export default function DealPipelinePage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [followUpMethod, setFollowUpMethod] = useState<string>("");
+  const [followUpOutcome, setFollowUpOutcome] = useState<string>("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [nextFollowUpDate, setNextFollowUpDate] = useState("");
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -114,6 +130,28 @@ export default function DealPipelinePage() {
 
   const { data: dealsData, isLoading: loadingDeals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
+  });
+
+  const { data: activitiesData, isLoading: loadingActivities, refetch: refetchActivities } = useQuery<DealActivity[]>({
+    queryKey: ["/api/deals", selectedDeal?.id, "activities"],
+    queryFn: async () => {
+      if (!selectedDeal?.id) return [];
+      const res = await fetch(`/api/deals/${selectedDeal.id}/activities`);
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+    enabled: !!selectedDeal?.id,
+  });
+
+  const { data: attachmentsData, isLoading: loadingAttachments, refetch: refetchAttachments } = useQuery<DealAttachment[]>({
+    queryKey: ["/api/deals", selectedDeal?.id, "attachments"],
+    queryFn: async () => {
+      if (!selectedDeal?.id) return [];
+      const res = await fetch(`/api/deals/${selectedDeal.id}/attachments`);
+      if (!res.ok) throw new Error("Failed to fetch attachments");
+      return res.json();
+    },
+    enabled: !!selectedDeal?.id,
   });
 
   const updateDealMutation = useMutation({
@@ -145,6 +183,48 @@ export default function DealPipelinePage() {
       toast({ title: "Failed to change stage", variant: "destructive" });
     },
   });
+
+  const recordFollowUpMutation = useMutation({
+    mutationFn: async (data: { id: number; method: string; outcome: string; notes: string; nextFollowUpAt?: string }) => {
+      const response = await apiRequest("POST", `/api/deals/${data.id}/follow-up`, {
+        method: data.method,
+        outcome: data.outcome,
+        notes: data.notes,
+        nextFollowUpAt: data.nextFollowUpAt || null,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/pipeline-counts"] });
+      if (selectedDeal) {
+        refetchActivities();
+      }
+      setShowFollowUpForm(false);
+      setFollowUpMethod("");
+      setFollowUpOutcome("");
+      setFollowUpNotes("");
+      setNextFollowUpDate("");
+      toast({ title: "Follow-up recorded" });
+    },
+    onError: () => {
+      toast({ title: "Failed to record follow-up", variant: "destructive" });
+    },
+  });
+
+  const handleRecordFollowUp = () => {
+    if (!selectedDeal || !followUpMethod || !followUpOutcome) {
+      toast({ title: "Please select method and outcome", variant: "destructive" });
+      return;
+    }
+    recordFollowUpMutation.mutate({
+      id: selectedDeal.id,
+      method: followUpMethod,
+      outcome: followUpOutcome,
+      notes: followUpNotes,
+      nextFollowUpAt: nextFollowUpDate || undefined,
+    });
+  };
 
   const handleOpenDeal = (deal: Deal) => {
     setSelectedDeal(deal);
@@ -793,6 +873,107 @@ export default function DealPipelinePage() {
                   </div>
                 </div>
 
+                <Card className="p-4 space-y-3" data-testid="follow-up-section">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PhoneOutgoing className="w-4 h-4 text-primary" />
+                      <h4 className="font-medium text-sm">Record Follow-Up</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedDeal.followUpAttemptCount} of {selectedDeal.maxFollowUpAttempts}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowFollowUpForm(!showFollowUpForm)}
+                      data-testid="button-toggle-followup"
+                    >
+                      {showFollowUpForm ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {showFollowUpForm && (
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Method</Label>
+                        <Select value={followUpMethod} onValueChange={setFollowUpMethod}>
+                          <SelectTrigger data-testid="select-followup-method">
+                            <SelectValue placeholder="Select method..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="phone">Phone</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="text">Text</SelectItem>
+                            <SelectItem value="visit">Visit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-xs">Outcome</Label>
+                        <Select value={followUpOutcome} onValueChange={setFollowUpOutcome}>
+                          <SelectTrigger data-testid="select-followup-outcome">
+                            <SelectValue placeholder="Select outcome..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no_answer">No Answer</SelectItem>
+                            <SelectItem value="left_voicemail">Left Voicemail</SelectItem>
+                            <SelectItem value="spoke_interested">Spoke - Interested</SelectItem>
+                            <SelectItem value="spoke_needs_time">Spoke - Needs Time</SelectItem>
+                            <SelectItem value="spoke_objection">Spoke - Objection</SelectItem>
+                            <SelectItem value="spoke_ready">Spoke - Ready</SelectItem>
+                            <SelectItem value="not_interested">Not Interested</SelectItem>
+                            <SelectItem value="callback_scheduled">Callback Scheduled</SelectItem>
+                            <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-xs">Notes</Label>
+                        <Textarea
+                          placeholder="Add follow-up notes..."
+                          value={followUpNotes}
+                          onChange={(e) => setFollowUpNotes(e.target.value)}
+                          rows={2}
+                          data-testid="textarea-followup-notes"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-xs flex items-center gap-1">
+                          <CalendarPlus className="w-3 h-3" />
+                          Next Follow-up Date (optional)
+                        </Label>
+                        <Input
+                          type="datetime-local"
+                          value={nextFollowUpDate}
+                          onChange={(e) => setNextFollowUpDate(e.target.value)}
+                          data-testid="input-next-followup-date"
+                        />
+                      </div>
+                      
+                      <Button
+                        className="w-full"
+                        onClick={handleRecordFollowUp}
+                        disabled={recordFollowUpMutation.isPending || !followUpMethod || !followUpOutcome}
+                        data-testid="button-submit-followup"
+                      >
+                        {recordFollowUpMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Check className="w-4 h-4 mr-2" />
+                        )}
+                        Record Follow-Up
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+
                 <div className="space-y-3">
                   <h4 className="font-medium text-sm">Change Stage</h4>
                   <Select value={editingStage} onValueChange={setEditingStage}>
@@ -849,6 +1030,129 @@ export default function DealPipelinePage() {
                     rows={4}
                     data-testid="textarea-notes"
                   />
+                </div>
+
+                <div className="space-y-3" data-testid="activity-timeline-section">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Activity Timeline</h4>
+                  </div>
+                  
+                  {loadingActivities ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : activitiesData && activitiesData.length > 0 ? (
+                    <div className="relative pl-4 border-l-2 border-muted space-y-4">
+                      {activitiesData
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((activity) => {
+                          const getActivityIcon = (activityType: string) => {
+                            switch (activityType) {
+                              case "call": return <Phone className="w-3 h-3" />;
+                              case "email": return <Mail className="w-3 h-3" />;
+                              case "text": return <MessageSquare className="w-3 h-3" />;
+                              case "visit": return <MapPin className="w-3 h-3" />;
+                              case "meeting": return <Users className="w-3 h-3" />;
+                              case "proposal_sent": return <FileText className="w-3 h-3" />;
+                              case "presentation": return <Presentation className="w-3 h-3" />;
+                              case "meeting_recording": return <Video className="w-3 h-3" />;
+                              case "follow_up": return <PhoneOutgoing className="w-3 h-3" />;
+                              case "stage_change": return <TrendingUp className="w-3 h-3" />;
+                              default: return <ClipboardList className="w-3 h-3" />;
+                            }
+                          };
+                          
+                          return (
+                            <div key={activity.id} className="relative" data-testid={`activity-item-${activity.id}`}>
+                              <div className="absolute -left-[21px] w-4 h-4 rounded-full bg-background border-2 border-primary flex items-center justify-center">
+                                {getActivityIcon(activity.activityType)}
+                              </div>
+                              <div className="ml-2">
+                                <p className="text-sm">{activity.description || activity.activityType.replace(/_/g, " ")}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <span>{format(new Date(activity.createdAt), "MMM d, h:mm a")}</span>
+                                  {activity.followUpOutcome && (
+                                    <>
+                                      <span>•</span>
+                                      <Badge variant="outline" className="text-xs py-0">
+                                        {activity.followUpOutcome.replace(/_/g, " ")}
+                                      </Badge>
+                                    </>
+                                  )}
+                                  {activity.agentName && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{activity.agentName}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-2">No activities recorded yet</p>
+                  )}
+                </div>
+
+                <div className="space-y-3" data-testid="attachments-section">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Attachments</h4>
+                  </div>
+                  
+                  {loadingAttachments ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : attachmentsData && attachmentsData.length > 0 ? (
+                    <div className="space-y-2">
+                      {attachmentsData.map((attachment) => {
+                        const getAttachmentIcon = (attachmentType: string) => {
+                          switch (attachmentType) {
+                            case "proposal": return <FileText className="w-4 h-4 text-blue-500" />;
+                            case "statement": return <Calculator className="w-4 h-4 text-green-500" />;
+                            case "esign_document": return <FileSignature className="w-4 h-4 text-purple-500" />;
+                            case "meeting_recording": return <Video className="w-4 h-4 text-red-500" />;
+                            case "brochure_drop": return <Send className="w-4 h-4 text-orange-500" />;
+                            default: return <FileQuestion className="w-4 h-4 text-muted-foreground" />;
+                          }
+                        };
+                        
+                        return (
+                          <div
+                            key={attachment.id}
+                            className="flex items-center justify-between p-2 rounded-md border bg-muted/30"
+                            data-testid={`attachment-item-${attachment.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {getAttachmentIcon(attachment.attachmentType)}
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-[180px]">{attachment.name || "Untitled"}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {attachment.attachmentType.replace(/_/g, " ")} • {format(new Date(attachment.createdAt), "MMM d")}
+                                </p>
+                              </div>
+                            </div>
+                            {attachment.url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => window.open(attachment.url!, "_blank", "noopener,noreferrer")}
+                                data-testid={`button-view-attachment-${attachment.id}`}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-2">No attachments</p>
+                  )}
                 </div>
 
                 {selectedDeal.appointmentDate && (
