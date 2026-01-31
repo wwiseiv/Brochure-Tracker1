@@ -2011,3 +2011,485 @@ export const insertProspectSearchSchema = createInsertSchema(prospectSearches).o
 });
 export type InsertProspectSearch = z.infer<typeof insertProspectSearchSchema>;
 export type ProspectSearch = typeof prospectSearches.$inferSelect;
+
+// ============================================================================
+// DEAL PIPELINE SYSTEM
+// Complete merchant services sales lifecycle management
+// ============================================================================
+
+// Pipeline stage enum - 14 stages across 4 phases
+export const PIPELINE_STAGES = [
+  // Phase 1: Prospecting
+  "prospect",
+  "cold_call",
+  "appointment_set",
+  // Phase 2: Active Selling
+  "presentation_made",
+  "proposal_sent",
+  "statement_analysis",
+  "negotiating",
+  "follow_up",
+  // Phase 3: Closing
+  "documents_sent",
+  "documents_signed",
+  "sold",
+  "dead",
+  // Phase 4: Post-Sale
+  "installation_scheduled",
+  "active_merchant"
+] as const;
+export type PipelineStage = typeof PIPELINE_STAGES[number];
+
+// Deal source types
+export const DEAL_SOURCES = [
+  "prospect_finder",
+  "referral",
+  "cold_call",
+  "walk_in",
+  "brochure_response",
+  "business_card",
+  "other"
+] as const;
+export type DealSource = typeof DEAL_SOURCES[number];
+
+// Deal temperature
+export const DEAL_TEMPERATURES = ["hot", "warm", "cold"] as const;
+export type DealTemperature = typeof DEAL_TEMPERATURES[number];
+
+// Deal E-Sign status (simplified for deals - references main ESignStatus)
+export const DEAL_ESIGN_STATUSES = ["not_sent", "sent", "viewed", "signed"] as const;
+export type DealESignStatus = typeof DEAL_ESIGN_STATUSES[number];
+
+// Contact preferred methods
+export const CONTACT_METHODS = ["phone", "email", "text"] as const;
+export type ContactMethod = typeof CONTACT_METHODS[number];
+
+// Follow-up methods
+export const FOLLOW_UP_METHODS = ["phone", "email", "text", "visit"] as const;
+export type FollowUpMethod = typeof FOLLOW_UP_METHODS[number];
+
+// Follow-up outcomes
+export const FOLLOW_UP_OUTCOMES = [
+  "no_answer",
+  "left_voicemail",
+  "spoke_interested",
+  "spoke_needs_time",
+  "spoke_objection",
+  "spoke_ready",
+  "not_interested",
+  "callback_scheduled",
+  "meeting_scheduled"
+] as const;
+export type FollowUpOutcome = typeof FOLLOW_UP_OUTCOMES[number];
+
+// Upsell product statuses
+export const UPSELL_STATUSES = ["not_discussed", "offered", "interested", "sold", "not_interested"] as const;
+export type UpsellStatus = typeof UPSELL_STATUSES[number];
+
+// Deals table - Core sales opportunity tracking
+export const deals = pgTable("deals", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  
+  // Core Business Information
+  businessName: varchar("business_name", { length: 255 }).notNull(),
+  businessAddress: text("business_address"),
+  businessCity: varchar("business_city", { length: 100 }),
+  businessState: varchar("business_state", { length: 2 }),
+  businessZip: varchar("business_zip", { length: 10 }),
+  businessPhone: varchar("business_phone", { length: 30 }),
+  businessEmail: varchar("business_email", { length: 255 }),
+  website: varchar("website", { length: 500 }),
+  mccCode: varchar("mcc_code", { length: 4 }),
+  businessType: varchar("business_type", { length: 100 }),
+  
+  // Primary Contact
+  contactName: varchar("contact_name", { length: 100 }),
+  contactTitle: varchar("contact_title", { length: 100 }),
+  contactPhone: varchar("contact_phone", { length: 30 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactPreferredMethod: varchar("contact_preferred_method", { length: 20 }),
+  
+  // Additional Contacts (JSON array)
+  additionalContacts: jsonb("additional_contacts"),
+  
+  // Pipeline Status
+  currentStage: varchar("current_stage", { length: 30 }).default("prospect").notNull(),
+  stageEnteredAt: timestamp("stage_entered_at").defaultNow().notNull(),
+  previousStage: varchar("previous_stage", { length: 30 }),
+  
+  // Deal Value
+  estimatedMonthlyVolume: numeric("estimated_monthly_volume", { precision: 12, scale: 2 }),
+  estimatedCommission: numeric("estimated_commission", { precision: 10, scale: 2 }),
+  dealProbability: integer("deal_probability"), // 0-100
+  
+  // Follow-Up Tracking
+  followUpAttemptCount: integer("follow_up_attempt_count").default(0).notNull(),
+  maxFollowUpAttempts: integer("max_follow_up_attempts").default(5).notNull(),
+  lastFollowUpAt: timestamp("last_follow_up_at"),
+  lastFollowUpMethod: varchar("last_follow_up_method", { length: 20 }),
+  lastFollowUpOutcome: varchar("last_follow_up_outcome", { length: 30 }),
+  nextFollowUpAt: timestamp("next_follow_up_at"),
+  nextFollowUpMethod: varchar("next_follow_up_method", { length: 20 }),
+  
+  // Source & Attribution
+  sourceType: varchar("source_type", { length: 30 }).default("cold_call").notNull(),
+  sourceDetails: text("source_details"),
+  referralId: integer("referral_id").references(() => referrals.id),
+  prospectId: integer("prospect_id").references(() => prospects.id),
+  
+  // Assignment
+  assignedAgentId: varchar("assigned_agent_id", { length: 255 }).notNull(),
+  previousAgentId: varchar("previous_agent_id", { length: 255 }),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  
+  // Temperature & Priority
+  temperature: varchar("temperature", { length: 10 }).default("warm").notNull(),
+  
+  // Appointment tracking
+  appointmentDate: timestamp("appointment_date"),
+  appointmentNotes: text("appointment_notes"),
+  
+  // Lifecycle Dates
+  lastActivityAt: timestamp("last_activity_at"),
+  lastActivityType: varchar("last_activity_type", { length: 50 }),
+  closedAt: timestamp("closed_at"),
+  closedReason: text("closed_reason"),
+  wonAt: timestamp("won_at"),
+  
+  // Post-Sale Fields
+  installationScheduledAt: timestamp("installation_scheduled_at"),
+  installationCompletedAt: timestamp("installation_completed_at"),
+  goLiveAt: timestamp("go_live_at"),
+  lastQuarterlyCheckinAt: timestamp("last_quarterly_checkin_at"),
+  nextQuarterlyCheckinAt: timestamp("next_quarterly_checkin_at"),
+  quarterlyCheckinFrequencyDays: integer("quarterly_checkin_frequency_days").default(90),
+  
+  // Upsell Tracking (JSON)
+  upsellOpportunities: jsonb("upsell_opportunities"),
+  
+  // Location (for mapping/routing)
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  
+  // E-Sign Status
+  esignStatus: varchar("esign_status", { length: 20 }).default("not_sent"),
+  esignSentAt: timestamp("esign_sent_at"),
+  esignViewedAt: timestamp("esign_viewed_at"),
+  esignSignedAt: timestamp("esign_signed_at"),
+  signedApplicationUrl: text("signed_application_url"),
+  
+  // Linked Records (for foreign keys, stored as IDs)
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  
+  // Notes & Manager Tools
+  notes: text("notes"),
+  managerNotes: text("manager_notes"),
+  flaggedForReview: boolean("flagged_for_review").default(false).notNull(),
+  flaggedAt: timestamp("flagged_at"),
+  flaggedBy: varchar("flagged_by", { length: 255 }),
+  
+  // Tags (JSON array)
+  tags: jsonb("tags"),
+  
+  // Soft Delete / Archive
+  archived: boolean("archived").default(false).notNull(),
+  archivedAt: timestamp("archived_at"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: varchar("created_by", { length: 255 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: varchar("updated_by", { length: 255 }),
+});
+
+export const dealsRelations = relations(deals, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [deals.organizationId],
+    references: [organizations.id],
+  }),
+  referral: one(referrals, {
+    fields: [deals.referralId],
+    references: [referrals.id],
+  }),
+  prospect: one(prospects, {
+    fields: [deals.prospectId],
+    references: [prospects.id],
+  }),
+  merchant: one(merchants, {
+    fields: [deals.merchantId],
+    references: [merchants.id],
+  }),
+  activities: many(dealActivities),
+  attachments: many(dealAttachments),
+}));
+
+export const insertDealSchema = createInsertSchema(deals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  stageEnteredAt: true,
+  assignedAt: true,
+});
+export type InsertDeal = z.infer<typeof insertDealSchema>;
+export type Deal = typeof deals.$inferSelect;
+
+// Activity types for deals
+export const DEAL_ACTIVITY_TYPES = [
+  "call",
+  "email",
+  "text",
+  "visit",
+  "meeting",
+  "presentation",
+  "proposal_sent",
+  "statement_analyzed",
+  "esign_sent",
+  "esign_viewed",
+  "esign_signed",
+  "follow_up",
+  "stage_change",
+  "note",
+  "voicemail",
+  "appointment_scheduled",
+  "appointment_completed",
+  "installation_scheduled",
+  "installation_completed",
+  "quarterly_checkin",
+  "referral_requested",
+  "deal_created",
+  "deal_reassigned",
+  "manager_note",
+  "brochure_drop",
+  "other"
+] as const;
+export type DealActivityType = typeof DEAL_ACTIVITY_TYPES[number];
+
+// Deal Activities table - Activity timeline for deals
+export const dealActivities = pgTable("deal_activities", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dealId: integer("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  
+  // Activity Details
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  activitySubtype: varchar("activity_subtype", { length: 50 }),
+  
+  // Timing
+  activityAt: timestamp("activity_at").defaultNow().notNull(),
+  
+  // Who
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  agentName: varchar("agent_name", { length: 100 }),
+  
+  // Details
+  description: text("description"),
+  notes: text("notes"),
+  
+  // For Follow-Up Activities
+  followUpAttemptNumber: integer("follow_up_attempt_number"),
+  followUpMethod: varchar("follow_up_method", { length: 20 }),
+  followUpOutcome: varchar("follow_up_outcome", { length: 30 }),
+  
+  // For Stage Change Activities
+  fromStage: varchar("from_stage", { length: 30 }),
+  toStage: varchar("to_stage", { length: 30 }),
+  stageChangeReason: text("stage_change_reason"),
+  
+  // For Communication Activities
+  communicationDirection: varchar("communication_direction", { length: 10 }), // outbound/inbound
+  communicationDurationSeconds: integer("communication_duration_seconds"),
+  
+  // Attachments
+  voiceNoteUrl: text("voice_note_url"),
+  attachmentUrls: jsonb("attachment_urls"),
+  
+  // Linking
+  linkedProposalId: integer("linked_proposal_id"),
+  linkedStatementId: integer("linked_statement_id"),
+  linkedEsignId: integer("linked_esign_id"),
+  linkedMeetingId: integer("linked_meeting_id"),
+  linkedBrochureDropId: integer("linked_brochure_drop_id"),
+  
+  // System Generated
+  isSystemGenerated: boolean("is_system_generated").default(false).notNull(),
+  
+  // Timestamp
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dealActivitiesRelations = relations(dealActivities, ({ one }) => ({
+  deal: one(deals, {
+    fields: [dealActivities.dealId],
+    references: [deals.id],
+  }),
+  organization: one(organizations, {
+    fields: [dealActivities.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertDealActivitySchema = createInsertSchema(dealActivities).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDealActivity = z.infer<typeof insertDealActivitySchema>;
+export type DealActivity = typeof dealActivities.$inferSelect;
+
+// Pipeline Stage Configuration - Admin configurable
+export const pipelineStageConfig = pgTable("pipeline_stage_config", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  
+  stageKey: varchar("stage_key", { length: 30 }).notNull(),
+  stageName: varchar("stage_name", { length: 100 }).notNull(),
+  stageOrder: integer("stage_order").notNull(),
+  
+  color: varchar("color", { length: 20 }).notNull(),
+  icon: varchar("icon", { length: 50 }),
+  
+  probabilityPercent: integer("probability_percent").default(0).notNull(),
+  staleThresholdDays: integer("stale_threshold_days").default(7).notNull(),
+  
+  isTerminal: boolean("is_terminal").default(false).notNull(),
+  isClosingStage: boolean("is_closing_stage").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  
+  requiredFields: jsonb("required_fields"),
+  requiredAttachments: jsonb("required_attachments"),
+  automationRules: jsonb("automation_rules"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueStagePerOrg: unique().on(table.organizationId, table.stageKey),
+}));
+
+export const pipelineStageConfigRelations = relations(pipelineStageConfig, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [pipelineStageConfig.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertPipelineStageConfigSchema = createInsertSchema(pipelineStageConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPipelineStageConfig = z.infer<typeof insertPipelineStageConfigSchema>;
+export type PipelineStageConfig = typeof pipelineStageConfig.$inferSelect;
+
+// Loss Reasons - Configurable loss reasons
+export const lossReasons = pgTable("loss_reasons", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  
+  reasonText: varchar("reason_text", { length: 200 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  
+  requiresCompetitorName: boolean("requires_competitor_name").default(false).notNull(),
+  requiresFollowUp: boolean("requires_follow_up").default(false).notNull(),
+  followUpDays: integer("follow_up_days"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const lossReasonsRelations = relations(lossReasons, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [lossReasons.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertLossReasonSchema = createInsertSchema(lossReasons).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertLossReason = z.infer<typeof insertLossReasonSchema>;
+export type LossReason = typeof lossReasons.$inferSelect;
+
+// Deal Attachments - Link external records to deals
+export const DEAL_ATTACHMENT_TYPES = [
+  "proposal",
+  "statement",
+  "esign_document",
+  "meeting_recording",
+  "brochure_drop",
+  "photo",
+  "document",
+  "other"
+] as const;
+export type DealAttachmentType = typeof DEAL_ATTACHMENT_TYPES[number];
+
+export const dealAttachments = pgTable("deal_attachments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  dealId: integer("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  
+  attachmentType: varchar("attachment_type", { length: 30 }).notNull(),
+  attachmentId: integer("attachment_id"), // FK to the related record
+  url: text("url"),
+  name: varchar("name", { length: 255 }),
+  description: text("description"),
+  
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dealAttachmentsRelations = relations(dealAttachments, ({ one }) => ({
+  deal: one(deals, {
+    fields: [dealAttachments.dealId],
+    references: [deals.id],
+  }),
+}));
+
+export const insertDealAttachmentSchema = createInsertSchema(dealAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDealAttachment = z.infer<typeof insertDealAttachmentSchema>;
+export type DealAttachment = typeof dealAttachments.$inferSelect;
+
+// Default pipeline stage configurations
+export const DEFAULT_PIPELINE_STAGES: Omit<InsertPipelineStageConfig, 'organizationId'>[] = [
+  { stageKey: "prospect", stageName: "Prospect", stageOrder: 1, color: "gray", probabilityPercent: 10, staleThresholdDays: 14, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "cold_call", stageName: "Cold Call / Drop-In", stageOrder: 2, color: "blue", probabilityPercent: 15, staleThresholdDays: 7, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "appointment_set", stageName: "Appointment Set", stageOrder: 3, color: "lightblue", probabilityPercent: 25, staleThresholdDays: 14, isTerminal: false, isClosingStage: false, isActive: true, requiredFields: ["appointmentDate"] },
+  { stageKey: "presentation_made", stageName: "Presentation Made", stageOrder: 4, color: "purple", probabilityPercent: 35, staleThresholdDays: 7, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "proposal_sent", stageName: "Proposal Sent", stageOrder: 5, color: "indigo", probabilityPercent: 50, staleThresholdDays: 5, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "statement_analysis", stageName: "Statement Analysis", stageOrder: 6, color: "cyan", probabilityPercent: 55, staleThresholdDays: 5, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "negotiating", stageName: "Negotiating", stageOrder: 7, color: "orange", probabilityPercent: 65, staleThresholdDays: 7, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "follow_up", stageName: "Follow-Up", stageOrder: 8, color: "yellow", probabilityPercent: 40, staleThresholdDays: 7, isTerminal: false, isClosingStage: false, isActive: true },
+  { stageKey: "documents_sent", stageName: "Documents Sent", stageOrder: 9, color: "amber", probabilityPercent: 80, staleThresholdDays: 3, isTerminal: false, isClosingStage: true, isActive: true },
+  { stageKey: "documents_signed", stageName: "Documents Signed", stageOrder: 10, color: "lime", probabilityPercent: 95, staleThresholdDays: 5, isTerminal: false, isClosingStage: true, isActive: true },
+  { stageKey: "sold", stageName: "Sold / Won", stageOrder: 11, color: "green", probabilityPercent: 100, staleThresholdDays: 0, isTerminal: true, isClosingStage: true, isActive: true },
+  { stageKey: "dead", stageName: "Dead / Lost", stageOrder: 12, color: "red", probabilityPercent: 0, staleThresholdDays: 0, isTerminal: true, isClosingStage: false, isActive: true, requiredFields: ["closedReason"] },
+  { stageKey: "installation_scheduled", stageName: "Installation Scheduled", stageOrder: 13, color: "teal", probabilityPercent: 100, staleThresholdDays: 14, isTerminal: false, isClosingStage: true, isActive: true, requiredFields: ["installationScheduledAt"] },
+  { stageKey: "active_merchant", stageName: "Active Merchant", stageOrder: 14, color: "emerald", probabilityPercent: 100, staleThresholdDays: 90, isTerminal: false, isClosingStage: true, isActive: true },
+];
+
+// Default loss reasons
+export const DEFAULT_LOSS_REASONS: Omit<InsertLossReason, 'organizationId'>[] = [
+  { reasonText: "Price / Fees too high", sortOrder: 1, isActive: true, requiresCompetitorName: false, requiresFollowUp: false },
+  { reasonText: "Staying with current processor", sortOrder: 2, isActive: true, requiresCompetitorName: false, requiresFollowUp: true, followUpDays: 180 },
+  { reasonText: "Went with competitor", sortOrder: 3, isActive: true, requiresCompetitorName: true, requiresFollowUp: false },
+  { reasonText: "Bad timing / Not ready now", sortOrder: 4, isActive: true, requiresCompetitorName: false, requiresFollowUp: true, followUpDays: 90 },
+  { reasonText: "Business closing or closed", sortOrder: 5, isActive: true, requiresCompetitorName: false, requiresFollowUp: false },
+  { reasonText: "Could not reach / Ghosted", sortOrder: 6, isActive: true, requiresCompetitorName: false, requiresFollowUp: true, followUpDays: 30 },
+  { reasonText: "Not a good fit for our services", sortOrder: 7, isActive: true, requiresCompetitorName: false, requiresFollowUp: false },
+  { reasonText: "Under contract with current provider", sortOrder: 8, isActive: true, requiresCompetitorName: false, requiresFollowUp: true, followUpDays: 365 },
+  { reasonText: "Decision maker unavailable", sortOrder: 9, isActive: true, requiresCompetitorName: false, requiresFollowUp: true, followUpDays: 30 },
+  { reasonText: "Other", sortOrder: 10, isActive: true, requiresCompetitorName: false, requiresFollowUp: false },
+];
+
+// Type for Deal with related data
+export type DealWithRelations = Deal & {
+  activities?: DealActivity[];
+  attachments?: DealAttachment[];
+  referral?: Referral | null;
+  prospect?: Prospect | null;
+  merchant?: Merchant | null;
+};
