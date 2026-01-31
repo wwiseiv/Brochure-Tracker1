@@ -7688,6 +7688,12 @@ Generate the following content in JSON format:
         return res.status(400).json({ error: "Image data and mime type required" });
       }
 
+      // Validate payload size (max 10MB base64 encoded)
+      const maxSize = 10 * 1024 * 1024 * 1.37; // 10MB * base64 overhead
+      if (imageData.length > maxSize) {
+        return res.status(400).json({ error: "Image too large. Maximum size is 10MB." });
+      }
+
       // Validate mime type
       const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
       if (!allowedTypes.includes(mimeType)) {
