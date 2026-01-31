@@ -2368,7 +2368,7 @@ export default function ProposalGeneratorPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/coach")}
+              onClick={() => navigate("/")}
               data-testid="button-back"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -2387,8 +2387,8 @@ export default function ProposalGeneratorPage() {
               You don't have permission to access the Proposal Generator.
               Contact your administrator to request access.
             </p>
-            <Button onClick={() => navigate("/coach")} data-testid="button-return-coach">
-              Return to Coach
+            <Button onClick={() => navigate("/")} data-testid="button-return-home">
+              Return Home
             </Button>
           </Card>
         </main>
@@ -2404,7 +2404,7 @@ export default function ProposalGeneratorPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/coach")}
+            onClick={() => navigate("/")}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />

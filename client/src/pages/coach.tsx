@@ -902,11 +902,7 @@ export default function CoachPage() {
   });
 
   const handleBack = () => {
-    if (window.history.length > 2) {
-      window.history.back();
-    } else {
-      navigate("/");
-    }
+    navigate("/");
   };
 
   const scrollToBottom = () => {

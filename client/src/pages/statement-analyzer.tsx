@@ -813,8 +813,8 @@ ${new Date().toLocaleDateString()}
     <div className="container mx-auto p-4 max-w-6xl print:p-0">
       <div className="flex items-center justify-between gap-4 mb-6 print:hidden">
         <div className="flex items-center gap-4">
-          <Link href="/coach">
-            <Button variant="ghost" size="icon" data-testid="button-back-coach">
+          <Link href="/">
+            <Button variant="ghost" size="icon" data-testid="button-back-home">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
