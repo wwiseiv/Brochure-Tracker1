@@ -7507,5 +7507,24 @@ Generate the following content in JSON format:
     }
   });
 
+  // AI Help Chatbot
+  app.post("/api/help/chat", isAuthenticated, async (req: any, res) => {
+    try {
+      const { message, conversationHistory = [] } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      const { getHelpResponse } = await import("./services/help-chatbot");
+      const response = await getHelpResponse(message, conversationHistory);
+      
+      res.json({ response });
+    } catch (error: any) {
+      console.error("[Help Chatbot] Error:", error);
+      res.status(500).json({ error: "Failed to get response. Please try again." });
+    }
+  });
+
   return httpServer;
 }
