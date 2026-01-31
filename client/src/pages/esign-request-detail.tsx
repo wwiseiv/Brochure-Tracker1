@@ -333,7 +333,7 @@ export default function ESignRequestDetailPage() {
   const formFields = getAllFormFields();
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">

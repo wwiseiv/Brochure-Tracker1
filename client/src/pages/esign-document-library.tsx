@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { 
+  ArrowLeft,
   FileText, 
   Package, 
   Send, 
@@ -279,13 +280,21 @@ export default function ESignDocumentLibrary() {
   const categories = Object.keys(templatesByCategory);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-x-hidden">
       <div className="flex-shrink-0 bg-background border-b">
         <div className="p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div>
-              <h1 className="text-2xl font-bold">E-Sign Document Library</h1>
-              <p className="text-muted-foreground">Send merchant applications and agreements for electronic signature</p>
+          <div className="flex items-center gap-3 mb-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setLocation("/")}
+              data-testid="button-back-home"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold truncate">E-Sign Document Library</h1>
+              <p className="text-sm text-muted-foreground line-clamp-1">Send merchant applications and agreements for electronic signature</p>
             </div>
           </div>
 
