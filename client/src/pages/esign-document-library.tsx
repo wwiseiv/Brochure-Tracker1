@@ -28,7 +28,10 @@ import {
   FileSignature,
   AlertCircle,
   Loader2,
-  FilePlus2
+  FilePlus2,
+  Link2,
+  Settings,
+  Unlink
 } from "lucide-react";
 
 interface FormFieldDefinition {
@@ -49,6 +52,15 @@ interface DocumentTemplate {
   formFields: FormFieldDefinition[];
   isRequired: boolean;
   sortOrder: number;
+  signNowTemplateId?: string | null;
+}
+
+interface SignNowTemplate {
+  id: string;
+  name: string;
+  created: string;
+  updated: string;
+  page_count?: number;
 }
 
 interface DocumentPackage {
@@ -116,6 +128,11 @@ export default function ESignDocumentLibrary() {
   const [merchantName, setMerchantName] = useState("");
   const [merchantEmail, setMerchantEmail] = useState("");
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
+  
+  // SignNow template linking state
+  const [showTemplateLinkDialog, setShowTemplateLinkDialog] = useState(false);
+  const [templateToLink, setTemplateToLink] = useState<DocumentTemplate | null>(null);
+  const [selectedSignNowTemplate, setSelectedSignNowTemplate] = useState<string>("");
 
   // Parse merchantId from URL query string
   const urlParams = new URLSearchParams(searchString);
@@ -146,6 +163,38 @@ export default function ESignDocumentLibrary() {
     expired: number;
   }>({
     queryKey: ["/api/esign/stats"]
+  });
+
+  // Fetch SignNow templates from user's account
+  const { data: signNowTemplates = [], isLoading: loadingSignNowTemplates } = useQuery<SignNowTemplate[]>({
+    queryKey: ["/api/esign/signnow/templates"],
+    enabled: showTemplateLinkDialog,
+    select: (data: any) => data?.templates || []
+  });
+
+  // Link SignNow template mutation
+  const linkTemplateMutation = useMutation({
+    mutationFn: async ({ templateId, signNowTemplateId }: { templateId: string; signNowTemplateId: string | null }) => {
+      const response = await apiRequest("POST", `/api/esign/templates/${templateId}/link-signnow`, { signNowTemplateId });
+      return { ...(await response.json()), wasLinked: !!signNowTemplateId };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.wasLinked ? "Template Linked" : "Template Unlinked",
+        description: "Document template updated successfully"
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/esign/templates"] });
+      setShowTemplateLinkDialog(false);
+      setTemplateToLink(null);
+      setSelectedSignNowTemplate("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update template link",
+        variant: "destructive"
+      });
+    }
   });
 
   // Fetch merchant data if merchantId is provided
@@ -394,20 +443,29 @@ export default function ESignDocumentLibrary() {
                 {filteredTemplates.map(template => (
                   <Card 
                     key={template.id} 
-                    className="hover-elevate cursor-pointer" 
+                    className="hover-elevate" 
                     data-testid={`card-template-${template.id}`}
-                    onClick={() => {
-                      setSelectedDocuments([template.id]);
-                      setSelectedPackage("");
-                      setShowNewRequestDialog(true);
-                    }}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-14 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                        <div 
+                          className="w-12 h-14 bg-muted rounded flex items-center justify-center flex-shrink-0 cursor-pointer"
+                          onClick={() => {
+                            setSelectedDocuments([template.id]);
+                            setSelectedPackage("");
+                            setShowNewRequestDialog(true);
+                          }}
+                        >
                           <FileText className="w-6 h-6 text-muted-foreground" />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div 
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => {
+                            setSelectedDocuments([template.id]);
+                            setSelectedPackage("");
+                            setShowNewRequestDialog(true);
+                          }}
+                        >
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-medium">{template.name}</h3>
                             {template.isRequired && (
@@ -416,6 +474,12 @@ export default function ESignDocumentLibrary() {
                             <Badge variant="outline" className="text-xs">
                               {CATEGORY_LABELS[template.category] || template.category}
                             </Badge>
+                            {template.signNowTemplateId && (
+                              <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                <Link2 className="w-3 h-3 mr-1" />
+                                SignNow
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                             {template.description}
@@ -424,7 +488,29 @@ export default function ESignDocumentLibrary() {
                             {template.formFields.length} fields
                           </p>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTemplateToLink(template);
+                              setSelectedSignNowTemplate(template.signNowTemplateId || "none");
+                              setShowTemplateLinkDialog(true);
+                            }}
+                            data-testid={`button-template-settings-${template.id}`}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                          <ChevronRight 
+                            className="w-5 h-5 text-muted-foreground cursor-pointer" 
+                            onClick={() => {
+                              setSelectedDocuments([template.id]);
+                              setSelectedPackage("");
+                              setShowNewRequestDialog(true);
+                            }}
+                          />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -672,6 +758,123 @@ export default function ESignDocumentLibrary() {
                 )}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* SignNow Template Link Dialog */}
+      <Dialog open={showTemplateLinkDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowTemplateLinkDialog(false);
+          setTemplateToLink(null);
+          setSelectedSignNowTemplate("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5" />
+              Link SignNow Template
+            </DialogTitle>
+            <DialogDescription>
+              Link a SignNow template to "{templateToLink?.name}" for automated document creation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>SignNow Template</Label>
+              {loadingSignNowTemplates ? (
+                <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Loading templates from SignNow...</span>
+                </div>
+              ) : signNowTemplates.length === 0 ? (
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <FileText className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No templates found in your SignNow account.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Create templates in SignNow first, then link them here.
+                  </p>
+                </div>
+              ) : (
+                <Select value={selectedSignNowTemplate} onValueChange={setSelectedSignNowTemplate}>
+                  <SelectTrigger data-testid="select-signnow-template">
+                    <SelectValue placeholder="Select a SignNow template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No template (generate PDF)</SelectItem>
+                    {signNowTemplates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {templateToLink?.signNowTemplateId && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-700 dark:text-green-300">
+                    Currently linked to SignNow template
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ID: {templateToLink.signNowTemplateId}
+                </p>
+              </div>
+            )}
+
+            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
+              <p className="font-medium mb-1">How it works:</p>
+              <ul className="text-xs space-y-1 list-disc list-inside">
+                <li>When sending for signature, documents are created from the linked template</li>
+                <li>Field values are pre-filled automatically</li>
+                <li>If no template is linked, a PDF is generated instead</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowTemplateLinkDialog(false)}
+              className="flex-1"
+              data-testid="button-cancel-link"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (templateToLink) {
+                  const signNowTemplateId = selectedSignNowTemplate === "none" ? null : selectedSignNowTemplate;
+                  linkTemplateMutation.mutate({ templateId: templateToLink.id, signNowTemplateId });
+                }
+              }}
+              disabled={linkTemplateMutation.isPending || !selectedSignNowTemplate}
+              className="flex-1"
+              data-testid="button-save-template-link"
+            >
+              {linkTemplateMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : selectedSignNowTemplate === "none" ? (
+                <>
+                  <Unlink className="w-4 h-4 mr-2" />
+                  Remove Link
+                </>
+              ) : (
+                <>
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Link Template
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
