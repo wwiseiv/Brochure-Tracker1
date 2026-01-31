@@ -1527,10 +1527,17 @@ export default function ProposalGeneratorPage() {
           <CardTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" />
             Cost Analysis Files
-            <Badge variant="destructive" className="ml-2 text-xs">At least one required</Badge>
+            {statementExtractedData ? (
+              <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+            ) : (
+              <Badge variant="destructive" className="ml-2 text-xs">At least one required</Badge>
+            )}
           </CardTitle>
           <CardDescription>
-            Upload the Dual Pricing and/or Interchange Plus cost analysis PDFs
+            {statementExtractedData 
+              ? "Optionally upload Dual Pricing and/or Interchange Plus PDFs for more detailed analysis"
+              : "Upload the Dual Pricing and/or Interchange Plus cost analysis PDFs"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1705,16 +1712,16 @@ export default function ProposalGeneratorPage() {
       {/* Sticky footer with action button */}
       <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 z-40">
         <div className="max-w-2xl mx-auto">
-          {(!dualPricingFile && !interchangePlusFile) && (
+          {(!dualPricingFile && !interchangePlusFile && !statementExtractedData) && (
             <p className="text-sm text-center text-muted-foreground mb-2">
-              Upload at least one pricing PDF to continue
+              Upload a statement or at least one pricing PDF to continue
             </p>
           )}
           <Button
             className="w-full"
             size="lg"
             onClick={handleStartBuild}
-            disabled={startBuildMutation.isPending || (!dualPricingFile && !interchangePlusFile)}
+            disabled={startBuildMutation.isPending || (!dualPricingFile && !interchangePlusFile && !statementExtractedData)}
             data-testid="button-start-build"
           >
             {startBuildMutation.isPending ? (
