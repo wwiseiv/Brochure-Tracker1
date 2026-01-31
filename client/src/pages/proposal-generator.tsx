@@ -359,6 +359,8 @@ export default function ProposalGeneratorPage() {
   const [statementExtractionStep, setStatementExtractionStep] = useState<"idle" | "uploading" | "extracting" | "done">("idle");
   const [statementIsDragging, setStatementIsDragging] = useState(false);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
+  const [dualPricingIsDragging, setDualPricingIsDragging] = useState(false);
+  const [interchangePlusIsDragging, setInterchangePlusIsDragging] = useState(false);
 
   const validateAgentInfo = () => {
     const errors: Record<string, string> = {};
@@ -1535,9 +1537,42 @@ export default function ProposalGeneratorPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-3">
               <Label className="font-medium">Dual Pricing Analysis</Label>
-              <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                dualPricingFile ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-              }`}>
+              <div 
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                  dualPricingFile 
+                    ? "border-primary bg-primary/5" 
+                    : dualPricingIsDragging 
+                      ? "border-primary bg-primary/10" 
+                      : "border-muted-foreground/25 hover:border-primary/50"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDualPricingIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDualPricingIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDualPricingIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type === "application/pdf") {
+                    setDualPricingFile(file);
+                  } else if (file) {
+                    toast({
+                      title: "Invalid File",
+                      description: "Please upload a PDF file",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                onClick={() => !dualPricingFile && document.getElementById("dual-pricing-upload")?.click()}
+                data-testid="dropzone-dual-pricing"
+              >
                 <input
                   type="file"
                   accept=".pdf"
@@ -1563,27 +1598,63 @@ export default function ProposalGeneratorPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setDualPricingFile(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDualPricingFile(null);
+                      }}
                       data-testid="button-remove-dual-pricing"
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
                 ) : (
-                  <label htmlFor="dual-pricing-upload" className="cursor-pointer block py-4">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to upload</p>
+                  <div className="py-4">
+                    <FileText className={`w-8 h-8 mx-auto mb-2 ${dualPricingIsDragging ? "text-primary" : "text-muted-foreground"}`} />
+                    <p className="text-sm font-medium">{dualPricingIsDragging ? "Drop file here" : "Drag & drop or click to upload"}</p>
                     <p className="text-xs text-muted-foreground">PDF only</p>
-                  </label>
+                  </div>
                 )}
               </div>
             </div>
 
             <div className="space-y-3">
               <Label className="font-medium">Interchange Plus Analysis</Label>
-              <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                interchangePlusFile ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-              }`}>
+              <div 
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                  interchangePlusFile 
+                    ? "border-primary bg-primary/5" 
+                    : interchangePlusIsDragging 
+                      ? "border-primary bg-primary/10" 
+                      : "border-muted-foreground/25 hover:border-primary/50"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInterchangePlusIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInterchangePlusIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInterchangePlusIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type === "application/pdf") {
+                    setInterchangePlusFile(file);
+                  } else if (file) {
+                    toast({
+                      title: "Invalid File",
+                      description: "Please upload a PDF file",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                onClick={() => !interchangePlusFile && document.getElementById("interchange-plus-upload")?.click()}
+                data-testid="dropzone-interchange-plus"
+              >
                 <input
                   type="file"
                   accept=".pdf"
@@ -1609,18 +1680,21 @@ export default function ProposalGeneratorPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setInterchangePlusFile(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInterchangePlusFile(null);
+                      }}
                       data-testid="button-remove-interchange-plus"
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
                 ) : (
-                  <label htmlFor="interchange-plus-upload" className="cursor-pointer block py-4">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to upload</p>
+                  <div className="py-4">
+                    <FileText className={`w-8 h-8 mx-auto mb-2 ${interchangePlusIsDragging ? "text-primary" : "text-muted-foreground"}`} />
+                    <p className="text-sm font-medium">{interchangePlusIsDragging ? "Drop file here" : "Drag & drop or click to upload"}</p>
                     <p className="text-xs text-muted-foreground">PDF only</p>
-                  </label>
+                  </div>
                 )}
               </div>
             </div>
