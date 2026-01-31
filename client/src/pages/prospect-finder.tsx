@@ -1,99 +1,378 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/BottomNav";
-import { 
-  ArrowLeft, 
-  Search, 
-  MapPin, 
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Search,
+  MapPin,
   Sparkles,
   Building2,
   Phone,
   Globe,
+  Loader2,
+  Check,
+  X,
+  Plus,
   ChevronRight,
-  Loader2
+  Utensils,
+  ShoppingBag,
+  Briefcase,
+  Car,
+  HeartPulse,
+  Ticket,
+  Home,
+  User,
+  GraduationCap,
+  Truck,
+  Zap,
+  Grid3x3,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
+
+interface MCCCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+interface MCCCode {
+  code: string;
+  title: string;
+  level: number;
+  category: string;
+  searchTerms: string[];
+}
+
+interface DiscoveredBusiness {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  phone: string | null;
+  website: string | null;
+  businessType: string;
+  mccCode: string;
+  confidence: number;
+}
+
+interface SearchResult {
+  businesses: DiscoveredBusiness[];
+  totalFound: number;
+  duplicatesSkipped: number;
+  searchId: string;
+}
+
+const categoryIcons: Record<string, any> = {
+  food: Utensils,
+  retail: ShoppingBag,
+  services: Briefcase,
+  automotive: Car,
+  healthcare: HeartPulse,
+  entertainment: Ticket,
+  home: Home,
+  personal: User,
+  education: GraduationCap,
+  transportation: Truck,
+  utilities: Zap,
+  other: Grid3x3,
+};
 
 export default function ProspectFinderPage() {
   const [zipCode, setZipCode] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMCCCodes, setSelectedMCCCodes] = useState<string[]>([]);
+  const [radius, setRadius] = useState("10");
+  const [maxResults, setMaxResults] = useState("25");
+  const [showMCCSheet, setShowMCCSheet] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [claimedBusinesses, setClaimedBusinesses] = useState<Set<string>>(new Set());
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: mccData, isLoading: loadingMCC } = useQuery<{
+    categories: MCCCategory[];
+    codes: MCCCode[];
+  }>({
+    queryKey: ["/api/prospects/mcc-codes"],
+  });
+
+  const searchMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/prospects/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          zipCode,
+          mccCodes: selectedMCCCodes,
+          radius: parseInt(radius),
+          maxResults: parseInt(maxResults),
+        }),
+      });
+      return response as SearchResult;
+    },
+    onSuccess: (data) => {
+      setSearchResults(data);
+      setShowResults(true);
+      if (data.businesses.length === 0) {
+        toast({
+          title: "No businesses found",
+          description: "Try expanding your search criteria or radius.",
+        });
+      } else {
+        toast({
+          title: `Found ${data.totalFound} businesses`,
+          description: data.duplicatesSkipped > 0 
+            ? `${data.duplicatesSkipped} already in your pipeline` 
+            : "Ready to claim!",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Search failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: async (business: DiscoveredBusiness) => {
+      const response = await apiRequest("/api/prospects/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ business }),
+      });
+      return response;
+    },
+    onSuccess: (data, business) => {
+      setClaimedBusinesses((prev) => new Set([...prev, business.name]));
+      queryClient.invalidateQueries({ queryKey: ["/api/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/prospects/pipeline"] });
+      toast({
+        title: "Prospect claimed!",
+        description: `${business.name} added to your pipeline`,
+      });
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Please try again";
+      const isAlreadyClaimed = message.toLowerCase().includes("already been claimed");
+      toast({
+        title: isAlreadyClaimed ? "Already claimed" : "Failed to claim",
+        description: isAlreadyClaimed 
+          ? "This business was claimed by another agent" 
+          : message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClaim = async (business: DiscoveredBusiness) => {
+    setClaimingId(business.name);
+    try {
+      await claimMutation.mutateAsync(business);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const groupedMCCCodes = useMemo(() => {
+    if (!mccData) return {};
+    return mccData.codes.reduce((acc, code) => {
+      if (!acc[code.category]) acc[code.category] = [];
+      acc[code.category].push(code);
+      return acc;
+    }, {} as Record<string, MCCCode[]>);
+  }, [mccData]);
+
+  const toggleMCCCode = (code: string) => {
+    setSelectedMCCCodes((prev) =>
+      prev.includes(code)
+        ? prev.filter((c) => c !== code)
+        : [...prev, code]
+    );
+  };
+
+  const selectedMCCDetails = useMemo(() => {
+    if (!mccData) return [];
+    return mccData.codes.filter((c) => selectedMCCCodes.includes(c.code));
+  }, [mccData, selectedMCCCodes]);
+
+  const getCategoryIcon = (categoryId: string) => {
+    const IconComponent = categoryIcons[categoryId] || Grid3x3;
+    return IconComponent;
+  };
+
+  const getConfidenceBadge = (confidence: number) => {
+    if (confidence >= 0.9) return { label: "High", variant: "default" as const };
+    if (confidence >= 0.7) return { label: "Medium", variant: "secondary" as const };
+    return { label: "Low", variant: "outline" as const };
+  };
+
+  const canSearch = zipCode.length >= 5 && selectedMCCCodes.length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            <h1 className="text-lg font-semibold">Prospect Finder</h1>
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              <h1 className="text-lg font-semibold">Prospect Finder</h1>
+            </div>
           </div>
+          <Badge className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white">
+            <Sparkles className="w-3 h-3 mr-1" />
+            AI-Powered
+          </Badge>
         </div>
       </header>
 
       <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
         <Card className="p-6">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
               <Search className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="font-semibold">Find Local Businesses</h2>
               <p className="text-sm text-muted-foreground">
-                AI-powered discovery in your territory
+                AI discovers businesses in your territory
               </p>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <label className="text-sm font-medium mb-2 block">ZIP Code</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                Location
+              </label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   value={zipCode}
-                  onChange={(e) => setZipCode(e.target.value)}
+                  onChange={(e) => setZipCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
                   placeholder="Enter ZIP code"
                   className="pl-10"
+                  maxLength={5}
                   data-testid="input-zip-code"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Business Type</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                Business Types ({selectedMCCCodes.length} selected)
+              </label>
               <div className="flex flex-wrap gap-2">
-                {["Restaurants", "Retail", "Services", "Healthcare", "Auto"].map((type) => (
-                  <Badge
-                    key={type}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-primary/10"
-                    data-testid={`badge-type-${type.toLowerCase()}`}
-                  >
-                    {type}
+                {selectedMCCDetails.slice(0, 4).map((mcc) => {
+                  const IconComponent = getCategoryIcon(mcc.category);
+                  return (
+                    <Badge
+                      key={mcc.code}
+                      className="cursor-pointer bg-primary text-primary-foreground"
+                      onClick={() => toggleMCCCode(mcc.code)}
+                      data-testid={`badge-mcc-${mcc.code}`}
+                    >
+                      <IconComponent className="w-3 h-3 mr-1" />
+                      {mcc.title.length > 20 ? mcc.title.slice(0, 20) + "..." : mcc.title}
+                      <X className="w-3 h-3 ml-1" />
+                    </Badge>
+                  );
+                })}
+                {selectedMCCDetails.length > 4 && (
+                  <Badge variant="secondary">
+                    +{selectedMCCDetails.length - 4} more
                   </Badge>
-                ))}
-                <Badge variant="outline" className="cursor-pointer border-dashed">
-                  + More
-                </Badge>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 border-dashed"
+                  onClick={() => setShowMCCSheet(true)}
+                  data-testid="button-add-business-types"
+                >
+                  <Plus className="w-3 h-3" />
+                  {selectedMCCCodes.length === 0 ? "Select Types" : "Add More"}
+                </Button>
               </div>
             </div>
 
-            <Button 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                  Radius
+                </label>
+                <Select value={radius} onValueChange={setRadius}>
+                  <SelectTrigger data-testid="select-radius">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 miles</SelectItem>
+                    <SelectItem value="10">10 miles</SelectItem>
+                    <SelectItem value="15">15 miles</SelectItem>
+                    <SelectItem value="25">25 miles</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                  Results
+                </label>
+                <Select value={maxResults} onValueChange={setMaxResults}>
+                  <SelectTrigger data-testid="select-results">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 businesses</SelectItem>
+                    <SelectItem value="25">25 businesses</SelectItem>
+                    <SelectItem value="50">50 businesses</SelectItem>
+                    <SelectItem value="100">100 businesses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button
               className="w-full gap-2"
-              disabled={!zipCode || isSearching}
+              disabled={!canSearch || searchMutation.isPending}
+              onClick={() => searchMutation.mutate()}
               data-testid="button-search-prospects"
             >
-              {isSearching ? (
+              {searchMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Searching...
+                  Searching with AI...
                 </>
               ) : (
                 <>
@@ -105,16 +384,209 @@ export default function ProspectFinderPage() {
           </div>
         </Card>
 
-        <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto mb-4">
-            <Building2 className="w-8 h-8 text-purple-600" />
+        {!searchResults && !searchMutation.isPending && (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-8 h-8 text-purple-600" />
+            </div>
+            <h3 className="font-semibold mb-2">Ready to Find Prospects</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              Enter a ZIP code and select business types to discover local businesses in your territory.
+            </p>
           </div>
-          <h3 className="font-semibold mb-2">Coming Soon</h3>
-          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            AI-powered prospect discovery is being finalized. Enter a ZIP code above to search when ready.
-          </p>
-        </div>
+        )}
+
+        <Link href="/prospects/pipeline">
+          <Card className="p-4 hover-elevate cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <p className="font-medium">My Pipeline</p>
+                  <p className="text-sm text-muted-foreground">View claimed prospects</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
       </main>
+
+      <Sheet open={showMCCSheet} onOpenChange={setShowMCCSheet}>
+        <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Select Business Types</SheetTitle>
+          </SheetHeader>
+          
+          {loadingMCC ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-6 pb-20">
+              {mccData?.categories.map((category) => {
+                const IconComponent = getCategoryIcon(category.id);
+                const codes = groupedMCCCodes[category.id] || [];
+                if (codes.length === 0) return null;
+                
+                return (
+                  <div key={category.id}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: category.color + "20" }}
+                      >
+                        <IconComponent
+                          className="w-4 h-4"
+                          style={{ color: category.color }}
+                        />
+                      </div>
+                      <h3 className="font-semibold">{category.name}</h3>
+                      <Badge variant="secondary" className="ml-auto">
+                        {codes.filter(c => selectedMCCCodes.includes(c.code)).length}/{codes.length}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {codes.map((mcc) => {
+                        const isSelected = selectedMCCCodes.includes(mcc.code);
+                        return (
+                          <Badge
+                            key={mcc.code}
+                            variant={isSelected ? "default" : "outline"}
+                            className={`cursor-pointer transition-all ${
+                              isSelected ? "bg-primary" : "hover:bg-muted"
+                            }`}
+                            onClick={() => toggleMCCCode(mcc.code)}
+                            data-testid={`mcc-option-${mcc.code}`}
+                          >
+                            {isSelected && <Check className="w-3 h-3 mr-1" />}
+                            {mcc.title.length > 30 ? mcc.title.slice(0, 30) + "..." : mcc.title}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
+            <Button
+              className="w-full"
+              onClick={() => setShowMCCSheet(false)}
+              data-testid="button-done-mcc"
+            >
+              Done ({selectedMCCCodes.length} selected)
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showResults} onOpenChange={setShowResults}>
+        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <div className="flex items-center justify-between">
+              <SheetTitle>
+                Search Results ({searchResults?.businesses.length || 0})
+              </SheetTitle>
+              {searchResults && searchResults.duplicatesSkipped > 0 && (
+                <Badge variant="secondary">
+                  {searchResults.duplicatesSkipped} already claimed
+                </Badge>
+              )}
+            </div>
+          </SheetHeader>
+
+          {searchResults?.businesses.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">No Results Found</h3>
+              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                Try expanding your search radius or selecting different business types.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 pb-4">
+              {searchResults?.businesses.map((business) => {
+                const isClaimed = claimedBusinesses.has(business.name);
+                const isClaiming = claimingId === business.name;
+                const confidenceBadge = getConfidenceBadge(business.confidence);
+
+                return (
+                  <Card key={`${business.name}-${business.zipCode}`} className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold">{business.name}</h3>
+                          <Badge variant={confidenceBadge.variant} className="text-xs">
+                            {confidenceBadge.label}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {business.address}, {business.city}, {business.state} {business.zipCode}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
+                      <Badge variant="outline" className="text-xs">
+                        {business.businessType}
+                      </Badge>
+                      {business.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {business.phone}
+                        </span>
+                      )}
+                      {business.website && (
+                        <a
+                          href={business.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Globe className="w-3 h-3" />
+                          Website
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      variant={isClaimed ? "secondary" : "default"}
+                      disabled={isClaimed || isClaiming}
+                      onClick={() => handleClaim(business)}
+                      data-testid={`button-claim-${business.name.replace(/\s+/g, "-")}`}
+                    >
+                      {isClaimed ? (
+                        <>
+                          <Check className="w-4 h-4 mr-1" />
+                          Claimed
+                        </>
+                      ) : isClaiming ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          Claiming...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-1" />
+                          Claim Prospect
+                        </>
+                      )}
+                    </Button>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <BottomNav />
     </div>

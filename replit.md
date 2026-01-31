@@ -59,6 +59,15 @@ Preferred communication style: Simple, everyday language.
       - **Privacy-First Design**: Merchant PII (names, addresses, emails, phone numbers, account numbers) is automatically redacted/anonymized before storage.
       - **Database Tables**: `statement_extractions` (stores anonymized extractions), `extraction_corrections` (user feedback), `fee_dictionary` (fee knowledge base).
       - **API Endpoints**: `/api/proposal-intelligence/learning/stats`, `/api/proposal-intelligence/learning/fee/:name`, `/api/proposal-intelligence/learning/extractions/:id/correct`, `/api/proposal-intelligence/learning/extractions/:id/verify`.
+    - **AI-Powered Prospecting**: Discover and manage local business prospects using AI-powered web search.
+      - **Prospect Finder**: Search for local businesses by ZIP code and business type. Uses Claude AI with web search capability to discover real, operating businesses. Features MCC code-based business type filtering with 100+ approved merchant categories organized by industry (Food & Dining, Retail, Services, Automotive, Healthcare, Entertainment, etc.). Configurable search radius (5-25 miles) and result count (10-100 businesses). Deduplication prevents showing businesses already in agent's pipeline.
+      - **Prospect Pipeline**: Track prospects through discovery → contacted → qualified → proposal_sent → negotiating → won/lost stages. Features status tracking, notes, follow-up scheduling, and activity logging.
+      - **Claim System**: Agent exclusivity - once a prospect is claimed, other agents cannot claim the same business.
+      - **Merchant Conversion**: One-click conversion of qualified prospects to full merchant records.
+      - **Database Tables**: `prospects` (business info, status, agent assignment), `prospect_activities` (activity log), `prospect_searches` (search history).
+      - **API Endpoints**: `/api/prospects/mcc-codes`, `/api/prospects/search`, `/api/prospects/claim`, `/api/prospects`, `/api/prospects/pipeline`, `/api/prospects/:id`, `/api/prospects/:id/convert`.
+      - **Data File**: `server/data/mcc-codes.json` contains all approved Level 1 and Level 2 MCC codes with search terms.
+    - **AI Help Chatbot**: Floating chat assistant available on all pages. Uses Claude AI (Replit AI Integrations) to answer questions about any app feature. Features conversation history, quick question suggestions, and minimizable interface.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
