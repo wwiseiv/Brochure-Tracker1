@@ -50,6 +50,13 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
+import { db } from "./db";
+import { 
+  presentationPracticeResponses, 
+  presentationProgress, 
+  presentationLessons 
+} from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { 
   listCoachingDocuments, 
   getAllCoachingContent, 
