@@ -1,5 +1,6 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
+import OpenAI from "openai";
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -30,7 +31,7 @@ interface ExtractedStatementData {
   extractionNotes: string[];
 }
 
-const GEMINI_EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements. This is a CRITICAL business task - accuracy is essential.
+const EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements. This is a CRITICAL business task - accuracy is essential.
 
 CAREFULLY analyze the provided statement document(s) and extract ALL available data. Return ONLY valid JSON with no additional text:
 
@@ -88,15 +89,20 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations.`;
 export async function extractStatementFromFiles(
   files: Array<{ path: string; mimeType: string; name: string }>
 ): Promise<ExtractedStatementData> {
-  const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-  const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
+  const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   
-  if (!geminiApiKey) {
-    throw new Error("Gemini API not configured for document extraction");
+  if (!openaiApiKey || !openaiBaseUrl) {
+    throw new Error("OpenAI API not configured for document extraction");
   }
 
-  const parts: any[] = [];
+  const openai = new OpenAI({
+    apiKey: openaiApiKey,
+    baseURL: openaiBaseUrl,
+  });
+
   const objectStorage = new ObjectStorageService();
+  const contentParts: OpenAI.ChatCompletionContentPart[] = [];
   
   for (const file of files) {
     try {
@@ -105,25 +111,30 @@ export async function extractStatementFromFiles(
       if (file.mimeType.includes("spreadsheet") || file.mimeType.includes("excel") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
         const textContent = await extractExcelAsText(file.path, objectStorage);
         console.log(`[StatementExtractor] Excel content extracted, length: ${textContent.length}`);
-        parts.push({ text: `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n` });
+        contentParts.push({ 
+          type: "text", 
+          text: `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n` 
+        });
       } else if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
         console.log(`[StatementExtractor] Processing PDF: ${file.name}`);
         const base64Data = await getFileAsBase64(file.path, objectStorage);
         console.log(`[StatementExtractor] PDF base64 length: ${base64Data.length}`);
-        parts.push({
-          inline_data: {
-            mime_type: "application/pdf",
-            data: base64Data
+        contentParts.push({
+          type: "image_url",
+          image_url: {
+            url: `data:application/pdf;base64,${base64Data}`,
+            detail: "high"
           }
         });
       } else if (file.mimeType.startsWith("image/")) {
         console.log(`[StatementExtractor] Processing image: ${file.name}`);
         const base64Data = await getFileAsBase64(file.path, objectStorage);
         console.log(`[StatementExtractor] Image base64 length: ${base64Data.length}`);
-        parts.push({
-          inline_data: {
-            mime_type: file.mimeType,
-            data: base64Data
+        contentParts.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${file.mimeType};base64,${base64Data}`,
+            detail: "high"
           }
         });
       } else {
@@ -134,75 +145,57 @@ export async function extractStatementFromFiles(
     }
   }
 
-  if (parts.length === 0) {
+  if (contentParts.length === 0) {
     throw new Error("No valid files could be processed");
   }
 
-  parts.push({ text: GEMINI_EXTRACTION_PROMPT });
+  contentParts.push({ type: "text", text: EXTRACTION_PROMPT });
 
-  console.log(`[StatementExtractor] Sending ${parts.length} parts to Gemini for analysis`);
+  console.log(`[StatementExtractor] Sending ${contentParts.length} parts to OpenAI for analysis`);
   
-  // Use gemini-2.5-flash for document analysis - good for vision tasks and more reliable
-  const model = "gemini-2.5-flash";
-  const apiUrl = `${geminiBaseUrl}/v1beta/models/${model}:generateContent`;
-  console.log(`[StatementExtractor] Using Gemini URL: ${apiUrl}`);
-  console.log(`[StatementExtractor] API key present: ${!!geminiApiKey}, length: ${geminiApiKey?.length || 0}`);
-  
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": geminiApiKey
-    },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 4096
-      }
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[StatementExtractor] Gemini API error:", response.status, errorText);
-    
-    // Parse error for better debugging
-    try {
-      const errorJson = JSON.parse(errorText);
-      const errorMessage = errorJson?.error?.message || errorText;
-      console.error("[StatementExtractor] Gemini error message:", errorMessage);
-      throw new Error(`AI analysis failed: ${errorMessage.substring(0, 100)}`);
-    } catch {
-      throw new Error(`Failed to analyze statement with AI (${response.status})`);
-    }
-  }
-
-  const data = await response.json() as any;
-  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-    
-    const extracted = JSON.parse(jsonMatch[0]) as ExtractedStatementData;
-    
-    if (!extracted.confidence) {
-      extracted.confidence = 50;
-    }
-    if (!extracted.extractionNotes) {
-      extracted.extractionNotes = [];
-    }
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: contentParts
+        }
+      ],
+      max_tokens: 4096,
+      temperature: 0.1
+    });
 
-    return extracted;
-  } catch (parseError) {
-    console.error("[StatementExtractor] JSON parse error:", parseError, "Response:", responseText);
-    return {
-      confidence: 0,
-      extractionNotes: ["Failed to parse AI response. Please enter data manually."]
-    };
+    const responseText = response.choices[0]?.message?.content || "";
+    console.log(`[StatementExtractor] OpenAI response length: ${responseText.length}`);
+
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No JSON found in response");
+      }
+      
+      const extracted = JSON.parse(jsonMatch[0]) as ExtractedStatementData;
+      
+      if (!extracted.confidence) {
+        extracted.confidence = 50;
+      }
+      if (!extracted.extractionNotes) {
+        extracted.extractionNotes = [];
+      }
+
+      console.log(`[StatementExtractor] Successfully extracted data with confidence: ${extracted.confidence}`);
+      return extracted;
+    } catch (parseError) {
+      console.error("[StatementExtractor] JSON parse error:", parseError, "Response:", responseText);
+      return {
+        confidence: 0,
+        extractionNotes: ["Failed to parse AI response. Please enter data manually."]
+      };
+    }
+  } catch (error: any) {
+    console.error("[StatementExtractor] OpenAI API error:", error?.message || error);
+    throw new Error(`AI analysis failed: ${error?.message || "Unknown error"}`);
   }
 }
 
