@@ -12,7 +12,7 @@ import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure, UserPreferences, UserPermissions } from "@shared/schema";
@@ -349,6 +349,30 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         Track and manage your claimed prospects
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                </div>
+              </Card>
+            </Link>
+
+            <Link href="/prospects/scan-card">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-scan-business-card">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold">Scan Business Card</h3>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                          New
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Snap a photo to add prospects instantly
                       </p>
                     </div>
                   </div>
