@@ -225,16 +225,76 @@ export default function ESignRequestDetailPage() {
     return templates.filter(t => request.documentIds.includes(t.id));
   };
 
+  // Field consolidation groups - similar fields that should share values
+  const FIELD_GROUPS: Record<string, { canonical: string; label: string; members: string[] }> = {
+    businessName: {
+      canonical: "businessName",
+      label: "Business / DBA Name",
+      members: ["dbaName", "dbaMerchantName", "merchantDba", "downloadDbaName", "pciBusinessName", "charityBusinessName"]
+    },
+    ownerName: {
+      canonical: "ownerName",
+      label: "Owner / Authorized Signer Name",
+      members: ["ownerName", "printName", "equipmentPrintedName", "pciOwnerNamePrinted", "charityOwnerName"]
+    },
+    ownerSignature: {
+      canonical: "ownerSignature",
+      label: "Owner / Authorized Signature",
+      members: ["personalGuarantorSignature", "ownerOfficerSignature", "equipmentSignature", "pciOwnerSignature", "charityOwnerSignature"]
+    },
+    signatureDate: {
+      canonical: "signatureDate",
+      label: "Signature Date",
+      members: ["personalGuarantorDate", "ownerOfficerDate", "equipmentDate", "pciDate"]
+    }
+  };
+
+  // Get which group a field belongs to
+  const getFieldGroup = (fieldName: string): string | null => {
+    for (const [groupName, group] of Object.entries(FIELD_GROUPS)) {
+      if (group.members.includes(fieldName)) {
+        return groupName;
+      }
+    }
+    return null;
+  };
+
   const getAllFormFields = () => {
     const docTemplates = getDocumentTemplates();
     const allFields: FormFieldDefinition[] = [];
     const seenFields = new Set<string>();
+    const seenGroups = new Set<string>();
     
     docTemplates.forEach(doc => {
       doc.formFields?.forEach(field => {
-        if (!seenFields.has(field.fieldName)) {
-          seenFields.add(field.fieldName);
-          allFields.push(field);
+        const group = getFieldGroup(field.fieldName);
+        
+        if (group) {
+          // For grouped fields, only show one representative
+          if (!seenGroups.has(group)) {
+            seenGroups.add(group);
+            const groupDef = FIELD_GROUPS[group];
+            // Check if ANY field in this group is required across all selected documents
+            const isGroupRequired = docTemplates.some(doc => 
+              doc.formFields?.some(f => 
+                groupDef.members.includes(f.fieldName) && f.required
+              )
+            );
+            // Create a consolidated field using the canonical name
+            allFields.push({
+              ...field,
+              id: `consolidated_${group}`,
+              fieldName: groupDef.canonical,
+              label: groupDef.label,
+              required: isGroupRequired
+            });
+          }
+        } else {
+          // Regular field - deduplicate by field name
+          if (!seenFields.has(field.fieldName)) {
+            seenFields.add(field.fieldName);
+            allFields.push(field);
+          }
         }
       });
     });
@@ -242,8 +302,46 @@ export default function ESignRequestDetailPage() {
     return allFields;
   };
 
+  // Get all related field names for a group
+  const getRelatedFields = (fieldName: string): string[] => {
+    for (const group of Object.values(FIELD_GROUPS)) {
+      if (group.canonical === fieldName || group.members.includes(fieldName)) {
+        return group.members;
+      }
+    }
+    return [fieldName];
+  };
+
+  // Get value for a field, checking related fields if canonical
+  const getFieldValue = (fieldName: string): string => {
+    // First check edited values
+    if (editedFieldValues[fieldName]) return editedFieldValues[fieldName];
+    
+    // Check if it's a canonical field and look for values in related fields
+    const relatedFields = getRelatedFields(fieldName);
+    for (const related of relatedFields) {
+      if (editedFieldValues[related]) return editedFieldValues[related];
+      if (request.fieldValues?.[related]) return request.fieldValues[related];
+    }
+    
+    // Check original field value
+    if (request.fieldValues?.[fieldName]) return request.fieldValues[fieldName];
+    
+    return "";
+  };
+
   const handleFieldChange = (fieldName: string, value: string) => {
-    setEditedFieldValues(prev => ({ ...prev, [fieldName]: value }));
+    // Get all related fields that should share this value
+    const relatedFields = getRelatedFields(fieldName);
+    
+    setEditedFieldValues(prev => {
+      const updates: Record<string, string> = { ...prev, [fieldName]: value };
+      // Propagate value to all related fields
+      relatedFields.forEach(relatedField => {
+        updates[relatedField] = value;
+      });
+      return updates;
+    });
     setHasFieldChanges(true);
   };
 
@@ -448,7 +546,7 @@ export default function ESignRequestDetailPage() {
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </Label>
                     <Input
-                      value={editedFieldValues[field.fieldName] ?? request.fieldValues?.[field.fieldName] ?? ""}
+                      value={getFieldValue(field.fieldName)}
                       onChange={(e) => handleFieldChange(field.fieldName, e.target.value)}
                       disabled={!canEdit}
                       placeholder={field.mappedFrom ? `Auto-mapped from ${field.mappedFrom}` : ""}
