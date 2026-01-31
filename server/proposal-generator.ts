@@ -16,31 +16,60 @@ import {
 } from "docx";
 import * as fs from "fs";
 import * as path from "path";
+import Anthropic from "@anthropic-ai/sdk";
 
-// Helper function to parse PDF using pdf-parse with proper lazy loading
+// Helper function to parse PDF using Claude's native PDF support
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
-  // Check for empty buffer before attempting to parse
   if (!buffer || buffer.length === 0) {
     throw new Error("The uploaded file is empty (0 bytes). Please upload a valid PDF file.");
   }
   
+  const anthropicApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+  const anthropicBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  
+  if (!anthropicApiKey || !anthropicBaseUrl) {
+    throw new Error("Claude API not configured for PDF extraction");
+  }
+
+  const anthropic = new Anthropic({
+    apiKey: anthropicApiKey,
+    baseURL: anthropicBaseUrl,
+  });
+
   try {
-    // pdf-parse v2.x uses a class-based API
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: buffer });
-    const textResult = await parser.getText();
+    const base64 = buffer.toString("base64");
+    console.log(`[ProposalGenerator] Parsing PDF with Claude, size: ${buffer.length} bytes`);
     
-    // Handle different response formats
-    let text = "";
-    if (textResult && textResult.pages && Array.isArray(textResult.pages)) {
-      text = textResult.pages.map((page: any) => page?.text || "").join("\n");
-    } else if (typeof textResult === "string") {
-      text = textResult;
-    } else if (textResult && typeof textResult.text === "string") {
-      text = textResult.text;
-    }
-    
-    await parser.destroy();
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: base64
+              }
+            },
+            {
+              type: "text",
+              text: `Extract ALL text content from this PDF document. 
+This is a merchant processing statement or pricing proposal.
+Return the complete text exactly as it appears, preserving numbers, percentages, and all data.
+Include ALL tables, fees, card volumes, transactions, rates, and any other financial data.
+Do not summarize - return the full text content.`
+            }
+          ]
+        }
+      ]
+    });
+
+    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[ProposalGenerator] Claude extracted ${text.length} characters from PDF`);
     
     if (!text || text.trim().length === 0) {
       console.warn("PDF parsing returned empty text");
