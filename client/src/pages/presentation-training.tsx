@@ -219,14 +219,14 @@ export default function PresentationTrainingPage() {
 
   if (modulesLoading) {
     return (
-      <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-card border-b border-border">
+      <div className="flex flex-col min-h-screen bg-background">
+        <header className="sticky top-0 z-40 bg-card border-b border-border shrink-0">
           <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
             <GraduationCap className="w-6 h-6 text-primary" />
             <h1 className="font-semibold text-lg">Teach Me the Presentation</h1>
           </div>
         </header>
-        <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
         <BottomNav />
@@ -235,8 +235,8 @@ export default function PresentationTrainingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="sticky top-0 z-40 bg-card border-b border-border shrink-0">
         <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <GraduationCap className="w-6 h-6 text-primary" />
@@ -256,7 +256,8 @@ export default function PresentationTrainingPage() {
         </div>
       </header>
 
-      <div className="container max-w-6xl mx-auto flex">
+      <div className="flex-1 overflow-hidden">
+        <div className="container max-w-6xl mx-auto flex h-full">
         <aside
           className={`
             fixed lg:static inset-y-0 left-0 z-30 w-72 bg-card border-r border-border
@@ -365,7 +366,7 @@ export default function PresentationTrainingPage() {
           />
         )}
 
-        <main className="flex-1 min-w-0 p-4 lg:p-6">
+        <main className="flex-1 min-w-0 p-4 lg:p-6 overflow-y-auto pb-24">
           {lessonLoading ? (
             <div className="flex items-center justify-center min-h-[50vh]">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -552,6 +553,7 @@ export default function PresentationTrainingPage() {
             </div>
           )}
         </main>
+        </div>
       </div>
 
       <Button
