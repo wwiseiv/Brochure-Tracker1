@@ -1942,7 +1942,10 @@ export default function ProposalGeneratorPage() {
                     <p className="font-medium">{merchant.phone}</p>
                   </div>
                 )}
-                {merchant.businessDescription && (
+                {merchant.businessDescription && 
+                  !merchant.businessDescription.toLowerCase().includes('{meta') &&
+                  !merchant.businessDescription.toLowerCase().includes('meta description') &&
+                  merchant.businessDescription.length > 10 && (
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Description</p>
                     <p className="text-sm">{merchant.businessDescription}</p>
@@ -2255,13 +2258,24 @@ export default function ProposalGeneratorPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="industry-guess">Industry Type</Label>
-                  <Input
-                    id="industry-guess"
-                    placeholder="Restaurant, Retail, Medical, etc."
-                    value={industryGuess}
-                    onChange={(e) => setIndustryGuess(e.target.value)}
-                    data-testid="input-industry-guess"
-                  />
+                  <Select value={industryGuess} onValueChange={setIndustryGuess}>
+                    <SelectTrigger id="industry-guess" data-testid="select-industry-guess">
+                      <SelectValue placeholder="Select industry..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto_repair">Auto Repair / Automotive</SelectItem>
+                      <SelectItem value="restaurant">Restaurant / Food Service</SelectItem>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="healthcare">Healthcare / Medical</SelectItem>
+                      <SelectItem value="professional">Professional Services</SelectItem>
+                      <SelectItem value="construction">Construction / Trades</SelectItem>
+                      <SelectItem value="salon">Salon / Spa / Beauty</SelectItem>
+                      <SelectItem value="fitness">Fitness / Gym</SelectItem>
+                      <SelectItem value="lodging">Hotel / Lodging</SelectItem>
+                      <SelectItem value="ecommerce">E-commerce</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="current-processor">Current Processor</Label>
