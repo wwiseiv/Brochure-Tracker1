@@ -43,8 +43,15 @@ export async function searchLocalBusinesses(
 
   const grokApiKey = process.env.GROK_API_KEY;
 
+  console.log("[ProspectSearch] === SEARCH STARTED ===");
+  console.log("[ProspectSearch] ZIP:", zipCode);
+  console.log("[ProspectSearch] Business types:", businessTypes.map(b => b.name).join(", "));
+  console.log("[ProspectSearch] API key exists:", !!grokApiKey);
+  console.log("[ProspectSearch] API key prefix:", grokApiKey?.substring(0, 8) + "...");
+
   if (!grokApiKey) {
-    throw new Error("Grok API not configured");
+    console.error("[ProspectSearch] !!! NO API KEY !!!");
+    throw new Error("Grok API not configured. Please add GROK_API_KEY to Secrets.");
   }
 
   const businessTypeNames = businessTypes.map((bt) => bt.name).join(", ");
@@ -91,50 +98,55 @@ Return the results as a JSON array with this exact format:
 Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no explanation.`;
 
   try {
-    console.log("[ProspectSearch] Searching with Grok for businesses near", zipCode);
+    console.log("[ProspectSearch] Making API request to x.ai...");
     
-    // Use Grok API with search tool
+    const requestBody = {
+      model: "grok-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a business research assistant with real-time web search capability. Search the web to find real local business information. Always return results as valid JSON arrays."
+        },
+        {
+          role: "user",
+          content: searchPrompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 4096
+    };
+    
+    console.log("[ProspectSearch] Request model:", requestBody.model);
+    
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${grokApiKey}`
       },
-      body: JSON.stringify({
-        model: "grok-3-fast",
-        messages: [
-          {
-            role: "system",
-            content: "You are a business research assistant that searches the web for real local business information. Always return results as valid JSON arrays."
-          },
-          {
-            role: "user",
-            content: searchPrompt
-          }
-        ],
-        search_parameters: {
-          mode: "auto",
-          return_citations: false
-        },
-        temperature: 0.3
-      })
+      body: JSON.stringify(requestBody)
     });
+
+    console.log("[ProspectSearch] Response status:", response.status);
+    console.log("[ProspectSearch] Response ok:", response.ok);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[ProspectSearch] Grok API error:", response.status, errorText);
-      throw new Error(`Grok API error: ${response.status}`);
+      console.error("[ProspectSearch] !!! API ERROR !!!");
+      console.error("[ProspectSearch] Status:", response.status);
+      console.error("[ProspectSearch] Error body:", errorText);
+      throw new Error(`Grok API error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json() as any;
-    console.log("[ProspectSearch] Grok response received");
+    console.log("[ProspectSearch] Response received successfully");
     
-    // Extract text from response
     const textContent = data.choices?.[0]?.message?.content || "";
-    console.log("[ProspectSearch] Response length:", textContent.length);
+    console.log("[ProspectSearch] Content length:", textContent.length);
 
     if (!textContent) {
       console.error("[ProspectSearch] No content in response");
+      console.error("[ProspectSearch] Full response:", JSON.stringify(data).substring(0, 500));
       return {
         businesses: [],
         totalFound: 0,
@@ -146,7 +158,8 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no exp
     // Extract JSON array from response
     const jsonMatch = textContent.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error("[ProspectSearch] No valid JSON found:", textContent.substring(0, 500));
+      console.error("[ProspectSearch] No JSON array found in response");
+      console.error("[ProspectSearch] Content preview:", textContent.substring(0, 500));
       return {
         businesses: [],
         totalFound: 0,
@@ -158,11 +171,12 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no exp
     let businesses: DiscoveredBusiness[];
     try {
       let jsonStr = jsonMatch[0];
-      // Remove trailing commas
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, "$1");
       businesses = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error("[ProspectSearch] JSON parse error:", parseError);
+      console.log("[ProspectSearch] Parsed", businesses.length, "businesses from JSON");
+    } catch (parseError: any) {
+      console.error("[ProspectSearch] JSON parse error:", parseError.message);
+      console.error("[ProspectSearch] JSON string preview:", jsonMatch[0].substring(0, 300));
       return {
         businesses: [],
         totalFound: 0,
@@ -192,10 +206,15 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no exp
         confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
       }));
 
-    console.log("[ProspectSearch] Found", businesses.length, "businesses");
+    console.log("[ProspectSearch] Valid businesses after filtering:", businesses.length);
 
     const { deduplicatedBusinesses, duplicatesSkipped } =
       await deduplicateResults(businesses, agentId);
+
+    console.log("[ProspectSearch] === SEARCH COMPLETE ===");
+    console.log("[ProspectSearch] Total found:", businesses.length);
+    console.log("[ProspectSearch] Duplicates skipped:", duplicatesSkipped);
+    console.log("[ProspectSearch] Returning:", deduplicatedBusinesses.length);
 
     return {
       businesses: deduplicatedBusinesses,
@@ -204,8 +223,11 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no exp
       searchId: generateSearchId(),
     };
   } catch (error: any) {
-    console.error("[ProspectSearch] Search error:", error.message || error);
-    throw new Error("Failed to search for businesses. Please try again.");
+    console.error("[ProspectSearch] === SEARCH FAILED ===");
+    console.error("[ProspectSearch] Error name:", error.name);
+    console.error("[ProspectSearch] Error message:", error.message);
+    console.error("[ProspectSearch] Error stack:", error.stack);
+    throw error;
   }
 }
 
