@@ -218,6 +218,7 @@ export default function StatementAnalyzer() {
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
   const [showCorrectionUI, setShowCorrectionUI] = useState(false);
   const [correctionField, setCorrectionField] = useState<string | null>(null);
+  const [correctionValue, setCorrectionValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
@@ -359,10 +360,35 @@ export default function StatementAnalyzer() {
       });
       setShowCorrectionUI(false);
       setCorrectionField(null);
+      setCorrectionValue("");
     },
     onError: (error: Error) => {
       toast({
         title: "Correction Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async (extractionId: number) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/proposal-intelligence/learning/extractions/${extractionId}/verify`,
+        {}
+      );
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Thanks!",
+        description: "Glad our extraction was accurate."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Verification Failed", 
         description: error.message,
         variant: "destructive"
       });
@@ -2238,6 +2264,135 @@ ${new Date().toLocaleDateString()}
                         </li>
                       ))}
                     </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Help Improve Accuracy - Only show if we have an extractionId */}
+          {extractedData?.extractionId && (
+            <Card className="border-blue-200 dark:border-blue-800 print:hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Brain className="h-5 w-5" />
+                  Help Improve Our Accuracy
+                </CardTitle>
+                <CardDescription>
+                  Your feedback helps us extract statements more accurately
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!showCorrectionUI ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <p className="text-sm text-muted-foreground flex-1">
+                      Did we extract the numbers correctly? If not, let us know what was wrong.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (extractedData?.extractionId) {
+                            verifyMutation.mutate(extractedData.extractionId);
+                          }
+                        }}
+                        disabled={verifyMutation.isPending}
+                        className="gap-2"
+                        data-testid="button-extraction-correct"
+                      >
+                        {verifyMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ThumbsUp className="h-4 w-4" />
+                        )}
+                        Looks Good
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCorrectionUI(true)}
+                        className="gap-2"
+                        data-testid="button-report-correction"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Report Issue
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">What field was wrong?</label>
+                        <Select value={correctionField || ""} onValueChange={setCorrectionField}>
+                          <SelectTrigger data-testid="select-correction-field">
+                            <SelectValue placeholder="Select a field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="totalVolume">Total Volume</SelectItem>
+                            <SelectItem value="totalTransactions">Total Transactions</SelectItem>
+                            <SelectItem value="totalFees">Total Fees</SelectItem>
+                            <SelectItem value="processorName">Processor Name</SelectItem>
+                            <SelectItem value="merchantName">Merchant Name</SelectItem>
+                            <SelectItem value="interchangeFees">Interchange Fees</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">What should the value be?</label>
+                        <Input
+                          placeholder="Enter correct value"
+                          value={correctionValue}
+                          onChange={(e) => setCorrectionValue(e.target.value)}
+                          data-testid="input-correction-value"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowCorrectionUI(false);
+                          setCorrectionField(null);
+                          setCorrectionValue("");
+                        }}
+                        data-testid="button-cancel-correction"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (correctionField && correctionValue) {
+                            const getOriginalValue = (field: string): string => {
+                              switch (field) {
+                                case "totalVolume": return extractedData?.totalVolume?.toString() || "";
+                                case "totalTransactions": return extractedData?.totalTransactions?.toString() || "";
+                                case "totalFees": return extractedData?.totalFees?.toString() || "";
+                                case "processorName": return extractedData?.processorName || "";
+                                case "merchantName": return extractedData?.merchantName || "";
+                                case "interchangeFees": return extractedData?.fees?.interchange?.toString() || "";
+                                default: return "";
+                              }
+                            };
+                            submitCorrection(correctionField, getOriginalValue(correctionField), correctionValue);
+                          }
+                        }}
+                        disabled={!correctionField || !correctionValue || correctionMutation.isPending}
+                        className="gap-2"
+                        data-testid="button-submit-correction"
+                      >
+                        {correctionMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Submit Correction
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

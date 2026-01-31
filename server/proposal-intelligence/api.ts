@@ -1021,7 +1021,7 @@ router.post("/learning/extractions/:id/correct", isAuthenticated, ensureOrgMembe
     await recordCorrection({
       extractionId,
       fieldName,
-      originalValue: String(originalValue),
+      originalValue: String(originalValue || ''),
       correctedValue: String(correctedValue),
       userId: req.user?.claims?.sub,
       orgId: req.orgMember?.orgId
@@ -1031,6 +1031,27 @@ router.post("/learning/extractions/:id/correct", isAuthenticated, ensureOrgMembe
   } catch (error) {
     console.error("[Learning] Correction error:", error);
     res.status(500).json({ error: "Failed to record correction" });
+  }
+});
+
+router.post("/learning/extractions/:id/verify", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const extractionId = parseInt(req.params.id);
+
+    await recordCorrection({
+      extractionId,
+      fieldName: '_verified',
+      originalValue: 'unverified',
+      correctedValue: 'verified',
+      userId: req.user?.claims?.sub,
+      orgId: req.orgMember?.orgId,
+      isPositiveFeedback: true
+    });
+
+    res.json({ success: true, message: "Thank you for verifying this extraction!" });
+  } catch (error) {
+    console.error("[Learning] Verification error:", error);
+    res.status(500).json({ error: "Failed to record verification" });
   }
 });
 

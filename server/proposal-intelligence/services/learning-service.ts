@@ -73,6 +73,19 @@ export function getVolumeRange(volume: number): string {
   return '1M+';
 }
 
+export function anonymizeExtractedData(data: Record<string, any>): Record<string, any> {
+  const sensitiveFields = ['merchantName', 'businessName', 'ownerName', 'email', 'phone', 'address'];
+  const anonymized = { ...data };
+  
+  for (const field of sensitiveFields) {
+    if (anonymized[field]) {
+      anonymized[field] = '[REDACTED]';
+    }
+  }
+  
+  return anonymized;
+}
+
 export async function storeExtraction(
   extractionData: {
     processorName: string;
@@ -101,6 +114,8 @@ export async function storeExtraction(
     ? hashStatement(extractionData.statementText)
     : null;
 
+  const anonymizedExtractedData = anonymizeExtractedData(extractionData.extractedData);
+
   const insertData: InsertStatementExtraction = {
     orgId: extractionData.orgId,
     processorName: extractionData.processorName,
@@ -110,7 +125,7 @@ export async function storeExtraction(
     volumeRange: getVolumeRange(extractionData.extractedData.totalVolume),
     transactionCount: extractionData.extractedData.totalTransactions,
     effectiveRate: extractionData.extractedData.effectiveRate,
-    extractedData: extractionData.extractedData,
+    extractedData: anonymizedExtractedData,
     extractionMethod: extractionData.extractionMethod || 'gemini-vision',
     extractionConfidence: extractionData.extractionConfidence,
     extractionPrompt: extractionData.extractionPrompt,
@@ -183,16 +198,22 @@ export async function getExtractionStats(): Promise<{
 }
 
 export async function recordCorrection(
-  correction: InsertExtractionCorrection
+  correction: InsertExtractionCorrection & { isPositiveFeedback?: boolean }
 ): Promise<void> {
-  await db.insert(extractionCorrections).values(correction);
+  const { isPositiveFeedback, ...correctionData } = correction;
   
-  await db
-    .update(statementExtractions)
-    .set({ userCorrected: true })
-    .where(eq(statementExtractions.id, correction.extractionId));
+  await db.insert(extractionCorrections).values(correctionData);
   
-  console.log(`[LearningService] Recorded correction for extraction #${correction.extractionId}`);
+  if (!isPositiveFeedback) {
+    await db
+      .update(statementExtractions)
+      .set({ userCorrected: true })
+      .where(eq(statementExtractions.id, correctionData.extractionId));
+    
+    console.log(`[LearningService] Recorded correction for extraction #${correctionData.extractionId}`);
+  } else {
+    console.log(`[LearningService] Recorded verification for extraction #${correctionData.extractionId}`);
+  }
 }
 
 export async function getFeeDictionary(): Promise<FeeDictionary[]> {
