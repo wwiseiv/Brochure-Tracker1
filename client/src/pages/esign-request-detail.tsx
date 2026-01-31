@@ -167,7 +167,17 @@ export default function ESignRequestDetailPage() {
   const sendRequestMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/esign/requests/${requestId}/send`, {});
-      return response.json();
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        const text = await response.text().catch(() => "Unknown error");
+        throw new Error(text || "Failed to send request");
+      }
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to send request");
+      }
+      return data;
     },
     onSuccess: () => {
       toast({ title: "Request Sent", description: "E-signature request has been sent to all signers" });
@@ -175,8 +185,8 @@ export default function ESignRequestDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/esign/requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/esign/stats"] });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to send request", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to send request", variant: "destructive" });
     }
   });
 
