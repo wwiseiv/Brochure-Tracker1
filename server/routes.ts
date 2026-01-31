@@ -54,9 +54,12 @@ import { db } from "./db";
 import { 
   presentationPracticeResponses, 
   presentationProgress, 
-  presentationLessons 
+  presentationLessons,
+  prospects,
+  prospectActivities,
+  prospectSearches,
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike } from "drizzle-orm";
 import { 
   listCoachingDocuments, 
   getAllCoachingContent, 
@@ -7523,6 +7526,414 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Help Chatbot] Error:", error);
       res.status(500).json({ error: "Failed to get response. Please try again." });
+    }
+  });
+
+  // ============================================
+  // AI-Powered Prospect Finder Routes
+  // ============================================
+
+  // Get MCC codes for UI
+  app.get("/api/prospects/mcc-codes", isAuthenticated, async (req, res) => {
+    try {
+      const mccData = await import("./data/mcc-codes.json");
+      res.json({
+        categories: mccData.categories,
+        codes: mccData.mccCodes,
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Error loading MCC codes:", error);
+      res.status(500).json({ error: "Failed to load business types" });
+    }
+  });
+
+  // Search for new prospects using AI
+  app.post("/api/prospects/search", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { zipCode, mccCodes: selectedCodes, radius = 10, maxResults = 25 } = req.body;
+      const membership = req.orgMembership as OrgMembershipInfo;
+
+      if (!zipCode || !selectedCodes?.length) {
+        return res.status(400).json({ error: "Zip code and at least one business type required" });
+      }
+
+      // Validate zip code format
+      if (!/^\d{5}(-\d{4})?$/.test(zipCode)) {
+        return res.status(400).json({ error: "Invalid zip code format" });
+      }
+
+      const mccData = await import("./data/mcc-codes.json");
+      const businessTypes = mccData.mccCodes
+        .filter((mcc: any) => selectedCodes.includes(mcc.code))
+        .map((mcc: any) => ({
+          code: mcc.code,
+          name: mcc.title,
+          searchTerms: mcc.searchTerms || [],
+        }));
+
+      if (!businessTypes.length) {
+        return res.status(400).json({ error: "Invalid business types provided" });
+      }
+
+      const { searchLocalBusinesses } = await import("./services/prospect-search");
+      const results = await searchLocalBusinesses({
+        zipCode,
+        businessTypes,
+        radius: Math.min(radius, 25),
+        maxResults: Math.min(maxResults, 100),
+        agentId: req.user.claims.sub,
+        organizationId: membership.orgId,
+      });
+
+      // Log search for analytics
+      await db.insert(prospectSearches).values({
+        agentId: req.user.claims.sub,
+        organizationId: membership.orgId,
+        zipCode,
+        businessTypes: selectedCodes,
+        radiusMiles: radius,
+        resultsCount: results.totalFound,
+      });
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("[Prospects] Search error:", error);
+      res.status(500).json({ error: "Search failed. Please try again." });
+    }
+  });
+
+  // Claim a discovered business
+  app.post("/api/prospects/claim", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const agentId = req.user.claims.sub;
+      const { business } = req.body;
+
+      if (!business?.name || !business?.zipCode) {
+        return res.status(400).json({ error: "Business name and zip code required" });
+      }
+
+      // Check if already claimed by another agent
+      const existing = await db
+        .select()
+        .from(prospects)
+        .where(
+          and(
+            eq(prospects.zipCode, business.zipCode),
+            ilike(prospects.businessName, business.name)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0 && existing[0].agentId !== agentId) {
+        return res.status(409).json({
+          error: "This business has already been claimed by another agent",
+          alreadyClaimed: true,
+        });
+      }
+
+      if (existing.length > 0) {
+        return res.json({ prospect: existing[0], alreadyClaimed: false });
+      }
+
+      // Create new prospect
+      const [prospect] = await db
+        .insert(prospects)
+        .values({
+          agentId,
+          organizationId: membership.orgId,
+          businessName: business.name,
+          addressLine1: business.address,
+          city: business.city,
+          state: business.state,
+          zipCode: business.zipCode,
+          phone: business.phone,
+          website: business.website,
+          mccCode: business.mccCode,
+          mccDescription: business.businessType,
+          businessType: business.businessType,
+          aiConfidenceScore: business.confidence?.toString(),
+          source: "ai_search",
+          status: "discovered",
+        })
+        .returning();
+
+      // Log activity
+      await db.insert(prospectActivities).values({
+        prospectId: prospect.id,
+        agentId,
+        activityType: "created",
+        notes: "Claimed from AI search",
+      });
+
+      res.json({ prospect, alreadyClaimed: false });
+    } catch (error: any) {
+      console.error("[Prospects] Claim error:", error);
+      res.status(500).json({ error: "Failed to claim prospect" });
+    }
+  });
+
+  // Get agent's prospects with filtering
+  app.get("/api/prospects", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const agentId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const { status, mccCode, sortBy = "created_at", sortOrder = "desc", page = 1, limit = 50 } = req.query;
+
+      let query = db
+        .select()
+        .from(prospects)
+        .where(eq(prospects.agentId, agentId));
+
+      if (status && typeof status === "string") {
+        query = query.where(eq(prospects.status, status));
+      }
+      if (mccCode && typeof mccCode === "string") {
+        query = query.where(eq(prospects.mccCode, mccCode));
+      }
+
+      const offset = (Number(page) - 1) * Number(limit);
+      
+      const allProspects = await query
+        .orderBy(sortOrder === "asc" ? prospects.createdAt : desc(prospects.createdAt))
+        .limit(Number(limit))
+        .offset(offset);
+
+      // Get count
+      const countResult = await db
+        .select()
+        .from(prospects)
+        .where(eq(prospects.agentId, agentId));
+
+      res.json({
+        prospects: allProspects,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: countResult.length,
+          pages: Math.ceil(countResult.length / Number(limit)),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Get error:", error);
+      res.status(500).json({ error: "Failed to fetch prospects" });
+    }
+  });
+
+  // Get pipeline summary
+  app.get("/api/prospects/pipeline", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const agentId = req.user.claims.sub;
+
+      const allProspects = await db
+        .select()
+        .from(prospects)
+        .where(eq(prospects.agentId, agentId));
+
+      // Count by status
+      const pipelineCounts = allProspects.reduce((acc: Record<string, number>, p) => {
+        acc[p.status] = (acc[p.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Get upcoming follow-ups
+      const now = new Date();
+      const upcomingFollowups = allProspects
+        .filter((p) => p.nextFollowupDate && new Date(p.nextFollowupDate) >= now)
+        .sort((a, b) => new Date(a.nextFollowupDate!).getTime() - new Date(b.nextFollowupDate!).getTime())
+        .slice(0, 5);
+
+      res.json({
+        counts: {
+          discovered: pipelineCounts.discovered || 0,
+          contacted: pipelineCounts.contacted || 0,
+          qualified: pipelineCounts.qualified || 0,
+          proposal_sent: pipelineCounts.proposal_sent || 0,
+          negotiating: pipelineCounts.negotiating || 0,
+          won: pipelineCounts.won || 0,
+          lost: pipelineCounts.lost || 0,
+          disqualified: pipelineCounts.disqualified || 0,
+        },
+        total: allProspects.length,
+        upcomingFollowups,
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Pipeline error:", error);
+      res.status(500).json({ error: "Failed to fetch pipeline" });
+    }
+  });
+
+  // Update prospect
+  app.patch("/api/prospects/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const agentId = req.user.claims.sub;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid prospect ID" });
+      }
+
+      // Check ownership
+      const [existing] = await db
+        .select()
+        .from(prospects)
+        .where(and(eq(prospects.id, id), eq(prospects.agentId, agentId)));
+
+      if (!existing) {
+        return res.status(404).json({ error: "Prospect not found" });
+      }
+
+      const { status, notes, nextFollowupDate, phone, email, contactAttempts } = req.body;
+      const updates: any = { updatedAt: new Date() };
+
+      if (status) updates.status = status;
+      if (notes !== undefined) updates.notes = notes;
+      if (nextFollowupDate) updates.nextFollowupDate = new Date(nextFollowupDate);
+      if (phone !== undefined) updates.phone = phone;
+      if (email !== undefined) updates.email = email;
+      if (contactAttempts !== undefined) updates.contactAttempts = contactAttempts;
+
+      const [updated] = await db
+        .update(prospects)
+        .set(updates)
+        .where(eq(prospects.id, id))
+        .returning();
+
+      // Log activity if status changed
+      if (status && status !== existing.status) {
+        await db.insert(prospectActivities).values({
+          prospectId: id,
+          agentId,
+          activityType: "status_change",
+          previousValue: existing.status,
+          newValue: status,
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Prospects] Update error:", error);
+      res.status(500).json({ error: "Failed to update prospect" });
+    }
+  });
+
+  // Convert prospect to merchant
+  app.post("/api/prospects/:id/convert", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const agentId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid prospect ID" });
+      }
+
+      // Check ownership
+      const [prospect] = await db
+        .select()
+        .from(prospects)
+        .where(and(eq(prospects.id, id), eq(prospects.agentId, agentId)));
+
+      if (!prospect) {
+        return res.status(404).json({ error: "Prospect not found" });
+      }
+
+      if (prospect.convertedToMerchantId) {
+        return res.status(400).json({ error: "Prospect already converted" });
+      }
+
+      // Create merchant from prospect
+      const merchant = await storage.createMerchant({
+        organizationId: membership.orgId,
+        businessName: prospect.businessName,
+        dbaName: prospect.dbaName || undefined,
+        status: "prospect",
+        address: prospect.addressLine1 || undefined,
+        city: prospect.city || undefined,
+        state: prospect.state || undefined,
+        zip: prospect.zipCode,
+        phone: prospect.phone || undefined,
+        email: prospect.email || undefined,
+        website: prospect.website || undefined,
+        businessType: prospect.businessType || undefined,
+        notes: prospect.notes || undefined,
+      });
+
+      // Update prospect
+      await db
+        .update(prospects)
+        .set({
+          convertedToMerchantId: merchant.id,
+          convertedAt: new Date(),
+          status: "won",
+          updatedAt: new Date(),
+        })
+        .where(eq(prospects.id, id));
+
+      // Log activity
+      await db.insert(prospectActivities).values({
+        prospectId: id,
+        agentId,
+        activityType: "converted",
+        newValue: merchant.id.toString(),
+        notes: "Converted to merchant record",
+      });
+
+      res.json({ merchant, prospect: { ...prospect, convertedToMerchantId: merchant.id } });
+    } catch (error: any) {
+      console.error("[Prospects] Convert error:", error);
+      res.status(500).json({ error: "Failed to convert prospect" });
+    }
+  });
+
+  // Delete/Release prospect
+  app.delete("/api/prospects/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const agentId = req.user.claims.sub;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid prospect ID" });
+      }
+
+      // Check ownership
+      const [existing] = await db
+        .select()
+        .from(prospects)
+        .where(and(eq(prospects.id, id), eq(prospects.agentId, agentId)));
+
+      if (!existing) {
+        return res.status(404).json({ error: "Prospect not found" });
+      }
+
+      await db.delete(prospects).where(eq(prospects.id, id));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Prospects] Delete error:", error);
+      res.status(500).json({ error: "Failed to delete prospect" });
+    }
+  });
+
+  // Get prospect activities
+  app.get("/api/prospects/:id/activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid prospect ID" });
+      }
+
+      const activities = await db
+        .select()
+        .from(prospectActivities)
+        .where(eq(prospectActivities.prospectId, id))
+        .orderBy(desc(prospectActivities.createdAt));
+
+      res.json(activities);
+    } catch (error: any) {
+      console.error("[Prospects] Activities error:", error);
+      res.status(500).json({ error: "Failed to fetch activities" });
     }
   });
 
