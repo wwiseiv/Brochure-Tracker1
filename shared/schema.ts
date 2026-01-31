@@ -307,6 +307,8 @@ export const merchantsRelations = relations(merchants, ({ one, many }) => ({
   referralsGiven: many(referrals, { relationName: "sourceMerchant" }),
   referralsReceived: many(referrals, { relationName: "referredMerchant" }),
   drops: many(drops),
+  proposals: many(proposals),
+  statementExtractions: many(statementExtractions),
 }));
 
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
@@ -1273,6 +1275,7 @@ export const proposals = pgTable("proposals", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("user_id").notNull(),
   organizationId: integer("organization_id").references(() => organizations.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   
   // Merchant info
   merchantName: varchar("merchant_name", { length: 255 }).notNull(),
@@ -1359,6 +1362,17 @@ export const proposals = pgTable("proposals", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const proposalsRelations = relations(proposals, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [proposals.organizationId],
+    references: [organizations.id],
+  }),
+  merchant: one(merchants, {
+    fields: [proposals.merchantId],
+    references: [merchants.id],
+  }),
+}));
 
 export const insertProposalSchema = createInsertSchema(proposals).omit({
   id: true,
@@ -1771,6 +1785,8 @@ export type FeeDictionary = typeof feeDictionary.$inferSelect;
 export const statementExtractions = pgTable("statement_extractions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   orgId: integer("org_id").references(() => organizations.id),
+  userId: varchar("user_id", { length: 255 }),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   
   processorName: varchar("processor_name", { length: 100 }).notNull(),
   processorConfidence: real("processor_confidence"),
@@ -1812,6 +1828,10 @@ export const statementExtractionsRelations = relations(statementExtractions, ({ 
   organization: one(organizations, {
     fields: [statementExtractions.orgId],
     references: [organizations.id],
+  }),
+  merchant: one(merchants, {
+    fields: [statementExtractions.merchantId],
+    references: [merchants.id],
   }),
   corrections: many(extractionCorrections),
 }));

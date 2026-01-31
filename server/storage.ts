@@ -127,6 +127,8 @@ import {
   proposals,
   type Proposal,
   type InsertProposal,
+  statementExtractions,
+  type StatementExtraction,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
@@ -1837,6 +1839,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProposal(id: number): Promise<void> {
     await db.delete(proposals).where(eq(proposals.id, id));
+  }
+
+  async getProposalsByMerchant(merchantId: number): Promise<Proposal[]> {
+    return db.select().from(proposals)
+      .where(eq(proposals.merchantId, merchantId))
+      .orderBy(desc(proposals.createdAt));
+  }
+
+  async getStatementExtractionsByUser(userId: string): Promise<StatementExtraction[]> {
+    return db.select().from(statementExtractions)
+      .where(eq(statementExtractions.userId, userId))
+      .orderBy(desc(statementExtractions.createdAt));
+  }
+
+  async getStatementExtractionsByOrganization(orgId: number): Promise<StatementExtraction[]> {
+    return db.select().from(statementExtractions)
+      .where(eq(statementExtractions.orgId, orgId))
+      .orderBy(desc(statementExtractions.createdAt));
+  }
+
+  async getStatementExtractionsByMerchant(merchantId: number): Promise<StatementExtraction[]> {
+    return db.select().from(statementExtractions)
+      .where(eq(statementExtractions.merchantId, merchantId))
+      .orderBy(desc(statementExtractions.createdAt));
+  }
+
+  async getStatementExtraction(id: number): Promise<StatementExtraction | undefined> {
+    const [extraction] = await db.select().from(statementExtractions)
+      .where(eq(statementExtractions.id, id));
+    return extraction;
+  }
+
+  async updateStatementExtraction(id: number, data: Partial<StatementExtraction>): Promise<StatementExtraction | undefined> {
+    const { id: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db.update(statementExtractions)
+      .set(updateData)
+      .where(eq(statementExtractions.id, id))
+      .returning();
+    return updated;
   }
 }
 

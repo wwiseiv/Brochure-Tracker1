@@ -6820,10 +6820,20 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: "Proposal not found" });
       }
 
-      const { status } = req.body;
+      const { status, merchantId } = req.body;
       const updateData: any = {};
       if (status && ["draft", "generated", "sent"].includes(status)) {
         updateData.status = status;
+      }
+      if (merchantId !== undefined) {
+        if (merchantId === null) {
+          updateData.merchantId = null;
+        } else {
+          const merchant = await storage.getMerchant(merchantId);
+          if (merchant && merchant.orgId === membership.orgId) {
+            updateData.merchantId = merchantId;
+          }
+        }
       }
 
       const updated = await storage.updateProposal(id, updateData);
@@ -6857,6 +6867,177 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Proposals] Error deleting proposal:", error);
       res.status(500).json({ error: "Failed to delete proposal" });
+    }
+  });
+
+  // ============================================
+  // Statement Extractions / Analyses Routes
+  // ============================================
+
+  // Get all statement extractions for the user
+  app.get("/api/statement-analyses", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+
+      let analyses;
+      if (isAdmin) {
+        analyses = await storage.getStatementExtractionsByOrganization(membership.orgId);
+      } else {
+        analyses = await storage.getStatementExtractionsByUser(userId);
+      }
+
+      res.json(analyses);
+    } catch (error: any) {
+      console.error("[Analyses] Error fetching analyses:", error);
+      res.status(500).json({ error: "Failed to fetch analyses" });
+    }
+  });
+
+  // Get single statement extraction
+  app.get("/api/statement-analyses/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid analysis ID" });
+      }
+
+      const analysis = await storage.getStatementExtraction(id);
+      if (!analysis) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      if (analysis.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      res.json(analysis);
+    } catch (error: any) {
+      console.error("[Analyses] Error fetching analysis:", error);
+      res.status(500).json({ error: "Failed to fetch analysis" });
+    }
+  });
+
+  // Update statement extraction (for merchant association)
+  app.patch("/api/statement-analyses/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid analysis ID" });
+      }
+
+      const analysis = await storage.getStatementExtraction(id);
+      if (!analysis) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      if (analysis.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      const { merchantId } = req.body;
+      const updateData: any = {};
+      
+      if (merchantId !== undefined) {
+        if (merchantId === null) {
+          updateData.merchantId = null;
+        } else {
+          const merchant = await storage.getMerchant(merchantId);
+          if (merchant && merchant.orgId === membership.orgId) {
+            updateData.merchantId = merchantId;
+          }
+        }
+      }
+
+      const updated = await storage.updateStatementExtraction(id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Analyses] Error updating analysis:", error);
+      res.status(500).json({ error: "Failed to update analysis" });
+    }
+  });
+
+  // Get combined work history (proposals + analyses)
+  app.get("/api/work-history", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+
+      let proposals, analyses;
+      if (isAdmin) {
+        [proposals, analyses] = await Promise.all([
+          storage.getProposalsByOrganization(membership.orgId),
+          storage.getStatementExtractionsByOrganization(membership.orgId)
+        ]);
+      } else {
+        [proposals, analyses] = await Promise.all([
+          storage.getProposalsByUser(userId),
+          storage.getStatementExtractionsByUser(userId)
+        ]);
+      }
+
+      // Combine and sort by date
+      const workItems = [
+        ...proposals.map(p => ({
+          type: 'proposal' as const,
+          id: p.id,
+          merchantName: p.merchantName,
+          merchantId: p.merchantId,
+          status: p.status,
+          createdAt: p.createdAt,
+          pdfUrl: p.pdfUrl,
+          docxUrl: p.docxUrl,
+        })),
+        ...analyses.map(a => ({
+          type: 'analysis' as const,
+          id: a.id,
+          merchantName: a.extractedData?.merchantName || 'Unknown',
+          merchantId: a.merchantId,
+          processorName: a.processorName,
+          totalVolume: a.extractedData?.totalVolume,
+          createdAt: a.createdAt,
+        }))
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json(workItems);
+    } catch (error: any) {
+      console.error("[Work History] Error fetching work history:", error);
+      res.status(500).json({ error: "Failed to fetch work history" });
+    }
+  });
+
+  // Get proposals and analyses for a specific merchant
+  app.get("/api/merchants/:id/work", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const merchantId = parseInt(req.params.id);
+
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant || merchant.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      const [proposals, analyses] = await Promise.all([
+        storage.getProposalsByMerchant(merchantId),
+        storage.getStatementExtractionsByMerchant(merchantId)
+      ]);
+
+      res.json({ proposals, analyses });
+    } catch (error: any) {
+      console.error("[Merchant Work] Error fetching merchant work:", error);
+      res.status(500).json({ error: "Failed to fetch merchant work" });
     }
   });
 
