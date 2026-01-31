@@ -141,10 +141,14 @@ export async function extractStatementFromFiles(
   parts.push({ text: GEMINI_EXTRACTION_PROMPT });
 
   console.log(`[StatementExtractor] Sending ${parts.length} parts to Gemini for analysis`);
-  console.log(`[StatementExtractor] Using Gemini URL: ${geminiBaseUrl}/v1beta/models/gemini-2.5-pro:generateContent`);
+  
+  // Use gemini-2.5-flash for document analysis - good for vision tasks and more reliable
+  const model = "gemini-2.5-flash";
+  const apiUrl = `${geminiBaseUrl}/v1beta/models/${model}:generateContent`;
+  console.log(`[StatementExtractor] Using Gemini URL: ${apiUrl}`);
   console.log(`[StatementExtractor] API key present: ${!!geminiApiKey}, length: ${geminiApiKey?.length || 0}`);
   
-  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.5-pro:generateContent`, {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
