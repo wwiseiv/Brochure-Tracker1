@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,10 @@ import {
   Navigation,
   Mail,
   User,
+  Mic,
+  Square,
+  FileSignature,
+  Video,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -108,6 +112,12 @@ export default function ProspectPipelinePage() {
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [editingStatus, setEditingStatus] = useState("");
   const [editingNotes, setEditingNotes] = useState("");
+
+  // Voice recording state for notes dictation
+  const [isRecordingNotes, setIsRecordingNotes] = useState(false);
+  const [isTranscribingNotes, setIsTranscribingNotes] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -192,6 +202,115 @@ export default function ProspectPipelinePage() {
         notes: editingNotes,
       },
     });
+  };
+
+  // Voice dictation functions
+  const startRecordingNotes = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options.mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options.mimeType = "audio/mp4";
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: mediaRecorder.mimeType || "audio/webm" 
+        });
+        await transcribeNotesAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsRecordingNotes(true);
+      toast({ title: "Recording...", description: "Speak now to dictate your notes" });
+    } catch (error) {
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice dictation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecordingNotes = () => {
+    if (mediaRecorderRef.current && isRecordingNotes) {
+      mediaRecorderRef.current.stop();
+      setIsRecordingNotes(false);
+    }
+  };
+
+  // Cleanup function to stop recording and release microphone
+  const cleanupRecording = () => {
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      // Stop all audio tracks to release microphone
+      mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current = null;
+    }
+    audioChunksRef.current = [];
+    setIsRecordingNotes(false);
+    setIsTranscribingNotes(false);
+  };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupRecording();
+    };
+  }, []);
+
+  const transcribeNotesAudio = async (audioBlob: Blob) => {
+    setIsTranscribingNotes(true);
+    try {
+      const formData = new FormData();
+      let ext = "webm";
+      const blobType = audioBlob.type.toLowerCase();
+      if (blobType.includes("mp4") || blobType.includes("m4a")) {
+        ext = "m4a";
+      }
+      formData.append("audio", audioBlob, `notes.${ext}`);
+      
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Transcription failed");
+      }
+      
+      const data = await response.json();
+      if (data.text) {
+        setEditingNotes(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+        toast({ title: "Transcription complete!" });
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Please try again or type your notes manually",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribingNotes(false);
+    }
   };
 
   const filteredProspects = prospectsData?.prospects.filter((p) =>
@@ -392,15 +511,20 @@ export default function ProspectPipelinePage() {
         )}
       </main>
 
-      <Sheet open={!!selectedProspect} onOpenChange={() => setSelectedProspect(null)}>
-        <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+      <Sheet open={!!selectedProspect} onOpenChange={(open) => {
+        if (!open) {
+          cleanupRecording();
+          setSelectedProspect(null);
+        }
+      }}>
+        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
           {selectedProspect && (
-            <>
-              <SheetHeader className="mb-4">
+            <div className="flex flex-col h-full">
+              <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
                 <SheetTitle>{selectedProspect.businessName}</SheetTitle>
               </SheetHeader>
 
-              <div className="space-y-6 pb-24">
+              <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {/* Quick Action Buttons */}
                 <div className="flex gap-2">
                   <Button
@@ -519,7 +643,33 @@ export default function ProspectPipelinePage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Notes</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Button
+                      variant={isRecordingNotes ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={isRecordingNotes ? stopRecordingNotes : startRecordingNotes}
+                      disabled={isTranscribingNotes}
+                      data-testid="button-dictate-notes"
+                    >
+                      {isTranscribingNotes ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Transcribing...
+                        </>
+                      ) : isRecordingNotes ? (
+                        <>
+                          <Square className="w-4 h-4 mr-2" />
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-4 h-4 mr-2" />
+                          Dictate
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <Textarea
                     value={editingNotes}
                     onChange={(e) => setEditingNotes(e.target.value)}
@@ -533,38 +683,66 @@ export default function ProspectPipelinePage() {
                   <span>Contact Attempts: {selectedProspect.contactAttempts}</span>
                   <span>Added: {format(new Date(selectedProspect.createdAt), "MMM d, yyyy")}</span>
                 </div>
-              </div>
 
-              <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t space-y-2">
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={handleSaveChanges}
-                    disabled={updateMutation.isPending}
-                    data-testid="button-save-changes"
-                  >
-                    {updateMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <Check className="w-4 h-4 mr-2" />
-                    )}
-                    Save Changes
-                  </Button>
-                  {!selectedProspect.convertedToMerchantId && (
+                {/* Convert to Merchant CTA - prominent when not yet converted */}
+                {!selectedProspect.convertedToMerchantId && (
+                  <Card className="p-4 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-teal-900/20 dark:to-blue-900/20 border-teal-200 dark:border-teal-800">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-teal-600" />
+                      Ready to Convert?
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Convert to a full Merchant record to unlock:
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <Badge variant="outline" className="text-xs">
+                        <FileSignature className="w-3 h-3 mr-1" />
+                        E-Sign Documents
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        <Video className="w-3 h-3 mr-1" />
+                        Meeting Recording
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        <FileText className="w-3 h-3 mr-1" />
+                        Proposals & Analysis
+                      </Badge>
+                    </div>
                     <Button
-                      variant="outline"
+                      className="w-full"
                       onClick={() => convertMutation.mutate(selectedProspect.id)}
                       disabled={convertMutation.isPending}
                       data-testid="button-convert-merchant"
                     >
                       {convertMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
-                        <TrendingUp className="w-4 h-4" />
+                        <TrendingUp className="w-4 h-4 mr-2" />
                       )}
+                      Convert to Merchant
                     </Button>
+                  </Card>
+                )}
+
+                {/* Spacer for bottom actions */}
+                <div className="h-4" />
+              </div>
+
+              {/* Bottom Action Buttons - not fixed, inside flex container */}
+              <div className="flex-shrink-0 px-4 py-4 bg-background border-t space-y-2 safe-area-bottom">
+                <Button
+                  className="w-full"
+                  onClick={handleSaveChanges}
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-changes"
+                >
+                  {updateMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="w-4 h-4 mr-2" />
                   )}
-                </div>
+                  Save Changes
+                </Button>
                 <Button
                   variant="ghost"
                   className="w-full text-destructive hover:text-destructive"
@@ -580,7 +758,7 @@ export default function ProspectPipelinePage() {
                   Release Prospect
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </SheetContent>
       </Sheet>
