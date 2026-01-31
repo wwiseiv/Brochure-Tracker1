@@ -130,8 +130,10 @@ export async function extractStatementFromFiles(
   parts.push({ text: GEMINI_EXTRACTION_PROMPT });
 
   console.log(`[StatementExtractor] Sending ${parts.length} parts to Gemini for analysis`);
+  console.log(`[StatementExtractor] Using Gemini URL: ${geminiBaseUrl}/v1beta/models/gemini-2.5-flash:generateContent`);
+  console.log(`[StatementExtractor] API key present: ${!!geminiApiKey}, length: ${geminiApiKey?.length || 0}`);
   
-  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-1.5-pro:generateContent`, {
+  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.5-flash:generateContent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -148,8 +150,17 @@ export async function extractStatementFromFiles(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("[StatementExtractor] Gemini API error:", errorText);
-    throw new Error("Failed to analyze statement with AI");
+    console.error("[StatementExtractor] Gemini API error:", response.status, errorText);
+    
+    // Parse error for better debugging
+    try {
+      const errorJson = JSON.parse(errorText);
+      const errorMessage = errorJson?.error?.message || errorText;
+      console.error("[StatementExtractor] Gemini error message:", errorMessage);
+      throw new Error(`AI analysis failed: ${errorMessage.substring(0, 100)}`);
+    } catch {
+      throw new Error(`Failed to analyze statement with AI (${response.status})`);
+    }
   }
 
   const data = await response.json() as any;
