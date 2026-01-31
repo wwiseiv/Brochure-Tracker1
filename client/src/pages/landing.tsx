@@ -212,7 +212,7 @@ export default function LandingPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Copyright PCBancard. All Rights Reserved &copy;2026<br />
-            <span className="text-[10px]">PCBancard LLC is a registered ISO of Synovus Bank, Columbus, GA; a registered ISO of Fifth Third Bank, N.A., Cincinnati, OH.; a registered ISO of Wells Fargo Bank, N.A., Concord, CA; and a registered ISO of Citizens Bank.</span>
+            <span className="text-[10px]">PCBancard LLC is a registered ISO of Synovus Bank, Columbus, GA.; a registered ISO of Fifth Third Bank, N.A., Cincinnati, OH.; a registered ISO of Wells Fargo Bank, N.A. Concord, CA,; and a registered ISO of Citizens Bank, N.A.</span>
           </p>
         </div>
       </footer>
