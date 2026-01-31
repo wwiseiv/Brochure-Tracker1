@@ -1,4 +1,4 @@
-import { ObjectStorageService, objectStorageClient } from "../../replit_integrations/object_storage/objectStorage";
+import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 
 interface ExtractedStatementData {
@@ -181,20 +181,26 @@ export async function extractStatementFromFiles(
 }
 
 async function getFileAsBase64(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
-  const { bucketName, objectName } = parseObjectPath(objectPath);
-  const bucket = objectStorageClient.bucket(bucketName);
-  const file = bucket.file(objectName);
+  console.log(`[StatementExtractor] getFileAsBase64 called with path: ${objectPath}`);
   
-  const [buffer] = await file.download();
-  return buffer.toString("base64");
+  try {
+    const file = await objectStorage.getObjectEntityFile(objectPath);
+    console.log(`[StatementExtractor] Got file object for: ${objectPath}`);
+    const [buffer] = await file.download();
+    console.log(`[StatementExtractor] Downloaded file, buffer size: ${buffer.length}`);
+    return buffer.toString("base64");
+  } catch (error: any) {
+    console.error(`[StatementExtractor] getFileAsBase64 error:`, error?.message || error);
+    throw error;
+  }
 }
 
 async function extractExcelAsText(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
-  const { bucketName, objectName } = parseObjectPath(objectPath);
-  const bucket = objectStorageClient.bucket(bucketName);
-  const file = bucket.file(objectName);
+  console.log(`[StatementExtractor] extractExcelAsText called with path: ${objectPath}`);
   
+  const file = await objectStorage.getObjectEntityFile(objectPath);
   const [buffer] = await file.download();
+  console.log(`[StatementExtractor] Excel downloaded, buffer size: ${buffer.length}`);
   
   try {
     const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -211,21 +217,6 @@ async function extractExcelAsText(objectPath: string, objectStorage: ObjectStora
     console.error("[StatementExtractor] Excel parsing error:", error);
     return "Unable to parse Excel file";
   }
-}
-
-function parseObjectPath(path: string): { bucketName: string; objectName: string } {
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
-  }
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    throw new Error("Invalid path: must contain at least a bucket name");
-  }
-
-  const bucketName = pathParts[1];
-  const objectName = pathParts.slice(2).join("/");
-
-  return { bucketName, objectName };
 }
 
 export type { ExtractedStatementData };
