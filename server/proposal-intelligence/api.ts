@@ -277,7 +277,12 @@ const statementAnalysisSchema = z.object({
     midQualified: z.object({ volume: z.number(), rate: z.number() }).optional(),
     nonQualified: z.object({ volume: z.number(), rate: z.number() }).optional()
   }).optional(),
-  useAI: z.boolean().optional()
+  useAI: z.boolean().optional(),
+  icPlusMargin: z.object({
+    ratePercent: z.number().min(0).max(5).default(0.50),
+    perTxnFee: z.number().min(0).max(1).default(0.10),
+    monthlyFee: z.number().min(0).max(100).default(10)
+  }).optional()
 });
 
 router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
@@ -307,7 +312,13 @@ router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async 
       qualificationBreakdown: data.qualificationBreakdown
     };
 
-    const analysis = analyzeStatement(statementData);
+    const icPlusMargin = data.icPlusMargin || {
+      ratePercent: 0.50,
+      perTxnFee: 0.10,
+      monthlyFee: 10
+    };
+
+    const analysis = analyzeStatement(statementData, icPlusMargin);
     const talkingPoints = generateTalkingPoints(analysis);
     
     let competitorInsights = null;

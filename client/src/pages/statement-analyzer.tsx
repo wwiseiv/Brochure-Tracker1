@@ -83,7 +83,10 @@ const formSchema = z.object({
   batchFees: z.string().optional(),
   equipmentFees: z.string().optional(),
   otherFees: z.string().optional(),
-  useAI: z.boolean().default(false)
+  useAI: z.boolean().default(false),
+  icPlusRateMargin: z.string().optional(),
+  icPlusPerTxnFee: z.string().optional(),
+  icPlusMonthlyFee: z.string().optional()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -222,7 +225,10 @@ export default function StatementAnalyzer() {
       batchFees: "",
       equipmentFees: "",
       otherFees: "",
-      useAI: false
+      useAI: false,
+      icPlusRateMargin: "0.50",
+      icPlusPerTxnFee: "0.10",
+      icPlusMonthlyFee: "10"
     }
   });
 
@@ -245,7 +251,12 @@ export default function StatementAnalyzer() {
           equipmentFees: data.equipmentFees ? parseFloat(data.equipmentFees) : undefined,
           otherFees: data.otherFees ? parseFloat(data.otherFees) : undefined
         },
-        useAI: data.useAI
+        useAI: data.useAI,
+        icPlusMargin: {
+          ratePercent: data.icPlusRateMargin ? parseFloat(data.icPlusRateMargin) : 0.50,
+          perTxnFee: data.icPlusPerTxnFee ? parseFloat(data.icPlusPerTxnFee) : 0.10,
+          monthlyFee: data.icPlusMonthlyFee ? parseFloat(data.icPlusMonthlyFee) : 10
+        }
       };
       
       const response = await apiRequest("POST", "/api/proposal-intelligence/analyze-statement", payload);
@@ -684,7 +695,10 @@ ${new Date().toLocaleDateString()}
       batchFees: "",
       equipmentFees: "",
       otherFees: "",
-      useAI: false
+      useAI: false,
+      icPlusRateMargin: "0.50",
+      icPlusPerTxnFee: "0.10",
+      icPlusMonthlyFee: "10"
     });
   };
 
@@ -1222,6 +1236,69 @@ ${new Date().toLocaleDateString()}
                                   <FormLabel className="text-xs">Other Fees</FormLabel>
                                   <FormControl>
                                     <Input type="number" placeholder="$0" {...field} data-testid="input-other-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <Separator className="my-4" />
+                          
+                          <p className="text-sm font-medium mb-2">Interchange Plus Margin (Your Pricing)</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Set the margin you'll offer to this merchant. This affects the proposal calculations.
+                          </p>
+                          <div className="grid grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="icPlusRateMargin"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Rate Markup %</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      step="0.01" 
+                                      placeholder="0.50" 
+                                      {...field} 
+                                      data-testid="input-ic-rate-margin" 
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="icPlusPerTxnFee"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Per Txn Fee $</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      step="0.01" 
+                                      placeholder="0.10" 
+                                      {...field} 
+                                      data-testid="input-ic-per-txn-fee" 
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="icPlusMonthlyFee"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Monthly Fee $</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      step="1" 
+                                      placeholder="10" 
+                                      {...field} 
+                                      data-testid="input-ic-monthly-fee" 
+                                    />
                                   </FormControl>
                                 </FormItem>
                               )}

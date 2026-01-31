@@ -311,3 +311,92 @@
     -webkit-backface-visibility: hidden;
   }
 }
+
+/* Print styles for clean PDF export */
+@media print {
+  /* Hide non-essential elements when printing */
+  .print\:hidden,
+  nav,
+  header,
+  .sidebar,
+  button:not(.print-show),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  /* Force white background */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page breaks inside elements */
+  .print-section,
+  .card,
+  [class*="Card"],
+  section,
+  article,
+  .space-y-4 > div,
+  .space-y-6 > div {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Allow page breaks between major sections */
+  .print-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Ensure content flows properly */
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset shadows and borders for print */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Make text readable in print */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Keep headings with their content */
+  h1 + *, h2 + *, h3 + *, h4 + * {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  /* Prevent orphaned elements */
+  p, li, dt, dd {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Ensure tabs content prints properly */
+  [role="tabpanel"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide tab triggers in print */
+  [role="tablist"] {
+    display: none !important;
+  }
+}

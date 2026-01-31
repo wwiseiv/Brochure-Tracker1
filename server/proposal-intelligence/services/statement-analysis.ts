@@ -387,7 +387,16 @@ export function detectHiddenFees(data: StatementData): HiddenFee[] {
   return hiddenFees;
 }
 
-export function analyzeStatement(data: StatementData): AnalysisResult {
+export interface ICPlusMargin {
+  ratePercent: number;
+  perTxnFee: number;
+  monthlyFee: number;
+}
+
+export function analyzeStatement(
+  data: StatementData, 
+  icPlusMargin: ICPlusMargin = { ratePercent: 0.50, perTxnFee: 0.10, monthlyFee: 10 }
+): AnalysisResult {
   const trueCosts = calculateTrueInterchange(data);
   const { totalVolume, totalTransactions, fees } = data;
   
@@ -398,14 +407,16 @@ export function analyzeStatement(data: StatementData): AnalysisResult {
 
   const pcbInterchangePlusCost = 
     trueCosts.trueWholesaleCost + 
-    (totalVolume * 0.20 / 100) + 
-    (totalTransactions * 0.10) + 
-    10;
+    (totalVolume * icPlusMargin.ratePercent / 100) + 
+    (totalTransactions * icPlusMargin.perTxnFee) + 
+    icPlusMargin.monthlyFee;
 
   const pcbDualPricingCost = 20;
 
   const redFlags = identifyRedFlags(data, trueCosts, processorMarkup);
   const hiddenFees = detectHiddenFees(data);
+
+  const icPlusDescription = `Interchange + ${icPlusMargin.ratePercent.toFixed(2)}% + $${icPlusMargin.perTxnFee.toFixed(2)}/txn + $${icPlusMargin.monthlyFee} monthly`;
 
   return {
     summary: {
@@ -431,7 +442,7 @@ export function analyzeStatement(data: StatementData): AnalysisResult {
         effectiveRate: Math.round((pcbInterchangePlusCost / totalVolume) * 10000) / 100,
         monthlySavings: Math.round((fees.totalFees - pcbInterchangePlusCost) * 100) / 100,
         annualSavings: Math.round((fees.totalFees - pcbInterchangePlusCost) * 12 * 100) / 100,
-        description: 'Interchange + 0.20% + $0.10/txn + $10 monthly'
+        description: icPlusDescription
       },
       dualPricing: {
         monthlyCost: pcbDualPricingCost,
