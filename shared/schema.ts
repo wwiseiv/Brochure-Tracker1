@@ -1700,3 +1700,157 @@ export interface EsignMerchantRecord {
   };
   status: string;
 }
+
+// ==================== STATEMENT LEARNING SYSTEM ====================
+
+// Fee categories for the fee dictionary
+export const FEE_CATEGORIES = [
+  "interchange",
+  "network",
+  "assessment",
+  "processor",
+  "monthly",
+  "compliance",
+  "equipment",
+  "markup",
+  "other"
+] as const;
+export type FeeCategory = typeof FEE_CATEGORIES[number];
+
+// Processor names for statement extraction
+export const PROCESSOR_NAMES = [
+  "CardConnect",
+  "First Data",
+  "Fiserv",
+  "TSYS",
+  "Worldpay",
+  "Vantiv",
+  "Square",
+  "Stripe",
+  "Heartland",
+  "Elavon",
+  "Clover",
+  "Toast",
+  "Global Payments",
+  "Chase Paymentech",
+  "Wells Fargo",
+  "PNC Merchant Services",
+  "Gravity Payments",
+  "PayPal",
+  "Unknown"
+] as const;
+export type ProcessorName = typeof PROCESSOR_NAMES[number];
+
+// Fee dictionary table - stores fee definitions for learning
+export const feeDictionary = pgTable("fee_dictionary", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  feeName: varchar("fee_name", { length: 100 }).notNull(),
+  feeAliases: text("fee_aliases").array(),
+  category: varchar("category", { length: 50 }).notNull(),
+  description: text("description"),
+  cardBrand: varchar("card_brand", { length: 30 }),
+  typicalAmountType: varchar("typical_amount_type", { length: 30 }),
+  typicalAmountMin: real("typical_amount_min"),
+  typicalAmountMax: real("typical_amount_max"),
+  isNegotiable: boolean("is_negotiable").default(false),
+  salesTalkingPoint: text("sales_talking_point"),
+  processorSpecific: varchar("processor_specific", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFeeDictionarySchema = createInsertSchema(feeDictionary).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertFeeDictionary = z.infer<typeof insertFeeDictionarySchema>;
+export type FeeDictionary = typeof feeDictionary.$inferSelect;
+
+// Statement extractions table - stores successful extractions for learning
+export const statementExtractions = pgTable("statement_extractions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").references(() => organizations.id),
+  
+  processorName: varchar("processor_name", { length: 100 }).notNull(),
+  processorConfidence: real("processor_confidence"),
+  
+  statementHash: varchar("statement_hash", { length: 64 }),
+  anonymizedText: text("anonymized_text"),
+  
+  volumeRange: varchar("volume_range", { length: 30 }),
+  transactionCount: integer("transaction_count"),
+  effectiveRate: real("effective_rate"),
+  
+  extractedData: jsonb("extracted_data").$type<{
+    merchantName?: string;
+    totalVolume: number;
+    totalTransactions: number;
+    totalFees: number;
+    effectiveRate: number;
+    cardMix?: {
+      visa?: { volume: number; transactions: number };
+      mastercard?: { volume: number; transactions: number };
+      discover?: { volume: number; transactions: number };
+      amex?: { volume: number; transactions: number };
+      debit?: { volume: number; transactions: number };
+    };
+    feeBreakdown?: Record<string, number>;
+  }>(),
+  
+  extractionMethod: varchar("extraction_method", { length: 50 }),
+  extractionConfidence: real("extraction_confidence"),
+  extractionPrompt: text("extraction_prompt"),
+  
+  wasSuccessful: boolean("was_successful").default(true),
+  userCorrected: boolean("user_corrected").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const statementExtractionsRelations = relations(statementExtractions, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [statementExtractions.orgId],
+    references: [organizations.id],
+  }),
+  corrections: many(extractionCorrections),
+}));
+
+export const insertStatementExtractionSchema = createInsertSchema(statementExtractions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertStatementExtraction = z.infer<typeof insertStatementExtractionSchema>;
+export type StatementExtraction = typeof statementExtractions.$inferSelect;
+
+// Extraction corrections table - stores user corrections for learning
+export const extractionCorrections = pgTable("extraction_corrections", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  extractionId: integer("extraction_id").notNull().references(() => statementExtractions.id),
+  userId: varchar("user_id", { length: 255 }),
+  orgId: integer("org_id").references(() => organizations.id),
+  
+  fieldName: varchar("field_name", { length: 100 }).notNull(),
+  originalValue: text("original_value"),
+  correctedValue: text("corrected_value").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const extractionCorrectionsRelations = relations(extractionCorrections, ({ one }) => ({
+  extraction: one(statementExtractions, {
+    fields: [extractionCorrections.extractionId],
+    references: [statementExtractions.id],
+  }),
+  organization: one(organizations, {
+    fields: [extractionCorrections.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertExtractionCorrectionSchema = createInsertSchema(extractionCorrections).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertExtractionCorrection = z.infer<typeof insertExtractionCorrectionSchema>;
+export type ExtractionCorrection = typeof extractionCorrections.$inferSelect;

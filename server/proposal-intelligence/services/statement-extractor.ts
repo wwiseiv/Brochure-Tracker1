@@ -1,6 +1,12 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  identifyProcessor,
+  findSimilarExtractions,
+  storeExtraction,
+  buildFewShotPrompt
+} from "./learning-service";
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -297,6 +303,112 @@ async function extractExcelAsText(objectPath: string, objectStorage: ObjectStora
   } catch (error) {
     console.error("[StatementExtractor] Excel parsing error:", error);
     return "Unable to parse Excel file";
+  }
+}
+
+export interface ExtractedStatementDataWithLearning extends ExtractedStatementData {
+  extractionId?: number;
+  processorIdentified?: string;
+  processorConfidence?: number;
+  usedExamples?: number;
+}
+
+export async function extractStatementWithLearning(
+  files: Array<{ path: string; mimeType: string; name: string }>,
+  orgId?: number
+): Promise<ExtractedStatementDataWithLearning> {
+  const extractedData = await extractStatementFromFiles(files);
+  
+  if (extractedData.confidence < 20) {
+    return extractedData;
+  }
+
+  const processorResult = identifyProcessor(extractedData.processorName || '');
+  console.log(`[StatementExtractor] Identified processor: ${processorResult.name} (${(processorResult.confidence * 100).toFixed(0)}%)`);
+
+  try {
+    const storedExtraction = await storeExtraction({
+      processorName: processorResult.name,
+      processorConfidence: processorResult.confidence,
+      extractedData: {
+        merchantName: extractedData.merchantName,
+        totalVolume: extractedData.totalVolume || 0,
+        totalTransactions: extractedData.totalTransactions || 0,
+        totalFees: extractedData.totalFees || 0,
+        effectiveRate: extractedData.totalVolume && extractedData.totalFees 
+          ? (extractedData.totalFees / extractedData.totalVolume) * 100 
+          : 0,
+        cardMix: extractedData.cardMix,
+        feeBreakdown: extractedData.fees as Record<string, number> | undefined
+      },
+      extractionMethod: 'claude-vision',
+      extractionConfidence: extractedData.confidence / 100,
+      orgId
+    });
+
+    return {
+      ...extractedData,
+      extractionId: storedExtraction.id,
+      processorIdentified: processorResult.name,
+      processorConfidence: processorResult.confidence
+    };
+  } catch (error) {
+    console.error('[StatementExtractor] Failed to store extraction:', error);
+    return {
+      ...extractedData,
+      processorIdentified: processorResult.name,
+      processorConfidence: processorResult.confidence
+    };
+  }
+}
+
+export async function getEnhancedPrompt(processorName: string): Promise<string> {
+  if (!processorName || processorName === 'Unknown') {
+    return EXTRACTION_PROMPT;
+  }
+
+  try {
+    const examples = await findSimilarExtractions(processorName, 3);
+    if (examples.length === 0) {
+      return EXTRACTION_PROMPT;
+    }
+
+    const fewShotSection = buildFewShotPrompt(examples, processorName);
+    console.log(`[StatementExtractor] Enhanced prompt with ${examples.length} examples for ${processorName}`);
+    
+    return `${fewShotSection}\n\n${EXTRACTION_PROMPT}`;
+  } catch (error) {
+    console.error('[StatementExtractor] Failed to get enhanced prompt:', error);
+    return EXTRACTION_PROMPT;
+  }
+}
+
+export async function getLearningSuggestions(processorName: string): Promise<{
+  exampleCount: number;
+  avgEffectiveRate?: number;
+  commonFees?: string[];
+}> {
+  try {
+    const examples = await findSimilarExtractions(processorName, 10);
+    if (examples.length === 0) {
+      return { exampleCount: 0 };
+    }
+
+    const effectiveRates = examples
+      .map(e => e.effectiveRate)
+      .filter((r): r is number => r !== null && r !== undefined);
+    
+    const avgRate = effectiveRates.length > 0 
+      ? effectiveRates.reduce((a, b) => a + b, 0) / effectiveRates.length 
+      : undefined;
+
+    return {
+      exampleCount: examples.length,
+      avgEffectiveRate: avgRate
+    };
+  } catch (error) {
+    console.error('[StatementExtractor] Failed to get learning suggestions:', error);
+    return { exampleCount: 0 };
   }
 }
 

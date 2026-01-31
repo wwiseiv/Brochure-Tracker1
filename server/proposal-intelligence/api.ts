@@ -7,7 +7,7 @@ import { z } from "zod";
 import { analyzeStatement, type StatementData } from "./services/statement-analysis";
 import { generateTalkingPoints, generateCompetitorInsights } from "./services/talking-points";
 import { getAIStatementAnalysis, generateProposalContent } from "./services/ai-analyzer";
-import { extractStatementFromFiles } from "./services/statement-extractor";
+import { extractStatementFromFiles, extractStatementWithLearning } from "./services/statement-extractor";
 
 const router = Router();
 
@@ -466,11 +466,15 @@ router.post("/extract-statement", isAuthenticated, ensureOrgMembership(), async 
     
     console.log(`[StatementExtractor] Processing ${files.length} files for extraction`);
 
-    const extracted = await extractStatementFromFiles(files);
+    const orgId = req.orgMember?.orgId;
+    const extracted = await extractStatementWithLearning(files, orgId);
 
     res.json({
       success: true,
       extracted,
+      extractionId: extracted.extractionId,
+      processorIdentified: extracted.processorIdentified,
+      processorConfidence: extracted.processorConfidence,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -954,6 +958,93 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
     res.status(500).json({
       error: error instanceof Error ? error.message : "Document generation failed"
     });
+  }
+});
+
+// ==================== LEARNING SYSTEM ENDPOINTS ====================
+
+import {
+  storeExtraction,
+  findSimilarExtractions,
+  getExtractionStats,
+  recordCorrection,
+  getFeeDictionary,
+  lookupFee,
+  seedFeeDictionary,
+  identifyProcessor
+} from "./services/learning-service";
+
+seedFeeDictionary().catch(err => console.error("[LearningService] Failed to seed fee dictionary:", err));
+
+router.get("/learning/stats", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const stats = await getExtractionStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error("[Learning] Stats error:", error);
+    res.status(500).json({ error: "Failed to get learning stats" });
+  }
+});
+
+router.get("/learning/fees", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const fees = await getFeeDictionary();
+    res.json({ success: true, fees });
+  } catch (error) {
+    console.error("[Learning] Fee dictionary error:", error);
+    res.status(500).json({ error: "Failed to get fee dictionary" });
+  }
+});
+
+router.get("/learning/fees/:name", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const fee = await lookupFee(req.params.name);
+    if (!fee) {
+      return res.status(404).json({ error: "Fee not found" });
+    }
+    res.json({ success: true, fee });
+  } catch (error) {
+    console.error("[Learning] Fee lookup error:", error);
+    res.status(500).json({ error: "Failed to lookup fee" });
+  }
+});
+
+router.post("/learning/extractions/:id/correct", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const extractionId = parseInt(req.params.id);
+    const { fieldName, originalValue, correctedValue } = req.body;
+
+    if (!fieldName || correctedValue === undefined) {
+      return res.status(400).json({ error: "fieldName and correctedValue are required" });
+    }
+
+    await recordCorrection({
+      extractionId,
+      fieldName,
+      originalValue: String(originalValue),
+      correctedValue: String(correctedValue),
+      userId: req.user?.claims?.sub,
+      orgId: req.orgMember?.orgId
+    });
+
+    res.json({ success: true, message: "Correction recorded - thank you for improving our accuracy!" });
+  } catch (error) {
+    console.error("[Learning] Correction error:", error);
+    res.status(500).json({ error: "Failed to record correction" });
+  }
+});
+
+router.post("/learning/identify-processor", isAuthenticated, ensureOrgMembership(), (req: any, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "text is required" });
+    }
+    const result = identifyProcessor(text);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("[Learning] Processor identification error:", error);
+    res.status(500).json({ error: "Failed to identify processor" });
   }
 });
 

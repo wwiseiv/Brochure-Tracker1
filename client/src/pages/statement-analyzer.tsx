@@ -44,7 +44,10 @@ import {
   Camera,
   Mail,
   Download,
-  Share2
+  Share2,
+  Pencil,
+  Brain,
+  ThumbsUp
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Link } from "wouter";
@@ -187,6 +190,9 @@ interface ExtractedData {
   };
   confidence: number;
   extractionNotes: string[];
+  extractionId?: number;
+  processorIdentified?: string;
+  processorConfidence?: number;
 }
 
 const quickFillExamples = {
@@ -210,6 +216,8 @@ export default function StatementAnalyzer() {
   const [extractionStep, setExtractionStep] = useState<"idle" | "uploading" | "extracting" | "review">("idle");
   const [isDragging, setIsDragging] = useState(false);
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
+  const [showCorrectionUI, setShowCorrectionUI] = useState(false);
+  const [correctionField, setCorrectionField] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
@@ -306,12 +314,22 @@ export default function StatementAnalyzer() {
     },
     onSuccess: (data) => {
       if (data.success && data.extracted) {
-        setExtractedData(data.extracted);
+        const extractedWithMeta = {
+          ...data.extracted,
+          extractionId: data.extractionId,
+          processorIdentified: data.processorIdentified,
+          processorConfidence: data.processorConfidence
+        };
+        setExtractedData(extractedWithMeta);
         applyExtractedData(data.extracted);
         setExtractionStep("review");
+        
+        const processorInfo = data.processorIdentified && data.processorIdentified !== 'Unknown'
+          ? ` • Processor: ${data.processorIdentified}`
+          : '';
         toast({
           title: "Data Extracted",
-          description: `Confidence: ${data.extracted.confidence}%. Please review and edit as needed.`
+          description: `Confidence: ${data.extracted.confidence}%${processorInfo}. Review and edit as needed.`
         });
       }
     },
@@ -324,6 +342,42 @@ export default function StatementAnalyzer() {
       });
     }
   });
+
+  const correctionMutation = useMutation({
+    mutationFn: async (params: { extractionId: number; fieldName: string; originalValue: string; correctedValue: string }) => {
+      const response = await apiRequest(
+        "POST", 
+        `/api/proposal-intelligence/learning/extractions/${params.extractionId}/correct`,
+        { fieldName: params.fieldName, originalValue: params.originalValue, correctedValue: params.correctedValue }
+      );
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Thank You!",
+        description: "Your correction helps improve our accuracy for everyone."
+      });
+      setShowCorrectionUI(false);
+      setCorrectionField(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Correction Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const submitCorrection = (fieldName: string, originalValue: string, correctedValue: string) => {
+    if (!extractedData?.extractionId) return;
+    correctionMutation.mutate({
+      extractionId: extractedData.extractionId,
+      fieldName,
+      originalValue,
+      correctedValue
+    });
+  };
 
   const applyExtractedData = (data: ExtractedData) => {
     if (data.merchantName) form.setValue("merchantName", data.merchantName);
