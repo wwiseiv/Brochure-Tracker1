@@ -8195,14 +8195,18 @@ Generate the following content in JSON format:
       const membership = req.orgMembership as OrgMembershipInfo;
       const orgId = membership.organization.id;
       
-      const followUpsDue = await storage.getDealsNeedingFollowUp(userId);
-      const staleDeals = await storage.getStaleDeals(orgId);
+      const [followUpsDue, staleDeals, checkInsDue] = await Promise.all([
+        storage.getDealsNeedingFollowUp(userId),
+        storage.getStaleDeals(orgId),
+        storage.getDealsNeedingQuarterlyCheckin(userId),
+      ]);
       
       const agentStaleDeals = staleDeals.filter(d => d.assignedAgentId === userId);
       
       res.json({
         followUpsDue,
         staleDeals: agentStaleDeals,
+        checkInsDue,
       });
     } catch (error: any) {
       console.error("[Deals] Today error:", error);
@@ -8867,6 +8871,155 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Deals] Follow-up error:", error);
       res.status(500).json({ error: "Failed to record follow-up" });
+    }
+  });
+
+  // POST /api/deals/:id/convert-to-merchant - Convert won deal to active merchant
+  app.post("/api/deals/:id/convert-to-merchant", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (existingDeal.currentStage !== "sold") {
+        return res.status(400).json({ error: "Deal must be in 'sold' stage to convert to merchant" });
+      }
+
+      if (existingDeal.merchantId) {
+        return res.status(400).json({ error: "Deal is already linked to a merchant" });
+      }
+
+      const merchant = await storage.createMerchant({
+        orgId: orgId,
+        businessName: existingDeal.businessName,
+        businessType: existingDeal.businessType || undefined,
+        businessPhone: existingDeal.businessPhone || undefined,
+        contactName: existingDeal.contactName || undefined,
+        email: existingDeal.businessEmail || undefined,
+        address: existingDeal.businessAddress 
+          ? `${existingDeal.businessAddress}${existingDeal.businessCity ? ', ' + existingDeal.businessCity : ''}${existingDeal.businessState ? ', ' + existingDeal.businessState : ''}${existingDeal.businessZip ? ' ' + existingDeal.businessZip : ''}`
+          : undefined,
+        latitude: existingDeal.latitude || undefined,
+        longitude: existingDeal.longitude || undefined,
+        status: "converted",
+        notes: existingDeal.notes || undefined,
+      });
+
+      const now = new Date();
+      const nextCheckin = new Date(now);
+      nextCheckin.setDate(nextCheckin.getDate() + (existingDeal.quarterlyCheckinFrequencyDays || 90));
+
+      const deal = await storage.updateDeal(id, {
+        merchantId: merchant.id,
+        currentStage: "active_merchant",
+        previousStage: existingDeal.currentStage,
+        stageEnteredAt: now,
+        goLiveAt: now,
+        lastQuarterlyCheckinAt: now,
+        nextQuarterlyCheckinAt: nextCheckin,
+        updatedBy: userId,
+      });
+
+      await storage.createDealActivity({
+        dealId: id,
+        organizationId: orgId,
+        activityType: "stage_change",
+        agentId: userId,
+        fromStage: "sold",
+        toStage: "active_merchant",
+        description: `Converted to active merchant (Merchant #${merchant.id})`,
+        notes: "Deal successfully converted to active merchant account",
+        isSystemGenerated: false,
+      });
+
+      res.json({ deal, merchant });
+    } catch (error: any) {
+      console.error("[Deals] Convert to merchant error:", error);
+      res.status(500).json({ error: "Failed to convert to merchant" });
+    }
+  });
+
+  // POST /api/deals/:id/check-in - Record quarterly check-in
+  app.post("/api/deals/:id/check-in", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const { notes, upsellOpportunities } = req.body;
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (existingDeal.currentStage !== "active_merchant") {
+        return res.status(400).json({ error: "Deal must be in 'active_merchant' stage to record check-in" });
+      }
+
+      const now = new Date();
+      const nextCheckin = new Date(now);
+      nextCheckin.setDate(nextCheckin.getDate() + (existingDeal.quarterlyCheckinFrequencyDays || 90));
+
+      const existingUpsells = (existingDeal.upsellOpportunities as any[]) || [];
+      const updatedUpsells = upsellOpportunities 
+        ? [...existingUpsells, ...upsellOpportunities]
+        : existingUpsells;
+
+      const deal = await storage.updateDeal(id, {
+        lastQuarterlyCheckinAt: now,
+        nextQuarterlyCheckinAt: nextCheckin,
+        upsellOpportunities: updatedUpsells.length > 0 ? updatedUpsells : undefined,
+        updatedBy: userId,
+      });
+
+      await storage.createDealActivity({
+        dealId: id,
+        organizationId: orgId,
+        activityType: "quarterly_checkin",
+        agentId: userId,
+        description: `Quarterly check-in completed`,
+        notes: notes || "Check-in recorded",
+        isSystemGenerated: false,
+      });
+
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Check-in error:", error);
+      res.status(500).json({ error: "Failed to record check-in" });
     }
   });
 

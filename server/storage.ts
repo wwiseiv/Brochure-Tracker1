@@ -319,6 +319,7 @@ export interface IStorage {
   getDealCountsByStage(orgId: number): Promise<{stage: string; count: number}[]>;
   getDealsNeedingFollowUp(agentId: string): Promise<Deal[]>;
   getStaleDeals(orgId: number, maxDaysInStage?: number): Promise<Deal[]>;
+  getDealsNeedingQuarterlyCheckin(agentId: string): Promise<Deal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2206,6 +2207,18 @@ export class DatabaseStorage implements IStorage {
     return staleDeals.sort((a, b) => 
       new Date(a.stageEnteredAt).getTime() - new Date(b.stageEnteredAt).getTime()
     );
+  }
+
+  async getDealsNeedingQuarterlyCheckin(agentId: string): Promise<Deal[]> {
+    const now = new Date();
+    return db.select().from(deals)
+      .where(and(
+        eq(deals.assignedAgentId, agentId),
+        eq(deals.archived, false),
+        eq(deals.currentStage, "active_merchant"),
+        lte(deals.nextQuarterlyCheckinAt, now)
+      ))
+      .orderBy(deals.nextQuarterlyCheckinAt);
   }
 }
 

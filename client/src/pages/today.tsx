@@ -28,6 +28,7 @@ import {
   Building2,
   FileText,
   Loader2,
+  Phone,
 } from "lucide-react";
 import { format, differenceInDays, isToday, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { Deal } from "@shared/schema";
@@ -35,6 +36,7 @@ import type { Deal } from "@shared/schema";
 interface TodayData {
   followUpsDue: Deal[];
   staleDeals: Deal[];
+  checkInsDue: Deal[];
 }
 
 const TEMPERATURE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -133,6 +135,24 @@ export default function TodayPage() {
   const followUpsCount = todayData?.followUpsDue?.length ?? 0;
   const appointmentsCount = appointmentsToday.length;
   const staleCount = todayData?.staleDeals?.length ?? 0;
+  const checkInsCount = todayData?.checkInsDue?.length ?? 0;
+
+  const recordCheckInMutation = useMutation({
+    mutationFn: async (dealId: number) => {
+      const response = await apiRequest("POST", `/api/deals/${dealId}/check-in`, {
+        notes: "Quarterly check-in completed from Today view",
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      toast({ title: "Check-in recorded" });
+    },
+    onError: () => {
+      toast({ title: "Failed to record check-in", variant: "destructive" });
+    },
+  });
 
   const handleCall = (phone: string) => {
     window.location.href = `tel:${phone}`;
@@ -190,12 +210,12 @@ export default function TodayPage() {
       </header>
 
       <main className="p-4 space-y-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Card data-testid="card-followups-summary">
             <CardContent className="p-3 text-center">
               <Bell className="w-5 h-5 mx-auto mb-1 text-yellow-600" />
               <p className="text-2xl font-bold">{followUpsCount}</p>
-              <p className="text-xs text-muted-foreground">Follow-ups Due</p>
+              <p className="text-xs text-muted-foreground">Follow-ups</p>
             </CardContent>
           </Card>
           <Card data-testid="card-appointments-summary">
@@ -205,11 +225,18 @@ export default function TodayPage() {
               <p className="text-xs text-muted-foreground">Appointments</p>
             </CardContent>
           </Card>
+          <Card data-testid="card-checkins-summary">
+            <CardContent className="p-3 text-center">
+              <CalendarCheck className="w-5 h-5 mx-auto mb-1 text-emerald-600" />
+              <p className="text-2xl font-bold">{checkInsCount}</p>
+              <p className="text-xs text-muted-foreground">Check-ins</p>
+            </CardContent>
+          </Card>
           <Card data-testid="card-stale-summary">
             <CardContent className="p-3 text-center">
               <AlertTriangle className="w-5 h-5 mx-auto mb-1 text-orange-600" />
               <p className="text-2xl font-bold">{staleCount}</p>
-              <p className="text-xs text-muted-foreground">Stale Deals</p>
+              <p className="text-xs text-muted-foreground">Stale</p>
             </CardContent>
           </Card>
         </div>
@@ -369,6 +396,92 @@ export default function TodayPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold flex items-center gap-2">
+              <CalendarCheck className="w-4 h-4 text-emerald-600" />
+              Quarterly Check-ins Due
+            </h2>
+            <Link href="/prospects/pipeline?phase=Post-Sale">
+              <Button variant="ghost" size="sm" data-testid="link-view-checkins">
+                View All <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+
+          {(todayData?.checkInsDue?.length ?? 0) === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Building2 className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
+                <p className="text-muted-foreground">No quarterly check-ins due.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {todayData?.checkInsDue?.map((deal) => {
+                const daysSinceCheckIn = deal.lastQuarterlyCheckinAt 
+                  ? differenceInDays(new Date(), new Date(deal.lastQuarterlyCheckinAt))
+                  : null;
+
+                return (
+                  <Card key={deal.id} className="hover-elevate border-emerald-200 dark:border-emerald-900/50" data-testid={`card-checkin-${deal.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/prospects/pipeline?deal=${deal.id}`}>
+                            <h3 className="font-medium truncate cursor-pointer hover:text-primary">
+                              {deal.businessName}
+                            </h3>
+                          </Link>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              <Building2 className="w-3 h-3 mr-1" />
+                              Active Merchant
+                            </Badge>
+                            {daysSinceCheckIn !== null && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {daysSinceCheckIn} days since last check-in
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {deal.businessPhone && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCall(deal.businessPhone!)}
+                            data-testid={`button-call-checkin-${deal.id}`}
+                          >
+                            <Phone className="w-4 h-4 mr-1" />
+                            Call
+                          </Button>
+                        )}
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => recordCheckInMutation.mutate(deal.id)}
+                          disabled={recordCheckInMutation.isPending}
+                          data-testid={`button-checkin-${deal.id}`}
+                        >
+                          {recordCheckInMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Record Check-in
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>

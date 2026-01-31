@@ -62,6 +62,7 @@ import {
   Paperclip,
   PhoneOutgoing,
   CalendarPlus,
+  CalendarCheck,
   ChevronDown,
   ChevronUp,
   Video,
@@ -211,6 +212,53 @@ export default function DealPipelinePage() {
       toast({ title: "Failed to record follow-up", variant: "destructive" });
     },
   });
+
+  const convertToMerchantMutation = useMutation({
+    mutationFn: async (dealId: number) => {
+      const response = await apiRequest("POST", `/api/deals/${dealId}/convert-to-merchant`);
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/pipeline-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants"] });
+      if (selectedDeal) {
+        refetchActivities();
+        setSelectedDeal({ ...selectedDeal, currentStage: "active_merchant", merchantId: data.merchant?.id });
+        setEditingStage("active_merchant");
+      }
+      toast({ 
+        title: "Converted to Active Merchant", 
+        description: `Merchant #${data.merchant?.id} created successfully` 
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to convert to merchant", variant: "destructive" });
+    },
+  });
+
+  const recordCheckInMutation = useMutation({
+    mutationFn: async (data: { dealId: number; notes: string }) => {
+      const response = await apiRequest("POST", `/api/deals/${data.dealId}/check-in`, {
+        notes: data.notes,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/today"] });
+      if (selectedDeal) {
+        refetchActivities();
+      }
+      setCheckInNotes("");
+      toast({ title: "Check-in recorded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to record check-in", variant: "destructive" });
+    },
+  });
+
+  const [checkInNotes, setCheckInNotes] = useState("");
 
   const handleRecordFollowUp = () => {
     if (!selectedDeal || !followUpMethod || !followUpOutcome) {
@@ -872,6 +920,123 @@ export default function DealPipelinePage() {
                     </div>
                   </div>
                 </div>
+
+                {selectedDeal.currentStage === "sold" && !selectedDeal.merchantId && (
+                  <Card className="p-4 border-green-200 dark:border-green-900/50 bg-green-50/50 dark:bg-green-900/10" data-testid="convert-merchant-section">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <h4 className="font-medium">Deal Won!</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Congratulations on closing this deal. Convert this deal to an active merchant to track ongoing relationship and quarterly check-ins.
+                      </p>
+                      <Button
+                        className="w-full"
+                        onClick={() => convertToMerchantMutation.mutate(selectedDeal.id)}
+                        disabled={convertToMerchantMutation.isPending}
+                        data-testid="button-convert-to-merchant"
+                      >
+                        {convertToMerchantMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Building2 className="w-4 h-4 mr-2" />
+                        )}
+                        Convert to Active Merchant
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {selectedDeal.currentStage === "active_merchant" && (
+                  <Card className="p-4 border-emerald-200 dark:border-emerald-900/50" data-testid="active-merchant-section">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-emerald-600" />
+                        <h4 className="font-medium">Active Merchant</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedDeal.merchantId && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Merchant ID</p>
+                            <Link href={`/merchants/${selectedDeal.merchantId}`}>
+                              <span className="text-sm font-medium text-primary hover:underline cursor-pointer">
+                                #{selectedDeal.merchantId}
+                              </span>
+                            </Link>
+                          </div>
+                        )}
+                        
+                        {selectedDeal.lastQuarterlyCheckinAt && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Last Check-in</p>
+                            <p className="text-sm font-medium">
+                              {format(new Date(selectedDeal.lastQuarterlyCheckinAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <p className="text-xs text-muted-foreground">Next Check-in Due</p>
+                          {selectedDeal.nextQuarterlyCheckinAt ? (
+                            <p className={`text-sm font-medium ${
+                              new Date(selectedDeal.nextQuarterlyCheckinAt) <= new Date() 
+                                ? "text-red-600 dark:text-red-400" 
+                                : ""
+                            }`}>
+                              {format(new Date(selectedDeal.nextQuarterlyCheckinAt), "MMM d, yyyy")}
+                              {new Date(selectedDeal.nextQuarterlyCheckinAt) <= new Date() && (
+                                <Badge variant="destructive" className="ml-2 text-xs">Overdue</Badge>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Not scheduled</p>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <p className="text-xs text-muted-foreground">Check-in Frequency</p>
+                          <p className="text-sm font-medium">{selectedDeal.quarterlyCheckinFrequencyDays || 90} days</p>
+                        </div>
+                      </div>
+                      
+                      <div className="border-t pt-3 space-y-2">
+                        <Label className="text-xs">Check-in Notes</Label>
+                        <Textarea
+                          placeholder="Record notes from check-in conversation..."
+                          value={checkInNotes}
+                          onChange={(e) => setCheckInNotes(e.target.value)}
+                          rows={2}
+                          data-testid="textarea-checkin-notes"
+                        />
+                        <Button
+                          className="w-full"
+                          onClick={() => recordCheckInMutation.mutate({ dealId: selectedDeal.id, notes: checkInNotes })}
+                          disabled={recordCheckInMutation.isPending}
+                          data-testid="button-record-checkin"
+                        >
+                          {recordCheckInMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <CalendarCheck className="w-4 h-4 mr-2" />
+                          )}
+                          Record Check-in
+                        </Button>
+                      </div>
+                      
+                      <div className="border-t pt-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="w-4 h-4 text-primary" />
+                          <h5 className="text-sm font-medium">Upsell Opportunities</h5>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Track upsell opportunities during quarterly check-ins. Feature coming soon.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
 
                 <Card className="p-4 space-y-3" data-testid="follow-up-section">
                   <div className="flex items-center justify-between">
