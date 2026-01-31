@@ -89,11 +89,16 @@ export async function extractStatementFromFiles(
   
   for (const file of files) {
     try {
+      console.log(`[StatementExtractor] Processing file: ${file.name}, mimeType: ${file.mimeType}, path: ${file.path}`);
+      
       if (file.mimeType.includes("spreadsheet") || file.mimeType.includes("excel") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
         const textContent = await extractExcelAsText(file.path, objectStorage);
+        console.log(`[StatementExtractor] Excel content extracted, length: ${textContent.length}`);
         parts.push({ text: `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n` });
       } else if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
+        console.log(`[StatementExtractor] Processing PDF: ${file.name}`);
         const base64Data = await getFileAsBase64(file.path, objectStorage);
+        console.log(`[StatementExtractor] PDF base64 length: ${base64Data.length}`);
         parts.push({
           inline_data: {
             mime_type: "application/pdf",
@@ -101,16 +106,20 @@ export async function extractStatementFromFiles(
           }
         });
       } else if (file.mimeType.startsWith("image/")) {
+        console.log(`[StatementExtractor] Processing image: ${file.name}`);
         const base64Data = await getFileAsBase64(file.path, objectStorage);
+        console.log(`[StatementExtractor] Image base64 length: ${base64Data.length}`);
         parts.push({
           inline_data: {
             mime_type: file.mimeType,
             data: base64Data
           }
         });
+      } else {
+        console.log(`[StatementExtractor] Unsupported file type: ${file.mimeType}`);
       }
-    } catch (error) {
-      console.error(`[StatementExtractor] Error processing file ${file.name}:`, error);
+    } catch (error: any) {
+      console.error(`[StatementExtractor] Error processing file ${file.name}:`, error?.message || error);
     }
   }
 
@@ -120,7 +129,9 @@ export async function extractStatementFromFiles(
 
   parts.push({ text: GEMINI_EXTRACTION_PROMPT });
 
-  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.0-flash:generateContent`, {
+  console.log(`[StatementExtractor] Sending ${parts.length} parts to Gemini for analysis`);
+  
+  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-1.5-pro:generateContent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
