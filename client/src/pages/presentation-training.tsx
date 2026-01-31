@@ -798,7 +798,7 @@ export default function PresentationTrainingPage() {
             </div>
           </ScrollArea>
 
-          <div className="border-t p-4 bg-card">
+          <div className="border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-card">
             <div className="max-w-2xl mx-auto flex gap-2">
               <div className="flex-1">
                 <DictationInput
