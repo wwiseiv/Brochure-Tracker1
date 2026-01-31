@@ -1604,6 +1604,7 @@ export const esignRequests = pgTable("esign_requests", {
   orgId: integer("org_id").notNull().references(() => organizations.id),
   agentId: varchar("agent_id").notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
+  dealId: integer("deal_id").references(() => deals.id),
   
   // Document info
   documentIds: text("document_ids").array().default([]),
@@ -1655,6 +1656,10 @@ export const esignRequestsRelations = relations(esignRequests, ({ one }) => ({
   merchant: one(merchants, {
     fields: [esignRequests.merchantId],
     references: [merchants.id],
+  }),
+  deal: one(deals, {
+    fields: [esignRequests.dealId],
+    references: [deals.id],
   }),
 }));
 

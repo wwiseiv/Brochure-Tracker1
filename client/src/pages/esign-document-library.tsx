@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Merchant } from "@shared/schema";
+import type { Merchant, Deal } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -128,6 +128,7 @@ export default function ESignDocumentLibrary() {
   const [merchantName, setMerchantName] = useState("");
   const [merchantEmail, setMerchantEmail] = useState("");
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string>("");
   
   // SignNow template linking state
   const [showTemplateLinkDialog, setShowTemplateLinkDialog] = useState(false);
@@ -163,6 +164,11 @@ export default function ESignDocumentLibrary() {
     expired: number;
   }>({
     queryKey: ["/api/esign/stats"]
+  });
+
+  // Fetch deals for linking
+  const { data: deals = [] } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"]
   });
 
   // Fetch SignNow templates from user's account
@@ -225,6 +231,7 @@ export default function ESignDocumentLibrary() {
       merchantName: string;
       merchantEmail: string;
       merchantId?: number;
+      dealId?: number;
       packageId?: string;
       documentIds?: string[];
     }) => {
@@ -257,6 +264,7 @@ export default function ESignDocumentLibrary() {
     setMerchantName("");
     setMerchantEmail("");
     setSelectedMerchantId(null);
+    setSelectedDealId("");
   };
 
   // Filter templates by category and search
@@ -309,6 +317,7 @@ export default function ESignDocumentLibrary() {
       merchantName,
       merchantEmail,
       merchantId: selectedMerchantId || undefined,
+      dealId: selectedDealId ? parseInt(selectedDealId) : undefined,
       packageId: selectedPackage || undefined,
       documentIds: selectedDocuments
     });
@@ -679,6 +688,26 @@ export default function ESignDocumentLibrary() {
                 placeholder="Enter email address"
                 data-testid="input-merchant-email"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Link to Deal (Optional)</Label>
+              <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+                <SelectTrigger data-testid="select-link-deal">
+                  <SelectValue placeholder="Select a deal to link..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No deal selected</SelectItem>
+                  {deals.map(deal => (
+                    <SelectItem key={deal.id} value={String(deal.id)}>
+                      {deal.businessName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Link this e-sign request to a deal in your pipeline
+              </p>
             </div>
 
             <div className="space-y-2">

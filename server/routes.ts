@@ -7241,11 +7241,13 @@ Generate the following content in JSON format:
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
       const userId = req.user.claims.sub;
+      const orgId = membership.orgId;
       
       const request = await esignService.createRequest({
-        orgId: membership.orgId,
+        orgId: orgId,
         agentId: userId,
         merchantId: req.body.merchantId || null,
+        dealId: req.body.dealId || null,
         documentIds: req.body.documentIds || [],
         packageId: req.body.packageId || null,
         merchantName: req.body.merchantName || null,
@@ -7254,6 +7256,38 @@ Generate the following content in JSON format:
         fieldValues: req.body.fieldValues || {},
         signers: req.body.signers || []
       });
+      
+      // If linked to a deal, create deal attachment and activity
+      if (req.body.dealId) {
+        try {
+          // Create deal attachment for the e-sign document
+          const docNames = (req.body.documentIds || []).join(", ") || "E-Sign Documents";
+          await storage.createDealAttachment({
+            dealId: req.body.dealId,
+            attachmentType: "esign_document",
+            attachmentId: request.id,
+            name: `E-Sign Request: ${req.body.merchantName || docNames}`,
+            createdBy: userId,
+          });
+          
+          // Create deal activity
+          await storage.createDealActivity({
+            dealId: req.body.dealId,
+            organizationId: orgId,
+            activityType: "esign_created",
+            agentId: userId,
+            description: `E-signature request created for: ${req.body.merchantName || "Merchant"}`,
+          });
+          
+          // Update deal's esignStatus to 'draft'
+          await storage.updateDeal(req.body.dealId, {
+            esignStatus: "draft",
+          });
+        } catch (linkError) {
+          console.error("[E-Sign] Error linking to deal:", linkError);
+          // Don't fail the request, just log the error
+        }
+      }
       
       res.json(request);
     } catch (error: any) {
@@ -7336,6 +7370,7 @@ Generate the following content in JSON format:
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
       const userId = req.user.claims.sub;
+      const orgId = membership.orgId;
       const id = parseInt(req.params.id);
       
       if (isNaN(id)) {
@@ -7356,7 +7391,68 @@ Generate the following content in JSON format:
         return res.status(403).json({ error: "Access denied" });
       }
       
+      const previousStatus = request.status;
       const updated = await esignService.updateRequest(id, req.body);
+      
+      // If the request is linked to a deal and status changed, sync with deal
+      if (updated && updated.dealId && req.body.status && req.body.status !== previousStatus) {
+        try {
+          // Map e-sign status to deal esignStatus
+          const statusMap: Record<string, string> = {
+            draft: "draft",
+            pending_send: "draft",
+            sent: "sent",
+            viewed: "viewed",
+            partially_signed: "viewed",
+            completed: "completed",
+            declined: "declined",
+            expired: "expired",
+            voided: "voided"
+          };
+          
+          const dealEsignStatus = statusMap[req.body.status] || req.body.status;
+          const dealUpdateData: Record<string, any> = { esignStatus: dealEsignStatus };
+          
+          // Add timestamps based on status
+          if (req.body.status === "sent") {
+            dealUpdateData.esignSentAt = new Date();
+          } else if (req.body.status === "viewed") {
+            dealUpdateData.esignViewedAt = new Date();
+          } else if (req.body.status === "completed") {
+            dealUpdateData.esignSignedAt = new Date();
+            if (updated.signedDocumentUrl) {
+              dealUpdateData.signedApplicationUrl = updated.signedDocumentUrl;
+            }
+          }
+          
+          await storage.updateDeal(updated.dealId, dealUpdateData);
+          
+          // Create deal activity for the status change
+          const statusLabels: Record<string, string> = {
+            draft: "E-sign draft created",
+            pending_send: "E-sign pending send",
+            sent: "E-sign documents sent",
+            viewed: "E-sign documents viewed by signer",
+            partially_signed: "E-sign partially signed",
+            completed: "E-sign documents signed and completed",
+            declined: "E-sign declined by signer",
+            expired: "E-sign request expired",
+            voided: "E-sign request voided"
+          };
+          
+          await storage.createDealActivity({
+            dealId: updated.dealId,
+            organizationId: orgId,
+            activityType: "esign_status_change",
+            agentId: userId,
+            description: statusLabels[req.body.status] || `E-sign status changed to: ${req.body.status}`,
+          });
+        } catch (syncError) {
+          console.error("[E-Sign] Error syncing status with deal:", syncError);
+          // Don't fail the request, just log the error
+        }
+      }
+      
       res.json(updated);
     } catch (error: any) {
       console.error("[E-Sign] Error updating request:", error);
@@ -7422,6 +7518,9 @@ Generate the following content in JSON format:
   // Send for signature
   app.post("/api/esign/requests/:id/send", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const orgId = membership.orgId;
       const id = parseInt(req.params.id);
       console.log("[E-Sign] Received send request for ID:", id, "body:", JSON.stringify(req.body));
       
@@ -7445,6 +7544,27 @@ Generate the following content in JSON format:
       }
       
       const request = await esignService.getRequest(id);
+      
+      // Sync with deal if linked
+      if (request && request.dealId) {
+        try {
+          await storage.updateDeal(request.dealId, {
+            esignStatus: "sent",
+            esignSentAt: new Date(),
+          });
+          
+          await storage.createDealActivity({
+            dealId: request.dealId,
+            organizationId: orgId,
+            activityType: "esign_status_change",
+            agentId: userId,
+            description: "E-sign documents sent for signature",
+          });
+        } catch (syncError) {
+          console.error("[E-Sign] Error syncing send status with deal:", syncError);
+        }
+      }
+      
       res.json(request);
     } catch (error: any) {
       console.error("[E-Sign] Error sending for signature:", error?.message || error);
@@ -7455,13 +7575,39 @@ Generate the following content in JSON format:
   // Void request
   app.post("/api/esign/requests/:id/void", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
+      const orgId = membership.orgId;
       const id = parseInt(req.params.id);
       
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid request ID" });
       }
       
+      // Get request before voiding to check for dealId
+      const requestBefore = await esignService.getRequest(id);
+      
       const updated = await esignService.voidRequest(id);
+      
+      // Sync with deal if linked
+      if (requestBefore && requestBefore.dealId) {
+        try {
+          await storage.updateDeal(requestBefore.dealId, {
+            esignStatus: "voided",
+          });
+          
+          await storage.createDealActivity({
+            dealId: requestBefore.dealId,
+            organizationId: orgId,
+            activityType: "esign_status_change",
+            agentId: userId,
+            description: "E-sign request voided",
+          });
+        } catch (syncError) {
+          console.error("[E-Sign] Error syncing void status with deal:", syncError);
+        }
+      }
+      
       res.json(updated);
     } catch (error: any) {
       console.error("[E-Sign] Error voiding request:", error);
