@@ -1,0 +1,94 @@
+Please review the Pipeline Enhancement Specification and verify the following items that were not mentioned in your implementation summary. For each item, confirm if it was built, partially built, or needs to be added:
+
+## Mobile UX (Critical for Field Agents)
+
+1. **Swipe Gestures** - Can agents swipe right on a deal card to advance stage and swipe left to move back or mark Dead? This was specified as critical for speed.
+
+2. **Bottom Sheet for Deal Detail** - Is the deal detail view implemented as a bottom sheet that slides up (and can be swiped down to dismiss), or does it navigate to a full new page? Bottom sheet is faster for mobile.
+
+3. **Quick Actions FROM the Deal Card** - Can agents tap to call, text, email, or get directions directly from the deal card in the list/kanban view WITHOUT opening the deal detail first?
+
+4. **48px Touch Targets** - Are all buttons and tappable elements at least 48px for thumb-friendly mobile use?
+
+## Follow-Up System
+
+5. **Follow-Up Attempt Counter** - Is there a visible "Follow-up 2 of 5" counter showing current attempt out of max attempts (default 5)?
+
+6. **Follow-Up Logging UI** - When logging a follow-up, can the agent select:
+   - Method: Phone / Email / Text / Visit
+   - Outcome: No answer, Left voicemail, Spoke-interested, Spoke-needs time, Spoke-objection, Spoke-ready, Not interested, Callback scheduled
+   
+7. **Suggested Follow-Up Cadence** - Does the system suggest next follow-up timing (Day 1, Day 3, Day 7, Day 14, Day 21)?
+
+8. **Auto-Move to Dead** - After max follow-up attempts with no progress, does the system prompt to move the deal to Dead?
+
+## Stage Validation & Prompts
+
+9. **Required Fields by Stage** - Is there validation preventing stage advancement without required data? For example:
+   - Can't move to "Appointment Set" without appointment date
+   - Can't move to "Proposal Sent" without proposal attached
+   - Can't move to "Documents Sent" without E-Sign linked
+   - Can't move to "Dead" without selecting a loss reason
+
+10. **Stage Change Prompts** - When advancing to certain stages, does the system prompt for relevant info (e.g., "When is the appointment?" when moving to Appointment Set)?
+
+## Offline Support
+
+11. **Offline Mode** - Can agents view, create, and edit deals when offline using IndexedDB? Does it sync when back online? This is critical for field work with spotty connectivity.
+
+12. **Pending Sync Indicator** - Is there a visual indicator showing how many changes are pending sync?
+
+## Integrations Not Mentioned
+
+13. **Referral Engine Integration** - When a deal is created from a referral, is it linked to the referral source? When the deal closes as Won, does the referral status update?
+
+14. **Business Card Scanner Integration** - Can scanning a business card create a new deal with pre-filled data?
+
+15. **Meeting Recording Integration** - Can meeting recordings be linked to deals?
+
+16. **Brochure Drop Integration** - Can brochure drops be linked to deals?
+
+## Manager Features
+
+17. **Manager-Only Notes** - Can managers add notes to deals that are NOT visible to agents (for coaching purposes)?
+
+18. **Team Activity Feed** - Is there a real-time timeline showing "Sarah moved Joe's Diner to Proposal Sent" type entries?
+
+19. **Deal Reassignment** - Can managers reassign deals from one agent to another?
+
+20. **Flag for Review** - Can managers flag deals to discuss in 1:1s?
+
+21. **Weighted Forecasting** - Is there a weighted pipeline view showing expected value based on stage probability?
+
+## Admin Configuration
+
+22. **Pipeline Stage Configuration UI** - Can admins add/remove/rename/reorder stages, set colors, set probability percentages, and set stale thresholds?
+
+23. **Loss Reason Management UI** - Can admins customize the list of loss reasons?
+
+24. **Automation Rules UI** - Can admins configure automations like "auto-create follow-up task when deal enters Negotiating"?
+
+25. **Audit Trail** - Is there a log of all changes to deals showing who changed what and when?
+
+## Data Management
+
+26. **Bulk Import/Export** - Can admins import deals from CSV and export deals to CSV/Excel?
+
+27. **Bulk Operations** - Can admins do bulk stage changes or bulk reassignments?
+
+## Notifications
+
+28. **Push Notifications** - Are push notifications implemented for:
+   - Follow-up due/overdue
+   - Appointment reminders
+   - Deal going stale
+   - E-Sign document viewed
+   - E-Sign document signed
+
+## Other Details
+
+29. **Temperature Setting** - How is deal temperature (Hot/Warm/Cold) determined? Is it manually set, automatically calculated, or both?
+
+30. **Signed Application Placeholder** - In the deal detail for won deals, is there a placeholder for "View Signed Application" that will display the signed document once E-Sign integration is complete?
+
+Please implement any missing items, prioritizing: Offline support, Swipe gestures, Follow-up system details, Required fields validation, and Referral integration.
