@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { db } from "../db";
 import { prospects } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -37,17 +36,17 @@ export interface SearchResult {
   searchId: string;
 }
 
-const genai = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
-  httpOptions: {
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
-});
-
 export async function searchLocalBusinesses(
   params: ProspectSearchParams
 ): Promise<SearchResult> {
   const { zipCode, businessTypes, radius, maxResults, agentId } = params;
+
+  const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+  const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
+
+  if (!geminiApiKey) {
+    throw new Error("Gemini API not configured");
+  }
 
   const businessTypeNames = businessTypes.map((bt) => bt.name).join(", ");
   const allSearchTerms = businessTypes.flatMap((bt) => [
@@ -55,7 +54,7 @@ export async function searchLocalBusinesses(
     ...bt.searchTerms,
   ]);
 
-  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Use Google Search to find real, currently operating local businesses matching these criteria:
+  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Search Google to find real, currently operating local businesses matching these criteria:
 
 SEARCH PARAMETERS:
 - Location: Within ${radius} miles of ZIP code ${zipCode}
@@ -101,18 +100,45 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
   try {
     console.log("[ProspectSearch] Searching with Gemini for businesses near", zipCode);
     
-    const response = await genai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: searchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.3,
-        maxOutputTokens: 8192,
+    // Use Gemini API with Google Search grounding
+    const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.0-flash:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey
       },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: searchPrompt }] }],
+        tools: [{ googleSearch: {} }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 8192
+        }
+      })
     });
 
-    const textContent = response.text || "";
-    console.log("[ProspectSearch] Received response, length:", textContent.length);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[ProspectSearch] API error:", response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+    console.log("[ProspectSearch] API response received");
+    
+    // Extract text from Gemini response
+    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    console.log("[ProspectSearch] Response text length:", textContent.length);
+
+    if (!textContent) {
+      console.error("[ProspectSearch] No text content in response");
+      return {
+        businesses: [],
+        totalFound: 0,
+        duplicatesSkipped: 0,
+        searchId: generateSearchId(),
+      };
+    }
 
     // Extract JSON array from response
     const jsonMatch = textContent.match(/\[[\s\S]*\]/);
