@@ -21,6 +21,13 @@ import {
   insertInvitationSchema,
   insertFeedbackSubmissionSchema,
   INVITATION_STATUSES,
+  insertDealSchema,
+  insertDealActivitySchema,
+  insertDealAttachmentSchema,
+  PipelineStage,
+  PIPELINE_STAGES,
+  deals,
+  dealActivities,
 } from "@shared/schema";
 import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail, sendRoleplaySessionEmail } from "./email";
 import { insertMeetingRecordingSchema } from "@shared/schema";
@@ -59,7 +66,7 @@ import {
   prospectActivities,
   prospectSearches,
 } from "@shared/schema";
-import { eq, and, desc, ilike } from "drizzle-orm";
+import { eq, and, desc, ilike, or, asc, lte } from "drizzle-orm";
 import { 
   listCoachingDocuments, 
   getAllCoachingContent, 
@@ -8028,6 +8035,692 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Prospects] Activities error:", error);
       res.status(500).json({ error: "Failed to fetch activities" });
+    }
+  });
+
+  // ==========================================
+  // DEAL PIPELINE ROUTES
+  // ==========================================
+
+  // GET /api/deals/today - Get today's action items (must be before /:id route)
+  app.get("/api/deals/today", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+      
+      const followUpsDue = await storage.getDealsNeedingFollowUp(userId);
+      const staleDeals = await storage.getStaleDeals(orgId);
+      
+      const agentStaleDeals = staleDeals.filter(d => d.assignedAgentId === userId);
+      
+      res.json({
+        followUpsDue,
+        staleDeals: agentStaleDeals,
+      });
+    } catch (error: any) {
+      console.error("[Deals] Today error:", error);
+      res.status(500).json({ error: "Failed to fetch today's action items" });
+    }
+  });
+
+  // GET /api/deals/pipeline-counts - Get counts by stage for pipeline view
+  app.get("/api/deals/pipeline-counts", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+      
+      const counts = await storage.getDealCountsByStage(orgId);
+      res.json(counts);
+    } catch (error: any) {
+      console.error("[Deals] Pipeline counts error:", error);
+      res.status(500).json({ error: "Failed to fetch pipeline counts" });
+    }
+  });
+
+  // POST /api/deals/convert-from-prospect - Convert prospect to deal
+  app.post("/api/deals/convert-from-prospect", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { prospectId } = req.body;
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      if (!prospectId) {
+        return res.status(400).json({ error: "prospectId is required" });
+      }
+
+      const [prospect] = await db.select().from(prospects).where(eq(prospects.id, prospectId));
+      if (!prospect) {
+        return res.status(404).json({ error: "Prospect not found" });
+      }
+
+      const fullAddress = [prospect.addressLine1, prospect.addressLine2, prospect.city, prospect.state, prospect.zipCode]
+        .filter(Boolean)
+        .join(", ");
+
+      const dealData = {
+        organizationId: orgId,
+        businessName: prospect.businessName,
+        businessAddress: fullAddress || undefined,
+        businessCity: prospect.city || undefined,
+        businessState: prospect.state || undefined,
+        businessZip: prospect.zipCode || undefined,
+        businessPhone: prospect.phone || undefined,
+        businessEmail: prospect.email || undefined,
+        website: prospect.website || undefined,
+        businessType: prospect.businessType || undefined,
+        mccCode: prospect.mccCode || undefined,
+        contactName: prospect.ownerName || undefined,
+        contactPhone: prospect.phone || undefined,
+        contactEmail: prospect.email || undefined,
+        assignedAgentId: userId,
+        prospectId: prospect.id,
+        sourceType: "prospect_finder" as const,
+        currentStage: "prospect" as const,
+        temperature: "warm" as const,
+        createdBy: userId,
+        updatedBy: userId,
+        notes: prospect.notes || undefined,
+      };
+
+      const deal = await storage.createDeal(dealData);
+
+      await db.update(prospects)
+        .set({ status: "converted", updatedAt: new Date() })
+        .where(eq(prospects.id, prospectId));
+
+      await storage.createDealActivity({
+        dealId: deal.id,
+        organizationId: orgId,
+        activityType: "deal_created",
+        agentId: userId,
+        description: `Deal created from prospect: ${prospect.businessName}`,
+        isSystemGenerated: true,
+      });
+
+      res.status(201).json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Convert from prospect error:", error);
+      res.status(500).json({ error: "Failed to convert prospect to deal" });
+    }
+  });
+
+  // GET /api/deals - Get all deals for agent (or org if RM/admin)
+  app.get("/api/deals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      
+      let dealsList;
+      if (role === "master_admin" || role === "relationship_manager") {
+        dealsList = await storage.getDealsByOrganization(orgId);
+      } else {
+        dealsList = await storage.getDealsByAgent(userId);
+      }
+      
+      res.json(dealsList);
+    } catch (error: any) {
+      console.error("[Deals] List error:", error);
+      res.status(500).json({ error: "Failed to fetch deals" });
+    }
+  });
+
+  // POST /api/deals - Create new deal
+  app.post("/api/deals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const parsed = insertDealSchema.safeParse({
+        ...req.body,
+        organizationId: orgId,
+        assignedAgentId: req.body.assignedAgentId || userId,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      const deal = await storage.createDeal(parsed.data);
+
+      await storage.createDealActivity({
+        dealId: deal.id,
+        organizationId: orgId,
+        activityType: "deal_created",
+        agentId: userId,
+        description: `Deal created: ${deal.businessName}`,
+        isSystemGenerated: true,
+      });
+
+      res.status(201).json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Create error:", error);
+      res.status(500).json({ error: "Failed to create deal" });
+    }
+  });
+
+  // GET /api/deals/:id - Get single deal with relations
+  app.get("/api/deals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const deal = await storage.getDealWithRelations(id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && deal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Get error:", error);
+      res.status(500).json({ error: "Failed to fetch deal" });
+    }
+  });
+
+  // PATCH /api/deals/:id - Update deal
+  app.patch("/api/deals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateData = {
+        ...req.body,
+        updatedBy: userId,
+      };
+
+      const deal = await storage.updateDeal(id, updateData);
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Update error:", error);
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  // DELETE /api/deals/:id - Archive deal (soft delete)
+  app.delete("/api/deals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.archiveDeal(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Deals] Delete error:", error);
+      res.status(500).json({ error: "Failed to archive deal" });
+    }
+  });
+
+  // PATCH /api/deals/:id/stage - Change deal stage
+  app.patch("/api/deals/:id/stage", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const { stage, reason } = req.body;
+      if (!stage || !PIPELINE_STAGES.includes(stage)) {
+        return res.status(400).json({ error: "Invalid stage" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const deal = await storage.changeDealStage(id, stage as PipelineStage, userId, reason);
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Stage change error:", error);
+      res.status(500).json({ error: "Failed to change deal stage" });
+    }
+  });
+
+  // GET /api/deals/:id/activities - Get deal activities
+  app.get("/api/deals/:id/activities", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const deal = await storage.getDeal(id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && deal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const activities = await storage.getDealActivities(id);
+      res.json(activities);
+    } catch (error: any) {
+      console.error("[Deals] Get activities error:", error);
+      res.status(500).json({ error: "Failed to fetch deal activities" });
+    }
+  });
+
+  // POST /api/deals/:id/activities - Add activity
+  app.post("/api/deals/:id/activities", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const deal = await storage.getDeal(id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && deal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const parsed = insertDealActivitySchema.safeParse({
+        ...req.body,
+        dealId: id,
+        organizationId: orgId,
+        agentId: userId,
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      const activity = await storage.createDealActivity(parsed.data);
+      res.status(201).json(activity);
+    } catch (error: any) {
+      console.error("[Deals] Add activity error:", error);
+      res.status(500).json({ error: "Failed to add activity" });
+    }
+  });
+
+  // GET /api/deals/:id/attachments - Get deal attachments
+  app.get("/api/deals/:id/attachments", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const deal = await storage.getDeal(id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && deal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const attachments = await storage.getDealAttachments(id);
+      res.json(attachments);
+    } catch (error: any) {
+      console.error("[Deals] Get attachments error:", error);
+      res.status(500).json({ error: "Failed to fetch deal attachments" });
+    }
+  });
+
+  // POST /api/deals/:id/attachments - Add attachment
+  app.post("/api/deals/:id/attachments", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const deal = await storage.getDeal(id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && deal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const parsed = insertDealAttachmentSchema.safeParse({
+        ...req.body,
+        dealId: id,
+        createdBy: userId,
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      const attachment = await storage.createDealAttachment(parsed.data);
+      res.status(201).json(attachment);
+    } catch (error: any) {
+      console.error("[Deals] Add attachment error:", error);
+      res.status(500).json({ error: "Failed to add attachment" });
+    }
+  });
+
+  // DELETE /api/deals/attachments/:id - Remove attachment
+  app.delete("/api/deals/attachments/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid attachment ID" });
+      }
+
+      await storage.deleteDealAttachment(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Deals] Delete attachment error:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
+    }
+  });
+
+  // POST /api/deals/:id/follow-up - Record follow-up attempt
+  app.post("/api/deals/:id/follow-up", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid deal ID" });
+      }
+
+      const { method, outcome, notes, nextFollowUpAt } = req.body;
+      if (!method || !outcome) {
+        return res.status(400).json({ error: "method and outcome are required" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      const existingDeal = await storage.getDeal(id);
+      if (!existingDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (existingDeal.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const now = new Date();
+      const newAttemptCount = (existingDeal.followUpAttemptCount || 0) + 1;
+
+      const updateData: any = {
+        followUpAttemptCount: newAttemptCount,
+        lastFollowUpAt: now,
+        lastFollowUpMethod: method,
+        lastFollowUpOutcome: outcome,
+        updatedBy: userId,
+      };
+
+      if (nextFollowUpAt) {
+        updateData.nextFollowUpAt = new Date(nextFollowUpAt);
+        updateData.nextFollowUpMethod = method;
+      } else {
+        updateData.nextFollowUpAt = null;
+      }
+
+      const deal = await storage.updateDeal(id, updateData);
+
+      await storage.createDealActivity({
+        dealId: id,
+        organizationId: orgId,
+        activityType: "follow_up",
+        agentId: userId,
+        followUpAttemptNumber: newAttemptCount,
+        followUpMethod: method,
+        followUpOutcome: outcome,
+        notes: notes,
+        description: `Follow-up #${newAttemptCount} via ${method}: ${outcome}`,
+        isSystemGenerated: false,
+      });
+
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Follow-up error:", error);
+      res.status(500).json({ error: "Failed to record follow-up" });
+    }
+  });
+
+  // GET /api/pipeline-config - Get pipeline stage configuration
+  app.get("/api/pipeline-config", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const config = await storage.getPipelineStageConfig(orgId);
+      res.json(config);
+    } catch (error: any) {
+      console.error("[Pipeline Config] Get error:", error);
+      res.status(500).json({ error: "Failed to fetch pipeline configuration" });
+    }
+  });
+
+  // POST /api/pipeline-config/initialize - Initialize default pipeline config
+  app.post("/api/pipeline-config/initialize", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const config = await storage.initializePipelineStageConfig(orgId);
+      res.json(config);
+    } catch (error: any) {
+      console.error("[Pipeline Config] Initialize error:", error);
+      res.status(500).json({ error: "Failed to initialize pipeline configuration" });
+    }
+  });
+
+  // PATCH /api/pipeline-config/:id - Update stage config
+  app.patch("/api/pipeline-config/:id", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const config = await storage.updatePipelineStageConfig(id, req.body);
+      if (!config) {
+        return res.status(404).json({ error: "Config not found" });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("[Pipeline Config] Update error:", error);
+      res.status(500).json({ error: "Failed to update pipeline configuration" });
+    }
+  });
+
+  // GET /api/loss-reasons - Get loss reasons
+  app.get("/api/loss-reasons", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const reasons = await storage.getLossReasons(orgId);
+      res.json(reasons);
+    } catch (error: any) {
+      console.error("[Loss Reasons] Get error:", error);
+      res.status(500).json({ error: "Failed to fetch loss reasons" });
+    }
+  });
+
+  // POST /api/loss-reasons/initialize - Initialize default loss reasons
+  app.post("/api/loss-reasons/initialize", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const reasons = await storage.initializeLossReasons(orgId);
+      res.json(reasons);
+    } catch (error: any) {
+      console.error("[Loss Reasons] Initialize error:", error);
+      res.status(500).json({ error: "Failed to initialize loss reasons" });
+    }
+  });
+
+  // POST /api/loss-reasons - Create loss reason
+  app.post("/api/loss-reasons", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+
+      const reason = await storage.createLossReason({
+        ...req.body,
+        organizationId: orgId,
+      });
+
+      res.status(201).json(reason);
+    } catch (error: any) {
+      console.error("[Loss Reasons] Create error:", error);
+      res.status(500).json({ error: "Failed to create loss reason" });
+    }
+  });
+
+  // PATCH /api/loss-reasons/:id - Update loss reason
+  app.patch("/api/loss-reasons/:id", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid loss reason ID" });
+      }
+
+      const reason = await storage.updateLossReason(id, req.body);
+      if (!reason) {
+        return res.status(404).json({ error: "Loss reason not found" });
+      }
+
+      res.json(reason);
+    } catch (error: any) {
+      console.error("[Loss Reasons] Update error:", error);
+      res.status(500).json({ error: "Failed to update loss reason" });
+    }
+  });
+
+  // DELETE /api/loss-reasons/:id - Delete loss reason
+  app.delete("/api/loss-reasons/:id", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid loss reason ID" });
+      }
+
+      await storage.deleteLossReason(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Loss Reasons] Delete error:", error);
+      res.status(500).json({ error: "Failed to delete loss reason" });
     }
   });
 
