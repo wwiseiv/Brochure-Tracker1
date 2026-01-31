@@ -8224,6 +8224,136 @@ Generate the following content in JSON format:
     }
   });
 
+  // GET /api/deals/team - Get all deals with agent info (manager only)
+  app.get("/api/deals/team", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+      
+      const [dealsList, members] = await Promise.all([
+        storage.getDealsByOrganization(orgId),
+        storage.getOrganizationMembers(orgId)
+      ]);
+      
+      const memberMap = new Map(members.map(m => [m.userId, m]));
+      
+      const dealsWithAgents = dealsList.map(deal => ({
+        ...deal,
+        agentName: memberMap.get(deal.assignedAgentId) 
+          ? `${memberMap.get(deal.assignedAgentId)?.firstName || ''} ${memberMap.get(deal.assignedAgentId)?.lastName || ''}`.trim() || 'Unknown'
+          : 'Unknown'
+      }));
+      
+      res.json(dealsWithAgents);
+    } catch (error: any) {
+      console.error("[Deals] Team list error:", error);
+      res.status(500).json({ error: "Failed to fetch team deals" });
+    }
+  });
+
+  // GET /api/deals/analytics - Get pipeline analytics data (manager only)
+  app.get("/api/deals/analytics", isAuthenticated, requireRole("master_admin", "relationship_manager"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const orgId = membership.organization.id;
+      
+      const [dealsList, members] = await Promise.all([
+        storage.getDealsByOrganization(orgId),
+        storage.getOrganizationMembers(orgId)
+      ]);
+      
+      const memberMap = new Map(members.map(m => [m.userId, m]));
+      
+      const now = new Date();
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const thisQuarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      
+      const wonDeals = dealsList.filter(d => d.currentStage === 'sold');
+      const lostDeals = dealsList.filter(d => d.currentStage === 'dead');
+      const activeDeals = dealsList.filter(d => !['sold', 'dead', 'active_merchant'].includes(d.currentStage));
+      
+      const wonThisMonth = wonDeals.filter(d => d.wonAt && new Date(d.wonAt) >= thisMonthStart);
+      const wonThisQuarter = wonDeals.filter(d => d.wonAt && new Date(d.wonAt) >= thisQuarterStart);
+      
+      const stageCounts: Record<string, number> = {};
+      const stageTimeSum: Record<string, number> = {};
+      const stageTimeCount: Record<string, number> = {};
+      
+      dealsList.forEach(deal => {
+        stageCounts[deal.currentStage] = (stageCounts[deal.currentStage] || 0) + 1;
+        
+        if (deal.stageEnteredAt) {
+          const timeInStage = (now.getTime() - new Date(deal.stageEnteredAt).getTime()) / (1000 * 60 * 60 * 24);
+          stageTimeSum[deal.currentStage] = (stageTimeSum[deal.currentStage] || 0) + timeInStage;
+          stageTimeCount[deal.currentStage] = (stageTimeCount[deal.currentStage] || 0) + 1;
+        }
+      });
+      
+      const avgTimeByStage: Record<string, number> = {};
+      Object.keys(stageTimeSum).forEach(stage => {
+        avgTimeByStage[stage] = Math.round(stageTimeSum[stage] / stageTimeCount[stage] * 10) / 10;
+      });
+      
+      const agentStats: Record<string, { name: string; won: number; lost: number; active: number; value: number }> = {};
+      dealsList.forEach(deal => {
+        const agentId = deal.assignedAgentId;
+        if (!agentStats[agentId]) {
+          const member = memberMap.get(agentId);
+          agentStats[agentId] = {
+            name: member ? `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+            won: 0,
+            lost: 0,
+            active: 0,
+            value: 0
+          };
+        }
+        if (deal.currentStage === 'sold') agentStats[agentId].won++;
+        else if (deal.currentStage === 'dead') agentStats[agentId].lost++;
+        else if (!['active_merchant'].includes(deal.currentStage)) agentStats[agentId].active++;
+        
+        if (deal.estimatedMonthlyVolume) {
+          agentStats[agentId].value += parseFloat(deal.estimatedMonthlyVolume.toString());
+        }
+      });
+      
+      const topPerformers = Object.entries(agentStats)
+        .sort((a, b) => b[1].won - a[1].won)
+        .slice(0, 5)
+        .map(([id, stats]) => ({ agentId: id, ...stats }));
+      
+      const totalValue = dealsList.reduce((sum, d) => {
+        return sum + (d.estimatedMonthlyVolume ? parseFloat(d.estimatedMonthlyVolume.toString()) : 0);
+      }, 0);
+      
+      const avgDealSize = wonDeals.length > 0 
+        ? wonDeals.reduce((sum, d) => sum + (d.estimatedMonthlyVolume ? parseFloat(d.estimatedMonthlyVolume.toString()) : 0), 0) / wonDeals.length
+        : 0;
+      
+      res.json({
+        summary: {
+          totalDeals: dealsList.length,
+          activeDeals: activeDeals.length,
+          wonDeals: wonDeals.length,
+          lostDeals: lostDeals.length,
+          wonThisMonth: wonThisMonth.length,
+          wonThisQuarter: wonThisQuarter.length,
+          totalPipelineValue: Math.round(totalValue),
+          avgDealSize: Math.round(avgDealSize),
+          winRate: wonDeals.length + lostDeals.length > 0 
+            ? Math.round((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100)
+            : 0
+        },
+        stageCounts,
+        avgTimeByStage,
+        topPerformers,
+        agentStats: Object.entries(agentStats).map(([id, stats]) => ({ agentId: id, ...stats }))
+      });
+    } catch (error: any) {
+      console.error("[Deals] Analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
   // POST /api/deals/convert-from-prospect - Convert prospect to deal
   app.post("/api/deals/convert-from-prospect", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {

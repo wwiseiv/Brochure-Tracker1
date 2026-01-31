@@ -33,6 +33,8 @@ import StatementAnalyzerPage from "@/pages/statement-analyzer";
 import MyWorkPage from "@/pages/my-work";
 import ProspectFinderPage from "@/pages/prospect-finder";
 import ProspectPipelinePage from "@/pages/prospect-pipeline";
+import TeamPipelinePage from "@/pages/team-pipeline";
+import PipelineAnalyticsPage from "@/pages/pipeline-analytics";
 import TodayPage from "@/pages/today";
 import BusinessCardScannerPage from "@/pages/business-card-scanner";
 import ESignDocumentLibraryPage from "@/pages/esign-document-library";
@@ -153,6 +155,8 @@ function AuthenticatedRouter() {
       <Route path="/my-work" component={MyWorkPage} />
       <Route path="/prospects/search" component={ProspectFinderPage} />
       <Route path="/prospects/pipeline" component={ProspectPipelinePage} />
+      <Route path="/team-pipeline" component={TeamPipelinePage} />
+      <Route path="/pipeline-analytics" component={PipelineAnalyticsPage} />
       <Route path="/today" component={TodayPage} />
       <Route path="/prospects/scan-card" component={BusinessCardScannerPage} />
       <Route path="/esign" component={ESignDocumentLibraryPage} />

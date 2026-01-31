@@ -1,6 +1,13 @@
 import { Link, useLocation } from "wouter";
-import { Home, QrCode, User, Store, MessageSquare, FileSignature, HelpCircle, CalendarCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+interface UserRole {
+  role: string;
+  memberId: number;
+  organization: { id: number; name: string };
+}
 
 const navItems = [
   { path: "/", icon: Home, label: "Home", tooltip: "Go to home screen" },
@@ -11,14 +18,30 @@ const navItems = [
   { path: "/profile", icon: User, label: "Profile", tooltip: "Your profile & settings" },
 ];
 
+const managerNavItems = [
+  { path: "/team-pipeline", icon: Users, label: "Team", tooltip: "Team pipeline overview" },
+  { path: "/pipeline-analytics", icon: BarChart3, label: "Analytics", tooltip: "Pipeline analytics" },
+];
+
 export function BottomNav() {
   const [location] = useLocation();
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
+
+  const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
+
+  const displayItems = isManager 
+    ? [...navItems.slice(0, 4), ...managerNavItems, navItems[5]] 
+    : navItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 safe-area-inset-bottom bottom-nav-fixed">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-        {navItems.map((item) => {
-          const isActive = location === item.path;
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
+        {displayItems.map((item) => {
+          const isActive = location === item.path || 
+            (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
+            (item.path === "/pipeline-analytics" && location === "/team-pipeline");
           const Icon = item.icon;
           
           return (
@@ -26,15 +49,15 @@ export function BottomNav() {
               <TooltipTrigger asChild>
                 <Link href={item.path}>
                   <button
-                    data-testid={`nav-${item.label.toLowerCase()}`}
-                    className={`flex flex-col items-center justify-center gap-1 min-w-[54px] min-h-touch py-2 px-1.5 rounded-lg transition-colors ${
+                    data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-touch py-2 px-1 rounded-lg transition-colors ${
                       isActive
                         ? "text-primary bg-primary/10"
                         : "text-muted-foreground hover-elevate"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
-                    <span className="text-[11px] font-medium">{item.label}</span>
+                    <span className="text-[10px] font-medium">{item.label}</span>
                   </button>
                 </Link>
               </TooltipTrigger>
