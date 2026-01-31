@@ -51,25 +51,32 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Presentation,
+  Calculator,
+  Send,
+  FileSignature,
+  Wrench,
+  MessageSquare,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Deal } from "@shared/schema";
 
-const STAGE_CONFIG: Record<string, { label: string; color: string; phase: string }> = {
-  prospect: { label: "Prospect", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300", phase: "Prospecting" },
-  cold_call: { label: "Cold Call", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", phase: "Prospecting" },
-  appointment_set: { label: "Appt Set", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300", phase: "Prospecting" },
-  presentation_made: { label: "Presented", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", phase: "Active Selling" },
-  proposal_sent: { label: "Proposal", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300", phase: "Active Selling" },
-  statement_analysis: { label: "Analysis", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300", phase: "Active Selling" },
-  negotiating: { label: "Negotiating", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", phase: "Active Selling" },
-  follow_up: { label: "Follow-Up", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", phase: "Active Selling" },
-  documents_sent: { label: "Docs Sent", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", phase: "Closing" },
-  documents_signed: { label: "Signed", color: "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300", phase: "Closing" },
-  sold: { label: "Won", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300", phase: "Closing" },
-  dead: { label: "Lost", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", phase: "Closing" },
-  installation_scheduled: { label: "Install", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300", phase: "Post-Sale" },
-  active_merchant: { label: "Active", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", phase: "Post-Sale" },
+const DEAL_STAGE_CONFIG: Record<string, { label: string; color: string; icon: any; phase: string }> = {
+  prospect: { label: "Prospect", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300", icon: Search, phase: "Prospecting" },
+  cold_call: { label: "Cold Call", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", icon: Phone, phase: "Prospecting" },
+  appointment_set: { label: "Appt Set", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300", icon: Calendar, phase: "Prospecting" },
+  presentation_made: { label: "Presented", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", icon: Presentation, phase: "Active Selling" },
+  proposal_sent: { label: "Proposal", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300", icon: FileText, phase: "Active Selling" },
+  statement_analysis: { label: "Analysis", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300", icon: Calculator, phase: "Active Selling" },
+  negotiating: { label: "Negotiating", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", icon: MessageSquare, phase: "Active Selling" },
+  follow_up: { label: "Follow-Up", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", icon: Clock, phase: "Active Selling" },
+  documents_sent: { label: "Docs Sent", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", icon: Send, phase: "Closing" },
+  documents_signed: { label: "Signed", color: "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300", icon: FileSignature, phase: "Closing" },
+  sold: { label: "Won", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300", icon: Check, phase: "Closing" },
+  dead: { label: "Lost", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle, phase: "Closing" },
+  installation_scheduled: { label: "Install", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300", icon: Wrench, phase: "Post-Sale" },
+  active_merchant: { label: "Active", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", icon: Building2, phase: "Post-Sale" },
 };
 
 const PHASES = ["All", "Prospecting", "Active Selling", "Closing", "Post-Sale"] as const;
@@ -266,8 +273,8 @@ export default function DealPipelinePage() {
   };
 
   const getStagesForPhase = (phase: string): string[] => {
-    if (phase === "All") return Object.keys(STAGE_CONFIG);
-    return Object.entries(STAGE_CONFIG)
+    if (phase === "All") return Object.keys(DEAL_STAGE_CONFIG);
+    return Object.entries(DEAL_STAGE_CONFIG)
       .filter(([_, config]) => config.phase === phase)
       .map(([stage]) => stage);
   };
@@ -275,7 +282,7 @@ export default function DealPipelinePage() {
   const filteredDeals = (dealsData || []).filter((deal) => {
     const matchesSearch = deal.businessName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTemperature = temperatureFilter === "all" || deal.temperature === temperatureFilter;
-    const matchesPhase = phaseFilter === "All" || STAGE_CONFIG[deal.currentStage]?.phase === phaseFilter;
+    const matchesPhase = phaseFilter === "All" || DEAL_STAGE_CONFIG[deal.currentStage]?.phase === phaseFilter;
     return matchesSearch && matchesTemperature && matchesPhase && !deal.archived;
   });
 
@@ -311,9 +318,11 @@ export default function DealPipelinePage() {
   };
 
   const renderStageBadge = (stage: string) => {
-    const config = STAGE_CONFIG[stage] || STAGE_CONFIG.prospect;
+    const config = DEAL_STAGE_CONFIG[stage] || DEAL_STAGE_CONFIG.prospect;
+    const Icon = config.icon;
     return (
       <Badge className={`text-xs ${config.color}`}>
+        <Icon className="w-3 h-3 mr-1" />
         {config.label}
       </Badge>
     );
@@ -427,7 +436,7 @@ export default function DealPipelinePage() {
         <div className="flex gap-4" style={{ minWidth: `${visibleStages.length * 280}px` }}>
           {visibleStages.map((stage) => {
             const stageDeals = filteredDeals.filter(d => d.currentStage === stage);
-            const config = STAGE_CONFIG[stage];
+            const config = DEAL_STAGE_CONFIG[stage];
             const count = pipelineCounts?.[stage] || stageDeals.length;
 
             return (
@@ -791,15 +800,18 @@ export default function DealPipelinePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STAGE_CONFIG).map(([stage, config]) => (
-                        <SelectItem key={stage} value={stage}>
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${config.color.split(' ')[0]}`} />
-                            {config.label}
-                            <span className="text-xs text-muted-foreground">({config.phase})</span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {Object.entries(DEAL_STAGE_CONFIG).map(([stage, config]) => {
+                        const StageIcon = config.icon;
+                        return (
+                          <SelectItem key={stage} value={stage}>
+                            <div className="flex items-center gap-2">
+                              <StageIcon className="w-4 h-4" />
+                              {config.label}
+                              <span className="text-xs text-muted-foreground">({config.phase})</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
