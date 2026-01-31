@@ -34,6 +34,7 @@ import {
   X,
   Plus,
   ChevronRight,
+  TrendingUp,
   Utensils,
   ShoppingBag,
   Briefcase,
@@ -119,6 +120,7 @@ export default function ProspectFinderPage() {
   const [showResults, setShowResults] = useState(false);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimedBusinesses, setClaimedBusinesses] = useState<Set<string>>(new Set());
+  const [convertingId, setConvertingId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -188,6 +190,37 @@ export default function ProspectFinderPage() {
         description: isAlreadyClaimed 
           ? "This business was claimed by another agent" 
           : message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const convertToDealMutation = useMutation({
+    mutationFn: async (prospect: DiscoveredBusiness) => {
+      const response = await apiRequest("POST", "/api/deals/convert-from-prospect", {
+        businessName: prospect.name,
+        businessAddress: prospect.address,
+        businessCity: prospect.city,
+        businessState: prospect.state,
+        businessZip: prospect.zipCode,
+        businessPhone: prospect.phone,
+        businessEmail: prospect.email,
+        website: prospect.website,
+        contactName: prospect.ownerName,
+      });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Converted to Deal!",
+        description: `${data.businessName} has been added to your deal pipeline.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Conversion failed",
+        description: error.message || "Failed to convert prospect to deal",
         variant: "destructive",
       });
     },
@@ -672,38 +705,68 @@ export default function ProspectFinderPage() {
                       )}
                     </div>
 
-                    <Tooltip delayDuration={700}>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          variant={isClaimed ? "secondary" : "default"}
-                          disabled={isClaimed || isClaiming}
-                          onClick={() => handleClaim(business)}
-                          data-testid={`button-claim-${business.name.replace(/\s+/g, "-")}`}
-                        >
-                          {isClaimed ? (
-                            <>
-                              <Check className="w-4 h-4 mr-1" />
-                              Claimed
-                            </>
-                          ) : isClaiming ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              Claiming...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-4 h-4 mr-1" />
-                              Claim Prospect
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{isClaimed ? "Already added to your pipeline" : "Add this business to your pipeline"}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    {isClaimed ? (
+                      <div className="flex gap-2">
+                        <div className="flex-1 flex items-center justify-center text-sm font-medium text-green-600 dark:text-green-500">
+                          <Check className="w-4 h-4 mr-1" />
+                          Claimed
+                        </div>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              disabled={convertingId === business.name}
+                              onClick={() => {
+                                setConvertingId(business.name);
+                                convertToDealMutation.mutate(business, {
+                                  onSettled: () => setConvertingId(null),
+                                });
+                              }}
+                              data-testid={`button-convert-deal-${business.name.replace(/\s+/g, "-")}`}
+                            >
+                              {convertingId === business.name ? (
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              ) : (
+                                <TrendingUp className="w-4 h-4 mr-1" />
+                              )}
+                              Convert to Deal
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add to deal pipeline</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ) : (
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            variant="default"
+                            disabled={isClaiming}
+                            onClick={() => handleClaim(business)}
+                            data-testid={`button-claim-${business.name.replace(/\s+/g, "-")}`}
+                          >
+                            {isClaiming ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Claiming...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4 mr-1" />
+                                Claim Prospect
+                              </>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Add this business to your pipeline</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </Card>
                 );
               })}
