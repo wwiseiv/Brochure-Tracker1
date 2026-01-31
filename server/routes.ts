@@ -5628,6 +5628,67 @@ ${lessonContext ? `\n### Current Lesson Context\n${lessonContext}\n` : ""}
     }
   });
 
+  const practiceFeedbackSchema = z.object({
+    lessonId: z.number().optional(),
+    practicePrompt: z.string().min(1, "Practice prompt is required"),
+    userResponse: z.string().min(1, "User response is required"),
+    lessonTitle: z.string().optional(),
+    scriptText: z.string().optional(),
+  });
+
+  app.post("/api/presentation/practice-feedback", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const parsed = practiceFeedbackSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.format() });
+      }
+      
+      const { practicePrompt, userResponse, lessonTitle, scriptText } = parsed.data;
+      
+      const systemPrompt = `You are an expert sales training coach for PCBancard's Dual Pricing presentation. Your role is to evaluate practice responses from sales agents and provide constructive, actionable feedback.
+
+## Lesson Context
+${lessonTitle ? `Lesson: "${lessonTitle}"` : ""}
+${scriptText ? `Script Reference: ${scriptText}` : ""}
+
+## Evaluation Criteria
+1. **Key Concepts**: Did they capture the main points of the lesson?
+2. **Understanding**: Do they show genuine comprehension, not just memorization?
+3. **Application**: Can they apply this to real sales situations?
+4. **Language**: Are they using effective persuasive language?
+5. **Confidence**: Does their response convey confidence and authority?
+
+## Feedback Guidelines
+- Start with what they did well (be specific)
+- Identify 1-2 areas for improvement
+- Provide a concrete example or suggestion
+- End with encouragement
+- Keep feedback concise (3-4 paragraphs max)
+- Be supportive but direct - this is sales training`;
+
+      const client = getAIIntegrationsClient();
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { 
+            role: "user", 
+            content: `Practice Prompt: "${practicePrompt}"\n\nAgent's Response: "${userResponse}"\n\nPlease evaluate this response and provide constructive feedback.`
+          },
+        ],
+        max_completion_tokens: 800,
+        temperature: 0.7,
+      });
+
+      const feedback = response.choices[0]?.message?.content?.trim() || "Unable to generate feedback. Please try again.";
+      
+      res.json({ feedback });
+    } catch (error: any) {
+      console.error("[Presentation] Error in practice feedback:", error);
+      res.status(500).json({ error: "Failed to get AI feedback" });
+    }
+  });
+
   // ============================================
   // Proposal Generator Routes
   // ============================================

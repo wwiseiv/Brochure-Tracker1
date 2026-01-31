@@ -10,6 +10,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { BottomNav } from "@/components/BottomNav";
@@ -32,6 +38,7 @@ import {
   X,
   Send,
   Play,
+  Sparkles,
 } from "lucide-react";
 import type {
   PresentationModule,
@@ -72,6 +79,9 @@ export default function PresentationTrainingPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAsking, setIsAsking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  const [practiceFeedback, setPracticeFeedback] = useState<string | null>(null);
+  const [isGettingFeedback, setIsGettingFeedback] = useState(false);
 
   const { data: modules, isLoading: modulesLoading } = useQuery<ModuleWithLessons[]>({
     queryKey: ["/api/presentation/modules"],
@@ -137,7 +147,40 @@ export default function PresentationTrainingPage() {
   const selectLesson = (lessonId: number) => {
     setSelectedLessonId(lessonId);
     setPracticeResponse("");
+    setPracticeFeedback(null);
     setSidebarOpen(false);
+  };
+  
+  const getPracticeFeedback = async () => {
+    if (!practiceResponse.trim() || !currentLesson || isGettingFeedback) return;
+    
+    setIsGettingFeedback(true);
+    setPracticeFeedback(null);
+    
+    try {
+      const res = await apiRequest("POST", "/api/presentation/practice-feedback", {
+        lessonId: currentLesson.id,
+        practicePrompt: currentLesson.practicePrompt,
+        userResponse: practiceResponse.trim(),
+        lessonTitle: currentLesson.title,
+        scriptText: currentLesson.scriptText?.slice(0, 500),
+      });
+      const data = await res.json();
+      setPracticeFeedback(data.feedback);
+      
+      toast({
+        title: "Feedback received!",
+        description: "Review the AI feedback below.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to get feedback",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGettingFeedback(false);
+    }
   };
 
   const getModuleProgress = (module: ModuleWithLessons) => {
@@ -219,14 +262,14 @@ export default function PresentationTrainingPage() {
 
   if (modulesLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <header className="sticky top-0 z-40 bg-card border-b border-border shrink-0">
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
             <GraduationCap className="w-6 h-6 text-primary" />
             <h1 className="font-semibold text-lg">Teach Me the Presentation</h1>
           </div>
         </header>
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
         <BottomNav />
@@ -234,9 +277,89 @@ export default function PresentationTrainingPage() {
     );
   }
 
+  const renderModulesList = () => (
+    <div className="p-4 space-y-2">
+      {modules?.map((module) => {
+        const progress = getModuleProgress(module);
+        const isExpanded = expandedModules.has(module.id);
+        const isCurrentModule = module.lessons.some(
+          (l) => l.id === selectedLessonId
+        );
+
+        return (
+          <Collapsible
+            key={module.id}
+            open={isExpanded}
+            onOpenChange={() => toggleModule(module.id)}
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                  isCurrentModule
+                    ? "bg-primary/10 border border-primary/30"
+                    : "hover-elevate bg-muted/50"
+                }`}
+                data-testid={`module-trigger-${module.id}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Module {module.moduleNumber}
+                      </span>
+                      {progress.completed === progress.total && progress.total > 0 && (
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                      )}
+                    </div>
+                    <p className="font-medium text-sm truncate">{module.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {progress.completed}/{progress.total} lessons completed
+                    </p>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  )}
+                </div>
+                <Progress
+                  value={(progress.completed / Math.max(progress.total, 1)) * 100}
+                  className="h-1 mt-2"
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="ml-4 mt-1 space-y-1">
+                {module.lessons.map((lesson) => (
+                  <button
+                    key={lesson.id}
+                    onClick={() => selectLesson(lesson.id)}
+                    className={`w-full text-left p-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                      lesson.id === selectedLessonId
+                        ? "bg-primary text-primary-foreground"
+                        : "hover-elevate"
+                    }`}
+                    data-testid={`lesson-button-${lesson.id}`}
+                  >
+                    {lesson.progress?.completed ? (
+                      <CheckCircle className="w-4 h-4 flex-shrink-0 text-green-500" />
+                    ) : (
+                      <Play className="w-4 h-4 flex-shrink-0 opacity-50" />
+                    )}
+                    <span className="truncate">{lesson.title}</span>
+                  </button>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-card border-b border-border shrink-0">
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <GraduationCap className="w-6 h-6 text-primary" />
@@ -248,7 +371,7 @@ export default function PresentationTrainingPage() {
             variant="ghost"
             size="sm"
             className="lg:hidden"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setSidebarOpen(true)}
             data-testid="button-toggle-sidebar"
           >
             <BookOpen className="w-5 h-5" />
@@ -256,117 +379,28 @@ export default function PresentationTrainingPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden">
-        <div className="container max-w-6xl mx-auto flex h-full">
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle>Modules</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-5rem)]">
+            {renderModulesList()}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+
+      <div className="container max-w-6xl mx-auto flex">
         <aside
-          className={`
-            fixed lg:static inset-y-0 left-0 z-30 w-72 bg-card border-r border-border
-            transform transition-transform lg:transform-none
-            ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-            pt-14 lg:pt-0
-          `}
+          className="hidden lg:block w-72 shrink-0 border-r border-border bg-card"
           data-testid="sidebar-modules"
         >
-          <div className="lg:hidden flex items-center justify-between p-4 border-b">
-            <span className="font-medium">Modules</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(false)}
-              data-testid="button-close-sidebar"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-          <ScrollArea className="h-[calc(100vh-8rem)]">
-            <div className="p-4 space-y-2">
-              {modules?.map((module) => {
-                const progress = getModuleProgress(module);
-                const isExpanded = expandedModules.has(module.id);
-                const isCurrentModule = module.lessons.some(
-                  (l) => l.id === selectedLessonId
-                );
-
-                return (
-                  <Collapsible
-                    key={module.id}
-                    open={isExpanded}
-                    onOpenChange={() => toggleModule(module.id)}
-                  >
-                    <CollapsibleTrigger asChild>
-                      <button
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          isCurrentModule
-                            ? "bg-primary/10 border border-primary/30"
-                            : "hover-elevate bg-muted/50"
-                        }`}
-                        data-testid={`module-trigger-${module.id}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-muted-foreground">
-                                Module {module.moduleNumber}
-                              </span>
-                              {progress.completed === progress.total && progress.total > 0 && (
-                                <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                              )}
-                            </div>
-                            <p className="font-medium text-sm truncate">{module.title}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {progress.completed}/{progress.total} lessons completed
-                            </p>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          )}
-                        </div>
-                        <Progress
-                          value={(progress.completed / Math.max(progress.total, 1)) * 100}
-                          className="h-1 mt-2"
-                        />
-                      </button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="ml-4 mt-1 space-y-1">
-                        {module.lessons.map((lesson) => (
-                          <button
-                            key={lesson.id}
-                            onClick={() => selectLesson(lesson.id)}
-                            className={`w-full text-left p-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
-                              lesson.id === selectedLessonId
-                                ? "bg-primary text-primary-foreground"
-                                : "hover-elevate"
-                            }`}
-                            data-testid={`lesson-button-${lesson.id}`}
-                          >
-                            {lesson.progress?.completed ? (
-                              <CheckCircle className="w-4 h-4 flex-shrink-0 text-green-500" />
-                            ) : (
-                              <Play className="w-4 h-4 flex-shrink-0 opacity-50" />
-                            )}
-                            <span className="truncate">{lesson.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-            </div>
+          <ScrollArea className="h-[calc(100vh-3.5rem)]">
+            {renderModulesList()}
           </ScrollArea>
         </aside>
 
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        <main className="flex-1 min-w-0 p-4 lg:p-6 overflow-y-auto pb-24">
+        <main className="flex-1 min-w-0 p-4 lg:p-6">
           {lessonLoading ? (
             <div className="flex items-center justify-center min-h-[50vh]">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -518,6 +552,32 @@ export default function PresentationTrainingPage() {
                     multiline
                     rows={4}
                   />
+                  <Button
+                    onClick={getPracticeFeedback}
+                    disabled={!practiceResponse.trim() || isGettingFeedback}
+                    className="mt-4 gap-2 w-full"
+                    data-testid="button-get-feedback"
+                  >
+                    {isGettingFeedback ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {isGettingFeedback ? "Getting Feedback..." : "Get AI Feedback"}
+                  </Button>
+                  
+                  {practiceFeedback && (
+                    <Card className="mt-4 p-4 bg-primary/5 border-primary/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                        <h4 className="font-semibold flex-1">AI Feedback</h4>
+                        <ListenButton text={practiceFeedback} />
+                      </div>
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                        {practiceFeedback}
+                      </div>
+                    </Card>
+                  )}
                 </Card>
               )}
 
@@ -553,7 +613,6 @@ export default function PresentationTrainingPage() {
             </div>
           )}
         </main>
-        </div>
       </div>
 
       <Button
