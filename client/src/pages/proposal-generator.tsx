@@ -1944,7 +1944,11 @@ export default function ProposalGeneratorPage() {
                 )}
                 {merchant.businessDescription && 
                   !merchant.businessDescription.toLowerCase().includes('{meta') &&
+                  !merchant.businessDescription.toLowerCase().includes('{description}') &&
                   !merchant.businessDescription.toLowerCase().includes('meta description') &&
+                  merchant.businessDescription.toLowerCase() !== 'undefined' &&
+                  merchant.businessDescription.toLowerCase() !== 'none' &&
+                  merchant.businessDescription.toLowerCase() !== 'n/a' &&
                   merchant.businessDescription.length > 10 && (
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Description</p>

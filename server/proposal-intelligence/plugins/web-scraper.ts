@@ -306,17 +306,12 @@ IMPORTANT:
             }
           }
           
-          // Build clean address from structured fields
+          // Build clean address from structured fields OR fallback to unstructured
           if (!context.merchantData.address) {
-            const addressParts = [];
-            if (extracted.streetAddress) addressParts.push(extracted.streetAddress);
-            if (extracted.city) addressParts.push(extracted.city);
-            if (extracted.state) addressParts.push(extracted.state);
-            if (extracted.zip) addressParts.push(extracted.zip);
+            let formattedAddress = '';
             
-            if (addressParts.length > 0) {
-              // Format: "123 Main St, City, ST 12345"
-              let formattedAddress = '';
+            // Try structured fields first
+            if (extracted.streetAddress || extracted.city || extracted.state || extracted.zip) {
               if (extracted.streetAddress) {
                 formattedAddress = extracted.streetAddress;
                 if (extracted.city || extracted.state || extracted.zip) {
@@ -338,9 +333,23 @@ IMPORTANT:
               if (extracted.zip) {
                 formattedAddress += extracted.zip;
               }
-              
+            } 
+            // Fallback: use unstructured address field if AI returned one
+            else if (extracted.address) {
+              formattedAddress = extracted.address;
+            }
+            
+            if (formattedAddress) {
               // Clean any phone numbers that might have slipped in
               context.merchantData.address = cleanAddress(formattedAddress);
+              
+              // Also try to extract phone from unstructured address if no phone yet
+              if (!context.merchantData.phone && !extracted.phone) {
+                const phoneFromAddress = extractPhoneNumber(formattedAddress);
+                if (phoneFromAddress) {
+                  context.merchantData.phone = phoneFromAddress;
+                }
+              }
             }
           }
           
