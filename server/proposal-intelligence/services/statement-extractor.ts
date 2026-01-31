@@ -1,11 +1,16 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 import OpenAI from "openai";
-import { createRequire } from "module";
 
-// Use createRequire for pdf-parse as it doesn't have ESM exports
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+// Dynamic import for pdf-parse to avoid bundler issues
+let pdfParseModule: any = null;
+async function getPdfParse() {
+  if (!pdfParseModule) {
+    const module = await import("pdf-parse");
+    pdfParseModule = module.default || module;
+  }
+  return pdfParseModule;
+}
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -196,6 +201,7 @@ async function extractPdfText(objectPath: string, objectStorage: ObjectStorageSe
     const [buffer] = await file.download();
     console.log(`[StatementExtractor] PDF downloaded, buffer size: ${buffer.length}`);
     
+    const pdfParse = await getPdfParse();
     const pdfData = await pdfParse(buffer);
     console.log(`[StatementExtractor] PDF parsed, text length: ${pdfData.text.length}, pages: ${pdfData.numpages}`);
     
