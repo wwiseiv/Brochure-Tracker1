@@ -207,6 +207,7 @@ export default function StatementAnalyzer() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [extractionStep, setExtractionStep] = useState<"idle" | "uploading" | "extracting" | "review">("idle");
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
@@ -350,6 +351,51 @@ export default function StatementAnalyzer() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    const acceptedExtensions = ACCEPTED_FILE_TYPES.split(",");
+    const validFiles = files.filter(file => {
+      const ext = "." + file.name.split(".").pop()?.toLowerCase();
+      return acceptedExtensions.includes(ext) || file.type.startsWith("image/");
+    });
+
+    if (validFiles.length === 0) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload PDF, Excel, CSV, or image files",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newFiles: UploadedFile[] = validFiles.map(file => ({
+      file,
+      preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      uploading: false,
+      uploaded: false
+    }));
+
+    setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
   const removeFile = (index: number) => {
@@ -894,8 +940,16 @@ ${new Date().toLocaleDateString()}
             {entryMode === "upload" && extractionStep !== "review" && (
               <div className="space-y-4">
                 <div 
-                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isDragging 
+                      ? "border-primary bg-primary/10" 
+                      : "hover:border-primary/50 hover:bg-muted/30"
+                  }`}
                   onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                   data-testid="dropzone"
                 >
                   <input
@@ -914,7 +968,9 @@ ${new Date().toLocaleDateString()}
                       <FileSpreadsheet className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">Click to upload statement files</p>
+                      <p className="font-medium">
+                        {isDragging ? "Drop files here" : "Drag & drop or click to upload"}
+                      </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         PDF, Excel, CSV, or Images (multiple pages supported)
                       </p>
