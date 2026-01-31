@@ -1514,6 +1514,7 @@ export const esignDocumentTemplates = pgTable("esign_document_templates", {
   thumbnailPath: varchar("thumbnail_path", { length: 255 }),
   pdfPath: varchar("pdf_path", { length: 255 }),
   pageIndex: integer("page_index"),
+  signNowTemplateId: varchar("signnow_template_id", { length: 100 }),
   formFields: jsonb("form_fields").$type<{
     id: string;
     fieldName: string;

@@ -480,7 +480,7 @@ export class ESignatureService {
     return Buffer.from(pdfBytes);
   }
 
-  // SignNow implementation - Using freeform invites for simplicity
+  // SignNow implementation - Using templates when available, freeform invites otherwise
   private async sendToSignNow(
     config: ProviderConfig,
     request: EsignRequest,
@@ -490,7 +490,6 @@ export class ESignatureService {
       const accessToken = await this.getSignNowAccessToken();
       if (!accessToken) {
         console.error("[SignNow] Failed to get access token - falling back to demo mode");
-        // Fall back to demo mode instead of failing
         return this.createDemoSignature(request, options.expirationDays);
       }
 
@@ -500,135 +499,181 @@ export class ESignatureService {
       }
 
       const primarySigner = signers[0];
-      console.log("[SignNow] Starting document upload and freeform invite for:", primarySigner.email);
+      console.log("[SignNow] Starting document processing for:", primarySigner.email);
 
-      // Step 1: Generate PDF
-      const pdfBuffer = await this.generateSigningPDF(request);
-      console.log("[SignNow] PDF generated, size:", pdfBuffer.length, "bytes");
+      // Step 1: Check for SignNow templates linked to the document types
+      const documentIds = request.documentIds as string[] || [];
+      let documentId: string | null = null;
 
-      // Step 2: Upload document to SignNow
-      const formData = new FormData();
-      formData.append("file", pdfBuffer, {
-        filename: `esign_${request.id}_${Date.now()}.pdf`,
-        contentType: "application/pdf"
-      });
-
-      const formHeaders = formData.getHeaders();
-      
-      const uploadResponse = await fetch("https://api.signnow.com/document", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          ...formHeaders
-        },
-        body: formData.getBuffer()
-      });
-
-      let uploadResult: any;
-      try {
-        uploadResult = await uploadResponse.json();
-      } catch (parseErr) {
-        console.error("[SignNow] Failed to parse upload response:", parseErr);
-        console.log("[SignNow] Falling back to demo mode due to response parse error");
-        return this.createDemoSignature(request, options.expirationDays);
-      }
-      
-      if (!uploadResult.id) {
-        console.error("[SignNow] Upload failed:", uploadResult);
-        console.log("[SignNow] Falling back to demo mode due to upload failure");
-        return this.createDemoSignature(request, options.expirationDays);
+      // Try to create document from SignNow template if available
+      if (documentIds.length > 0) {
+        const templateResult = await this.tryCreateFromSignNowTemplate(
+          documentIds[0], // Use the first document's template
+          request.merchantName || "Merchant Document",
+          request.fieldValues as Record<string, string> || {}
+        );
+        
+        if (templateResult.success && templateResult.documentId) {
+          documentId = templateResult.documentId;
+          console.log("[SignNow] Created document from template:", documentId);
+        }
       }
 
-      const documentId = uploadResult.id;
-      console.log("[SignNow] Document uploaded, ID:", documentId);
+      // Fall back to PDF generation if no template was used
+      if (!documentId) {
+        console.log("[SignNow] No SignNow template available, generating PDF");
+        
+        const pdfBuffer = await this.generateSigningPDF(request);
+        console.log("[SignNow] PDF generated, size:", pdfBuffer.length, "bytes");
 
-      // Step 3: Send a freeform invite (no pre-defined fields required)
-      // This allows the signer to place their signature anywhere on the document
-      const invitePayload = {
-        to: primarySigner.email,
+        const formData = new FormData();
+        formData.append("file", pdfBuffer, {
+          filename: `esign_${request.id}_${Date.now()}.pdf`,
+          contentType: "application/pdf"
+        });
+
+        const formHeaders = formData.getHeaders();
+        
+        const uploadResponse = await fetch("https://api.signnow.com/document", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            ...formHeaders
+          },
+          body: formData.getBuffer()
+        });
+
+        let uploadResult: any;
+        try {
+          uploadResult = await uploadResponse.json();
+        } catch (parseErr) {
+          console.error("[SignNow] Failed to parse upload response:", parseErr);
+          console.log("[SignNow] Falling back to demo mode due to response parse error");
+          return this.createDemoSignature(request, options.expirationDays);
+        }
+        
+        if (!uploadResult.id) {
+          console.error("[SignNow] Upload failed:", uploadResult);
+          console.log("[SignNow] Falling back to demo mode due to upload failure");
+          return this.createDemoSignature(request, options.expirationDays);
+        }
+
+        documentId = uploadResult.id;
+        console.log("[SignNow] Document uploaded, ID:", documentId);
+      }
+
+      // Step 2: Send invite for the document
+      return this.sendSignNowInvite(documentId, primarySigner, request, options, accessToken);
+    } catch (error) {
+      console.error("[SignNow] Error sending document:", error);
+      console.log("[SignNow] Falling back to demo mode due to error");
+      return this.createDemoSignature(request, options.expirationDays);
+    }
+  }
+
+  // Try to create document from SignNow template
+  private async tryCreateFromSignNowTemplate(
+    documentTypeId: string,
+    documentName: string,
+    prefillData: Record<string, string>
+  ): Promise<{ success: boolean; documentId?: string }> {
+    try {
+      // Look up the document template in the database to check for SignNow template link
+      const [template] = await db
+        .select()
+        .from(esignDocumentTemplates)
+        .where(eq(esignDocumentTemplates.id, documentTypeId));
+
+      if (!template?.signNowTemplateId) {
+        console.log("[SignNow] No SignNow template linked to document type:", documentTypeId);
+        return { success: false };
+      }
+
+      console.log("[SignNow] Found linked SignNow template:", template.signNowTemplateId);
+      return this.createDocumentFromTemplate(
+        template.signNowTemplateId,
+        documentName,
+        prefillData
+      );
+    } catch (error) {
+      console.error("[SignNow] Error checking for template:", error);
+      return { success: false };
+    }
+  }
+
+  // Send SignNow invite for a document
+  private async sendSignNowInvite(
+    documentId: string,
+    primarySigner: Signer,
+    request: EsignRequest,
+    options: { subject: string; message: string; expirationDays: number },
+    accessToken: string
+  ): Promise<SendDocumentResult> {
+    // Send a freeform invite
+    const invitePayload = {
+      to: primarySigner.email,
+      from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com",
+      subject: options.subject || `PCBancard - Please Sign: ${request.merchantName}`,
+      message: options.message || "Please review and sign the attached document."
+    };
+
+    console.log("[SignNow] Sending freeform invite to:", primarySigner.email);
+    
+    const inviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(invitePayload)
+    });
+
+    const inviteText = await inviteResponse.text();
+    console.log("[SignNow] Invite response status:", inviteResponse.status);
+    
+    if (!inviteResponse.ok) {
+      console.error("[SignNow] Freeform invite failed, trying role-based invite...");
+      
+      const roleInvitePayload = {
+        to: [
+          {
+            email: primarySigner.email,
+            role: "Signer",
+            order: 1,
+            reassign: "0",
+            decline_by_signature: "0"
+          }
+        ],
         from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com",
         subject: options.subject || `PCBancard - Please Sign: ${request.merchantName}`,
-        message: options.message || "Please review and sign the attached document. You can place your signature anywhere on the document."
+        message: options.message || "Please review and sign the attached document."
       };
-
-      console.log("[SignNow] Sending freeform invite to:", primarySigner.email);
       
-      const inviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
+      const roleInviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(invitePayload)
+        body: JSON.stringify(roleInvitePayload)
       });
-
-      const inviteText = await inviteResponse.text();
-      console.log("[SignNow] Invite response status:", inviteResponse.status);
-      console.log("[SignNow] Invite response body:", inviteText);
       
-      if (!inviteResponse.ok) {
-        console.error("[SignNow] Freeform invite failed, trying role-based invite...");
-        
-        // Try the role-based invite as fallback
-        const roleInvitePayload = {
-          to: [
-            {
-              email: primarySigner.email,
-              role: "Signer",
-              order: 1,
-              reassign: "0",
-              decline_by_signature: "0"
-            }
-          ],
-          from: process.env.SIGNNOW_EMAIL || "wwiseiv@gmail.com",
-          subject: options.subject || `PCBancard - Please Sign: ${request.merchantName}`,
-          message: options.message || "Please review and sign the attached document."
-        };
-        
-        const roleInviteResponse = await fetch(`https://api.signnow.com/document/${documentId}/invite`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(roleInvitePayload)
-        });
-        
+      if (!roleInviteResponse.ok) {
         const roleInviteText = await roleInviteResponse.text();
-        console.log("[SignNow] Role-based invite response:", roleInviteResponse.status, roleInviteText);
-        
-        if (!roleInviteResponse.ok) {
-          // Both invite methods failed - use Claude to debug and fall back to demo
-          try {
-            const debugAdvice = await debugSignNowError(
-              { status: roleInviteResponse.status, body: roleInviteText },
-              roleInvitePayload
-            );
-            console.log("[SignNow] Claude debug advice:", debugAdvice);
-          } catch (debugErr) {
-            console.error("[SignNow] Claude debug failed:", debugErr);
-          }
-          
-          console.log("[SignNow] Both invite methods failed, falling back to demo mode");
-          return this.createDemoSignature(request, options.expirationDays, documentId);
-        }
+        console.error("[SignNow] Role-based invite also failed:", roleInviteText);
+        return this.createDemoSignature(request, options.expirationDays, documentId);
       }
-
-      console.log("[SignNow] Invite sent successfully to:", primarySigner.email);
-
-      return {
-        success: true,
-        externalRequestId: documentId,
-        signingUrl: `https://app.signnow.com/webapp/document/${documentId}`
-      };
-    } catch (error) {
-      console.error("[SignNow] Error sending document:", error);
-      // Fall back to demo mode on any error
-      console.log("[SignNow] Falling back to demo mode due to error");
-      return this.createDemoSignature(request, options.expirationDays);
     }
+
+    console.log("[SignNow] Invite sent successfully to:", primarySigner.email);
+
+    return {
+      success: true,
+      externalRequestId: documentId,
+      signingUrl: `https://app.signnow.com/webapp/document/${documentId}`
+    };
   }
-  
+
   // Helper to create demo signature response when SignNow fails
   private async createDemoSignature(
     request: EsignRequest, 
@@ -761,6 +806,205 @@ export class ESignatureService {
       declined: requests.filter(r => r.status === "declined").length,
       expired: requests.filter(r => r.status === "expired").length
     };
+  }
+
+  // ============================================
+  // SignNow Template Management
+  // ============================================
+
+  // List templates from SignNow account
+  async listSignNowTemplates(): Promise<{
+    success: boolean;
+    templates?: Array<{
+      id: string;
+      name: string;
+      pageCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    error?: string;
+  }> {
+    try {
+      const accessToken = await this.getSignNowAccessToken();
+      if (!accessToken) {
+        return { success: false, error: "Failed to authenticate with SignNow" };
+      }
+
+      const response = await fetch("https://api.signnow.com/template", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[SignNow] Failed to list templates:", response.status, errorText);
+        return { success: false, error: `Failed to fetch templates: ${response.status}` };
+      }
+
+      const templates = await response.json() as any[];
+      console.log("[SignNow] Retrieved", templates.length, "templates");
+
+      return {
+        success: true,
+        templates: templates.map((t: any) => ({
+          id: t.id,
+          name: t.document_name || t.template_name || "Untitled Template",
+          pageCount: t.page_count || 1,
+          createdAt: t.created || new Date().toISOString(),
+          updatedAt: t.updated || new Date().toISOString()
+        }))
+      };
+    } catch (error: any) {
+      console.error("[SignNow] Error listing templates:", error);
+      return { success: false, error: error.message || "Unknown error" };
+    }
+  }
+
+  // Create document from SignNow template
+  async createDocumentFromTemplate(
+    templateId: string,
+    documentName: string,
+    prefillData?: Record<string, string>
+  ): Promise<{
+    success: boolean;
+    documentId?: string;
+    error?: string;
+  }> {
+    try {
+      const accessToken = await this.getSignNowAccessToken();
+      if (!accessToken) {
+        return { success: false, error: "Failed to authenticate with SignNow" };
+      }
+
+      console.log("[SignNow] Creating document from template:", templateId);
+
+      // Create a document copy from the template
+      const response = await fetch(`https://api.signnow.com/template/${templateId}/copy`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          document_name: documentName
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[SignNow] Failed to create document from template:", response.status, errorText);
+        return { success: false, error: `Failed to create document: ${response.status}` };
+      }
+
+      const result = await response.json() as any;
+      const documentId = result.id;
+      console.log("[SignNow] Document created from template, ID:", documentId);
+
+      // If there's prefill data, update the document fields
+      if (prefillData && Object.keys(prefillData).length > 0) {
+        await this.prefillDocumentFields(documentId, prefillData, accessToken);
+      }
+
+      return {
+        success: true,
+        documentId
+      };
+    } catch (error: any) {
+      console.error("[SignNow] Error creating document from template:", error);
+      return { success: false, error: error.message || "Unknown error" };
+    }
+  }
+
+  // Prefill document fields
+  private async prefillDocumentFields(
+    documentId: string,
+    data: Record<string, string>,
+    accessToken: string
+  ): Promise<void> {
+    try {
+      // Get the document to see available fields
+      const docResponse = await fetch(`https://api.signnow.com/document/${documentId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!docResponse.ok) {
+        console.error("[SignNow] Failed to get document for prefill");
+        return;
+      }
+
+      const doc = await docResponse.json() as any;
+      const fields = doc.fields || [];
+
+      // Update text fields that match our data
+      for (const field of fields) {
+        if (field.type === "text" && data[field.name]) {
+          await fetch(`https://api.signnow.com/document/${documentId}/field/${field.id}`, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              value: data[field.name]
+            })
+          });
+        }
+      }
+
+      console.log("[SignNow] Prefilled document fields");
+    } catch (error) {
+      console.error("[SignNow] Error prefilling fields:", error);
+    }
+  }
+
+  // Update document template with SignNow template ID
+  async linkSignNowTemplate(
+    documentTemplateId: string,
+    signNowTemplateId: string | null
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await db
+        .update(esignDocumentTemplates)
+        .set({ 
+          signNowTemplateId: signNowTemplateId,
+          updatedAt: new Date()
+        })
+        .where(eq(esignDocumentTemplates.id, documentTemplateId));
+
+      console.log(`[ESign] Linked document template ${documentTemplateId} to SignNow template ${signNowTemplateId}`);
+      return { success: true };
+    } catch (error: any) {
+      console.error("[ESign] Error linking SignNow template:", error);
+      return { success: false, error: error.message || "Unknown error" };
+    }
+  }
+
+  // Get document template with SignNow info
+  async getDocumentTemplateWithSignNow(id: string): Promise<{
+    template?: typeof esignDocumentTemplates.$inferSelect;
+    signNowLinked: boolean;
+  }> {
+    try {
+      const [template] = await db
+        .select()
+        .from(esignDocumentTemplates)
+        .where(eq(esignDocumentTemplates.id, id));
+
+      return {
+        template,
+        signNowLinked: !!template?.signNowTemplateId
+      };
+    } catch (error) {
+      console.error("[ESign] Error getting document template:", error);
+      return { signNowLinked: false };
+    }
   }
 }
 

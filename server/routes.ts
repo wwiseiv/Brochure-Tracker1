@@ -6584,6 +6584,50 @@ Generate the following content in JSON format:
     }
   });
 
+  // ============================================
+  // SignNow Template Management Routes
+  // ============================================
+
+  // List SignNow templates from user's account
+  app.get("/api/esign/signnow/templates", isAuthenticated, async (_req: any, res) => {
+    try {
+      const result = await esignService.listSignNowTemplates();
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ templates: result.templates });
+    } catch (error: any) {
+      console.error("[E-Sign] Error listing SignNow templates:", error);
+      res.status(500).json({ error: "Failed to list SignNow templates" });
+    }
+  });
+
+  // Link a SignNow template to a document template
+  app.post("/api/esign/templates/:id/link-signnow", isAuthenticated, async (req: any, res) => {
+    try {
+      const { signNowTemplateId } = req.body;
+      const result = await esignService.linkSignNowTemplate(req.params.id, signNowTemplateId || null);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[E-Sign] Error linking SignNow template:", error);
+      res.status(500).json({ error: "Failed to link SignNow template" });
+    }
+  });
+
+  // Get template with SignNow info
+  app.get("/api/esign/templates/:id/signnow-info", isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await esignService.getDocumentTemplateWithSignNow(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[E-Sign] Error getting template SignNow info:", error);
+      res.status(500).json({ error: "Failed to get template info" });
+    }
+  });
+
   // Create new e-signature request
   app.post("/api/esign/requests", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
