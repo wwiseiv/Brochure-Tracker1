@@ -393,10 +393,27 @@ export interface ICPlusMargin {
   monthlyFee: number;
 }
 
+export interface PricingConfigInput {
+  pricingModel: 'dual_pricing' | 'interchange_plus' | 'surcharge';
+  dualPricing: {
+    customerFeePercent: number;
+    monthlyFee: number;
+  };
+  interchangePlus: {
+    markupPercent: number;
+    perTransaction: number;
+    monthlyFee: number;
+  };
+  surcharge: {
+    rate: number;
+  };
+}
+
 export function analyzeStatement(
   data: StatementData, 
   icPlusMargin: ICPlusMargin = { ratePercent: 0.50, perTxnFee: 0.10, monthlyFee: 10 },
-  dualPricingMonthlyCost: number = 64.95
+  dualPricingMonthlyCost: number = 64.95,
+  pricingConfig?: PricingConfigInput
 ): AnalysisResult {
   const trueCosts = calculateTrueInterchange(data);
   const { totalVolume, totalTransactions, fees } = data;
@@ -418,6 +435,9 @@ export function analyzeStatement(
   const hiddenFees = detectHiddenFees(data);
 
   const icPlusDescription = `Interchange + ${icPlusMargin.ratePercent.toFixed(2)}% + $${icPlusMargin.perTxnFee.toFixed(2)}/txn + $${icPlusMargin.monthlyFee} monthly`;
+  
+  const customerFeePercent = pricingConfig?.dualPricing?.customerFeePercent ?? 3.99;
+  const dualPricingDescription = `Customer pays ${customerFeePercent.toFixed(2)}% service fee, merchant pays $${pcbDualPricingCost.toFixed(2)}/mo`;
 
   return {
     summary: {
@@ -450,7 +470,7 @@ export function analyzeStatement(
         effectiveRate: Math.round((pcbDualPricingCost / totalVolume) * 10000) / 100,
         monthlySavings: Math.round((fees.totalFees - pcbDualPricingCost) * 100) / 100,
         annualSavings: Math.round((fees.totalFees - pcbDualPricingCost) * 12 * 100) / 100,
-        description: `Customer pays 3.99% service fee, merchant pays $${pcbDualPricingCost.toFixed(2)}/mo`
+        description: dualPricingDescription
       }
     },
     

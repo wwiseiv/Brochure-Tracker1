@@ -51,6 +51,7 @@ import {
   Package,
   Cpu
 } from "lucide-react";
+import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
 
 interface ParsedProposal {
   merchantName: string;
@@ -292,6 +293,9 @@ export default function ProposalGeneratorPage() {
   const [industryGuess, setIndustryGuess] = useState("");
   const [currentProcessor, setCurrentProcessor] = useState("");
   const [repNotes, setRepNotes] = useState("");
+  
+  // Pricing configuration
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
 
   // Form section states
   const [agentInfoOpen, setAgentInfoOpen] = useState(true);
@@ -2107,6 +2111,15 @@ export default function ProposalGeneratorPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PricingConfiguration
+        onConfigChange={setPricingConfig}
+        initialConfig={pricingConfig}
+        compact={false}
+        collapsible={true}
+        defaultCollapsed={true}
+        showPresets={true}
+      />
 
       <Card>
         <CardHeader>

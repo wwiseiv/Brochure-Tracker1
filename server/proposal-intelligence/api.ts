@@ -283,7 +283,22 @@ const statementAnalysisSchema = z.object({
     perTxnFee: z.number().min(0).max(1).default(0.10),
     monthlyFee: z.number().min(0).max(100).default(10)
   }).optional(),
-  dualPricingMonthlyCost: z.number().min(0).max(500).default(64.95).optional()
+  dualPricingMonthlyCost: z.number().min(0).max(500).default(64.95).optional(),
+  pricingConfig: z.object({
+    pricingModel: z.enum(['dual_pricing', 'interchange_plus', 'surcharge']).default('dual_pricing'),
+    dualPricing: z.object({
+      customerFeePercent: z.number().min(0).max(10).default(3.99),
+      monthlyFee: z.number().min(0).max(500).default(64.95)
+    }).optional(),
+    interchangePlus: z.object({
+      markupPercent: z.number().min(0).max(5).default(0.60),
+      perTransaction: z.number().min(0).max(1).default(0.12),
+      monthlyFee: z.number().min(0).max(100).default(9.95)
+    }).optional(),
+    surcharge: z.object({
+      rate: z.number().min(0).max(3).default(3.00)
+    }).optional()
+  }).optional()
 });
 
 router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
@@ -319,9 +334,25 @@ router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async 
       monthlyFee: 10
     };
 
-    const dualPricingMonthlyCost = data.dualPricingMonthlyCost || 64.95;
+    const dualPricingMonthlyCost = data.pricingConfig?.dualPricing?.monthlyFee ?? data.dualPricingMonthlyCost ?? 64.95;
 
-    const analysis = analyzeStatement(statementData, icPlusMargin, dualPricingMonthlyCost);
+    const pricingConfigForAnalysis = data.pricingConfig ? {
+      pricingModel: data.pricingConfig.pricingModel,
+      dualPricing: {
+        customerFeePercent: data.pricingConfig.dualPricing?.customerFeePercent ?? 3.99,
+        monthlyFee: data.pricingConfig.dualPricing?.monthlyFee ?? 64.95
+      },
+      interchangePlus: {
+        markupPercent: data.pricingConfig.interchangePlus?.markupPercent ?? 0.60,
+        perTransaction: data.pricingConfig.interchangePlus?.perTransaction ?? 0.12,
+        monthlyFee: data.pricingConfig.interchangePlus?.monthlyFee ?? 9.95
+      },
+      surcharge: {
+        rate: data.pricingConfig.surcharge?.rate ?? 3.00
+      }
+    } : undefined;
+
+    const analysis = analyzeStatement(statementData, icPlusMargin, dualPricingMonthlyCost, pricingConfigForAnalysis);
     const talkingPoints = generateTalkingPoints(analysis);
     
     let competitorInsights = null;

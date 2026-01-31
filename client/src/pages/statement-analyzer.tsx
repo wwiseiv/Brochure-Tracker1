@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Link } from "wouter";
+import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
 
 const processors = [
   "Unknown",
@@ -208,6 +209,7 @@ export default function StatementAnalyzer() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [extractionStep, setExtractionStep] = useState<"idle" | "uploading" | "extracting" | "review">("idle");
   const [isDragging, setIsDragging] = useState(false);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
@@ -255,12 +257,27 @@ export default function StatementAnalyzer() {
           otherFees: data.otherFees ? parseFloat(data.otherFees) : undefined
         },
         useAI: data.useAI,
-        icPlusMargin: {
-          ratePercent: data.icPlusRateMargin ? parseFloat(data.icPlusRateMargin) : 0.50,
-          perTxnFee: data.icPlusPerTxnFee ? parseFloat(data.icPlusPerTxnFee) : 0.10,
-          monthlyFee: data.icPlusMonthlyFee ? parseFloat(data.icPlusMonthlyFee) : 10
+        pricingConfig: {
+          pricingModel: pricingConfig.pricingModel,
+          dualPricing: {
+            customerFeePercent: pricingConfig.dualPricingCustomerFee,
+            monthlyFee: pricingConfig.dualPricingMonthlyFee
+          },
+          interchangePlus: {
+            markupPercent: pricingConfig.icPlusMarkupPercent,
+            perTransaction: pricingConfig.icPlusPerTransaction,
+            monthlyFee: pricingConfig.icPlusMonthlyFee
+          },
+          surcharge: {
+            rate: pricingConfig.surchargeRate
+          }
         },
-        dualPricingMonthlyCost: data.dualPricingMonthlyCost ? parseFloat(data.dualPricingMonthlyCost) : 64.95
+        icPlusMargin: {
+          ratePercent: pricingConfig.icPlusMarkupPercent,
+          perTxnFee: pricingConfig.icPlusPerTransaction,
+          monthlyFee: pricingConfig.icPlusMonthlyFee
+        },
+        dualPricingMonthlyCost: pricingConfig.dualPricingMonthlyFee
       };
       
       const response = await apiRequest("POST", "/api/proposal-intelligence/analyze-statement", payload);
@@ -1470,97 +1487,17 @@ ${new Date().toLocaleDateString()}
                               )}
                             />
                           </div>
-                          
-                          <Separator className="my-4" />
-                          
-                          <p className="text-sm font-medium mb-2">Interchange Plus Margin (Your Pricing)</p>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Set the margin you'll offer to this merchant. This affects the proposal calculations.
-                          </p>
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="icPlusRateMargin"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Rate Markup %</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="number" 
-                                      step="0.01" 
-                                      placeholder="0.50" 
-                                      {...field} 
-                                      data-testid="input-ic-rate-margin" 
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="icPlusPerTxnFee"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Per Txn Fee $</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="number" 
-                                      step="0.01" 
-                                      placeholder="0.10" 
-                                      {...field} 
-                                      data-testid="input-ic-per-txn-fee" 
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="icPlusMonthlyFee"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Monthly Fee $</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="number" 
-                                      step="1" 
-                                      placeholder="10" 
-                                      {...field} 
-                                      data-testid="input-ic-monthly-fee" 
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          
-                          <Separator className="my-4" />
-                          
-                          <p className="text-sm font-medium mb-2">Dual Pricing Program</p>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Set the monthly cost for the dual pricing program.
-                          </p>
-                          <FormField
-                            control={form.control}
-                            name="dualPricingMonthlyCost"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Monthly Cost $</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    placeholder="64.95" 
-                                    {...field} 
-                                    data-testid="input-dual-pricing-cost" 
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
+
+                    <PricingConfiguration
+                      onConfigChange={setPricingConfig}
+                      initialConfig={pricingConfig}
+                      compact={false}
+                      collapsible={true}
+                      defaultCollapsed={true}
+                    />
 
                     <FormField
                       control={form.control}
