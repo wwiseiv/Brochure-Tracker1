@@ -2,7 +2,7 @@ import { Router } from "express";
 import { initializeProposalIntelligence, orchestrator, modelRouter, pluginManager } from "./index";
 import type { ProposalRequest } from "./core/orchestrator";
 import { isAuthenticated } from "../replit_integrations/auth";
-import { ensureOrgMembership } from "../rbac";
+import { ensureOrgMembership, requireRole } from "../rbac";
 import { z } from "zod";
 import { analyzeStatement, type StatementData } from "./services/statement-analysis";
 import { generateTalkingPoints, generateCompetitorInsights } from "./services/talking-points";
@@ -119,7 +119,7 @@ router.get("/status", (req, res) => {
   });
 });
 
-router.post("/plugins/:pluginId/toggle", isAuthenticated, ensureOrgMembership(), (req: any, res) => {
+router.post("/plugins/:pluginId/toggle", isAuthenticated, ensureOrgMembership(), requireRole("master_admin"), (req: any, res) => {
   const { pluginId } = req.params;
   const { enabled } = req.body;
 
@@ -130,16 +130,20 @@ router.post("/plugins/:pluginId/toggle", isAuthenticated, ensureOrgMembership(),
 
   pluginManager.setEnabled(pluginId, enabled);
   
+  console.log(`[ProposalAPI] Plugin ${pluginId} ${enabled ? 'enabled' : 'disabled'} by admin ${req.user?.claims?.sub}`);
+  
   res.json({
     pluginId,
     enabled: pluginManager.isEnabled(pluginId)
   });
 });
 
-router.post("/test-model", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+router.post("/test-model", isAuthenticated, ensureOrgMembership(), requireRole("master_admin"), async (req: any, res) => {
   try {
     const { prompt, provider, taskType } = req.body;
 
+    console.log(`[ProposalAPI] Model test initiated by admin ${req.user?.claims?.sub}`);
+    
     const response = await modelRouter.route({
       type: taskType || "general",
       prompt: prompt || "Say hello in one sentence."
