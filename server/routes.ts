@@ -6507,6 +6507,200 @@ Generate the following content in JSON format:
     }
   });
 
+  // Claude-powered document generation endpoint
+  app.post("/api/proposals/:id/generate-claude", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const id = parseInt(req.params.id);
+      const { format = "pdf", agentName, agentTitle, agentEmail, agentPhone, businessName, businessAddress, businessDescription, selectedEquipment } = req.body;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid proposal ID" });
+      }
+
+      if (format !== "pdf" && format !== "docx") {
+        return res.status(400).json({ error: "Format must be 'pdf' or 'docx'" });
+      }
+
+      const proposal = await storage.getProposal(id);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const { generateClaudeDocument } = await import("./services/claude-document-generator");
+      const { convertHtmlToPdf, generateDocx } = await import("./services/document-converter");
+
+      const parsedData = {
+        merchantName: businessName || proposal.merchantName,
+        preparedDate: proposal.preparedDate,
+        agentName: proposal.agentName,
+        agentTitle: proposal.agentTitle,
+        currentState: proposal.currentState,
+        optionInterchangePlus: proposal.optionInterchangePlus,
+        optionDualPricing: proposal.optionDualPricing,
+        proposalType: proposal.optionDualPricing ? "dual_pricing" : "interchange_plus",
+      } as any;
+
+      console.log("[Proposals] Generating Claude document for:", parsedData.merchantName);
+
+      // Generate beautiful proposal content with Claude
+      const claudeDoc = await generateClaudeDocument({
+        parsedData,
+        agentName: agentName || proposal.agentName || "PCBancard Representative",
+        agentTitle: agentTitle || proposal.agentTitle || "Account Executive",
+        agentEmail: agentEmail || "",
+        agentPhone: agentPhone || "",
+        businessName: businessName || proposal.merchantName,
+        businessAddress,
+        businessDescription,
+        selectedEquipment,
+      });
+
+      let buffer: Buffer;
+      let contentType: string;
+      let filename: string;
+      const safeMerchantName = (businessName || proposal.merchantName).replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+      const today = new Date().toISOString().split("T")[0];
+
+      if (format === "pdf") {
+        buffer = await convertHtmlToPdf(claudeDoc.html);
+        contentType = "application/pdf";
+        filename = `PCBancard_Proposal_${safeMerchantName}_${today}.pdf`;
+      } else {
+        buffer = await generateDocx({
+          merchantName: businessName || proposal.merchantName,
+          businessAddress,
+          sections: claudeDoc.sections,
+          parsedData,
+          agentName: agentName || proposal.agentName || "PCBancard Representative",
+          agentTitle: agentTitle || proposal.agentTitle || "Account Executive",
+          agentEmail: agentEmail || "",
+          agentPhone: agentPhone || "",
+          date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          equipmentList: selectedEquipment,
+        });
+        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        filename = `PCBancard_Proposal_${safeMerchantName}_${today}.docx`;
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", buffer.length);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[Proposals] Error generating Claude document:", error);
+      res.status(500).json({ error: "Failed to generate document: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Validation schema for Claude direct generation
+  const claudeGenerateSchema = z.object({
+    parsedData: z.object({
+      merchantName: z.string().optional(),
+      currentState: z.object({
+        totalVolume: z.number().optional(),
+        totalTransactions: z.number().optional(),
+        avgTicket: z.number().optional(),
+        totalMonthlyCost: z.number().optional(),
+        effectiveRatePercent: z.number().optional(),
+      }).optional(),
+      optionDualPricing: z.object({
+        monthlySavings: z.number().optional(),
+        annualSavings: z.number().optional(),
+        totalMonthlyCost: z.number().optional(),
+      }).optional(),
+      optionInterchangePlus: z.object({
+        monthlySavings: z.number().optional(),
+        annualSavings: z.number().optional(),
+        totalMonthlyCost: z.number().optional(),
+      }).optional(),
+    }).passthrough(),
+    format: z.enum(["pdf", "docx"]).default("pdf"),
+    agentName: z.string().optional(),
+    agentTitle: z.string().optional(),
+    agentEmail: z.string().optional(),
+    agentPhone: z.string().optional(),
+    businessName: z.string().optional(),
+    businessAddress: z.string().optional(),
+    businessDescription: z.string().optional(),
+    selectedEquipment: z.array(z.object({
+      name: z.string(),
+      description: z.string().optional(),
+      price: z.string().optional(),
+    })).optional(),
+  });
+
+  // Direct Claude document generation (without saved proposal)
+  app.post("/api/proposals/generate-claude-direct", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const validationResult = claudeGenerateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Invalid request data: " + validationResult.error.message });
+      }
+
+      const { parsedData, format, agentName, agentTitle, agentEmail, agentPhone, businessName, businessAddress, businessDescription, selectedEquipment } = validationResult.data;
+
+      const { generateClaudeDocument } = await import("./services/claude-document-generator");
+      const { convertHtmlToPdf, generateDocx } = await import("./services/document-converter");
+
+      const merchantName = businessName || parsedData.merchantName || "Valued Merchant";
+
+      console.log("[Proposals] Generating direct Claude document for:", merchantName);
+
+      // Generate beautiful proposal content with Claude
+      const claudeDoc = await generateClaudeDocument({
+        parsedData,
+        agentName: agentName || "PCBancard Representative",
+        agentTitle: agentTitle || "Account Executive",
+        agentEmail: agentEmail || "",
+        agentPhone: agentPhone || "",
+        businessName: merchantName,
+        businessAddress,
+        businessDescription,
+        selectedEquipment,
+      });
+
+      let buffer: Buffer;
+      let contentType: string;
+      let filename: string;
+      const safeMerchantName = merchantName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+      const today = new Date().toISOString().split("T")[0];
+
+      if (format === "pdf") {
+        buffer = await convertHtmlToPdf(claudeDoc.html);
+        contentType = "application/pdf";
+        filename = `PCBancard_Proposal_${safeMerchantName}_${today}.pdf`;
+      } else {
+        buffer = await generateDocx({
+          merchantName,
+          businessAddress,
+          sections: claudeDoc.sections,
+          parsedData,
+          agentName: agentName || "PCBancard Representative",
+          agentTitle: agentTitle || "Account Executive",
+          agentEmail: agentEmail || "",
+          agentPhone: agentPhone || "",
+          date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          equipmentList: selectedEquipment,
+        });
+        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        filename = `PCBancard_Proposal_${safeMerchantName}_${today}.docx`;
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", buffer.length);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[Proposals] Error generating direct Claude document:", error);
+      res.status(500).json({ error: "Failed to generate document: " + (error.message || "Unknown error") });
+    }
+  });
+
   app.get("/api/proposals/:id/download/:format", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;

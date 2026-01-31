@@ -268,11 +268,12 @@ export default function ProposalGeneratorPage() {
   const [equipmentVendorFilter, setEquipmentVendorFilter] = useState<string>("all");
   const [step, setStep] = useState<"upload" | "review" | "equipment" | "generated">("upload");
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedRenderer, setSelectedRenderer] = useState<"replit" | "gamma">("replit");
+  const [selectedRenderer, setSelectedRenderer] = useState<"replit" | "gamma" | "claude">("claude");
   const [outputFormat, setOutputFormat] = useState<"pdf" | "docx" | "pptx">("pdf");
   const [gammaUrl, setGammaUrl] = useState<string | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [isGeneratingClaude, setIsGeneratingClaude] = useState(false);
 
   // Agent Information (REQUIRED)
   const [agentFirstName, setAgentFirstName] = useState("");
@@ -445,7 +446,7 @@ export default function ProposalGeneratorPage() {
       selectedTerminalIds?: number[];
       selectedEquipmentDetails?: EquipmentProduct[];
       useAI?: boolean;
-      renderer?: "replit" | "gamma";
+      renderer?: "replit" | "gamma" | "claude";
       format?: "pdf" | "docx" | "pptx";
       intakeData?: ReturnType<typeof getIntakeFormData>;
     }) => {
@@ -765,20 +766,98 @@ export default function ProposalGeneratorPage() {
     }
   };
 
-  const handleGenerate = (useAI: boolean) => {
-    if (parsedData) {
-      setUsedFallback(false);
-      setGammaUrl(null);
-      generateMutation.mutate({
-        parsedData,
-        selectedTerminalIds: selectedEquipment.map(eq => eq.id),
-        selectedEquipmentDetails: selectedEquipment,
-        useAI,
-        renderer: selectedRenderer,
-        format: outputFormat,
-        intakeData: getIntakeFormData(),
-      });
+  const handleGenerate = async (useAI: boolean) => {
+    if (!parsedData) return;
+    
+    setUsedFallback(false);
+    setGammaUrl(null);
+    
+    // For Claude renderer, call the direct Claude endpoint which generates and downloads in one step
+    if (selectedRenderer === "claude") {
+      setIsGeneratingClaude(true);
+      try {
+        const response = await fetch("/api/proposals/generate-claude-direct", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            parsedData,
+            format: outputFormat,
+            agentName: `${agentFirstName} ${agentLastName}`.trim() || "PCBancard Representative",
+            agentTitle: agentTitle || "Account Executive",
+            agentEmail,
+            agentPhone,
+            businessName: businessName || parsedData.merchantName,
+            businessAddress,
+            businessDescription: repNotes,
+            selectedEquipment: selectedEquipment.map(eq => ({
+              name: eq.name,
+              description: eq.description || eq.features?.join(", ") || "",
+              price: eq.priceRange || "",
+            })),
+          }),
+        });
+        
+        // Check content type to determine if it's JSON error or binary success
+        const contentType = response.headers.get("Content-Type") || "";
+        
+        if (!response.ok) {
+          let errorMessage = "Failed to generate document";
+          if (contentType.includes("application/json")) {
+            try {
+              const err = await response.json();
+              errorMessage = err.error || errorMessage;
+            } catch {
+              errorMessage = `Server error: ${response.status}`;
+            }
+          } else {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
+        }
+        
+        // Download the file
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get("Content-Disposition");
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+        const filename = filenameMatch ? filenameMatch[1] : `PCBancard_Proposal.${outputFormat}`;
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        setStep("generated");
+        toast({
+          title: "Proposal Generated",
+          description: `Your Claude AI proposal has been downloaded as ${outputFormat.toUpperCase()}!`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error Generating Proposal",
+          description: error instanceof Error ? error.message : "Failed to generate Claude proposal",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGeneratingClaude(false);
+      }
+      return;
     }
+    
+    // For other renderers, use the standard mutation
+    generateMutation.mutate({
+      parsedData,
+      selectedTerminalIds: selectedEquipment.map(eq => eq.id),
+      selectedEquipmentDetails: selectedEquipment,
+      useAI,
+      renderer: selectedRenderer,
+      format: outputFormat,
+      intakeData: getIntakeFormData(),
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -2213,7 +2292,35 @@ export default function ProposalGeneratorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                selectedRenderer === "claude" ? "border-primary bg-primary/5" : "hover-elevate"
+              }`}
+              onClick={() => {
+                setSelectedRenderer("claude");
+                if (outputFormat === "pptx") setOutputFormat("pdf");
+              }}
+              data-testid="renderer-claude"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  selectedRenderer === "claude" ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}>
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium flex items-center gap-1">Claude AI <span className="text-xs bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded">Best</span></p>
+                  <p className="text-sm text-muted-foreground">AI-written proposal content</p>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-muted-foreground space-y-1">
+                <p>• Professional AI writing</p>
+                <p>• Beautiful formatting</p>
+                <p>• PDF or Word output</p>
+              </div>
+            </div>
+
             <div
               className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                 selectedRenderer === "replit" ? "border-primary bg-primary/5" : "hover-elevate"
@@ -2282,7 +2389,7 @@ export default function ProposalGeneratorPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pdf">PDF</SelectItem>
-                {selectedRenderer === "replit" && (
+                {(selectedRenderer === "replit" || selectedRenderer === "claude") && (
                   <SelectItem value="docx">Word Document (DOCX)</SelectItem>
                 )}
                 {selectedRenderer === "gamma" && (
@@ -2306,10 +2413,10 @@ export default function ProposalGeneratorPage() {
         <Button
           variant="outline"
           onClick={() => handleGenerate(false)}
-          disabled={generateMutation.isPending}
+          disabled={generateMutation.isPending || isGeneratingClaude}
           data-testid="button-generate-basic"
         >
-          {generateMutation.isPending ? (
+          {(generateMutation.isPending || isGeneratingClaude) ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
             <FileText className="w-4 h-4 mr-2" />
@@ -2319,13 +2426,13 @@ export default function ProposalGeneratorPage() {
         <Button
           className="flex-1"
           onClick={() => handleGenerate(true)}
-          disabled={generateMutation.isPending}
+          disabled={generateMutation.isPending || isGeneratingClaude}
           data-testid="button-generate-ai"
         >
-          {generateMutation.isPending ? (
+          {(generateMutation.isPending || isGeneratingClaude) ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
+              {isGeneratingClaude ? "Claude is writing..." : "Generating..."}
             </>
           ) : (
             <>
