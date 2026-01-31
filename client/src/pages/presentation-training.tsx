@@ -116,6 +116,10 @@ export default function PresentationTrainingPage() {
   const savePracticeResponseMutation = useMutation({
     mutationFn: async (data: { lessonId: number; practiceResponse: string; aiFeedback: string }) => {
       const res = await apiRequest("POST", "/api/presentation/practice-responses", data);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `Failed with status ${res.status}`);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -123,10 +127,11 @@ export default function PresentationTrainingPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/presentation/modules"] });
       queryClient.invalidateQueries({ queryKey: ["/api/presentation/lessons", selectedLessonId] });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      console.error("[PresentationTraining] Save practice response error:", error);
       toast({
         title: "Failed to save response",
-        description: "Your response was not saved. Please try again.",
+        description: error.message || "Your response was not saved. Please try again.",
         variant: "destructive",
       });
     },

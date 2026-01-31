@@ -5701,13 +5701,23 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
 
   app.post("/api/presentation/practice-responses", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
+      console.log("[Presentation] Saving practice response, body:", JSON.stringify(req.body));
+      
       const parsed = savePracticeResponseSchema.safeParse(req.body);
       if (!parsed.success) {
+        console.error("[Presentation] Validation failed:", parsed.error.format());
         return res.status(400).json({ error: "Invalid request", details: parsed.error.format() });
       }
       
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        console.error("[Presentation] No user ID found in request");
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
       const { lessonId, practiceResponse, aiFeedback, feedbackScore, strengths, improvements } = parsed.data;
+      
+      console.log("[Presentation] Inserting practice response for lesson:", lessonId, "user:", userId);
       
       const [saved] = await db
         .insert(presentationPracticeResponses)
@@ -5722,6 +5732,8 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
         })
         .returning();
       
+      console.log("[Presentation] Practice response saved, ID:", saved?.id);
+      
       // Also mark practice as recorded in progress
       await db
         .insert(presentationProgress)
@@ -5735,10 +5747,12 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
           set: { practiceRecorded: true },
         });
       
+      console.log("[Presentation] Progress updated for lesson:", lessonId);
+      
       res.json({ success: true, response: saved });
     } catch (error: any) {
-      console.error("[Presentation] Error saving practice response:", error);
-      res.status(500).json({ error: "Failed to save practice response" });
+      console.error("[Presentation] Error saving practice response:", error.message, error.stack);
+      res.status(500).json({ error: "Failed to save practice response", details: error.message });
     }
   });
 
