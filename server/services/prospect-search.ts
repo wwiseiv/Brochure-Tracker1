@@ -41,11 +41,10 @@ export async function searchLocalBusinesses(
 ): Promise<SearchResult> {
   const { zipCode, businessTypes, radius, maxResults, agentId } = params;
 
-  const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-  const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
+  const grokApiKey = process.env.GROK_API_KEY;
 
-  if (!geminiApiKey) {
-    throw new Error("Gemini API not configured");
+  if (!grokApiKey) {
+    throw new Error("Grok API not configured");
   }
 
   const businessTypeNames = businessTypes.map((bt) => bt.name).join(", ");
@@ -54,27 +53,21 @@ export async function searchLocalBusinesses(
     ...bt.searchTerms,
   ]);
 
-  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Search Google to find real, currently operating local businesses matching these criteria:
+  const searchPrompt = `Search the web to find real, currently operating local businesses matching these criteria:
 
 SEARCH PARAMETERS:
 - Location: Within ${radius} miles of ZIP code ${zipCode}
 - Business Types: ${businessTypeNames}
-- Search Terms to Use: ${allSearchTerms.slice(0, 15).join(", ")}
+- Search Terms: ${allSearchTerms.slice(0, 10).join(", ")}
 - Number of Results Needed: ${maxResults}
 
-CRITICAL REQUIREMENTS:
-1. Search for REAL, VERIFIED businesses that currently exist and are operating
-2. Include COMPLETE address information (exact street address, city, state, zip)
-3. Prioritize independent local businesses over national chains (better prospects for payment processing)
-4. Focus on businesses likely to accept card payments
-5. Exclude businesses that are permanently closed
+REQUIREMENTS:
+1. Find REAL businesses that currently exist and are operating
+2. Include COMPLETE address information (street address, city, state, zip)
+3. Prioritize independent local businesses over national chains
+4. Include phone numbers, websites, and hours when available
 
-SEARCH STRATEGY:
-- Search for "${businessTypeNames} near ${zipCode}"
-- Look for Google Business listings, Yelp results, Yellow Pages
-- Verify addresses are complete and accurate
-
-For each business, provide ALL available information in this exact JSON format:
+Return the results as a JSON array with this exact format:
 [
   {
     "name": "Business Name",
@@ -84,54 +77,64 @@ For each business, provide ALL available information in this exact JSON format:
     "zipCode": "46032",
     "phone": "(555) 123-4567",
     "website": "https://example.com",
-    "email": "contact@example.com",
+    "email": null,
     "hoursOfOperation": "Mon-Fri 9am-5pm",
-    "ownerName": "Owner Name",
-    "yearEstablished": "2015",
-    "description": "Brief business description",
-    "businessType": "Restaurant",
-    "mccCode": "5812",
+    "ownerName": null,
+    "yearEstablished": null,
+    "description": "Brief description",
+    "businessType": "${businessTypes[0]?.name || 'Business'}",
+    "mccCode": "${businessTypes[0]?.code || '0000'}",
     "confidence": 0.9
   }
 ]
 
-Return ONLY a valid JSON array. Start with [ and end with ]. No additional text or explanation.`;
+Return ONLY a valid JSON array. Start with [ and end with ]. No markdown, no explanation.`;
 
   try {
-    console.log("[ProspectSearch] Searching with Gemini for businesses near", zipCode);
+    console.log("[ProspectSearch] Searching with Grok for businesses near", zipCode);
     
-    // Use Gemini API with Google Search grounding
-    const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.0-flash:generateContent`, {
+    // Use Grok API with search tool
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": geminiApiKey
+        "Authorization": `Bearer ${grokApiKey}`
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: searchPrompt }] }],
-        tools: [{ googleSearch: {} }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 8192
-        }
+        model: "grok-3-fast",
+        messages: [
+          {
+            role: "system",
+            content: "You are a business research assistant that searches the web for real local business information. Always return results as valid JSON arrays."
+          },
+          {
+            role: "user",
+            content: searchPrompt
+          }
+        ],
+        search_parameters: {
+          mode: "auto",
+          return_citations: false
+        },
+        temperature: 0.3
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[ProspectSearch] API error:", response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status}`);
+      console.error("[ProspectSearch] Grok API error:", response.status, errorText);
+      throw new Error(`Grok API error: ${response.status}`);
     }
 
     const data = await response.json() as any;
-    console.log("[ProspectSearch] API response received");
+    console.log("[ProspectSearch] Grok response received");
     
-    // Extract text from Gemini response
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    console.log("[ProspectSearch] Response text length:", textContent.length);
+    // Extract text from response
+    const textContent = data.choices?.[0]?.message?.content || "";
+    console.log("[ProspectSearch] Response length:", textContent.length);
 
     if (!textContent) {
-      console.error("[ProspectSearch] No text content in response");
+      console.error("[ProspectSearch] No content in response");
       return {
         businesses: [],
         totalFound: 0,
@@ -143,7 +146,7 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
     // Extract JSON array from response
     const jsonMatch = textContent.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error("[ProspectSearch] No valid JSON found in response:", textContent.substring(0, 500));
+      console.error("[ProspectSearch] No valid JSON found:", textContent.substring(0, 500));
       return {
         businesses: [],
         totalFound: 0,
@@ -154,15 +157,12 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
 
     let businesses: DiscoveredBusiness[];
     try {
-      // Clean up the JSON string
       let jsonStr = jsonMatch[0];
-      // Remove any trailing commas before ] or }
+      // Remove trailing commas
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, "$1");
-      // Parse the JSON
       businesses = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error("[ProspectSearch] Failed to parse JSON:", parseError);
-      console.error("[ProspectSearch] Raw JSON:", jsonMatch[0].substring(0, 500));
+      console.error("[ProspectSearch] JSON parse error:", parseError);
       return {
         businesses: [],
         totalFound: 0,
@@ -171,7 +171,7 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
       };
     }
 
-    // Ensure all businesses have required fields
+    // Validate and normalize businesses
     businesses = businesses
       .filter((b) => b.name && b.address && b.city && b.state)
       .map((b) => ({
@@ -192,7 +192,7 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
         confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
       }));
 
-    console.log("[ProspectSearch] Parsed", businesses.length, "businesses");
+    console.log("[ProspectSearch] Found", businesses.length, "businesses");
 
     const { deduplicatedBusinesses, duplicatesSkipped } =
       await deduplicateResults(businesses, agentId);
@@ -204,7 +204,7 @@ Return ONLY a valid JSON array. Start with [ and end with ]. No additional text 
       searchId: generateSearchId(),
     };
   } catch (error: any) {
-    console.error("[ProspectSearch] AI search error:", error.message || error);
+    console.error("[ProspectSearch] Search error:", error.message || error);
     throw new Error("Failed to search for businesses. Please try again.");
   }
 }
