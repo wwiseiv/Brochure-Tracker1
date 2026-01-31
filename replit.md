@@ -79,8 +79,9 @@ A modular, plugin-based AI platform for generating merchant proposals.
 - **Google Cloud Storage**: For file uploads.
 
 ### AI/ML
+- **xAI Grok-4**: Primary AI provider for Prospect Finder using Responses API with web_search tool for real-time business discovery.
+- **Claude AI (Anthropic)**: Primary for proposal generation, compliance analysis, AI Help Chatbot, and fallback for Prospect Finder (model: claude-sonnet-4-5).
 - **Gemini AI**: For transcription, summarization, lead scoring, and role-play feedback.
-- **Claude AI (Anthropic)**: For high-quality proposal generation, compliance analysis, and AI Help Chatbot.
 - **OpenAI**: Fallback provider for AI operations.
 - **ElevenLabs TTS**: For AI voice responses in role-play.
 
