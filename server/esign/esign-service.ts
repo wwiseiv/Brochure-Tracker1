@@ -813,6 +813,7 @@ export class ESignatureService {
   // ============================================
 
   // List templates from SignNow account
+  // SignNow stores templates in a special "Templates" folder, not via /template endpoint
   async listSignNowTemplates(): Promise<{
     success: boolean;
     templates?: Array<{
@@ -830,7 +831,9 @@ export class ESignatureService {
         return { success: false, error: "Failed to authenticate with SignNow" };
       }
 
-      const response = await fetch("https://api.signnow.com/template", {
+      // Step 1: Get all folders to find the Templates folder ID
+      console.log("[SignNow] Fetching folders to find Templates folder...");
+      const foldersResponse = await fetch("https://api.signnow.com/folder", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
@@ -838,20 +841,52 @@ export class ESignatureService {
         }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[SignNow] Failed to list templates:", response.status, errorText);
-        return { success: false, error: `Failed to fetch templates: ${response.status}` };
+      if (!foldersResponse.ok) {
+        const errorText = await foldersResponse.text();
+        console.error("[SignNow] Failed to list folders:", foldersResponse.status, errorText);
+        return { success: false, error: `Failed to fetch folders: ${foldersResponse.status}` };
       }
 
-      const templates = await response.json() as any[];
-      console.log("[SignNow] Retrieved", templates.length, "templates");
+      const foldersData = await foldersResponse.json();
+      const folders = foldersData.folders || foldersData || [];
+      console.log("[SignNow] Found", folders.length, "folders");
+
+      // Find the Templates folder (it's a system folder with name "Templates")
+      const templatesFolder = folders.find((f: any) => 
+        f.name === "Templates" || f.name === "templates" || f.system_folder === "templates"
+      );
+
+      if (!templatesFolder) {
+        console.log("[SignNow] Templates folder not found. Available folders:", folders.map((f: any) => f.name));
+        return { success: true, templates: [] };
+      }
+
+      console.log("[SignNow] Found Templates folder:", templatesFolder.id);
+
+      // Step 2: Get documents from the Templates folder
+      const templatesResponse = await fetch(`https://api.signnow.com/folder/${templatesFolder.id}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!templatesResponse.ok) {
+        const errorText = await templatesResponse.text();
+        console.error("[SignNow] Failed to get Templates folder contents:", templatesResponse.status, errorText);
+        return { success: false, error: `Failed to fetch templates: ${templatesResponse.status}` };
+      }
+
+      const folderContents = await templatesResponse.json();
+      const templates = folderContents.documents || [];
+      console.log("[SignNow] Retrieved", templates.length, "templates from Templates folder");
 
       return {
         success: true,
         templates: templates.map((t: any) => ({
           id: t.id,
-          name: t.document_name || t.template_name || "Untitled Template",
+          name: t.document_name || t.template_name || t.name || "Untitled Template",
           pageCount: t.page_count || 1,
           createdAt: t.created || new Date().toISOString(),
           updatedAt: t.updated || new Date().toISOString()
