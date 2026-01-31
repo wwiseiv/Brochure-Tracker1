@@ -15,7 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { ProposalJobStep, ProposalJobStatus, ProposalJobStepStatus, PricingComparison, MerchantScrapedData, SalespersonInfo } from "@shared/schema";
+import type { ProposalJobStep, ProposalJobStatus, ProposalJobStepStatus, PricingComparison, MerchantScrapedData, SalespersonInfo, Deal } from "@shared/schema";
 import {
   ArrowLeft,
   Upload,
@@ -362,6 +362,11 @@ export default function ProposalGeneratorPage() {
   const statementFileInputRef = useRef<HTMLInputElement>(null);
   const [dualPricingIsDragging, setDualPricingIsDragging] = useState(false);
   const [interchangePlusIsDragging, setInterchangePlusIsDragging] = useState(false);
+  const [selectedDealId, setSelectedDealId] = useState<string>("");
+
+  const { data: deals } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
 
   const validateAgentInfo = () => {
     const errors: Record<string, string> = {};
@@ -647,10 +652,32 @@ export default function ProposalGeneratorPage() {
         }
         if (data.status === "completed") {
           setAgenticStep("complete");
-          toast({
-            title: "Proposal Complete!",
-            description: "Your professional proposal is ready for download.",
-          });
+          
+          if (selectedDealId && currentJobId) {
+            try {
+              const merchantName = businessName || data.merchantScrapedData?.businessName || "Unknown Merchant";
+              await apiRequest("POST", `/api/deals/${selectedDealId}/attachments`, {
+                attachmentType: "proposal",
+                externalId: String(currentJobId),
+                name: `Proposal - ${merchantName}`,
+                notes: "Generated from Proposal Generator",
+              });
+              toast({
+                title: "Proposal Complete!",
+                description: "Your proposal is ready and linked to the deal.",
+              });
+            } catch (error) {
+              toast({
+                title: "Proposal Complete!",
+                description: "Your proposal is ready but failed to link to deal.",
+              });
+            }
+          } else {
+            toast({
+              title: "Proposal Complete!",
+              description: "Your professional proposal is ready for download.",
+            });
+          }
         } else {
           toast({
             title: "Build Failed",
@@ -1299,6 +1326,34 @@ export default function ProposalGeneratorPage() {
             onChange={(e) => setMerchantWebsiteUrl(e.target.value)}
             data-testid="input-merchant-website"
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-primary" />
+            Link to Deal
+            <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+          </CardTitle>
+          <CardDescription>
+            Link this proposal to an existing deal in your pipeline
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+            <SelectTrigger data-testid="select-link-deal">
+              <SelectValue placeholder="Select a deal to link..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No deal selected</SelectItem>
+              {deals?.map((deal) => (
+                <SelectItem key={deal.id} value={String(deal.id)}>
+                  {deal.businessName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 

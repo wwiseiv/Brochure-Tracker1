@@ -2,8 +2,9 @@ import { useState, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import type { Deal } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -98,6 +99,8 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface AnalysisResult {
   success: boolean;
+  merchantName?: string;
+  processorName?: string;
   analysis: {
     summary: {
       monthlyVolume: number;
@@ -220,6 +223,11 @@ export default function StatementAnalyzer() {
   const [correctionField, setCorrectionField] = useState<string | null>(null);
   const [correctionValue, setCorrectionValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string>("");
+
+  const { data: deals } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -292,12 +300,34 @@ export default function StatementAnalyzer() {
       const response = await apiRequest("POST", "/api/proposal-intelligence/analyze-statement", payload);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setResults(data);
-      toast({
-        title: "Analysis Complete",
-        description: "Statement analyzed successfully"
-      });
+      
+      if (selectedDealId && extractedData?.extractionId) {
+        try {
+          const merchantName = form.getValues("merchantName") || "Unknown Merchant";
+          await apiRequest("POST", `/api/deals/${selectedDealId}/attachments`, {
+            attachmentType: "statement",
+            externalId: String(extractedData.extractionId),
+            name: `Statement Analysis - ${merchantName}`,
+            notes: "Linked from Statement Analyzer",
+          });
+          toast({
+            title: "Analysis Complete",
+            description: "Statement analyzed and linked to deal successfully"
+          });
+        } catch (error) {
+          toast({
+            title: "Analysis Complete",
+            description: "Statement analyzed but failed to link to deal"
+          });
+        }
+      } else {
+        toast({
+          title: "Analysis Complete",
+          description: "Statement analyzed successfully"
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -1391,6 +1421,24 @@ ${new Date().toLocaleDateString()}
                       />
                     </div>
 
+                    <FormItem>
+                      <FormLabel>Link to Deal (Optional)</FormLabel>
+                      <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+                        <SelectTrigger data-testid="select-link-deal">
+                          <SelectValue placeholder="Select a deal to link..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No deal selected</SelectItem>
+                          {deals?.map((deal) => (
+                            <SelectItem key={deal.id} value={String(deal.id)}>
+                              {deal.businessName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Link this analysis to an existing deal in your pipeline</FormDescription>
+                    </FormItem>
+
                     <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
@@ -2144,12 +2192,12 @@ ${new Date().toLocaleDateString()}
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => copyToClipboard(objData.response || (data as string), `Objection: ${key}`)}
+                                    onClick={() => copyToClipboard(objData.response || '', `Objection: ${key}`)}
                                   >
                                     {copiedText === `Objection: ${key}` ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                                   </Button>
                                 </div>
-                                <p className="text-sm whitespace-pre-wrap">{objData.response || (data as string)}</p>
+                                <p className="text-sm whitespace-pre-wrap">{objData.response || ''}</p>
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
