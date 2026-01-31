@@ -36,7 +36,7 @@ import ESignRequestDetailPage from "@/pages/esign-request-detail";
 import CompleteProfilePage from "@/pages/complete-profile";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
-import { FloatingHelpButton } from "@/components/BottomNav";
+import { HelpChatbot } from "@/components/HelpChatbot";
 
 import { useLocation } from "wouter";
 
@@ -123,7 +123,7 @@ function RMRoute() {
 function AuthenticatedRouter() {
   return (
     <>
-      <FloatingHelpButton />
+      <HelpChatbot />
       <Switch>
         <Route path="/" component={DashboardPage} />
       <Route path="/admin" component={AdminRoute} />
