@@ -49,7 +49,9 @@ import {
   Search,
   Filter,
   Package,
-  Cpu
+  Cpu,
+  FileSpreadsheet,
+  File
 } from "lucide-react";
 import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
 
@@ -181,6 +183,39 @@ interface ProposalJobResponse {
   updatedAt: string;
   completedAt: string | null;
 }
+
+interface StatementUploadedFile {
+  file: File;
+  uploading: boolean;
+  uploaded: boolean;
+  error?: string;
+  preview?: string;
+  objectPath?: string;
+}
+
+interface StatementExtractedData {
+  merchantName?: string;
+  processorName?: string;
+  statementPeriod?: string;
+  totalVolume?: number;
+  totalTransactions?: number;
+  totalFees?: number;
+  merchantType?: string;
+  fees?: {
+    interchange?: number;
+    assessments?: number;
+    monthlyFees?: number;
+    pciFees?: number;
+    statementFees?: number;
+    batchFees?: number;
+    equipmentFees?: number;
+    otherFees?: number;
+  };
+  confidence: number;
+  extractionNotes: string[];
+}
+
+const STATEMENT_ACCEPTED_FILE_TYPES = ".pdf,.png,.jpg,.jpeg,.gif,.xlsx,.xls,.csv";
 
 const STEP_LABELS: Record<ProposalJobStep, { label: string; icon: typeof FileText }> = {
   parsing_documents: { label: "Parsing Documents", icon: FileText },
@@ -317,6 +352,13 @@ export default function ProposalGeneratorPage() {
   const [jobStatus, setJobStatus] = useState<ProposalJobResponse | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Merchant Statement upload state
+  const [statementFiles, setStatementFiles] = useState<StatementUploadedFile[]>([]);
+  const [statementExtractedData, setStatementExtractedData] = useState<StatementExtractedData | null>(null);
+  const [statementExtractionStep, setStatementExtractionStep] = useState<"idle" | "uploading" | "extracting" | "done">("idle");
+  const [statementIsDragging, setStatementIsDragging] = useState(false);
+  const statementFileInputRef = useRef<HTMLInputElement>(null);
 
   const validateAgentInfo = () => {
     const errors: Record<string, string> = {};
@@ -644,6 +686,224 @@ export default function ProposalGeneratorPage() {
       }
     };
   }, []);
+
+  // Statement file handling helpers
+  const getStatementFileIcon = (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (file.type.startsWith("image/") || ["png", "jpg", "jpeg", "gif"].includes(ext || "")) {
+      return <ImageIcon className="h-5 w-5 text-blue-500" />;
+    }
+    if (file.type === "application/pdf" || ext === "pdf") {
+      return <FileText className="h-5 w-5 text-red-500" />;
+    }
+    if (["xlsx", "xls", "csv"].includes(ext || "")) {
+      return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    }
+    return <File className="h-5 w-5 text-gray-500" />;
+  };
+
+  const handleStatementFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newFiles: StatementUploadedFile[] = files.map(file => ({
+      file,
+      preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      uploading: false,
+      uploaded: false
+    }));
+
+    setStatementFiles(prev => [...prev, ...newFiles]);
+    
+    if (statementFileInputRef.current) {
+      statementFileInputRef.current.value = "";
+    }
+  };
+
+  const handleStatementDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStatementIsDragging(true);
+  };
+
+  const handleStatementDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStatementIsDragging(false);
+  };
+
+  const handleStatementDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStatementIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    const acceptedExtensions = STATEMENT_ACCEPTED_FILE_TYPES.split(",");
+    const validFiles = files.filter(file => {
+      const ext = "." + file.name.split(".").pop()?.toLowerCase();
+      return acceptedExtensions.includes(ext) || file.type.startsWith("image/");
+    });
+
+    if (validFiles.length === 0) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload PDF, Excel, CSV, or image files",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newFiles: StatementUploadedFile[] = validFiles.map(file => ({
+      file,
+      preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      uploading: false,
+      uploaded: false
+    }));
+
+    setStatementFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const removeStatementFile = (index: number) => {
+    setStatementFiles(prev => {
+      const updated = [...prev];
+      if (updated[index].preview) {
+        URL.revokeObjectURL(updated[index].preview!);
+      }
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const uploadAndExtractStatement = async () => {
+    if (statementFiles.length === 0) return;
+
+    setStatementExtractionStep("uploading");
+    
+    const fileData: Array<{ path: string; mimeType: string; name: string }> = [];
+
+    for (let i = 0; i < statementFiles.length; i++) {
+      const uploadFile = statementFiles[i];
+      
+      setStatementFiles(prev => {
+        const updated = [...prev];
+        updated[i] = { ...updated[i], uploading: true };
+        return updated;
+      });
+
+      try {
+        const urlResponse = await fetch("/api/uploads/request-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            name: uploadFile.file.name,
+            size: uploadFile.file.size,
+            contentType: uploadFile.file.type || "application/octet-stream"
+          })
+        });
+
+        if (!urlResponse.ok) {
+          throw new Error("Failed to get upload URL");
+        }
+
+        const { uploadURL, objectPath } = await urlResponse.json();
+
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: uploadFile.file,
+          headers: { "Content-Type": uploadFile.file.type || "application/octet-stream" }
+        });
+
+        setStatementFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, uploaded: true, objectPath };
+          return updated;
+        });
+
+        fileData.push({
+          path: objectPath,
+          mimeType: uploadFile.file.type || "application/octet-stream",
+          name: uploadFile.file.name
+        });
+
+      } catch (error) {
+        setStatementFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, error: "Upload failed" };
+          return updated;
+        });
+      }
+    }
+
+    if (fileData.length > 0) {
+      setStatementExtractionStep("extracting");
+      try {
+        const response = await fetch("/api/proposal-intelligence/extract-statement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ files: fileData })
+        });
+        
+        if (!response.ok) {
+          throw new Error("Extraction failed");
+        }
+        
+        const data = await response.json();
+        if (data.success && data.extracted) {
+          setStatementExtractedData(data.extracted);
+          setStatementExtractionStep("done");
+          toast({
+            title: "Data Extracted",
+            description: `Confidence: ${data.extracted.confidence}%. Review and use the data below.`
+          });
+        } else {
+          throw new Error("No data extracted");
+        }
+      } catch (error) {
+        setStatementExtractionStep("idle");
+        toast({
+          title: "Extraction Failed",
+          description: error instanceof Error ? error.message : "Failed to extract data",
+          variant: "destructive"
+        });
+      }
+    } else {
+      setStatementExtractionStep("idle");
+      toast({
+        title: "Upload Failed",
+        description: "No files could be uploaded",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const applyExtractedStatementData = () => {
+    if (!statementExtractedData) return;
+    
+    if (statementExtractedData.merchantName) {
+      setBusinessName(statementExtractedData.merchantName);
+    }
+    if (statementExtractedData.processorName) {
+      setCurrentProcessor(statementExtractedData.processorName);
+    }
+    
+    toast({
+      title: "Data Applied",
+      description: "Merchant information has been populated from the statement."
+    });
+  };
+
+  const clearStatementUpload = () => {
+    statementFiles.forEach(f => {
+      if (f.preview) URL.revokeObjectURL(f.preview);
+    });
+    setStatementFiles([]);
+    setStatementExtractedData(null);
+    setStatementExtractionStep("idle");
+  };
 
   const handleStartBuild = () => {
     if (!validateAgentInfo()) {
@@ -1035,6 +1295,228 @@ export default function ProposalGeneratorPage() {
             onChange={(e) => setMerchantWebsiteUrl(e.target.value)}
             data-testid="input-merchant-website"
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-primary" />
+            Merchant Statement
+            <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+          </CardTitle>
+          <CardDescription>
+            Upload a merchant processing statement to automatically extract pricing data with AI
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {statementExtractionStep !== "done" && (
+            <div 
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                statementIsDragging 
+                  ? "border-primary bg-primary/10" 
+                  : "hover:border-primary/50 hover:bg-muted/30"
+              }`}
+              onClick={() => statementFileInputRef.current?.click()}
+              onDragOver={handleStatementDragOver}
+              onDragEnter={handleStatementDragOver}
+              onDragLeave={handleStatementDragLeave}
+              onDrop={handleStatementDrop}
+              data-testid="statement-dropzone"
+            >
+              <input
+                ref={statementFileInputRef}
+                type="file"
+                accept={STATEMENT_ACCEPTED_FILE_TYPES}
+                multiple
+                onChange={handleStatementFileSelect}
+                className="hidden"
+                data-testid="input-statement-file"
+              />
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                  <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {statementIsDragging ? "Drop files here" : "Drag & drop or click to upload"}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    PDF, Excel, CSV, or Images (multiple pages supported)
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {statementFiles.length > 0 && statementExtractionStep !== "done" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Files to analyze ({statementFiles.length})</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={clearStatementUpload}
+                  className="text-muted-foreground hover:text-destructive"
+                  data-testid="button-clear-statement-files"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear All
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {statementFiles.map((f, i) => (
+                  <div 
+                    key={i} 
+                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
+                    data-testid={`statement-file-item-${i}`}
+                  >
+                    {f.preview ? (
+                      <img src={f.preview} alt="" className="h-10 w-10 object-cover rounded" />
+                    ) : (
+                      getStatementFileIcon(f.file)
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{f.file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(f.file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    {f.uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {f.uploaded && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                    {f.error && <XCircle className="h-4 w-4 text-red-500" />}
+                    {!f.uploading && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => { e.stopPropagation(); removeStatementFile(i); }}
+                        data-testid={`button-remove-statement-file-${i}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {statementExtractionStep === "uploading" && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Uploading files...</p>
+                  <Progress value={
+                    (statementFiles.filter(f => f.uploaded).length / statementFiles.length) * 100
+                  } />
+                </div>
+              )}
+
+              {statementExtractionStep === "extracting" && (
+                <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">AI is extracting data from your statement...</span>
+                </div>
+              )}
+
+              {statementExtractionStep === "idle" && (
+                <Button 
+                  className="w-full" 
+                  onClick={uploadAndExtractStatement}
+                  disabled={statementFiles.length === 0}
+                  data-testid="button-extract-statement"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Extract Data with AI
+                </Button>
+              )}
+            </div>
+          )}
+
+          {statementExtractionStep === "done" && statementExtractedData && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-green-800 dark:text-green-300">
+                      Data Extracted Successfully
+                    </p>
+                    <p className="text-sm text-green-700 dark:text-green-400">
+                      Confidence: {statementExtractedData.confidence}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {statementExtractedData.merchantName && (
+                  <div>
+                    <p className="text-muted-foreground">Merchant Name</p>
+                    <p className="font-medium">{statementExtractedData.merchantName}</p>
+                  </div>
+                )}
+                {statementExtractedData.processorName && (
+                  <div>
+                    <p className="text-muted-foreground">Processor</p>
+                    <p className="font-medium">{statementExtractedData.processorName}</p>
+                  </div>
+                )}
+                {statementExtractedData.totalVolume !== undefined && (
+                  <div>
+                    <p className="text-muted-foreground">Monthly Volume</p>
+                    <p className="font-medium">{formatCurrency(statementExtractedData.totalVolume)}</p>
+                  </div>
+                )}
+                {statementExtractedData.totalTransactions !== undefined && (
+                  <div>
+                    <p className="text-muted-foreground">Transactions</p>
+                    <p className="font-medium">{statementExtractedData.totalTransactions.toLocaleString()}</p>
+                  </div>
+                )}
+                {statementExtractedData.totalFees !== undefined && (
+                  <div>
+                    <p className="text-muted-foreground">Total Fees</p>
+                    <p className="font-medium">{formatCurrency(statementExtractedData.totalFees)}</p>
+                  </div>
+                )}
+                {statementExtractedData.statementPeriod && (
+                  <div>
+                    <p className="text-muted-foreground">Statement Period</p>
+                    <p className="font-medium">{statementExtractedData.statementPeriod}</p>
+                  </div>
+                )}
+              </div>
+
+              {statementExtractedData.extractionNotes && statementExtractedData.extractionNotes.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  <p className="font-medium mb-1">Notes:</p>
+                  <ul className="list-disc list-inside">
+                    {statementExtractedData.extractionNotes.map((note, i) => (
+                      <li key={i}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={applyExtractedStatementData}
+                  className="flex-1"
+                  data-testid="button-use-extracted-data"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Use This Data
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={clearStatementUpload}
+                  data-testid="button-clear-extracted-data"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
