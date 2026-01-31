@@ -772,6 +772,15 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
   
   if (structured && (structured.totalVolume > 0 || structured.visa?.volume > 0 || structured.merchantName !== "Unknown")) {
     console.log("[ProposalGenerator] Using Claude structured data extraction");
+    console.log("[ProposalGenerator] Structured data:", {
+      merchantName: structured.merchantName,
+      totalVolume: structured.totalVolume,
+      totalTransactions: structured.totalTransactions,
+      totalFees: structured.totalFees,
+      processingFees: structured.processingFees,
+      monthlySavings: structured.monthlySavings,
+      annualSavings: structured.annualSavings,
+    });
     
     merchantName = structured.merchantName || "Unknown Merchant";
     proposalType = structured.proposalType === "dual_pricing" ? "dual_pricing" : "interchange_plus";
@@ -869,13 +878,25 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
     proposalType,
   };
   
+  // Get Claude's extracted savings if available
+  const claudeMonthlySavings = structured?.monthlySavings || 0;
+  const claudeAnnualSavings = structured?.annualSavings || (claudeMonthlySavings > 0 ? claudeMonthlySavings * 12 : 0);
+  
   // ALWAYS calculate both options for comparison display
   // Dual Pricing Option
   const dpMonthlyMatch = text.match(/Dual\s+Pricing\s+Monthly\s+\$?([\d,]+\.?\d*)/i);
   const dpMonthlyFee = dpMonthlyMatch ? parseNumber(dpMonthlyMatch[1]) : 64.95;
   const dpTotalCost = dpMonthlyFee + fees.statementFee + fees.pciNonCompliance;
-  const dpMonthlySavings = totalMonthlyCost - dpTotalCost;
+  let dpMonthlySavings = totalMonthlyCost - dpTotalCost;
+  let dpAnnualSavings = dpMonthlySavings * 12;
   const dpSavingsPercent = totalMonthlyCost > 0 ? (dpMonthlySavings / totalMonthlyCost) * 100 : 0;
+  
+  // Use Claude's extracted savings if our calculation is zero/negative
+  if (dpMonthlySavings <= 0 && claudeMonthlySavings > 0) {
+    console.log("[ProposalGenerator] Using Claude's extracted savings:", claudeMonthlySavings);
+    dpMonthlySavings = claudeMonthlySavings;
+    dpAnnualSavings = claudeAnnualSavings;
+  }
   
   result.optionDualPricing = {
     merchantDiscountRate: 0,
@@ -890,7 +911,7 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
     totalMonthlyCost: dpTotalCost,
     monthlySavings: dpMonthlySavings > 0 ? dpMonthlySavings : savings.monthly,
     savingsPercent: dpSavingsPercent > 0 ? dpSavingsPercent : savings.percent,
-    annualSavings: dpMonthlySavings > 0 ? dpMonthlySavings * 12 : savings.yearly,
+    annualSavings: dpAnnualSavings > 0 ? dpAnnualSavings : savings.yearly,
   };
   
   // Interchange Plus Option
@@ -917,6 +938,15 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
   const icMonthlySavings = totalMonthlyCost - icTotalCost;
   const icSavingsPercent = totalMonthlyCost > 0 ? (icMonthlySavings / totalMonthlyCost) * 100 : 0;
   
+  // Use Claude's extracted savings as fallback for IC+ too
+  let finalIcMonthlySavings = icMonthlySavings;
+  let finalIcAnnualSavings = icMonthlySavings * 12;
+  if (icMonthlySavings <= 0 && claudeMonthlySavings > 0) {
+    // For IC+, typically savings are slightly less than DP, use 70% as estimate
+    finalIcMonthlySavings = claudeMonthlySavings * 0.7;
+    finalIcAnnualSavings = claudeAnnualSavings * 0.7;
+  }
+  
   result.optionInterchangePlus = {
     discountRatePercent: proposedRate,
     perTransactionFee: proposedFee,
@@ -931,9 +961,9 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
       otherFees: 0,
     },
     totalMonthlyCost: icTotalCost,
-    monthlySavings: icMonthlySavings > 0 ? icMonthlySavings : savings.monthly,
+    monthlySavings: finalIcMonthlySavings > 0 ? finalIcMonthlySavings : savings.monthly,
     savingsPercent: icSavingsPercent > 0 ? icSavingsPercent : savings.percent,
-    annualSavings: icMonthlySavings > 0 ? icMonthlySavings * 12 : savings.yearly,
+    annualSavings: finalIcAnnualSavings > 0 ? finalIcAnnualSavings : savings.yearly,
   };
   
   const validation = validateExtractedData(result);

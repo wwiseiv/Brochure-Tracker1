@@ -658,12 +658,75 @@
     @media print {
       .page {
         page-break-after: always;
+        break-after: page;
       }
 
       body {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
+
+      /* Keep sections together - prevent awkward breaks */
+      .section-header,
+      .executive-summary,
+      .savings-card,
+      .recommendation-box,
+      .equipment-card,
+      .cta-section,
+      .disclosures {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      /* Keep headers with their content */
+      h1, h2, h3, h4 {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+
+      /* Keep tables together when possible */
+      table, .data-table, .comparison-table {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      /* CRITICAL: Prevent text truncation in tables */
+      td, th {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+      }
+
+      /* Keep timeline items together */
+      .timeline-item {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      /* Keep recommendation reasons together */
+      .reason-item {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      /* Ensure full page width usage */
+      .page {
+        width: 100% !important;
+        max-width: 8.5in !important;
+        margin: 0 !important;
+      }
+    }
+
+    /* ========== TABLE TEXT WRAPPING (Screen & Print) ========== */
+    .data-table td,
+    .comparison-table td,
+    .timeline-content p {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
     }
   </style>
 </head>
