@@ -71,6 +71,7 @@ import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
 import { researchBusiness } from "./business-research";
+import { extractBusinessCardData } from "./services/business-card-scanner";
 import { generateProposalImages, type ProposalImages } from "./proposal-images";
 import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./proposal-builder";
 import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
@@ -7675,6 +7676,88 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Prospects] Claim error:", error);
       res.status(500).json({ error: "Failed to claim prospect" });
+    }
+  });
+
+  // Scan business card and extract contact data using AI OCR
+  app.post("/api/prospects/scan-card", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { imageData, mimeType } = req.body;
+
+      if (!imageData || !mimeType) {
+        return res.status(400).json({ error: "Image data and mime type required" });
+      }
+
+      // Validate mime type
+      const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (!allowedTypes.includes(mimeType)) {
+        return res.status(400).json({ error: "Invalid image type. Please use JPEG, PNG, GIF, or WebP." });
+      }
+
+      console.log("[BusinessCard] Processing card scan, mimeType:", mimeType, "dataLength:", imageData.length);
+
+      const extractedData = await extractBusinessCardData(imageData, mimeType);
+
+      console.log("[BusinessCard] Extraction complete, confidence:", extractedData.confidence);
+
+      res.json({
+        success: true,
+        data: extractedData,
+      });
+    } catch (error: any) {
+      console.error("[BusinessCard] Scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to scan business card. Please try again." });
+    }
+  });
+
+  // Create prospect from business card scan
+  app.post("/api/prospects/from-card", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const agentId = req.user.claims.sub;
+      const { cardData } = req.body;
+
+      if (!cardData?.businessName) {
+        return res.status(400).json({ error: "Business name is required" });
+      }
+
+      // Create the prospect
+      const [prospect] = await db
+        .insert(prospects)
+        .values({
+          agentId,
+          organizationId: membership.orgId,
+          businessName: cardData.businessName,
+          ownerName: cardData.contactName,
+          addressLine1: cardData.addressLine1,
+          city: cardData.city,
+          state: cardData.state,
+          zipCode: cardData.zipCode || "00000",
+          phone: cardData.phone,
+          email: cardData.email,
+          website: cardData.website,
+          businessType: cardData.businessType,
+          aiConfidenceScore: cardData.confidence?.toString(),
+          source: "business_card",
+          status: "discovered",
+          notes: cardData.extractionNotes?.length > 0 
+            ? `Scanned from business card. Notes: ${cardData.extractionNotes.join("; ")}` 
+            : "Scanned from business card",
+        })
+        .returning();
+
+      // Log activity
+      await db.insert(prospectActivities).values({
+        prospectId: prospect.id,
+        agentId,
+        activityType: "created",
+        notes: "Created from business card scan",
+      });
+
+      res.json({ prospect });
+    } catch (error: any) {
+      console.error("[Prospects] Create from card error:", error);
+      res.status(500).json({ error: "Failed to create prospect from business card" });
     }
   });
 

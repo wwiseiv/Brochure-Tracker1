@@ -33,6 +33,7 @@ import StatementAnalyzerPage from "@/pages/statement-analyzer";
 import MyWorkPage from "@/pages/my-work";
 import ProspectFinderPage from "@/pages/prospect-finder";
 import ProspectPipelinePage from "@/pages/prospect-pipeline";
+import BusinessCardScannerPage from "@/pages/business-card-scanner";
 import ESignDocumentLibraryPage from "@/pages/esign-document-library";
 import ESignRequestDetailPage from "@/pages/esign-request-detail";
 import CompleteProfilePage from "@/pages/complete-profile";
@@ -151,6 +152,7 @@ function AuthenticatedRouter() {
       <Route path="/my-work" component={MyWorkPage} />
       <Route path="/prospects/search" component={ProspectFinderPage} />
       <Route path="/prospects/pipeline" component={ProspectPipelinePage} />
+      <Route path="/prospects/scan-card" component={BusinessCardScannerPage} />
       <Route path="/esign" component={ESignDocumentLibraryPage} />
       <Route path="/esign/:id" component={ESignRequestDetailPage} />
       <Route path="/complete-profile" component={CompleteProfilePage} />

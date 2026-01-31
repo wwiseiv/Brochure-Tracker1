@@ -38,6 +38,7 @@ import {
   Clock,
   TrendingUp,
   XCircle,
+  Camera,
   Target,
   FileText,
   Trash2,
@@ -215,12 +216,19 @@ export default function ProspectPipelinePage() {
               <h1 className="text-lg font-semibold">My Pipeline</h1>
             </div>
           </div>
-          <Link href="/prospects/search">
-            <Button variant="outline" size="sm" className="gap-1" data-testid="button-find-more">
-              <Sparkles className="w-4 h-4" />
-              Find More
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/prospects/scan-card">
+              <Button variant="outline" size="icon" data-testid="button-scan-card">
+                <Camera className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link href="/prospects/search">
+              <Button variant="outline" size="sm" className="gap-1" data-testid="button-find-more">
+                <Sparkles className="w-4 h-4" />
+                Find More
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
