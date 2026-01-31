@@ -386,9 +386,11 @@ export default function MyWorkPage() {
   const assignProposalMerchantMutation = useMutation({
     mutationFn: async ({ proposalId, merchantId }: { proposalId: number; merchantId: number }) => {
       await apiRequest("PATCH", `/api/proposals/${proposalId}`, { merchantId });
+      return merchantId;
     },
-    onSuccess: () => {
+    onSuccess: (merchantId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/work-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId.toString(), "work"] });
       toast({ title: "Merchant assigned successfully" });
     },
     onError: () => {
@@ -399,9 +401,11 @@ export default function MyWorkPage() {
   const assignAnalysisMerchantMutation = useMutation({
     mutationFn: async ({ analysisId, merchantId }: { analysisId: number; merchantId: number }) => {
       await apiRequest("PATCH", `/api/statement-analyses/${analysisId}`, { merchantId });
+      return merchantId;
     },
-    onSuccess: () => {
+    onSuccess: (merchantId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/work-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId.toString(), "work"] });
       toast({ title: "Merchant assigned successfully" });
     },
     onError: () => {

@@ -6805,6 +6805,7 @@ Generate the following content in JSON format:
   app.patch("/api/proposals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
 
       if (isNaN(id)) {
@@ -6816,7 +6817,14 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: "Proposal not found" });
       }
 
+      // Check org membership
       if (proposal.organizationId !== membership.orgId) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Non-admins can only update their own proposals
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+      if (!isAdmin && proposal.userId !== userId) {
         return res.status(404).json({ error: "Proposal not found" });
       }
 
@@ -6900,6 +6908,7 @@ Generate the following content in JSON format:
   app.get("/api/statement-analyses/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
 
       if (isNaN(id)) {
@@ -6911,7 +6920,14 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: "Analysis not found" });
       }
 
+      // Check org membership
       if (analysis.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      // Non-admins can only see their own analyses
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+      if (!isAdmin && analysis.userId !== userId) {
         return res.status(404).json({ error: "Analysis not found" });
       }
 
@@ -6926,6 +6942,7 @@ Generate the following content in JSON format:
   app.patch("/api/statement-analyses/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
 
       if (isNaN(id)) {
@@ -6937,7 +6954,14 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: "Analysis not found" });
       }
 
+      // Check org membership
       if (analysis.orgId !== membership.orgId) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      // Non-admins can only update their own analyses
+      const isAdmin = membership.role === "master_admin" || membership.role === "relationship_manager";
+      if (!isAdmin && analysis.userId !== userId) {
         return res.status(404).json({ error: "Analysis not found" });
       }
 

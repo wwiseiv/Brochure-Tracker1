@@ -172,6 +172,15 @@ export default function MerchantDetailPage() {
     enabled: !!merchantId,
   });
 
+  // Fetch proposals and analyses for this merchant
+  const { data: merchantWork, isLoading: workLoading } = useQuery<{
+    proposals: Array<{ id: number; merchantName: string; status: string; pdfUrl?: string | null; docxUrl?: string | null; createdAt: string }>;
+    analyses: Array<{ id: number; processorName?: string | null; extractedData?: { merchantName?: string; totalVolume?: number } | null; createdAt: string }>;
+  }>({
+    queryKey: ["/api/merchants", merchantId, "work"],
+    enabled: !!merchantId,
+  });
+
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
   
   // Voice recording for notes
@@ -1184,6 +1193,93 @@ export default function MerchantDetailPage() {
               <Mic className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
                 No recordings yet. Tap "Record Meeting" above to start.
+              </p>
+            </Card>
+          )}
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold mb-3">Proposals & Analyses</h2>
+          {workLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
+          ) : merchantWork && (merchantWork.proposals.length > 0 || merchantWork.analyses.length > 0) ? (
+            <div className="space-y-3">
+              {merchantWork.proposals.map((proposal) => (
+                <Card key={`proposal-${proposal.id}`} className="p-4" data-testid={`card-proposal-${proposal.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FileSignature className="w-4 h-4 text-primary" />
+                        <span className="font-medium">Proposal</span>
+                        <Badge variant={proposal.status === 'generated' ? 'default' : 'secondary'}>
+                          {proposal.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(proposal.createdAt), "MMM d, yyyy")}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {proposal.pdfUrl && (
+                        <a href={proposal.pdfUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" data-testid={`button-view-proposal-pdf-${proposal.id}`}>
+                            <FileText className="w-4 h-4 mr-1" />
+                            PDF
+                          </Button>
+                        </a>
+                      )}
+                      {proposal.docxUrl && (
+                        <a href={proposal.docxUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" data-testid={`button-view-proposal-word-${proposal.id}`}>
+                            <FileText className="w-4 h-4 mr-1" />
+                            Word
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {merchantWork.analyses.map((analysis) => (
+                <Card key={`analysis-${analysis.id}`} className="p-4" data-testid={`card-analysis-${analysis.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-4 h-4 text-blue-500" />
+                        <span className="font-medium">Statement Analysis</span>
+                        {analysis.processorName && (
+                          <Badge variant="outline">{analysis.processorName}</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(analysis.createdAt), "MMM d, yyyy")}
+                        {analysis.extractedData?.totalVolume && (
+                          <span className="ml-2">
+                            • Volume: ${analysis.extractedData.totalVolume.toLocaleString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <a href={`/statement-analyzer?id=${analysis.id}`}>
+                      <Button variant="ghost" size="icon" data-testid={`button-view-analysis-${analysis.id}`}>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </a>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-6 text-center">
+              <FileSignature className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No proposals or analyses linked to this merchant yet.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Create proposals and analyses in the Coach section, then link them here.
               </p>
             </Card>
           )}
