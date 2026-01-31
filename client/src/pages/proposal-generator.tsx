@@ -1876,23 +1876,116 @@ export default function ProposalGeneratorPage() {
             <DollarSign className="w-5 h-5 text-primary" />
             Cost Comparison
           </CardTitle>
+          <CardDescription>Click on any value to edit it</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg border">
-              <p className="text-sm font-medium text-muted-foreground mb-2">Current Costs</p>
-              <p className="text-2xl font-bold">{formatCurrency(parsedData?.currentCosts?.totalMonthly || 0)}</p>
-              <p className="text-sm text-muted-foreground">per month</p>
+              <Label className="text-sm font-medium text-muted-foreground mb-2 block">Current Costs</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="text-lg font-bold pl-8"
+                  value={parsedData?.currentCosts?.totalMonthly || 0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setParsedData(prev => {
+                      if (!prev) return null;
+                      const dualPricingCost = prev.proposedCosts?.dualPricing?.totalMonthly || 0;
+                      const icPlusCost = prev.proposedCosts?.interchangePlus?.totalMonthly || 0;
+                      return {
+                        ...prev,
+                        currentCosts: { ...prev.currentCosts, totalMonthly: value },
+                        savings: {
+                          dualPricingMonthly: value - dualPricingCost,
+                          dualPricingAnnual: (value - dualPricingCost) * 12,
+                          interchangePlusMonthly: value - icPlusCost,
+                          interchangePlusAnnual: (value - icPlusCost) * 12,
+                        }
+                      };
+                    });
+                  }}
+                  data-testid="input-current-costs"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">per month</p>
             </div>
             <div className="p-4 rounded-lg border border-primary bg-primary/5">
-              <p className="text-sm font-medium text-muted-foreground mb-2">Dual Pricing</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(parsedData?.proposedCosts?.dualPricing?.totalMonthly || 0)}</p>
-              <p className="text-sm text-muted-foreground">per month</p>
+              <Label className="text-sm font-medium text-muted-foreground mb-2 block">Dual Pricing</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-primary">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="text-lg font-bold text-primary pl-8 border-primary"
+                  value={parsedData?.proposedCosts?.dualPricing?.totalMonthly || 0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setParsedData(prev => {
+                      if (!prev) return null;
+                      const currentCost = prev.currentCosts?.totalMonthly || 0;
+                      const icPlusCost = prev.proposedCosts?.interchangePlus?.totalMonthly || 0;
+                      const existingDualPricing = prev.proposedCosts?.dualPricing || { monthlyProcessingFees: 0, monthlyFees: 0, totalMonthly: 0 };
+                      return {
+                        ...prev,
+                        proposedCosts: {
+                          ...prev.proposedCosts,
+                          dualPricing: { ...existingDualPricing, totalMonthly: value }
+                        },
+                        savings: {
+                          dualPricingMonthly: currentCost - value,
+                          dualPricingAnnual: (currentCost - value) * 12,
+                          interchangePlusMonthly: currentCost - icPlusCost,
+                          interchangePlusAnnual: (currentCost - icPlusCost) * 12,
+                        }
+                      };
+                    });
+                  }}
+                  data-testid="input-dual-pricing"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">per month</p>
             </div>
             <div className="p-4 rounded-lg border">
-              <p className="text-sm font-medium text-muted-foreground mb-2">Interchange Plus</p>
-              <p className="text-2xl font-bold">{formatCurrency(parsedData?.proposedCosts?.interchangePlus?.totalMonthly || 0)}</p>
-              <p className="text-sm text-muted-foreground">per month</p>
+              <Label className="text-sm font-medium text-muted-foreground mb-2 block">Interchange Plus</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="text-lg font-bold pl-8"
+                  value={parsedData?.proposedCosts?.interchangePlus?.totalMonthly || 0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setParsedData(prev => {
+                      if (!prev) return null;
+                      const currentCost = prev.currentCosts?.totalMonthly || 0;
+                      const dualPricingCost = prev.proposedCosts?.dualPricing?.totalMonthly || 0;
+                      const existingIcPlus = prev.proposedCosts?.interchangePlus || { monthlyProcessingFees: 0, monthlyFees: 0, totalMonthly: 0 };
+                      return {
+                        ...prev,
+                        proposedCosts: {
+                          ...prev.proposedCosts,
+                          interchangePlus: { ...existingIcPlus, totalMonthly: value }
+                        },
+                        savings: {
+                          dualPricingMonthly: currentCost - dualPricingCost,
+                          dualPricingAnnual: (currentCost - dualPricingCost) * 12,
+                          interchangePlusMonthly: currentCost - value,
+                          interchangePlusAnnual: (currentCost - value) * 12,
+                        }
+                      };
+                    });
+                  }}
+                  data-testid="input-interchange-plus"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">per month</p>
             </div>
           </div>
         </CardContent>

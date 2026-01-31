@@ -30,18 +30,18 @@ interface ExtractedStatementData {
   extractionNotes: string[];
 }
 
-const GEMINI_EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements.
+const GEMINI_EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements. This is a CRITICAL business task - accuracy is essential.
 
-Analyze the provided statement document(s) and extract the following information. Return ONLY valid JSON with no additional text:
+CAREFULLY analyze the provided statement document(s) and extract ALL available data. Return ONLY valid JSON with no additional text:
 
 {
-  "merchantName": "Business name from statement (string or null)",
-  "processorName": "Processor/ISO name like Square, Stripe, First Data, Worldpay, etc. (string or null)",
-  "statementPeriod": "Statement month/period (string or null)",
-  "totalVolume": "Total monthly processing volume in dollars (number or null)",
-  "totalTransactions": "Total number of transactions (number or null)",
-  "totalFees": "Total fees charged for the month in dollars (number or null)",
-  "merchantType": "retail, restaurant, qsr, supermarket, ecommerce, service, healthcare, or b2b (string or null)",
+  "merchantName": "Business name from statement header/address block (string or null)",
+  "processorName": "Processor/ISO name from header (string or null)",
+  "statementPeriod": "Statement period dates like '12/01/25 - 12/31/25' (string or null)",
+  "totalVolume": "Total amount submitted/processed in dollars (number or null)",
+  "totalTransactions": "Total number of transactions/items (number or null)",
+  "totalFees": "Total fees charged in dollars - look for 'Fees Charged' or similar (number or null)",
+  "merchantType": "Based on business name: retail, restaurant, dental, healthcare, service, etc. (string or null)",
   "fees": {
     "interchange": "Interchange fees in dollars (number or null)",
     "assessments": "Assessment/network fees in dollars (number or null)",
@@ -63,16 +63,27 @@ Analyze the provided statement document(s) and extract the following information
   "extractionNotes": ["List of notes about what was found or issues encountered"]
 }
 
-Key extraction rules:
-1. Look for "Total Sales", "Net Sales", "Processing Volume" for totalVolume
-2. Look for "Total Transactions", "Transaction Count", "# of Transactions" for totalTransactions  
-3. Look for "Total Fees", "Net Fees", "Processing Fees" for totalFees
-4. Common processors: Square, Stripe, PayPal, Clover, Toast, First Data/Fiserv, TSYS/Global Payments, Worldpay/Vantiv, Heartland, Elavon, Chase Paymentech
-5. For card mix, look for Visa/MC/Discover/Amex volume and transaction breakdowns
-6. Return null for any fields you cannot confidently extract
-7. Numbers should be positive values without currency symbols or commas
+EXTRACTION LOCATIONS - Look carefully in these areas:
+1. MERCHANT NAME: Usually in header block with address. Examples: "BRICKWORKS DENTAL", "ABC RESTAURANT LLC"
+2. PROCESSOR NAME: Top of statement - CardConnect, First Data, Worldpay, Fiserv, TSYS, Heartland, Elavon, etc.
+3. STATEMENT PERIOD: Usually shows "Statement Period: MM/DD/YY - MM/DD/YY"
+4. TOTAL VOLUME: Look for "Amounts Submitted", "Total Sales", "Total Amount You Submitted" - the grand total
+5. TOTAL TRANSACTIONS: Look for "Items" column total in card breakdown, or "Total Transactions"
+6. TOTAL FEES: Look for "Fees Charged" in summary, or "Total Fees" - this is often negative in statement format
+7. CARD MIX TABLE: Usually labeled "SUMMARY BY CARD TYPE" with columns for Card Type, Items, Amount
+   - Include both credit AND debit for each network (Visa + Visa Debit = total Visa)
+   - AMEX may be labeled "AMEXCT043" or similar
+   - Discover may be labeled "DCVR ACQ" or similar
 
-IMPORTANT: Return ONLY the JSON object, no markdown, no explanations.`;
+CRITICAL RULES:
+1. Numbers should be positive values without currency symbols or commas
+2. If fees show as negative (like -$3,307.19), convert to positive: 3307.19
+3. For card mix, ADD credit + debit together for each network (e.g., MASTERCARD + Mastercard Debit = mastercard total)
+4. Look at EVERY page of multi-page statements
+5. The "Amount Funded to Your Bank" = Volume - Fees
+6. If you see data but aren't 100% certain, extract it and note uncertainty in extractionNotes
+
+Return ONLY the JSON object, no markdown, no code blocks, no explanations.`;
 
 export async function extractStatementFromFiles(
   files: Array<{ path: string; mimeType: string; name: string }>
@@ -130,10 +141,10 @@ export async function extractStatementFromFiles(
   parts.push({ text: GEMINI_EXTRACTION_PROMPT });
 
   console.log(`[StatementExtractor] Sending ${parts.length} parts to Gemini for analysis`);
-  console.log(`[StatementExtractor] Using Gemini URL: ${geminiBaseUrl}/v1beta/models/gemini-2.5-flash:generateContent`);
+  console.log(`[StatementExtractor] Using Gemini URL: ${geminiBaseUrl}/v1beta/models/gemini-2.5-pro:generateContent`);
   console.log(`[StatementExtractor] API key present: ${!!geminiApiKey}, length: ${geminiApiKey?.length || 0}`);
   
-  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.5-flash:generateContent`, {
+  const response = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.5-pro:generateContent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
