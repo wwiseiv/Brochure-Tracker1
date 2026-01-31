@@ -6686,6 +6686,7 @@ Generate the following content in JSON format:
     businessName: z.string().optional(),
     businessAddress: z.string().optional(),
     businessDescription: z.string().optional(),
+    merchantWebsiteUrl: z.string().optional(),
     selectedEquipment: z.array(z.object({
       name: z.string(),
       description: z.string().optional(),
@@ -6701,7 +6702,7 @@ Generate the following content in JSON format:
         return res.status(400).json({ error: "Invalid request data: " + validationResult.error.message });
       }
 
-      const { parsedData, format, agentName, agentTitle, agentEmail, agentPhone, businessName, businessAddress, businessDescription, selectedEquipment } = validationResult.data;
+      const { parsedData, format, agentName, agentTitle, agentEmail, agentPhone, businessName, businessAddress, businessDescription, merchantWebsiteUrl, selectedEquipment } = validationResult.data;
 
       const { generateClaudeDocument } = await import("./services/claude-document-generator");
       const { convertHtmlToPdf, generateDocx } = await import("./services/document-converter");
@@ -6709,6 +6710,33 @@ Generate the following content in JSON format:
       const merchantName = businessName || parsedData.merchantName || "Valued Merchant";
 
       console.log("[Proposals] Generating direct Claude document for:", merchantName);
+
+      // Scrape merchant website if URL provided for enriched proposal content
+      let scrapedData: { description?: string; address?: string; phone?: string; logoUrl?: string } = {};
+      if (merchantWebsiteUrl) {
+        console.log("[Proposals] Scraping merchant website:", merchantWebsiteUrl);
+        try {
+          const scraped = await scrapeMerchantWebsite(merchantWebsiteUrl);
+          scrapedData = {
+            description: scraped.description,
+            address: scraped.address,
+            phone: scraped.phone,
+            logoUrl: scraped.logoUrl,
+          };
+          console.log("[Proposals] Website scraped successfully:", {
+            hasDescription: !!scrapedData.description,
+            hasAddress: !!scrapedData.address,
+            hasPhone: !!scrapedData.phone,
+            hasLogo: !!scrapedData.logoUrl,
+          });
+        } catch (scrapeError: any) {
+          console.log("[Proposals] Website scraping failed, continuing without:", scrapeError.message);
+        }
+      }
+
+      // Use scraped data to enrich the proposal - prefer scraped data over manual input
+      const enrichedDescription = scrapedData.description || businessDescription;
+      const enrichedAddress = scrapedData.address || businessAddress;
 
       // Generate beautiful proposal content with Claude
       const claudeDoc = await generateClaudeDocument({
@@ -6718,8 +6746,8 @@ Generate the following content in JSON format:
         agentEmail: agentEmail || "",
         agentPhone: agentPhone || "",
         businessName: merchantName,
-        businessAddress,
-        businessDescription,
+        businessAddress: enrichedAddress,
+        businessDescription: enrichedDescription,
         selectedEquipment,
       });
 

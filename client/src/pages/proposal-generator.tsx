@@ -1094,6 +1094,7 @@ export default function ProposalGeneratorPage() {
             businessName: businessName || parsedData.merchantName,
             businessAddress,
             businessDescription: repNotes,
+            merchantWebsiteUrl: merchantWebsiteUrl || undefined,
             selectedEquipment: selectedEquipment.map(eq => ({
               name: eq.name,
               description: eq.description || eq.features?.join(", ") || "",
