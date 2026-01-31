@@ -649,15 +649,15 @@ export default function ESignDocumentLibrary() {
       </div>
 
       <Dialog open={showNewRequestDialog} onOpenChange={setShowNewRequestDialog}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto mx-4">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[80vh] mx-4 flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>New E-Signature Request</DialogTitle>
             <DialogDescription>
               Create a new request to send documents for electronic signature
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
             <div className="space-y-2">
               <Label htmlFor="merchantName">Merchant / Business Name</Label>
               <Input
@@ -699,7 +699,7 @@ export default function ESignDocumentLibrary() {
 
             <div className="space-y-2">
               <Label>Documents to Include</Label>
-              <div className="border rounded-md divide-y max-h-48 overflow-y-auto">
+              <div className="border rounded-md divide-y max-h-36 overflow-y-auto">
                 {templates.map(template => (
                   <label
                     key={template.id}
@@ -726,38 +726,38 @@ export default function ESignDocumentLibrary() {
                 {selectedDocuments.length} document(s) selected
               </p>
             </div>
+          </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowNewRequestDialog(false);
-                  resetNewRequestForm();
-                }}
-                className="flex-1"
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateRequest}
-                disabled={createRequestMutation.isPending}
-                className="flex-1"
-                data-testid="button-create-request"
-              >
-                {createRequestMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Request
-                  </>
-                )}
-              </Button>
-            </div>
+          <div className="flex gap-2 pt-4 flex-shrink-0 border-t mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowNewRequestDialog(false);
+                resetNewRequestForm();
+              }}
+              className="flex-1"
+              data-testid="button-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateRequest}
+              disabled={createRequestMutation.isPending}
+              className="flex-1"
+              data-testid="button-create-request"
+            >
+              {createRequestMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Request
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
