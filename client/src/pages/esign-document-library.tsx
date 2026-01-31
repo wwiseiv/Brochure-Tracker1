@@ -563,7 +563,7 @@ export default function ESignDocumentLibrary() {
       </div>
 
       <Dialog open={showNewRequestDialog} onOpenChange={setShowNewRequestDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto mx-4">
           <DialogHeader>
             <DialogTitle>New E-Signature Request</DialogTitle>
             <DialogDescription>
