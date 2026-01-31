@@ -1,6 +1,11 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 import OpenAI from "openai";
+import { createRequire } from "module";
+
+// Use createRequire for pdf-parse as it doesn't have ESM exports
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -33,7 +38,7 @@ interface ExtractedStatementData {
 
 const EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements. This is a CRITICAL business task - accuracy is essential.
 
-CAREFULLY analyze the provided statement document(s) and extract ALL available data. Return ONLY valid JSON with no additional text:
+CAREFULLY analyze the provided statement text and extract ALL available data. Return ONLY valid JSON with no additional text:
 
 {
   "merchantName": "Business name from statement header/address block (string or null)",
@@ -102,7 +107,7 @@ export async function extractStatementFromFiles(
   });
 
   const objectStorage = new ObjectStorageService();
-  const contentParts: OpenAI.ChatCompletionContentPart[] = [];
+  let combinedText = "";
   
   for (const file of files) {
     try {
@@ -111,32 +116,17 @@ export async function extractStatementFromFiles(
       if (file.mimeType.includes("spreadsheet") || file.mimeType.includes("excel") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
         const textContent = await extractExcelAsText(file.path, objectStorage);
         console.log(`[StatementExtractor] Excel content extracted, length: ${textContent.length}`);
-        contentParts.push({ 
-          type: "text", 
-          text: `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n` 
-        });
+        combinedText += `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n`;
       } else if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
         console.log(`[StatementExtractor] Processing PDF: ${file.name}`);
-        const base64Data = await getFileAsBase64(file.path, objectStorage);
-        console.log(`[StatementExtractor] PDF base64 length: ${base64Data.length}`);
-        contentParts.push({
-          type: "image_url",
-          image_url: {
-            url: `data:application/pdf;base64,${base64Data}`,
-            detail: "high"
-          }
-        });
+        const pdfText = await extractPdfText(file.path, objectStorage);
+        console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText.length}`);
+        combinedText += `\n--- PDF Content from ${file.name} ---\n${pdfText}\n`;
       } else if (file.mimeType.startsWith("image/")) {
-        console.log(`[StatementExtractor] Processing image: ${file.name}`);
+        console.log(`[StatementExtractor] Processing image: ${file.name} - will use vision`);
         const base64Data = await getFileAsBase64(file.path, objectStorage);
-        console.log(`[StatementExtractor] Image base64 length: ${base64Data.length}`);
-        contentParts.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${file.mimeType};base64,${base64Data}`,
-            detail: "high"
-          }
-        });
+        const imageResult = await analyzeImageWithVision(openai, base64Data, file.mimeType);
+        combinedText += `\n--- Image Content from ${file.name} ---\n${imageResult}\n`;
       } else {
         console.log(`[StatementExtractor] Unsupported file type: ${file.mimeType}`);
       }
@@ -145,37 +135,36 @@ export async function extractStatementFromFiles(
     }
   }
 
-  if (contentParts.length === 0) {
-    throw new Error("No valid files could be processed");
+  if (!combinedText.trim()) {
+    throw new Error("No text could be extracted from the files");
   }
 
-  contentParts.push({ type: "text", text: EXTRACTION_PROMPT });
-
-  console.log(`[StatementExtractor] Sending ${contentParts.length} parts to OpenAI for analysis`);
+  console.log(`[StatementExtractor] Total extracted text length: ${combinedText.length}`);
+  console.log(`[StatementExtractor] First 500 chars: ${combinedText.substring(0, 500)}`);
   
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
+          role: "system",
+          content: "You are a payment processing statement analyzer. Extract key data from merchant statements accurately. Always return valid JSON."
+        },
+        {
           role: "user",
-          content: contentParts
+          content: `Analyze this merchant processing statement and extract the data.\n\nSTATEMENT TEXT:\n${combinedText}\n\n${EXTRACTION_PROMPT}`
         }
       ],
       max_tokens: 4096,
-      temperature: 0.1
+      temperature: 0.1,
+      response_format: { type: "json_object" }
     });
 
     const responseText = response.choices[0]?.message?.content || "";
     console.log(`[StatementExtractor] OpenAI response length: ${responseText.length}`);
 
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      
-      const extracted = JSON.parse(jsonMatch[0]) as ExtractedStatementData;
+      const extracted = JSON.parse(responseText) as ExtractedStatementData;
       
       if (!extracted.confidence) {
         extracted.confidence = 50;
@@ -199,12 +188,63 @@ export async function extractStatementFromFiles(
   }
 }
 
+async function extractPdfText(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
+  console.log(`[StatementExtractor] extractPdfText called with path: ${objectPath}`);
+  
+  try {
+    const file = await objectStorage.getObjectEntityFile(objectPath);
+    const [buffer] = await file.download();
+    console.log(`[StatementExtractor] PDF downloaded, buffer size: ${buffer.length}`);
+    
+    const pdfData = await pdfParse(buffer);
+    console.log(`[StatementExtractor] PDF parsed, text length: ${pdfData.text.length}, pages: ${pdfData.numpages}`);
+    
+    return pdfData.text;
+  } catch (error: any) {
+    console.error(`[StatementExtractor] PDF extraction error:`, error?.message || error);
+    throw new Error(`Failed to extract text from PDF: ${error?.message}`);
+  }
+}
+
+async function analyzeImageWithVision(openai: OpenAI, base64Data: string, mimeType: string): Promise<string> {
+  console.log(`[StatementExtractor] Analyzing image with vision, base64 length: ${base64Data.length}`);
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract ALL text from this merchant processing statement image. Include all numbers, dates, amounts, card types, and fee details. Return the raw text content."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`,
+                detail: "high"
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 4096
+    });
+
+    return response.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[StatementExtractor] Vision API error:", error?.message || error);
+    return "";
+  }
+}
+
 async function getFileAsBase64(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
   console.log(`[StatementExtractor] getFileAsBase64 called with path: ${objectPath}`);
   
   try {
     const file = await objectStorage.getObjectEntityFile(objectPath);
-    console.log(`[StatementExtractor] Got file object for: ${objectPath}`);
     const [buffer] = await file.download();
     console.log(`[StatementExtractor] Downloaded file, buffer size: ${buffer.length}`);
     return buffer.toString("base64");
