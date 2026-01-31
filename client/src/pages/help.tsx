@@ -64,7 +64,9 @@ import {
   Star,
   Copy,
   FileDown,
-  Upload
+  Upload,
+  Camera,
+  Globe
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -567,6 +569,45 @@ export default function HelpPage() {
     },
   ];
 
+  const prospectingFeatures: HelpItem[] = [
+    {
+      title: "AI Prospect Finder",
+      description: "Search for local businesses in your area using AI-powered web search. Filter by business type (MCC codes) to find merchants who need better payment processing.",
+      link: "/prospects/search",
+      icon: <Search className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "Business Card Scanner",
+      description: "Snap a photo of any business card to instantly add a prospect. AI extracts the name, phone, email, address, and business type automatically.",
+      link: "/prospects/scan-card",
+      icon: <Camera className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "My Pipeline",
+      description: "Track and manage all your claimed prospects in one place. See their status, contact info, and take quick actions like calling or getting directions.",
+      link: "/prospects/pipeline",
+      icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "Claim Prospects",
+      description: "Found a great prospect? Claim them as your lead to prevent other agents from contacting them. Claimed prospects appear in your personal pipeline.",
+      link: "/prospects/search",
+      icon: <Target className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "Maps & Directions",
+      description: "Tap the location icon on any prospect to get driving directions in Google Maps. Plan efficient routes to visit multiple prospects in one trip.",
+      link: "/prospects/pipeline",
+      icon: <Navigation className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "One-Tap Calling",
+      description: "Tap the phone icon to instantly call any prospect. No need to copy numbers - just tap and call directly from the app.",
+      link: "/prospects/pipeline",
+      icon: <Smartphone className="w-5 h-5 text-blue-600" />,
+    },
+  ];
+
   const activityFeatures: HelpItem[] = [
     {
       title: "Team Activity Feed",
@@ -991,6 +1032,7 @@ export default function HelpPage() {
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
+            { title: "AI-Powered Prospecting", description: "Find new merchants with AI search, scan business cards, and build your sales pipeline.", items: prospectingFeatures, badge: "New" },
             { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
             { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
             { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users" },
