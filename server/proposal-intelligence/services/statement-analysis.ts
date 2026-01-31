@@ -395,7 +395,8 @@ export interface ICPlusMargin {
 
 export function analyzeStatement(
   data: StatementData, 
-  icPlusMargin: ICPlusMargin = { ratePercent: 0.50, perTxnFee: 0.10, monthlyFee: 10 }
+  icPlusMargin: ICPlusMargin = { ratePercent: 0.50, perTxnFee: 0.10, monthlyFee: 10 },
+  dualPricingMonthlyCost: number = 64.95
 ): AnalysisResult {
   const trueCosts = calculateTrueInterchange(data);
   const { totalVolume, totalTransactions, fees } = data;
@@ -411,7 +412,7 @@ export function analyzeStatement(
     (totalTransactions * icPlusMargin.perTxnFee) + 
     icPlusMargin.monthlyFee;
 
-  const pcbDualPricingCost = 20;
+  const pcbDualPricingCost = dualPricingMonthlyCost;
 
   const redFlags = identifyRedFlags(data, trueCosts, processorMarkup);
   const hiddenFees = detectHiddenFees(data);
@@ -449,7 +450,7 @@ export function analyzeStatement(
         effectiveRate: Math.round((pcbDualPricingCost / totalVolume) * 10000) / 100,
         monthlySavings: Math.round((fees.totalFees - pcbDualPricingCost) * 100) / 100,
         annualSavings: Math.round((fees.totalFees - pcbDualPricingCost) * 12 * 100) / 100,
-        description: 'Customer pays 3.99% service fee, merchant pays $20/mo'
+        description: `Customer pays 3.99% service fee, merchant pays $${pcbDualPricingCost.toFixed(2)}/mo`
       }
     },
     

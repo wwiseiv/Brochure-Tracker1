@@ -282,7 +282,8 @@ const statementAnalysisSchema = z.object({
     ratePercent: z.number().min(0).max(5).default(0.50),
     perTxnFee: z.number().min(0).max(1).default(0.10),
     monthlyFee: z.number().min(0).max(100).default(10)
-  }).optional()
+  }).optional(),
+  dualPricingMonthlyCost: z.number().min(0).max(500).default(64.95).optional()
 });
 
 router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
@@ -318,7 +319,9 @@ router.post("/analyze-statement", isAuthenticated, ensureOrgMembership(), async 
       monthlyFee: 10
     };
 
-    const analysis = analyzeStatement(statementData, icPlusMargin);
+    const dualPricingMonthlyCost = data.dualPricingMonthlyCost || 64.95;
+
+    const analysis = analyzeStatement(statementData, icPlusMargin, dualPricingMonthlyCost);
     const talkingPoints = generateTalkingPoints(analysis);
     
     let competitorInsights = null;

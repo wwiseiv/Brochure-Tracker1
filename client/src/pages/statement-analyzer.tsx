@@ -86,7 +86,8 @@ const formSchema = z.object({
   useAI: z.boolean().default(false),
   icPlusRateMargin: z.string().optional(),
   icPlusPerTxnFee: z.string().optional(),
-  icPlusMonthlyFee: z.string().optional()
+  icPlusMonthlyFee: z.string().optional(),
+  dualPricingMonthlyCost: z.string().optional()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -228,7 +229,8 @@ export default function StatementAnalyzer() {
       useAI: false,
       icPlusRateMargin: "0.50",
       icPlusPerTxnFee: "0.10",
-      icPlusMonthlyFee: "10"
+      icPlusMonthlyFee: "10",
+      dualPricingMonthlyCost: "64.95"
     }
   });
 
@@ -256,7 +258,8 @@ export default function StatementAnalyzer() {
           ratePercent: data.icPlusRateMargin ? parseFloat(data.icPlusRateMargin) : 0.50,
           perTxnFee: data.icPlusPerTxnFee ? parseFloat(data.icPlusPerTxnFee) : 0.10,
           monthlyFee: data.icPlusMonthlyFee ? parseFloat(data.icPlusMonthlyFee) : 10
-        }
+        },
+        dualPricingMonthlyCost: data.dualPricingMonthlyCost ? parseFloat(data.dualPricingMonthlyCost) : 64.95
       };
       
       const response = await apiRequest("POST", "/api/proposal-intelligence/analyze-statement", payload);
@@ -558,6 +561,75 @@ ${new Date().toLocaleDateString()}
     });
   };
 
+  const copyCustomerProposal = async () => {
+    if (!results) return;
+    
+    const { analysis } = results;
+    const merchantName = form.getValues("merchantName") || "Your Business";
+    const maxSavings = Math.max(
+      analysis.savings.dualPricing.annualSavings,
+      analysis.savings.interchangePlus.annualSavings
+    );
+    const maxMonthlySavings = Math.max(
+      analysis.savings.dualPricing.monthlySavings,
+      analysis.savings.interchangePlus.monthlySavings
+    );
+    
+    let proposalText = `EXCLUSIVE SAVINGS PROPOSAL FOR ${merchantName.toUpperCase()}
+${"=".repeat(40)}
+
+Dear ${merchantName},
+
+Based on our analysis of your current payment processing, we've identified significant savings opportunities for your business.
+
+SAVINGS OPPORTUNITY
+-------------------
+Annual Savings: ${formatCurrency(maxSavings)}
+Monthly Savings: ${formatCurrency(maxMonthlySavings)}
+
+YOUR CURRENT SITUATION
+----------------------
+Monthly Processing Volume: ${formatCurrency(analysis.summary.monthlyVolume)}
+Monthly Transactions: ${analysis.summary.monthlyTransactions.toLocaleString()}
+Average Ticket Size: ${formatCurrencyExact(analysis.summary.averageTicket)}
+Current Effective Rate: ${analysis.summary.currentEffectiveRate}%
+Current Monthly Processing Fees: ${formatCurrencyExact(analysis.summary.currentTotalFees)}
+
+PCBANCARD PROGRAM OPTIONS
+-------------------------
+
+OPTION 1: DUAL PRICING PROGRAM (Most Popular)
+Your customers pay a small service fee for card payments, dramatically reducing your processing costs.
+- Your Monthly Cost: ${formatCurrencyExact(analysis.savings.dualPricing.monthlyCost)}
+- Your Effective Rate: ${analysis.savings.dualPricing.effectiveRate}%
+- Your Monthly Savings: ${formatCurrency(analysis.savings.dualPricing.monthlySavings)}
+- Your Annual Savings: ${formatCurrency(analysis.savings.dualPricing.annualSavings)}
+
+OPTION 2: INTERCHANGE PLUS PRICING
+Transparent pricing with true interchange pass-through plus a small margin.
+- Your Monthly Cost: ${formatCurrencyExact(analysis.savings.interchangePlus.monthlyCost)}
+- Your Effective Rate: ${analysis.savings.interchangePlus.effectiveRate}%
+- Your Monthly Savings: ${formatCurrency(analysis.savings.interchangePlus.monthlySavings)}
+- Your Annual Savings: ${formatCurrency(analysis.savings.interchangePlus.annualSavings)}
+
+NEXT STEPS
+----------
+Ready to start saving? Contact your PCBancard representative to get started. We can have you up and running within 48 hours.
+
+---
+Prepared for you by PCBancard
+${new Date().toLocaleDateString()}
+`;
+
+    await navigator.clipboard.writeText(proposalText);
+    setCopiedText("Customer Proposal");
+    setTimeout(() => setCopiedText(null), 3000);
+    toast({ 
+      title: "Proposal Copied!", 
+      description: "Customer-facing proposal ready to send" 
+    });
+  };
+
   const exportToExcel = () => {
     if (!results) return;
     
@@ -698,7 +770,8 @@ ${new Date().toLocaleDateString()}
       useAI: false,
       icPlusRateMargin: "0.50",
       icPlusPerTxnFee: "0.10",
-      icPlusMonthlyFee: "10"
+      icPlusMonthlyFee: "10",
+      dualPricingMonthlyCost: "64.95"
     });
   };
 
@@ -1304,6 +1377,31 @@ ${new Date().toLocaleDateString()}
                               )}
                             />
                           </div>
+                          
+                          <Separator className="my-4" />
+                          
+                          <p className="text-sm font-medium mb-2">Dual Pricing Program</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Set the monthly cost for the dual pricing program.
+                          </p>
+                          <FormField
+                            control={form.control}
+                            name="dualPricingMonthlyCost"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Monthly Cost $</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="64.95" 
+                                    {...field} 
+                                    data-testid="input-dual-pricing-cost" 
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -1368,6 +1466,25 @@ ${new Date().toLocaleDateString()}
                   <Button 
                     variant="default" 
                     size="sm"
+                    onClick={copyCustomerProposal}
+                    className="gap-2"
+                    data-testid="button-copy-customer-proposal"
+                  >
+                    {copiedText === "Customer Proposal" ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="h-4 w-4" />
+                        Send to Customer
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
                     onClick={copyAllForEmail}
                     className="gap-2"
                     data-testid="button-copy-email"
@@ -1380,7 +1497,7 @@ ${new Date().toLocaleDateString()}
                     ) : (
                       <>
                         <Mail className="h-4 w-4" />
-                        Copy for Email
+                        My Notes
                       </>
                     )}
                   </Button>
