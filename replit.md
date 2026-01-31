@@ -64,6 +64,7 @@ Preferred communication style: Simple, everyday language.
 - **Admin & RM Dashboards**: Org-wide stats, team performance, member management.
 - **Individual User Permissions**: Per-user feature toggles (leaderboard, coach, EquipIQ, export, etc.) manageable by admins in Team Management.
 - **Data Isolation**: Role-based data access - agents see only their own data, managers see team data, admins see all organization data.
+- **My Work History**: Centralized view at `/my-work` showing all user's proposals and statement analyses. Features tabbed filtering (All/Proposals/Analyses), search by merchant name, and ability to link work items to merchant records. Linked proposals/analyses appear on merchant detail pages in a dedicated "Proposals & Analyses" section.
 - **Team Leaderboard**: Optional leaderboard showing top agents by drops/conversions. Controlled by individual permission (off by default).
 - **Access Control**: Proper "Access Denied" pages for restricted routes instead of 404s.
 - **PWA Features**: Service worker for offline support.
