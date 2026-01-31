@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { db } from "../db";
 import { prospects } from "@shared/schema";
-import { eq, and, ilike } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export interface ProspectSearchParams {
   zipCode: string;
@@ -37,9 +37,11 @@ export interface SearchResult {
   searchId: string;
 }
 
-const anthropic = new Anthropic({
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+const genai = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
+  httpOptions: {
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 export async function searchLocalBusinesses(
@@ -53,85 +55,69 @@ export async function searchLocalBusinesses(
     ...bt.searchTerms,
   ]);
 
-  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Search the web for real, currently operating local businesses matching these criteria:
+  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Use Google Search to find real, currently operating local businesses matching these criteria:
 
 SEARCH PARAMETERS:
 - Location: Within ${radius} miles of ZIP code ${zipCode}
 - Business Types: ${businessTypeNames}
-- Search Terms to Use: ${allSearchTerms.slice(0, 20).join(", ")}
+- Search Terms to Use: ${allSearchTerms.slice(0, 15).join(", ")}
 - Number of Results Needed: ${maxResults}
 
 CRITICAL REQUIREMENTS:
-1. Use web search to find REAL, VERIFIED businesses that currently exist and are operating
-2. Include COMPLETE address information (exact street address, city, state, zip) - the sales rep needs to physically visit
-3. Prioritize independent local businesses over national chains (they're better prospects)
+1. Search for REAL, VERIFIED businesses that currently exist and are operating
+2. Include COMPLETE address information (exact street address, city, state, zip)
+3. Prioritize independent local businesses over national chains (better prospects for payment processing)
 4. Focus on businesses likely to accept card payments
-5. Exclude businesses that are permanently closed or temporarily closed
-6. Search Google Maps, Yelp, Yellow Pages, and business directories for accurate info
+5. Exclude businesses that are permanently closed
 
-GATHER AS MUCH CONTACT INFO AS POSSIBLE - the sales rep needs to:
-- Call ahead to schedule meetings
-- Send emails to decision makers
-- Visit in person during business hours
-- Know who the owner/manager is
+SEARCH STRATEGY:
+- Search for "${businessTypeNames} near ${zipCode}"
+- Look for Google Business listings, Yelp results, Yellow Pages
+- Verify addresses are complete and accurate
 
-For each business found, provide ALL available information:
-- Business Name (official name as it appears on signage/listing)
-- Full Street Address (exact, for GPS navigation)
-- City, State, ZIP
-- Phone Number (format: (555) 123-4567) - ESSENTIAL for calling ahead
-- Website URL - for researching before visit
-- Email address (if available from website or listings)
-- Hours of Operation (e.g., "Mon-Fri 9am-5pm, Sat 10am-3pm")
-- Owner/Manager Name (if available from business listings or website)
-- Year Established (if available)
-- Brief Description (what they specialize in, size, notable features)
-- Primary Business Type from the categories I provided
-- MCC Code (the 4-digit merchant category code that best matches)
-- Confidence score (0.0-1.0) that this is a real, currently operating business
-
-Return ONLY a valid JSON array with no additional text or explanation. Start with [ and end with ]:
+For each business, provide ALL available information in this exact JSON format:
 [
   {
-    "name": "Joe's Italian Kitchen",
-    "address": "1234 Main Street",
-    "city": "Indianapolis",
+    "name": "Business Name",
+    "address": "123 Main Street",
+    "city": "City Name",
     "state": "IN",
     "zipCode": "46032",
-    "phone": "(317) 555-1234",
-    "website": "https://joesitaliankitchen.com",
-    "email": "info@joesitaliankitchen.com",
-    "hoursOfOperation": "Tue-Sun 11am-10pm, Closed Mon",
-    "ownerName": "Joe Rossi",
-    "yearEstablished": "2018",
-    "description": "Family-owned Italian restaurant with 50 seats, known for homemade pasta",
+    "phone": "(555) 123-4567",
+    "website": "https://example.com",
+    "email": "contact@example.com",
+    "hoursOfOperation": "Mon-Fri 9am-5pm",
+    "ownerName": "Owner Name",
+    "yearEstablished": "2015",
+    "description": "Brief business description",
     "businessType": "Restaurant",
     "mccCode": "5812",
-    "confidence": 0.95
+    "confidence": 0.9
   }
-]`;
+]
+
+Return ONLY a valid JSON array. Start with [ and end with ]. No additional text or explanation.`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8192,
-      tools: [
-        {
-          type: "web_search_20250305" as any,
-          name: "web_search",
-        },
-      ],
-      messages: [{ role: "user", content: searchPrompt }],
+    console.log("[ProspectSearch] Searching with Gemini for businesses near", zipCode);
+    
+    const response = await genai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: searchPrompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        temperature: 0.3,
+        maxOutputTokens: 8192,
+      },
     });
 
-    const textContent = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("");
+    const textContent = response.text || "";
+    console.log("[ProspectSearch] Received response, length:", textContent.length);
 
+    // Extract JSON array from response
     const jsonMatch = textContent.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error("No valid JSON found in AI response:", textContent);
+      console.error("[ProspectSearch] No valid JSON found in response:", textContent.substring(0, 500));
       return {
         businesses: [],
         totalFound: 0,
@@ -142,9 +128,15 @@ Return ONLY a valid JSON array with no additional text or explanation. Start wit
 
     let businesses: DiscoveredBusiness[];
     try {
-      businesses = JSON.parse(jsonMatch[0]);
+      // Clean up the JSON string
+      let jsonStr = jsonMatch[0];
+      // Remove any trailing commas before ] or }
+      jsonStr = jsonStr.replace(/,\s*([\]}])/g, "$1");
+      // Parse the JSON
+      businesses = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error("Failed to parse JSON:", parseError);
+      console.error("[ProspectSearch] Failed to parse JSON:", parseError);
+      console.error("[ProspectSearch] Raw JSON:", jsonMatch[0].substring(0, 500));
       return {
         businesses: [],
         totalFound: 0,
@@ -153,17 +145,28 @@ Return ONLY a valid JSON array with no additional text or explanation. Start wit
       };
     }
 
-    businesses = businesses.map((b) => ({
-      ...b,
-      phone: b.phone || null,
-      website: b.website || null,
-      email: b.email || null,
-      hoursOfOperation: b.hoursOfOperation || null,
-      ownerName: b.ownerName || null,
-      yearEstablished: b.yearEstablished || null,
-      description: b.description || null,
-      confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
-    }));
+    // Ensure all businesses have required fields
+    businesses = businesses
+      .filter((b) => b.name && b.address && b.city && b.state)
+      .map((b) => ({
+        name: b.name,
+        address: b.address,
+        city: b.city,
+        state: b.state,
+        zipCode: b.zipCode || zipCode,
+        phone: b.phone || null,
+        website: b.website || null,
+        email: b.email || null,
+        hoursOfOperation: b.hoursOfOperation || null,
+        ownerName: b.ownerName || null,
+        yearEstablished: b.yearEstablished || null,
+        description: b.description || null,
+        businessType: b.businessType || businessTypes[0]?.name || "Unknown",
+        mccCode: b.mccCode || businessTypes[0]?.code || "0000",
+        confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
+      }));
+
+    console.log("[ProspectSearch] Parsed", businesses.length, "businesses");
 
     const { deduplicatedBusinesses, duplicatesSkipped } =
       await deduplicateResults(businesses, agentId);
@@ -174,9 +177,9 @@ Return ONLY a valid JSON array with no additional text or explanation. Start wit
       duplicatesSkipped,
       searchId: generateSearchId(),
     };
-  } catch (error) {
-    console.error("AI search error:", error);
-    throw new Error("Failed to search for businesses");
+  } catch (error: any) {
+    console.error("[ProspectSearch] AI search error:", error.message || error);
+    throw new Error("Failed to search for businesses. Please try again.");
   }
 }
 
