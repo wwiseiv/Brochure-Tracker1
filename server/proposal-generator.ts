@@ -19,7 +19,7 @@ import * as path from "path";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Helper function to parse PDF using Claude's native PDF support
-async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
+async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; structured?: any }> {
   if (!buffer || buffer.length === 0) {
     throw new Error("The uploaded file is empty (0 bytes). Please upload a valid PDF file.");
   }
@@ -57,25 +57,80 @@ async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
             },
             {
               type: "text",
-              text: `Extract ALL text content from this PDF document. 
-This is a merchant processing statement or pricing proposal.
-Return the complete text exactly as it appears, preserving numbers, percentages, and all data.
-Include ALL tables, fees, card volumes, transactions, rates, and any other financial data.
-Do not summarize - return the full text content.`
+              text: `Analyze this merchant processing statement or pricing proposal PDF.
+
+Extract ALL data and return BOTH:
+1. The complete text content
+2. Structured JSON data
+
+Return your response in this EXACT format:
+
+---TEXT---
+[Full text content of the document here, preserving all numbers and data]
+---JSON---
+{
+  "merchantName": "Business name from document",
+  "proposalType": "dual_pricing or interchange_plus",
+  "visa": { "volume": 0, "transactions": 0 },
+  "mastercard": { "volume": 0, "transactions": 0 },
+  "discover": { "volume": 0, "transactions": 0 },
+  "amex": { "volume": 0, "transactions": 0 },
+  "totalVolume": 0,
+  "totalTransactions": 0,
+  "totalFees": 0,
+  "processingFees": 0,
+  "statementFee": 0,
+  "pciFee": 0,
+  "otherFees": 0,
+  "currentEffectiveRate": 0,
+  "proposedRate": 0,
+  "proposedPerTxFee": 0,
+  "monthlySavings": 0,
+  "annualSavings": 0
+}
+
+IMPORTANT:
+- Numbers should be positive values (no $ signs or commas)
+- If a field cannot be found, use 0 for numbers or "Unknown" for strings
+- Look at ALL pages of the document
+- Card volumes are typically in "Current Processing" or "Volume Summary" sections`
             }
           ]
         }
       ]
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
-    console.log(`[ProposalGenerator] Claude extracted ${text.length} characters from PDF`);
+    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[ProposalGenerator] Claude response length: ${responseText.length} characters`);
+    
+    // Parse the response into text and structured data
+    let text = responseText;
+    let structured: any = null;
+    
+    const textMatch = responseText.match(/---TEXT---\s*([\s\S]*?)---JSON---/);
+    const jsonMatch = responseText.match(/---JSON---\s*([\s\S]*?)$/);
+    
+    if (textMatch) {
+      text = textMatch[1].trim();
+    }
+    
+    if (jsonMatch) {
+      try {
+        const jsonStr = jsonMatch[1].trim();
+        // Remove any markdown code blocks if present
+        const cleanJson = jsonStr.replace(/```json?\s*/g, '').replace(/```\s*/g, '');
+        structured = JSON.parse(cleanJson);
+        console.log(`[ProposalGenerator] Extracted structured data:`, JSON.stringify(structured, null, 2));
+      } catch (e) {
+        console.warn("[ProposalGenerator] Failed to parse structured JSON:", e);
+      }
+    }
     
     if (!text || text.trim().length === 0) {
       console.warn("PDF parsing returned empty text");
     }
     
-    return { text };
+    return { text, structured };
   } catch (error) {
     console.error("PDF parsing error:", error);
     throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -686,11 +741,13 @@ async function parseExcelFile(buffer: Buffer): Promise<string> {
 export async function parseProposalFile(buffer: Buffer, filename: string): Promise<ParsedProposal> {
   const ext = filename.toLowerCase().split('.').pop() || '';
   let text = "";
+  let structured: any = null;
   
   if (ext === 'pdf') {
-    // Use PDF parser
+    // Use PDF parser with Claude AI
     const data = await parsePdfBuffer(buffer);
     text = data.text;
+    structured = data.structured;
   } else if (ext === 'doc' || ext === 'docx') {
     // Use mammoth for Word docs
     text = await parseWordDocument(buffer);
@@ -701,23 +758,86 @@ export async function parseProposalFile(buffer: Buffer, filename: string): Promi
     throw new Error(`Unsupported file type: ${ext}`);
   }
   
-  // Now extract data from the text (same logic as PDF)
-  const merchantName = extractMerchantName(text);
+  // Use structured data from Claude if available, otherwise fall back to regex extraction
+  let merchantName: string;
+  let proposalType: "dual_pricing" | "interchange_plus";
+  let currentVisa: CardBreakdown;
+  let currentMC: CardBreakdown;
+  let currentDiscover: CardBreakdown;
+  let currentAmex: CardBreakdown;
+  let fees: { statementFee: number; pciNonCompliance: number; creditPassthrough: number; otherFees: number; batchHeader: number };
+  let totalVolume: number;
+  let totalTransactions: number;
+  let currentProcessingFees: number;
+  
+  if (structured && (structured.totalVolume > 0 || structured.visa?.volume > 0 || structured.merchantName !== "Unknown")) {
+    console.log("[ProposalGenerator] Using Claude structured data extraction");
+    
+    merchantName = structured.merchantName || "Unknown Merchant";
+    proposalType = structured.proposalType === "dual_pricing" ? "dual_pricing" : "interchange_plus";
+    
+    currentVisa = {
+      volume: structured.visa?.volume || 0,
+      transactions: structured.visa?.transactions || 0,
+      ratePercent: 0,
+      perTxFee: 0,
+      totalCost: 0
+    };
+    currentMC = {
+      volume: structured.mastercard?.volume || 0,
+      transactions: structured.mastercard?.transactions || 0,
+      ratePercent: 0,
+      perTxFee: 0,
+      totalCost: 0
+    };
+    currentDiscover = {
+      volume: structured.discover?.volume || 0,
+      transactions: structured.discover?.transactions || 0,
+      ratePercent: 0,
+      perTxFee: 0,
+      totalCost: 0
+    };
+    currentAmex = {
+      volume: structured.amex?.volume || 0,
+      transactions: structured.amex?.transactions || 0,
+      ratePercent: 0,
+      perTxFee: 0,
+      totalCost: 0
+    };
+    
+    fees = {
+      statementFee: structured.statementFee || 0,
+      pciNonCompliance: structured.pciFee || 0,
+      creditPassthrough: 0,
+      otherFees: structured.otherFees || 0,
+      batchHeader: 0
+    };
+    
+    totalVolume = structured.totalVolume || (currentVisa.volume + currentMC.volume + currentDiscover.volume + currentAmex.volume);
+    totalTransactions = structured.totalTransactions || (currentVisa.transactions + currentMC.transactions + currentDiscover.transactions + currentAmex.transactions);
+    currentProcessingFees = structured.processingFees || structured.totalFees || 0;
+  } else {
+    console.log("[ProposalGenerator] Falling back to regex extraction");
+    
+    merchantName = extractMerchantName(text);
+    proposalType = isDualPricingProposal(text) ? "dual_pricing" : "interchange_plus";
+    
+    currentVisa = extractCardData(text, "visa", "current");
+    currentMC = extractCardData(text, "mastercard", "current");
+    currentDiscover = extractCardData(text, "discover", "current");
+    currentAmex = extractCardData(text, "amex", "current");
+    fees = extractFees(text);
+    
+    totalVolume = currentVisa.volume + currentMC.volume + currentDiscover.volume + currentAmex.volume;
+    totalTransactions = currentVisa.transactions + currentMC.transactions + currentDiscover.transactions + currentAmex.transactions;
+    currentProcessingFees = extractTotalProcessingFees(text);
+  }
+  
   const preparedDate = extractDate(text);
   const agentInfo = extractAgentInfo(text);
-  const proposalType = isDualPricingProposal(text) ? "dual_pricing" : "interchange_plus";
   
-  const currentVisa = extractCardData(text, "visa", "current");
-  const currentMC = extractCardData(text, "mastercard", "current");
-  const currentDiscover = extractCardData(text, "discover", "current");
-  const currentAmex = extractCardData(text, "amex", "current");
-  const fees = extractFees(text);
-  
-  const totalVolume = currentVisa.volume + currentMC.volume + currentDiscover.volume + currentAmex.volume;
-  const totalTransactions = currentVisa.transactions + currentMC.transactions + currentDiscover.transactions + currentAmex.transactions;
   const avgTicket = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
   
-  const currentProcessingFees = extractTotalProcessingFees(text);
   const totalMonthlyCost = currentProcessingFees + fees.statementFee + fees.pciNonCompliance + 
     fees.creditPassthrough + fees.otherFees + fees.batchHeader;
   
