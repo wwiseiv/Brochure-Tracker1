@@ -5689,6 +5689,117 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
     }
   });
 
+  // Save practice response with AI feedback
+  const savePracticeResponseSchema = z.object({
+    lessonId: z.number(),
+    practiceResponse: z.string().min(1),
+    aiFeedback: z.string().optional(),
+    feedbackScore: z.number().min(0).max(100).optional(),
+    strengths: z.array(z.string()).optional(),
+    improvements: z.array(z.string()).optional(),
+  });
+
+  app.post("/api/presentation/practice-responses", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const parsed = savePracticeResponseSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.format() });
+      }
+      
+      const userId = req.user.claims.sub;
+      const { lessonId, practiceResponse, aiFeedback, feedbackScore, strengths, improvements } = parsed.data;
+      
+      const [saved] = await db
+        .insert(presentationPracticeResponses)
+        .values({
+          lessonId,
+          userId,
+          practiceResponse,
+          aiFeedback,
+          feedbackScore,
+          strengths,
+          improvements,
+        })
+        .returning();
+      
+      // Also mark practice as recorded in progress
+      await db
+        .insert(presentationProgress)
+        .values({
+          lessonId,
+          userId,
+          practiceRecorded: true,
+        })
+        .onConflictDoUpdate({
+          target: [presentationProgress.lessonId, presentationProgress.userId],
+          set: { practiceRecorded: true },
+        });
+      
+      res.json({ success: true, response: saved });
+    } catch (error: any) {
+      console.error("[Presentation] Error saving practice response:", error);
+      res.status(500).json({ error: "Failed to save practice response" });
+    }
+  });
+
+  // Get practice responses for a lesson
+  app.get("/api/presentation/practice-responses/:lessonId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const lessonId = parseInt(req.params.lessonId);
+      const userId = req.user.claims.sub;
+      
+      if (isNaN(lessonId)) {
+        return res.status(400).json({ error: "Invalid lesson ID" });
+      }
+      
+      const responses = await db
+        .select()
+        .from(presentationPracticeResponses)
+        .where(
+          and(
+            eq(presentationPracticeResponses.lessonId, lessonId),
+            eq(presentationPracticeResponses.userId, userId)
+          )
+        )
+        .orderBy(desc(presentationPracticeResponses.createdAt));
+      
+      res.json({ responses });
+    } catch (error: any) {
+      console.error("[Presentation] Error fetching practice responses:", error);
+      res.status(500).json({ error: "Failed to fetch practice responses" });
+    }
+  });
+
+  // Get all practice responses for the user (for history/review)
+  app.get("/api/presentation/practice-responses", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const responses = await db
+        .select({
+          id: presentationPracticeResponses.id,
+          lessonId: presentationPracticeResponses.lessonId,
+          practiceResponse: presentationPracticeResponses.practiceResponse,
+          aiFeedback: presentationPracticeResponses.aiFeedback,
+          feedbackScore: presentationPracticeResponses.feedbackScore,
+          strengths: presentationPracticeResponses.strengths,
+          improvements: presentationPracticeResponses.improvements,
+          createdAt: presentationPracticeResponses.createdAt,
+          lessonTitle: presentationLessons.title,
+        })
+        .from(presentationPracticeResponses)
+        .leftJoin(presentationLessons, eq(presentationPracticeResponses.lessonId, presentationLessons.id))
+        .where(eq(presentationPracticeResponses.userId, userId))
+        .orderBy(desc(presentationPracticeResponses.createdAt))
+        .limit(50);
+      
+      res.json({ responses });
+    } catch (error: any) {
+      console.error("[Presentation] Error fetching all practice responses:", error);
+      res.status(500).json({ error: "Failed to fetch practice responses" });
+    }
+  });
+
   // ============================================
   // Proposal Generator Routes
   // ============================================
