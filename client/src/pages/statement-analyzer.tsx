@@ -798,6 +798,91 @@ ${new Date().toLocaleDateString()}
     }, 100);
   };
 
+  const downloadAgentWord = async () => {
+    if (!results) return;
+    try {
+      const response = await fetch("/api/proposal-intelligence/statement-docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          merchantName: results.merchantName || "Merchant",
+          processorName: results.processorName,
+          analysis: {
+            ...results.analysis,
+            talkingPoints: results.talkingPoints,
+            competitorInsights: results.competitorInsights,
+            aiInsights: results.aiAnalysis
+          },
+          documentType: "agent"
+        })
+      });
+      
+      if (!response.ok) throw new Error("Failed to generate document");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(results.merchantName || "Merchant").replace(/[^a-zA-Z0-9]/g, "_")}_Statement_Analysis_Agent.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Agent Word Document",
+        description: "Downloaded editable Word document with full analysis"
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Could not generate Word document",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const downloadMerchantWord = async () => {
+    if (!results) return;
+    try {
+      const response = await fetch("/api/proposal-intelligence/statement-docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          merchantName: results.merchantName || "Merchant",
+          processorName: results.processorName,
+          analysis: results.analysis,
+          documentType: "merchant"
+        })
+      });
+      
+      if (!response.ok) throw new Error("Failed to generate document");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(results.merchantName || "Merchant").replace(/[^a-zA-Z0-9]/g, "_")}_Statement_Analysis.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Merchant Word Document",
+        description: "Downloaded editable Word document for sharing"
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Could not generate Word document",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleQuickFill = (type: keyof typeof quickFillExamples) => {
     const example = quickFillExamples[type];
     form.setValue("totalVolume", example.volume);
@@ -1601,6 +1686,26 @@ ${new Date().toLocaleDateString()}
                   >
                     <FileText className="h-4 w-4" />
                     Merchant PDF
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={downloadAgentWord}
+                    className="gap-2"
+                    data-testid="button-download-agent-word"
+                  >
+                    <Download className="h-4 w-4" />
+                    Agent Word
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={downloadMerchantWord}
+                    className="gap-2"
+                    data-testid="button-download-merchant-word"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Merchant Word
                   </Button>
                   <Button 
                     variant="ghost" 

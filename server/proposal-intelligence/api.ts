@@ -450,4 +450,480 @@ router.post("/extract-statement", isAuthenticated, ensureOrgMembership(), async 
   }
 });
 
+const statementDocxSchema = z.object({
+  merchantName: z.string().min(1),
+  processorName: z.string().optional(),
+  analysis: z.object({
+    summary: z.object({
+      monthlyVolume: z.number(),
+      monthlyTransactions: z.number(),
+      averageTicket: z.number(),
+      currentTotalFees: z.number(),
+      currentEffectiveRate: z.number()
+    }),
+    costAnalysis: z.object({
+      trueInterchange: z.number(),
+      trueAssessments: z.number(),
+      trueWholesale: z.number(),
+      trueWholesaleRate: z.number(),
+      processorMarkup: z.number(),
+      processorMarkupRate: z.number()
+    }),
+    savings: z.object({
+      dualPricing: z.object({
+        monthlyCost: z.number(),
+        monthlySavings: z.number(),
+        annualSavings: z.number(),
+        effectiveRate: z.number()
+      }),
+      interchangePlus: z.object({
+        monthlyCost: z.number(),
+        monthlySavings: z.number(),
+        annualSavings: z.number(),
+        effectiveRate: z.number()
+      })
+    }),
+    redFlags: z.array(z.object({
+      severity: z.string(),
+      issue: z.string(),
+      detail: z.string(),
+      savings: z.number(),
+      category: z.string().optional()
+    })).optional(),
+    aiInsights: z.any().optional(),
+    talkingPoints: z.any().optional(),
+    competitorInsights: z.any().optional()
+  }),
+  documentType: z.enum(["agent", "merchant"])
+});
+
+router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const parsed = statementDocxSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: parsed.error.format()
+      });
+    }
+
+    const { merchantName, processorName, analysis, documentType } = parsed.data;
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } = await import("docx");
+
+    const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const purpleColor = "7C5CFC";
+
+    const children: any[] = [];
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Statement Analysis Report", bold: true, size: 36, color: purpleColor })],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 200 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Merchant: ${merchantName}`, size: 24 })],
+        spacing: { after: 100 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Current Processor: ${processorName || "Unknown"}`, size: 24, color: "666666" })],
+        spacing: { after: 300 }
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Current Processing Summary", bold: true, size: 28, color: purpleColor })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 150 }
+      })
+    );
+
+    const summaryTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Monthly Volume")], width: { size: 50, type: WidthType.PERCENTAGE } }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.summary.monthlyVolume), bold: true })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Monthly Transactions")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: analysis.summary.monthlyTransactions.toLocaleString(), bold: true })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Average Ticket")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.summary.averageTicket), bold: true })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Current Total Fees")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.summary.currentTotalFees), bold: true, color: "DC2626" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Current Effective Rate")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${analysis.summary.currentEffectiveRate}%`, bold: true, color: "DC2626" })] })] })
+          ]
+        })
+      ]
+    });
+    children.push(summaryTable);
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "True Cost Breakdown", bold: true, size: 28, color: purpleColor })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 150 }
+      })
+    );
+
+    const costTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("True Interchange")] }),
+            new TableCell({ children: [new Paragraph(formatCurrency(analysis.costAnalysis.trueInterchange))] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Card Brand Assessments")] }),
+            new TableCell({ children: [new Paragraph(formatCurrency(analysis.costAnalysis.trueAssessments))] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("True Wholesale Cost")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.costAnalysis.trueWholesale), color: "16A34A" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Processor Markup")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${formatCurrency(analysis.costAnalysis.processorMarkup)} (${analysis.costAnalysis.processorMarkupRate}%)`, color: "DC2626" })] })] })
+          ]
+        })
+      ]
+    });
+    children.push(costTable);
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Savings Opportunities", bold: true, size: 28, color: purpleColor })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 150 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: "Option 1: Dual Pricing", bold: true, size: 24 })],
+        spacing: { after: 100 }
+      })
+    );
+
+    const dpTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("New Monthly Cost")] }),
+            new TableCell({ children: [new Paragraph(formatCurrency(analysis.savings.dualPricing.monthlyCost))] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Monthly Savings")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.savings.dualPricing.monthlySavings), bold: true, color: "16A34A" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Annual Savings")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.savings.dualPricing.annualSavings), bold: true, color: "16A34A" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("New Effective Rate")] }),
+            new TableCell({ children: [new Paragraph(`${analysis.savings.dualPricing.effectiveRate}%`)] })
+          ]
+        })
+      ]
+    });
+    children.push(dpTable);
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Option 2: Interchange Plus", bold: true, size: 24 })],
+        spacing: { before: 200, after: 100 }
+      })
+    );
+
+    const icpTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("New Monthly Cost")] }),
+            new TableCell({ children: [new Paragraph(formatCurrency(analysis.savings.interchangePlus.monthlyCost))] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Monthly Savings")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.savings.interchangePlus.monthlySavings), bold: true, color: "16A34A" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("Annual Savings")] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(analysis.savings.interchangePlus.annualSavings), bold: true, color: "16A34A" })] })] })
+          ]
+        }),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph("New Effective Rate")] }),
+            new TableCell({ children: [new Paragraph(`${analysis.savings.interchangePlus.effectiveRate}%`)] })
+          ]
+        })
+      ]
+    });
+    children.push(icpTable);
+
+    if (documentType === "agent" && analysis.redFlags && analysis.redFlags.length > 0) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Issues Found (Agent Only)", bold: true, size: 28, color: "DC2626" })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 150 }
+        })
+      );
+
+      for (const flag of analysis.redFlags) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: `[${flag.severity.toUpperCase()}] ${flag.issue}`, bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `  ${flag.detail}`, italics: true, color: "666666" })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `  Potential Monthly Savings: ${formatCurrency(flag.savings)}`, color: "16A34A" })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+    }
+
+    if (documentType === "agent" && analysis.talkingPoints) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Sales Talking Points (Agent Only)", bold: true, size: 28, color: purpleColor })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 150 }
+        })
+      );
+
+      const points = analysis.talkingPoints;
+      if (points.opening) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Opening Statement:", bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: points.opening, italics: true })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+      if (points.dualPricingPitch) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Dual Pricing Pitch:", bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: points.dualPricingPitch, italics: true })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+      if (points.interchangePlusPitch) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Interchange Plus Pitch:", bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: points.interchangePlusPitch, italics: true })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+      if (points.closingStatement || points.closing) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Closing Statement:", bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: points.closingStatement || points.closing, italics: true })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+    }
+
+    if (documentType === "agent" && analysis.aiInsights) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: "AI Insights (Agent Only)", bold: true, size: 28, color: purpleColor })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 150 }
+        })
+      );
+
+      const ai = analysis.aiInsights;
+      if (ai.statementSummary) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Statement Summary:", bold: true })],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: ai.statementSummary })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+      if (ai.customTalkingPoints && ai.customTalkingPoints.length > 0) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Custom Talking Points:", bold: true })],
+            spacing: { after: 50 }
+          })
+        );
+        for (const point of ai.customTalkingPoints) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: `• ${point}` })],
+              spacing: { after: 30 }
+            })
+          );
+        }
+      }
+      if (ai.personalizedClosing) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Personalized Closing:", bold: true })],
+            spacing: { before: 100, after: 50 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: ai.personalizedClosing, italics: true })],
+            spacing: { after: 150 }
+          })
+        );
+      }
+    }
+
+    if (documentType === "agent" && analysis.competitorInsights) {
+      const comp = analysis.competitorInsights;
+      const hasContent = (comp.knownIssues?.length > 0) || (comp.contractPitfalls?.length > 0) || (comp.talkingPoints?.length > 0);
+      
+      if (hasContent) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Competitor Intelligence (Agent Only)", bold: true, size: 28, color: purpleColor })],
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 300, after: 150 }
+          })
+        );
+
+        if (comp.knownIssues && comp.knownIssues.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: "Known Issues with Current Processor:", bold: true })],
+              spacing: { after: 50 }
+            })
+          );
+          for (const issue of comp.knownIssues) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: `• ${issue}` })],
+                spacing: { after: 30 }
+              })
+            );
+          }
+        }
+        if (comp.contractPitfalls && comp.contractPitfalls.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: "Contract Pitfalls:", bold: true })],
+              spacing: { before: 100, after: 50 }
+            })
+          );
+          for (const pitfall of comp.contractPitfalls) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: `• ${pitfall}` })],
+                spacing: { after: 30 }
+              })
+            );
+          }
+        }
+        if (comp.talkingPoints && comp.talkingPoints.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: "Competitive Advantages:", bold: true })],
+              spacing: { before: 100, after: 50 }
+            })
+          );
+          for (const point of comp.talkingPoints) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: `• ${point}` })],
+                spacing: { after: 30 }
+              })
+            );
+          }
+        }
+      }
+    }
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: `Generated by PCBancard Statement Analyzer • ${new Date().toLocaleDateString()}`, size: 18, color: "999999" })],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 400 }
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children }]
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    const fileName = `${merchantName.replace(/[^a-zA-Z0-9]/g, "_")}_Statement_Analysis_${documentType}.docx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.send(buffer);
+
+  } catch (error) {
+    console.error("[StatementDocx] Error:", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Document generation failed"
+    });
+  }
+});
+
 export default router;
