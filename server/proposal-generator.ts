@@ -20,12 +20,16 @@ import Anthropic from "@anthropic-ai/sdk";
 
 // Helper function to parse PDF using Claude's native PDF support
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; structured?: any }> {
+  console.log(`[ProposalGenerator] parsePdfBuffer called, buffer exists: ${!!buffer}, length: ${buffer?.length || 0}`);
+  
   if (!buffer || buffer.length === 0) {
     throw new Error("The uploaded file is empty (0 bytes). Please upload a valid PDF file.");
   }
   
   const anthropicApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
   const anthropicBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  
+  console.log(`[ProposalGenerator] Claude API configured: ${!!anthropicApiKey && !!anthropicBaseUrl}`);
   
   if (!anthropicApiKey || !anthropicBaseUrl) {
     throw new Error("Claude API not configured for PDF extraction");
@@ -131,9 +135,62 @@ IMPORTANT:
     }
     
     return { text, structured };
-  } catch (error) {
-    console.error("PDF parsing error:", error);
-    throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
+  } catch (error: any) {
+    console.error("[ProposalGenerator] PDF parsing error:", error?.message || error);
+    console.error("[ProposalGenerator] Error details:", JSON.stringify({
+      name: error?.name,
+      status: error?.status,
+      code: error?.code,
+      type: error?.type
+    }));
+    throw new Error(`Failed to parse PDF: ${error?.message || "Unknown error"}`);
+  }
+}
+
+// Parse proposal files from Object Storage (same approach as Statement Analyzer)
+export async function parseProposalFromStorage(
+  files: Array<{ path: string; mimeType: string; name: string }>
+): Promise<ParsedProposal> {
+  const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+  const objectStorage = new ObjectStorageService();
+  
+  for (const file of files) {
+    try {
+      console.log(`[ProposalGenerator] Processing file from storage: ${file.name}, mimeType: ${file.mimeType}, path: ${file.path}`);
+      
+      if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
+        // Get buffer from Object Storage
+        const buffer = await getFileBufferFromStorage(file.path, objectStorage);
+        console.log(`[ProposalGenerator] Retrieved PDF buffer from storage, size: ${buffer.length} bytes`);
+        
+        // Parse using Claude (same as direct upload path)
+        return await parseProposalFile(buffer, file.name);
+      } else {
+        console.log(`[ProposalGenerator] Unsupported file type: ${file.mimeType}`);
+      }
+    } catch (error: any) {
+      console.error(`[ProposalGenerator] Error processing file ${file.name}:`, error?.message || error);
+      throw error;
+    }
+  }
+  
+  throw new Error("No valid PDF files could be processed");
+}
+
+// Helper to get file buffer from Object Storage (same approach as Statement Analyzer)
+async function getFileBufferFromStorage(objectPath: string, objectStorage: any): Promise<Buffer> {
+  console.log(`[ProposalGenerator] getFileBufferFromStorage called with path: ${objectPath}`);
+  
+  try {
+    // Use getObjectEntityFile followed by download() - same as Statement Analyzer
+    const file = await objectStorage.getObjectEntityFile(objectPath);
+    console.log(`[ProposalGenerator] Got file object for: ${objectPath}`);
+    const [buffer] = await file.download();
+    console.log(`[ProposalGenerator] Downloaded file, buffer size: ${buffer.length}`);
+    return buffer;
+  } catch (error: any) {
+    console.error(`[ProposalGenerator] getFileBufferFromStorage error:`, error?.message || error);
+    throw new Error(`Failed to retrieve file from storage: ${error?.message || "Unknown error"}`);
   }
 }
 

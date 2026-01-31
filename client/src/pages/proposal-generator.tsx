@@ -394,23 +394,61 @@ export default function ProposalGeneratorPage() {
 
   const parseMutation = useMutation({
     mutationFn: async (files: File[]) => {
-      const allResults: any[] = [];
+      // Step 1: Upload files to Object Storage (same approach as Statement Analyzer)
+      const uploadedFileData: Array<{ path: string; mimeType: string; name: string }> = [];
+      
       for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/proposals/parse", {
+        // Request presigned upload URL
+        const urlResponse = await fetch("/api/uploads/request-url", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            contentType: file.type || "application/pdf"
+          })
         });
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
-          throw new Error(errorData.error || errorData.message || `Failed to parse ${file.name}`);
+        
+        if (!urlResponse.ok) {
+          throw new Error(`Failed to get upload URL for ${file.name}`);
         }
-        const result = await res.json();
-        allResults.push({ data: result.data || result, fileName: file.name });
+        
+        const { uploadURL, objectPath } = await urlResponse.json();
+        
+        // Upload file to Object Storage
+        const uploadResponse = await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type || "application/pdf" }
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        
+        uploadedFileData.push({
+          path: objectPath,
+          mimeType: file.type || "application/pdf",
+          name: file.name
+        });
       }
-      return allResults;
+      
+      // Step 2: Parse files from Object Storage
+      const res = await fetch("/api/proposals/parse-from-storage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ files: uploadedFileData })
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
+        throw new Error(errorData.error || errorData.message || "Failed to parse files");
+      }
+      
+      const result = await res.json();
+      return [{ data: result.data || result, fileName: files[0]?.name || "document.pdf" }];
     },
     onSuccess: (results) => {
       if (results.length > 0) {

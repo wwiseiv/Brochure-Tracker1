@@ -5844,6 +5844,8 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
         return res.status(400).json({ error: "File is required" });
       }
 
+      console.log(`[Proposals] Parsing file: ${req.file.originalname}, size: ${req.file.buffer?.length || 0} bytes, mimetype: ${req.file.mimetype}`);
+      
       const { parseProposalFile } = await import("./proposal-generator");
       const parsedData = await parseProposalFile(req.file.buffer, req.file.originalname);
 
@@ -5854,6 +5856,42 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
     } catch (error: any) {
       console.error("[Proposals] Error parsing file:", error);
       res.status(500).json({ error: "Failed to parse file: " + (error.message || "Unknown error") });
+    }
+  });
+
+  // Parse proposal files from Object Storage (same approach as Statement Analyzer)
+  const parseFromStorageSchema = z.object({
+    files: z.array(z.object({
+      path: z.string().min(1, "File path is required"),
+      mimeType: z.string().min(1, "MIME type is required"),
+      name: z.string().min(1, "File name is required")
+    })).min(1, "At least one file is required")
+  });
+  
+  app.post("/api/proposals/parse-from-storage", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const parsed = parseFromStorageSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body",
+          details: parsed.error.format() 
+        });
+      }
+      
+      const { files } = parsed.data;
+      console.log(`[Proposals] Parsing ${files.length} file(s) from storage`);
+      
+      // Import the parsing function that works with Object Storage
+      const { parseProposalFromStorage } = await import("./proposal-generator");
+      const parsedData = await parseProposalFromStorage(files);
+      
+      res.json({
+        success: true,
+        data: parsedData,
+      });
+    } catch (error: any) {
+      console.error("[Proposals] Error parsing files from storage:", error);
+      res.status(500).json({ error: "Failed to parse files: " + (error.message || "Unknown error") });
     }
   });
 
