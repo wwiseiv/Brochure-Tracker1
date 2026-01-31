@@ -7,6 +7,7 @@ import { z } from "zod";
 import { analyzeStatement, type StatementData } from "./services/statement-analysis";
 import { generateTalkingPoints, generateCompetitorInsights } from "./services/talking-points";
 import { getAIStatementAnalysis, generateProposalContent } from "./services/ai-analyzer";
+import { extractStatementFromFiles } from "./services/statement-extractor";
 
 const router = Router();
 
@@ -383,6 +384,52 @@ router.get("/competitor-insights/:processorName", isAuthenticated, (req: any, re
 
   const insights = generateCompetitorInsights(processorName);
   res.json({ processorName, insights });
+});
+
+const extractStatementSchema = z.object({
+  files: z.array(z.object({
+    path: z.string(),
+    mimeType: z.string(),
+    name: z.string()
+  })).min(1, "At least one file is required")
+});
+
+router.post("/extract-statement", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+  try {
+    const parsed = extractStatementSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.format() 
+      });
+    }
+
+    const { files } = parsed.data;
+    
+    const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+    for (const file of files) {
+      if (!file.path.startsWith("/objects/uploads/") && !file.path.includes(privateDir)) {
+        return res.status(403).json({ 
+          error: "Access denied: Invalid file path" 
+        });
+      }
+    }
+    
+    console.log(`[StatementExtractor] Processing ${files.length} files for extraction`);
+
+    const extracted = await extractStatementFromFiles(files);
+
+    res.json({
+      success: true,
+      extracted,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[StatementExtractor] Error:", error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Extraction failed" 
+    });
+  }
 });
 
 export default router;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,10 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { 
   FileText, 
-  TrendingDown, 
   AlertTriangle, 
   MessageSquare, 
   DollarSign,
@@ -34,7 +34,14 @@ import {
   BarChart3,
   Target,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  FileSpreadsheet,
+  Image,
+  File,
+  X,
+  Keyboard,
+  Camera
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -142,6 +149,37 @@ interface AnalysisResult {
   };
 }
 
+interface UploadedFile {
+  file: File;
+  preview?: string;
+  objectPath?: string;
+  uploading: boolean;
+  uploaded: boolean;
+  error?: string;
+}
+
+interface ExtractedData {
+  merchantName?: string;
+  processorName?: string;
+  statementPeriod?: string;
+  totalVolume?: number;
+  totalTransactions?: number;
+  totalFees?: number;
+  merchantType?: string;
+  fees?: {
+    interchange?: number;
+    assessments?: number;
+    monthlyFees?: number;
+    pciFees?: number;
+    statementFees?: number;
+    batchFees?: number;
+    equipmentFees?: number;
+    otherFees?: number;
+  };
+  confidence: number;
+  extractionNotes: string[];
+}
+
 const quickFillExamples = {
   small: { volume: "15000", transactions: "300", totalFees: "450", merchantType: "retail" },
   medium: { volume: "50000", transactions: "800", totalFees: "1350", merchantType: "retail" },
@@ -149,12 +187,19 @@ const quickFillExamples = {
   restaurant: { volume: "75000", transactions: "1500", totalFees: "1950", merchantType: "restaurant" }
 };
 
+const ACCEPTED_FILE_TYPES = ".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic";
+
 export default function StatementAnalyzer() {
   const { toast } = useToast();
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [expandedObjection, setExpandedObjection] = useState<string | null>(null);
+  const [entryMode, setEntryMode] = useState<"upload" | "manual">("upload");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [extractionStep, setExtractionStep] = useState<"idle" | "uploading" | "extracting" | "review">("idle");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -218,6 +263,161 @@ export default function StatementAnalyzer() {
     }
   });
 
+  const extractMutation = useMutation({
+    mutationFn: async (files: Array<{ path: string; mimeType: string; name: string }>) => {
+      const response = await apiRequest("POST", "/api/proposal-intelligence/extract-statement", { files });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success && data.extracted) {
+        setExtractedData(data.extracted);
+        applyExtractedData(data.extracted);
+        setExtractionStep("review");
+        toast({
+          title: "Data Extracted",
+          description: `Confidence: ${data.extracted.confidence}%. Please review and edit as needed.`
+        });
+      }
+    },
+    onError: (error: Error) => {
+      setExtractionStep("idle");
+      toast({
+        title: "Extraction Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const applyExtractedData = (data: ExtractedData) => {
+    if (data.merchantName) form.setValue("merchantName", data.merchantName);
+    if (data.processorName) {
+      const matchedProcessor = processors.find(p => 
+        p.toLowerCase().includes(data.processorName?.toLowerCase() || "") ||
+        data.processorName?.toLowerCase().includes(p.toLowerCase())
+      );
+      form.setValue("processorName", matchedProcessor || "Other");
+    }
+    if (data.totalVolume) form.setValue("totalVolume", data.totalVolume.toString());
+    if (data.totalTransactions) form.setValue("totalTransactions", data.totalTransactions.toString());
+    if (data.totalFees) form.setValue("totalFees", data.totalFees.toString());
+    if (data.merchantType) form.setValue("merchantType", data.merchantType);
+    
+    if (data.fees) {
+      if (data.fees.interchange) form.setValue("interchangeFees", data.fees.interchange.toString());
+      if (data.fees.assessments) form.setValue("assessmentFees", data.fees.assessments.toString());
+      if (data.fees.monthlyFees) form.setValue("monthlyFees", data.fees.monthlyFees.toString());
+      if (data.fees.pciFees) form.setValue("pciFees", data.fees.pciFees.toString());
+      if (data.fees.statementFees) form.setValue("statementFees", data.fees.statementFees.toString());
+      if (data.fees.batchFees) form.setValue("batchFees", data.fees.batchFees.toString());
+      if (data.fees.equipmentFees) form.setValue("equipmentFees", data.fees.equipmentFees.toString());
+      if (data.fees.otherFees) form.setValue("otherFees", data.fees.otherFees.toString());
+      setShowAdvanced(true);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newFiles: UploadedFile[] = files.map(file => ({
+      file,
+      preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      uploading: false,
+      uploaded: false
+    }));
+
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => {
+      const updated = [...prev];
+      if (updated[index].preview) {
+        URL.revokeObjectURL(updated[index].preview!);
+      }
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const uploadAndExtract = async () => {
+    if (uploadedFiles.length === 0) return;
+
+    setExtractionStep("uploading");
+    
+    const fileData: Array<{ path: string; mimeType: string; name: string }> = [];
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const uploadFile = uploadedFiles[i];
+      
+      setUploadedFiles(prev => {
+        const updated = [...prev];
+        updated[i] = { ...updated[i], uploading: true };
+        return updated;
+      });
+
+      try {
+        const urlResponse = await fetch("/api/uploads/request-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: uploadFile.file.name,
+            size: uploadFile.file.size,
+            contentType: uploadFile.file.type || "application/octet-stream"
+          })
+        });
+
+        if (!urlResponse.ok) {
+          throw new Error("Failed to get upload URL");
+        }
+
+        const { uploadURL, objectPath } = await urlResponse.json();
+
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: uploadFile.file,
+          headers: { "Content-Type": uploadFile.file.type || "application/octet-stream" }
+        });
+
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, uploaded: true, objectPath };
+          return updated;
+        });
+
+        fileData.push({
+          path: objectPath,
+          mimeType: uploadFile.file.type || "application/octet-stream",
+          name: uploadFile.file.name
+        });
+
+      } catch (error) {
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, error: "Upload failed" };
+          return updated;
+        });
+      }
+    }
+
+    if (fileData.length > 0) {
+      setExtractionStep("extracting");
+      extractMutation.mutate(fileData);
+    } else {
+      setExtractionStep("idle");
+      toast({
+        title: "Upload Failed",
+        description: "No files could be uploaded",
+        variant: "destructive"
+      });
+    }
+  };
+
   const copyToClipboard = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
     setCopiedText(label);
@@ -235,7 +435,28 @@ export default function StatementAnalyzer() {
 
   const handleNewAnalysis = () => {
     setResults(null);
-    form.reset();
+    setExtractedData(null);
+    setExtractionStep("idle");
+    setUploadedFiles([]);
+    setEntryMode("upload");
+    setShowAdvanced(false);
+    form.reset({
+      merchantName: "",
+      processorName: "Unknown",
+      totalVolume: "",
+      totalTransactions: "",
+      totalFees: "",
+      merchantType: "retail",
+      interchangeFees: "",
+      assessmentFees: "",
+      monthlyFees: "",
+      pciFees: "",
+      statementFees: "",
+      batchFees: "",
+      equipmentFees: "",
+      otherFees: "",
+      useAI: false
+    });
   };
 
   const handlePrint = () => {
@@ -263,6 +484,15 @@ export default function StatementAnalyzer() {
     }).format(amount);
   };
 
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith("image/")) return <Image className="h-5 w-5 text-blue-500" />;
+    if (file.type.includes("pdf")) return <FileText className="h-5 w-5 text-red-500" />;
+    if (file.type.includes("sheet") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
+      return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    }
+    return <File className="h-5 w-5 text-gray-500" />;
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-6xl print:p-0">
       <div className="flex items-center justify-between gap-4 mb-6 print:hidden">
@@ -274,7 +504,7 @@ export default function StatementAnalyzer() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Statement Analyzer</h1>
-            <p className="text-muted-foreground">Analyze merchant statements and generate talking points</p>
+            <p className="text-muted-foreground">Upload or enter statement data for analysis</p>
           </div>
         </div>
         {results && (
@@ -296,322 +526,497 @@ export default function StatementAnalyzer() {
           <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Enter Statement Data
+              Statement Data Entry
             </CardTitle>
             <CardDescription className="text-primary-foreground/80">
-              Enter the merchant's processing statement information
+              Upload statement files or enter numbers manually
             </CardDescription>
           </CardHeader>
           
-          <div className="px-6 py-3 bg-muted/50 border-b flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Quick fill:</span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleQuickFill("small")}
-              data-testid="button-quick-small"
-            >
-              Small ($15k)
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleQuickFill("medium")}
-              data-testid="button-quick-medium"
-            >
-              Medium ($50k)
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleQuickFill("large")}
-              data-testid="button-quick-large"
-            >
-              Large ($150k)
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleQuickFill("restaurant")}
-              data-testid="button-quick-restaurant"
-            >
-              Restaurant
-            </Button>
+          <div className="border-b">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setEntryMode("upload")}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-colors ${
+                  entryMode === "upload" 
+                    ? "bg-primary/10 text-primary border-b-2 border-primary" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+                data-testid="tab-upload"
+              >
+                <Upload className="h-4 w-4" />
+                Upload Statement
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryMode("manual")}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-colors ${
+                  entryMode === "manual" 
+                    ? "bg-primary/10 text-primary border-b-2 border-primary" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+                data-testid="tab-manual"
+              >
+                <Keyboard className="h-4 w-4" />
+                Enter Manually
+              </button>
+            </div>
           </div>
 
           <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="merchantName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Merchant Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Business name" {...field} data-testid="input-merchant-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+            {entryMode === "upload" && extractionStep !== "review" && (
+              <div className="space-y-4">
+                <div 
+                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="dropzone"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ACCEPTED_FILE_TYPES}
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    data-testid="input-file"
                   />
-                  <FormField
-                    control={form.control}
-                    name="processorName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Current Processor</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-processor">
-                              <SelectValue placeholder="Select processor" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {processors.map(p => (
-                              <SelectItem key={p} value={p}>{p}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="totalVolume"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Volume *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                            <Input className="pl-7" placeholder="50,000" {...field} data-testid="input-total-volume" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="totalTransactions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Transactions *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="800" {...field} data-testid="input-transactions" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="totalFees"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Fees *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                            <Input className="pl-7" placeholder="1,250" {...field} data-testid="input-total-fees" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="merchantType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Merchant Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-merchant-type">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="retail">Retail Store</SelectItem>
-                          <SelectItem value="restaurant">Restaurant</SelectItem>
-                          <SelectItem value="qsr">Quick Service Restaurant</SelectItem>
-                          <SelectItem value="supermarket">Supermarket</SelectItem>
-                          <SelectItem value="ecommerce">E-Commerce / Online</SelectItem>
-                          <SelectItem value="service">Service Business</SelectItem>
-                          <SelectItem value="healthcare">Healthcare</SelectItem>
-                          <SelectItem value="b2b">B2B</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" type="button" className="w-full justify-start text-primary" data-testid="button-toggle-advanced">
-                      {showAdvanced ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                      Advanced: Fee Breakdown (optional)
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4">
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        If available on the statement, enter the fee breakdown for more accurate analysis:
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-8 w-8 text-muted-foreground" />
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <FileSpreadsheet className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Click to upload statement files</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        PDF, Excel, CSV, or Images (multiple pages supported)
                       </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="interchangeFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Interchange</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-interchange" />
-                              </FormControl>
-                            </FormItem>
+                    </div>
+                  </div>
+                </div>
+
+                {uploadedFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Files to analyze ({uploadedFiles.length})</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {uploadedFiles.map((f, i) => (
+                        <div 
+                          key={i} 
+                          className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
+                          data-testid={`file-item-${i}`}
+                        >
+                          {f.preview ? (
+                            <img src={f.preview} alt="" className="h-10 w-10 object-cover rounded" />
+                          ) : (
+                            getFileIcon(f.file)
                           )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="assessmentFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Assessments</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-assessments" />
-                              </FormControl>
-                            </FormItem>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{f.file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(f.file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                          {f.uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {f.uploaded && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                          {f.error && <XCircle className="h-4 w-4 text-red-500" />}
+                          {!f.uploading && !f.uploaded && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                              data-testid={`button-remove-file-${i}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="monthlyFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Monthly Fee</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-monthly-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="pciFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">PCI Fee</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-pci-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="statementFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Statement Fee</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-statement-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="batchFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Batch Fees</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-batch-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="equipmentFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Equipment</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-equipment-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="otherFees"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Other Fees</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="$0" {...field} data-testid="input-other-fees" />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+                        </div>
+                      ))}
+                    </div>
+
+                    {extractionStep === "uploading" && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">Uploading files...</p>
+                        <Progress value={
+                          (uploadedFiles.filter(f => f.uploaded).length / uploadedFiles.length) * 100
+                        } />
+                      </div>
+                    )}
+
+                    {extractionStep === "extracting" && (
+                      <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">AI is extracting data from your statement...</span>
+                      </div>
+                    )}
+
+                    {extractionStep === "idle" && (
+                      <Button 
+                        className="w-full" 
+                        onClick={uploadAndExtract}
+                        disabled={uploadedFiles.length === 0}
+                        data-testid="button-extract"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Extract Data with AI
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">
+                    or{" "}
+                    <button 
+                      type="button"
+                      onClick={() => setEntryMode("manual")}
+                      className="text-primary underline"
+                      data-testid="link-manual-entry"
+                    >
+                      enter numbers manually
+                    </button>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {(entryMode === "manual" || extractionStep === "review") && (
+              <>
+                {extractionStep === "review" && extractedData && (
+                  <div className="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium text-green-800 dark:text-green-300">
+                          Data Extracted Successfully
+                        </p>
+                        <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                          Confidence: {extractedData.confidence}% - Please review and correct any values below.
+                        </p>
+                        {extractedData.extractionNotes.length > 0 && (
+                          <ul className="text-xs text-green-600 dark:text-green-500 mt-2 list-disc list-inside">
+                            {extractedData.extractionNotes.map((note, i) => (
+                              <li key={i}>{note}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                  </div>
+                )}
 
-                <FormField
-                  control={form.control}
-                  name="useAI"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>AI-Enhanced Analysis</FormLabel>
-                        <FormDescription>
-                          Use Claude AI for personalized insights and talking points
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-use-ai"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                {entryMode === "manual" && (
+                  <div className="px-0 py-3 bg-muted/50 -mx-6 px-6 mb-4 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Quick fill:</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleQuickFill("small")}
+                      data-testid="button-quick-small"
+                    >
+                      Small ($15k)
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleQuickFill("medium")}
+                      data-testid="button-quick-medium"
+                    >
+                      Medium ($50k)
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleQuickFill("large")}
+                      data-testid="button-quick-large"
+                    >
+                      Large ($150k)
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleQuickFill("restaurant")}
+                      data-testid="button-quick-restaurant"
+                    >
+                      Restaurant
+                    </Button>
+                  </div>
+                )}
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={analyzeMutation.isPending}
-                  data-testid="button-analyze-statement"
-                >
-                  {analyzeMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Analyze Statement
-                    </>
-                  )}
-                </Button>
-              </form>
-            </Form>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="merchantName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Merchant Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Business name" {...field} data-testid="input-merchant-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="processorName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Current Processor</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-processor">
+                                  <SelectValue placeholder="Select processor" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {processors.map(p => (
+                                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="totalVolume"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Monthly Volume *</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                <Input className="pl-7" placeholder="50,000" {...field} data-testid="input-total-volume" />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalTransactions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Transactions *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="800" {...field} data-testid="input-transactions" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalFees"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total Fees *</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                <Input className="pl-7" placeholder="1,250" {...field} data-testid="input-total-fees" />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="merchantType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Merchant Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-merchant-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="retail">Retail Store</SelectItem>
+                              <SelectItem value="restaurant">Restaurant</SelectItem>
+                              <SelectItem value="qsr">Quick Service Restaurant</SelectItem>
+                              <SelectItem value="supermarket">Supermarket</SelectItem>
+                              <SelectItem value="ecommerce">E-Commerce / Online</SelectItem>
+                              <SelectItem value="service">Service Business</SelectItem>
+                              <SelectItem value="healthcare">Healthcare</SelectItem>
+                              <SelectItem value="b2b">B2B</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" type="button" className="w-full justify-start text-primary" data-testid="button-toggle-advanced">
+                          {showAdvanced ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                          Advanced: Fee Breakdown (optional)
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-4">
+                        <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+                          <p className="text-sm text-muted-foreground">
+                            If available on the statement, enter the fee breakdown for more accurate analysis:
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="interchangeFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Interchange</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-interchange" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="assessmentFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Assessments</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-assessments" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="monthlyFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Monthly Fee</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-monthly-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="pciFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">PCI Fee</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-pci-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="statementFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Statement Fee</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-statement-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="batchFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Batch Fees</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-batch-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="equipmentFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Equipment</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-equipment-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="otherFees"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Other Fees</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="$0" {...field} data-testid="input-other-fees" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    <FormField
+                      control={form.control}
+                      name="useAI"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>AI-Enhanced Analysis</FormLabel>
+                            <FormDescription>
+                              Use Claude AI for personalized insights and talking points
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-use-ai"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={analyzeMutation.isPending}
+                      data-testid="button-analyze-statement"
+                    >
+                      {analyzeMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Analyze Statement
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -1053,145 +1458,99 @@ export default function StatementAnalyzer() {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5" />
-                PCBancard Value Propositions
+                Value Propositions
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                {(Array.isArray(results.talkingPoints.valueProps) 
-                  ? results.talkingPoints.valueProps 
-                  : [
-                    { title: "Transparent Interchange-Plus Pricing", detail: "See exactly what interchange you pay - no hidden markups" },
-                    { title: "No Junk Fees", detail: "No annual fees, no PCI fees, no statement fees, no batch fees" },
-                    { title: "Free PCI Compliance Assistance", detail: "We help you complete your PCI questionnaire at no extra cost" },
-                    { title: "Free Terminal with Dual Pricing", detail: "Dejavoo P1 or P3 terminal included with our free equipment program" },
-                    { title: "No Long-Term Contract", detail: "Month-to-month agreement with no early termination fees" },
-                    { title: "US-Based Support", detail: "Real people answering the phone, not overseas call centers" }
-                  ]
-                ).map((prop, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold">{typeof prop === 'string' ? prop : prop.title}</p>
-                      {typeof prop !== 'string' && prop.detail && (
-                        <p className="text-sm text-muted-foreground">{prop.detail}</p>
-                      )}
-                    </div>
+                {results.talkingPoints.valueProps.map((prop, i) => (
+                  <div key={i} className="p-4 bg-muted/50 rounded-lg">
+                    <h4 className="font-semibold text-sm">{prop.title}</h4>
+                    <p className="text-sm text-muted-foreground mt-1">{prop.detail}</p>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Competitor Insights */}
+          {/* AI Analysis (if enabled) */}
+          {results.aiAnalysis && (
+            <Card className="border-purple-200 dark:border-purple-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Sparkles className="h-5 w-5" />
+                  AI-Enhanced Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Statement Summary</h4>
+                  <p className="text-sm text-muted-foreground">{results.aiAnalysis.statementSummary}</p>
+                </div>
+                {results.aiAnalysis.customTalkingPoints.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Custom Talking Points</h4>
+                    <ul className="text-sm space-y-1">
+                      {results.aiAnalysis.customTalkingPoints.map((point, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Sparkles className="h-3 w-3 text-purple-500 mt-1 flex-shrink-0" />
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {results.aiAnalysis.personalizedClosing && (
+                  <div>
+                    <h4 className="font-medium mb-2">Personalized Closing</h4>
+                    <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg text-sm">
+                      {results.aiAnalysis.personalizedClosing}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Competitor Insights (if available) */}
           {results.competitorInsights && (
             <Card>
-              <CardHeader>
-                <CardTitle>Competitor Insights: {form.getValues("processorName")}</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Competitor Intelligence
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
+              <CardContent className="space-y-4">
+                {results.competitorInsights.knownIssues.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2 text-red-600 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      Known Issues
-                    </h4>
+                    <h4 className="font-medium mb-2 text-red-600">Known Issues</h4>
                     <ul className="text-sm space-y-1">
                       {results.competitorInsights.knownIssues.map((issue, i) => (
                         <li key={i} className="flex items-start gap-2">
-                          <XCircle className="h-3 w-3 mt-1 text-red-500 flex-shrink-0" />
-                          <span>{issue}</span>
+                          <AlertTriangle className="h-3 w-3 text-red-500 mt-1 flex-shrink-0" />
+                          {issue}
                         </li>
                       ))}
                     </ul>
                   </div>
+                )}
+                {results.competitorInsights.talkingPoints.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2 text-amber-600 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      Contract Pitfalls
-                    </h4>
-                    <ul className="text-sm space-y-1">
-                      {results.competitorInsights.contractPitfalls.map((pitfall, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <XCircle className="h-3 w-3 mt-1 text-amber-500 flex-shrink-0" />
-                          <span>{pitfall}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2 text-blue-600 flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Talking Points
-                    </h4>
+                    <h4 className="font-medium mb-2">Competitive Talking Points</h4>
                     <ul className="text-sm space-y-1">
                       {results.competitorInsights.talkingPoints.map((point, i) => (
                         <li key={i} className="flex items-start gap-2">
-                          <CheckCircle2 className="h-3 w-3 mt-1 text-blue-500 flex-shrink-0" />
-                          <span className="italic">{point}</span>
+                          <CheckCircle2 className="h-3 w-3 text-green-500 mt-1 flex-shrink-0" />
+                          {point}
                         </li>
                       ))}
                     </ul>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           )}
-
-          {/* AI Insights */}
-          {results.aiAnalysis && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  AI-Powered Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Statement Summary</h4>
-                    <p className="text-sm bg-muted p-4 rounded-lg">{results.aiAnalysis.statementSummary}</p>
-                  </div>
-                  {results.aiAnalysis.customTalkingPoints.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-2">Custom Talking Points</h4>
-                      <ul className="space-y-2">
-                        {results.aiAnalysis.customTalkingPoints.map((point, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
-                            <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                            {point}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {results.aiAnalysis.personalizedClosing && (
-                    <div>
-                      <h4 className="font-medium mb-2">Personalized Closing</h4>
-                      <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg text-sm">
-                        {results.aiAnalysis.personalizedClosing}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Print Section */}
-          <div className="bg-muted rounded-xl p-6 text-center print:hidden">
-            <p className="text-muted-foreground mb-3">Need a printable version?</p>
-            <Button onClick={handlePrint} data-testid="button-print-bottom">
-              <Printer className="h-4 w-4 mr-2" />
-              Print Talking Points
-            </Button>
-          </div>
-
-          {/* Footer */}
-          <p className="text-center text-xs text-muted-foreground print:hidden">
-            Interchange rates are estimates. Actual rates vary based on card mix and qualification.
-          </p>
         </div>
       )}
     </div>

@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCBancard Statement Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app"></div>
+
+  <script>
+    // ============================================================
+    // INTERCHANGE RATES DATABASE
+    // ============================================================
+    const interchangeRates = {
+      visa: {
+        debitRegulated: { percent: 0.05, fixed: 0.21 },
+        debitUnregulated: { percent: 0.80, fixed: 0.15 },
+        cpsRetail: { percent: 1.65, fixed: 0.10 },
+        rewards1: { percent: 1.65, fixed: 0.10 },
+        rewards2: { percent: 1.95, fixed: 0.10 },
+        signaturePreferred: { percent: 2.10, fixed: 0.10 },
+        infinite: { percent: 2.30, fixed: 0.10 },
+        commercial: { percent: 2.50, fixed: 0.10 }
+      },
+      mastercard: {
+        debitRegulated: { percent: 0.05, fixed: 0.21 },
+        meritI: { percent: 1.58, fixed: 0.10 },
+        world: { percent: 1.73, fixed: 0.10 },
+        worldElite: { percent: 2.05, fixed: 0.10 },
+        commercial: { percent: 2.50, fixed: 0.10 }
+      },
+      discover: {
+        retail: { percent: 1.56, fixed: 0.10 },
+        rewards: { percent: 1.71, fixed: 0.10 },
+        premiumPlus: { percent: 2.15, fixed: 0.10 }
+      },
+      amex: {
+        optblue: { percent: 2.00, fixed: 0.10 }
+      }
+    };
+
+    const assessmentFees = { visa: 0.13, mastercard: 0.13, discover: 0.13, amex: 0.15 };
+
+    const typicalCardMix = {
+      retail: { visa: 40, mastercard: 28, discover: 8, amex: 18, debitRatio: 0.35 },
+      restaurant: { visa: 42, mastercard: 30, discover: 6, amex: 18, debitRatio: 0.25 },
+      ecommerce: { visa: 45, mastercard: 30, discover: 8, amex: 15, debitRatio: 0.20 },
+      service: { visa: 38, mastercard: 28, discover: 7, amex: 22, debitRatio: 0.30 }
+    };
+
+    const pcbancardPricing = {
+      interchangePlus: { markup: 0.20, perTransaction: 0.10, monthlyFee: 10 },
+      dualPricing: { serviceFee: 3.99, monthlyFee: 44.95 }
+    };
+
+    // ============================================================
+    // ANALYSIS ENGINE
+    // ============================================================
+    function calculateTrueInterchange(volume, transactions, merchantType) {
+      const mix = typicalCardMix[merchantType] || typicalCardMix.retail;
+      let totalInterchange = 0;
+      let totalAssessments = 0;
+
+      // Visa
+      const visaVol = volume * (mix.visa / 100);
+      const visaTxns = transactions * (mix.visa / 100);
+      const visaDebitVol = visaVol * mix.debitRatio;
+      const visaCreditVol = visaVol * (1 - mix.debitRatio);
+      totalInterchange += (visaDebitVol * 0.0005) + (visaTxns * mix.debitRatio * 0.21);
+      totalInterchange += (visaCreditVol * 0.0195) + (visaTxns * (1 - mix.debitRatio) * 0.10);
+      totalAssessments += visaVol * 0.0013;
+
+      // Mastercard
+      const mcVol = volume * (mix.mastercard / 100);
+      const mcTxns = transactions * (mix.mastercard / 100);
+      const mcDebitVol = mcVol * mix.debitRatio;
+      const mcCreditVol = mcVol * (1 - mix.debitRatio);
+      totalInterchange += (mcDebitVol * 0.0005) + (mcTxns * mix.debitRatio * 0.21);
+      totalInterchange += (mcCreditVol * 0.0185) + (mcTxns * (1 - mix.debitRatio) * 0.10);
+      totalAssessments += mcVol * 0.0013;
+
+      // Discover
+      const discVol = volume * (mix.discover / 100);
+      const discTxns = transactions * (mix.discover / 100);
+      totalInterchange += (discVol * 0.0171) + (discTxns * 0.10);
+      totalAssessments += discVol * 0.0013;
+
+      // Amex
+      const amexVol = volume * (mix.amex / 100);
+      const amexTxns = transactions * (mix.amex / 100);
+      totalInterchange += (amexVol * 0.02) + (amexTxns * 0.10);
+      totalAssessments += amexVol * 0.0015;
+
+      return {
+        interchange: totalInterchange,
+        assessments: totalAssessments,
+        wholesale: totalInterchange + totalAssessments,
+        wholesaleRate: ((totalInterchange + totalAssessments) / volume) * 100
+      };
+    }
+
+    function analyzeStatement(data) {
+      const { volume, transactions, totalFees, merchantType } = data;
+      const trueCosts = calculateTrueInterchange(volume, transactions, merchantType);
+      
+      const currentEffectiveRate = (totalFees / volume) * 100;
+      const processorMarkup = totalFees - trueCosts.wholesale;
+      const markupRate = (processorMarkup / volume) * 100;
+
+      // PCBancard IC+
+      const icPlusMarkup = volume * (pcbancardPricing.interchangePlus.markup / 100);
+      const icPlusTxnFees = transactions * pcbancardPricing.interchangePlus.perTransaction;
+      const icPlusTotal = trueCosts.wholesale + icPlusMarkup + icPlusTxnFees + pcbancardPricing.interchangePlus.monthlyFee;
+      const icPlusRate = (icPlusTotal / volume) * 100;
+      const icPlusSavings = totalFees - icPlusTotal;
+
+      // PCBancard Dual Pricing
+      const dualPricingTotal = pcbancardPricing.dualPricing.monthlyFee;
+      const dualPricingRate = (dualPricingTotal / volume) * 100;
+      const dualPricingSavings = totalFees - dualPricingTotal;
+
+      // Red flags
+      const redFlags = [];
+      if (currentEffectiveRate > 3.5) {
+        redFlags.push({ severity: 'CRITICAL', title: 'Extremely High Rate', detail: `${currentEffectiveRate.toFixed(2)}% is well above industry average`, impact: (currentEffectiveRate - 2.5) / 100 * volume });
+      } else if (currentEffectiveRate > 2.8) {
+        redFlags.push({ severity: 'HIGH', title: 'Above Average Rate', detail: `${currentEffectiveRate.toFixed(2)}% is higher than typical`, impact: (currentEffectiveRate - 2.2) / 100 * volume });
+      }
+      if (markupRate > 1.0) {
+        redFlags.push({ severity: 'HIGH', title: 'Excessive Markup', detail: `${markupRate.toFixed(2)}% processor markup is very high`, impact: processorMarkup * 0.7 });
+      } else if (markupRate > 0.5) {
+        redFlags.push({ severity: 'MEDIUM', title: 'High Markup', detail: `${markupRate.toFixed(2)}% markup above competitive rates`, impact: (markupRate - 0.25) / 100 * volume });
+      }
+
+      return {
+        input: { volume, transactions, totalFees, merchantType, avgTicket: volume / transactions },
+        current: { effectiveRate: currentEffectiveRate, totalFees },
+        trueCosts,
+        markup: { amount: processorMarkup, rate: markupRate },
+        pcbancard: {
+          interchangePlus: { total: icPlusTotal, rate: icPlusRate, savings: icPlusSavings, annualSavings: icPlusSavings * 12 },
+          dualPricing: { total: dualPricingTotal, rate: dualPricingRate, savings: dualPricingSavings, annualSavings: dualPricingSavings * 12 }
+        },
+        redFlags,
+        maxSavings: Math.max(icPlusSavings, dualPricingSavings),
+        maxAnnualSavings: Math.max(icPlusSavings, dualPricingSavings) * 12,
+        recommended: dualPricingSavings > icPlusSavings ? 'dualPricing' : 'interchangePlus'
+      };
+    }
+
+    // ============================================================
+    // TALKING POINTS GENERATOR
+    // ============================================================
+    function generateTalkingPoints(analysis) {
+      const { input, current, trueCosts, markup, pcbancard, maxSavings, maxAnnualSavings } = analysis;
+      const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      const fmtExact = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const pct = (n) => n.toFixed(2) + '%';
+
+      return {
+        opening: `"I've analyzed your processing statement and found significant savings opportunities.
+
+You're currently paying an effective rate of ${pct(current.effectiveRate)} on your ${fmt(input.volume)} in monthly volume. That's ${fmtExact(current.totalFees)} per month in processing fees.
+
+Here's what most processors don't tell you: the TRUE cost of processing - called interchange - is only ${pct(trueCosts.wholesaleRate)}.
+
+That means your current processor is charging you ${pct(markup.rate)} in markup above actual cost. That's ${fmt(markup.amount)} every month going straight to their profit.
+
+I can show you how to save ${fmt(maxSavings)} per month - that's ${fmt(maxAnnualSavings)} per year that stays in YOUR business."`,
+
+        keyFacts: [
+          `Monthly Volume: ${fmt(input.volume)}`,
+          `Transactions: ${input.transactions.toLocaleString()}`,
+          `Average Ticket: ${fmtExact(input.avgTicket)}`,
+          `Current Effective Rate: ${pct(current.effectiveRate)}`,
+          `True Interchange Cost: ${pct(trueCosts.wholesaleRate)}`,
+          `Processor Markup: ${pct(markup.rate)} (${fmt(markup.amount)}/month)`,
+          `Potential Monthly Savings: ${fmt(maxSavings)}`,
+          `Potential Annual Savings: ${fmt(maxAnnualSavings)}`
+        ],
+
+        questions: [
+          "When was the last time your processor reviewed your rates?",
+          "Did you know interchange is set by Visa/MC, not your processor?",
+          "Has anyone shown you the difference between interchange and markup?",
+          `Would saving ${fmt(maxSavings)}/month be worth 15 minutes of your time?`,
+          "Have you heard about dual pricing? It's a game-changer.",
+          `What would you do with an extra ${fmt(maxAnnualSavings)} per year?`
+        ],
+
+        objections: {
+          contract: {
+            q: "I'm locked into a contract",
+            a: `"Most contracts have loopholes - rate increases or fee changes often void the terms. Even with a termination fee, your ${fmt(maxAnnualSavings)} annual savings pays it off in 2-3 months. Plus, PCBancard may help cover that fee to earn your business."`
+          },
+          happy: {
+            q: "I'm happy with my current processor",
+            a: `"That's great they've been reliable. But being happy doesn't mean best deal. You're paying ${fmt(markup.amount)} more than necessary every month - ${fmt(maxAnnualSavings)}/year leaving your business. Wouldn't you rather keep that money?"`
+          },
+          noTime: {
+            q: "I don't have time to switch",
+            a: `"The switch takes 15 minutes of your time - we handle everything. For 15 minutes, you save ${fmt(maxAnnualSavings)} this year. That's like getting paid ${fmt(maxAnnualSavings * 4)}/hour for your time."`
+          },
+          thinkAboutIt: {
+            q: "I need to think about it",
+            a: `"Absolutely. But every month you wait costs ${fmt(maxSavings)} you won't get back. What specific questions can I answer right now to help you decide?"`
+          }
+        },
+
+        dualPricingPitch: `"Let me explain Dual Pricing - this changes everything.
+
+You display TWO prices: cash price and card price. The card price includes a 3.99% service fee.
+
+Cash/debit customers pay the lower price.
+Card customers pay slightly more - covering the processing fee.
+
+Result? Instead of YOU paying ${fmtExact(current.totalFees)}/month, your customers cover that cost when they choose cards.
+
+Your effective rate drops to nearly ZERO - just ${fmtExact(pcbancard.dualPricing.total)}/month in account fees.
+
+That's ${fmt(pcbancard.dualPricing.savings)}/month back in YOUR pocket.
+${fmt(pcbancard.dualPricing.annualSavings)} per year.
+
+It's 100% legal when done correctly. We provide all signage and setup.
+
+Would you like to see how this would work in your business?"`,
+
+        icPlusPitch: `"If dual pricing isn't right for you, our Interchange-Plus pricing still saves you significantly.
+
+You pay true wholesale interchange - exactly what Visa/MC charge - plus just 0.20% and $0.10/transaction.
+
+Your true interchange is ${pct(trueCosts.wholesaleRate)}. Add our markup, your all-in rate would be around ${pct(trueCosts.wholesaleRate + 0.25)}.
+
+That saves ${fmt(pcbancard.interchangePlus.savings)}/month compared to now.
+
+The biggest difference? Total transparency. Every statement shows exactly what interchange you paid and our markup. No surprises, no hidden fees."`,
+
+        closing: `"Bottom line: Switching to PCBancard saves you ${fmt(maxAnnualSavings)} this year.
+
+${analysis.recommended === 'dualPricing' 
+  ? `With Dual Pricing, you pay just ${fmtExact(pcbancard.dualPricing.total)}/month instead of ${fmtExact(current.totalFees)}. Customers cover card fees, you keep prices competitive.`
+  : `With Interchange Plus, you pay true interchange plus just 0.20% - far less than your current ${pct(markup.rate)} markup.`}
+
+I can have you processing in 48 hours. Same bank account, same operations - just lower fees.
+
+What questions do you have before we get started?"`
+      };
+    }
+
+    // ============================================================
+    // UI RENDERING
+    // ============================================================
+    let currentView = 'input';
+    let analysisData = null;
+    let talkingPointsData = null;
+
+    function formatCurrency(n) {
+      return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function formatCurrencyExact(n) {
+      return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatPercent(n) {
+      return n.toFixed(2) + '%';
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text);
+      const original = btn.innerHTML;
+      btn.innerHTML = '✓ Copied!';
+      btn.classList.add('text-green-600');
+      setTimeout(() => {
+        btn.innerHTML = original;
+        btn.classList.remove('text-green-600');
+      }, 2000);
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      
+      let html = `
+        <!-- Header -->
+        <header class="bg-indigo-700 text-white shadow-lg">
+          <div class="max-w-6xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h1 class="text-2xl font-bold">PCBancard Statement Analyzer</h1>
+                <p class="text-indigo-200 text-sm">AI-Powered Savings Calculator • Win More Deals</p>
+              </div>
+              ${analysisData ? `
+                <button onclick="resetAnalysis()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium">
+                  New Analysis
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </header>
+      `;
+
+      // Tab navigation
+      if (analysisData) {
+        html += `
+          <div class="bg-white border-b sticky top-0 z-10">
+            <div class="max-w-6xl mx-auto px-4">
+              <nav class="flex space-x-8">
+                <button onclick="setView('results')" class="py-4 px-1 border-b-2 font-medium text-sm ${currentView === 'results' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+                  📊 Analysis Results
+                </button>
+                <button onclick="setView('talking')" class="py-4 px-1 border-b-2 font-medium text-sm ${currentView === 'talking' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+                  🗣️ Talking Points
+                </button>
+              </nav>
+            </div>
+          </div>
+        `;
+      }
+
+      html += '<main class="max-w-6xl mx-auto px-4 py-8">';
+
+      if (currentView === 'input' && !analysisData) {
+        html += renderInputForm();
+      } else if (currentView === 'results' && analysisData) {
+        html += renderResults();
+      } else if (currentView === 'talking' && talkingPointsData) {
+        html += renderTalkingPoints();
+      }
+
+      html += '</main>';
+
+      // Footer
+      html += `
+        <footer class="bg-gray-800 text-gray-400 mt-8">
+          <div class="max-w-6xl mx-auto px-4 py-6 text-center text-sm">
+            <p>PCBancard Statement Analyzer • Built for Sales Agents</p>
+            <p class="mt-1">Interchange rates are estimates based on typical card mix. Actual rates vary.</p>
+          </div>
+        </footer>
+      `;
+
+      app.innerHTML = html;
+    }
+
+    function renderInputForm() {
+      return `
+        <div class="max-w-2xl mx-auto fade-in">
+          <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4">
+              <h2 class="text-xl font-bold text-white">Enter Statement Data</h2>
+              <p class="text-indigo-200 text-sm mt-1">Enter the merchant's processing statement information</p>
+            </div>
+
+            <div class="px-6 py-3 bg-gray-50 border-b flex items-center gap-2 text-sm flex-wrap">
+              <span class="text-gray-500">Quick fill:</span>
+              <button onclick="fillExample('small')" class="px-3 py-1 bg-white rounded border hover:bg-gray-100 text-sm">Small ($15k)</button>
+              <button onclick="fillExample('medium')" class="px-3 py-1 bg-white rounded border hover:bg-gray-100 text-sm">Medium ($50k)</button>
+              <button onclick="fillExample('large')" class="px-3 py-1 bg-white rounded border hover:bg-gray-100 text-sm">Large ($150k)</button>
+              <button onclick="fillExample('restaurant')" class="px-3 py-1 bg-white rounded border hover:bg-gray-100 text-sm">Restaurant</button>
+            </div>
+
+            <form onsubmit="handleSubmit(event)" class="p-6 space-y-5">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Volume *</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input type="text" id="volume" placeholder="50,000" required
+                      class="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Transactions *</label>
+                  <input type="text" id="transactions" placeholder="800" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Total Monthly Fees *</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input type="text" id="totalFees" placeholder="1,250" required
+                      class="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Merchant Type</label>
+                  <select id="merchantType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <option value="retail">Retail Store</option>
+                    <option value="restaurant">Restaurant</option>
+                    <option value="ecommerce">E-Commerce</option>
+                    <option value="service">Service Business</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Current Processor</label>
+                <select id="processor" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                  <option value="Unknown">Unknown</option>
+                  <option value="Square">Square</option>
+                  <option value="Stripe">Stripe</option>
+                  <option value="PayPal">PayPal</option>
+                  <option value="Clover">Clover</option>
+                  <option value="Toast">Toast</option>
+                  <option value="First Data">First Data / Fiserv</option>
+                  <option value="TSYS">TSYS / Global Payments</option>
+                  <option value="Worldpay">Worldpay</option>
+                  <option value="Heartland">Heartland</option>
+                  <option value="Elavon">Elavon</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <button type="submit" class="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                🔍 Analyze Statement
+              </button>
+            </form>
+          </div>
+
+          <div class="mt-6 text-center text-sm text-gray-500">
+            <p>Enter totals from the merchant's monthly processing statement.</p>
+            <p class="mt-1">The analyzer calculates true interchange costs and identifies savings.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderResults() {
+      const a = analysisData;
+      return `
+        <div class="space-y-6 fade-in">
+          <!-- Savings Hero -->
+          <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
+            <div class="text-center">
+              <p class="text-green-100 text-sm font-medium uppercase tracking-wide">Maximum Savings Opportunity</p>
+              <p class="text-5xl font-bold mt-2">${formatCurrency(a.maxAnnualSavings)}</p>
+              <p class="text-green-100 mt-1">per year (${formatCurrency(a.maxSavings)}/month)</p>
+            </div>
+            <div class="mt-6 grid grid-cols-3 gap-4 text-center">
+              <div class="bg-white/10 rounded-lg p-3">
+                <p class="text-2xl font-bold">${formatPercent(a.current.effectiveRate)}</p>
+                <p class="text-xs text-green-100">Current Rate</p>
+              </div>
+              <div class="bg-white/10 rounded-lg p-3">
+                <p class="text-2xl font-bold">${formatPercent(a.trueCosts.wholesaleRate)}</p>
+                <p class="text-xs text-green-100">True Interchange</p>
+              </div>
+              <div class="bg-white/10 rounded-lg p-3">
+                <p class="text-2xl font-bold">${formatPercent(a.pcbancard.dualPricing.rate)}</p>
+                <p class="text-xs text-green-100">Dual Pricing</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Red Flags -->
+          ${a.redFlags.length > 0 ? `
+            <div class="bg-white rounded-xl shadow-lg p-6">
+              <h3 class="text-lg font-bold text-gray-900 mb-4">🚨 Issues Found (${a.redFlags.length})</h3>
+              <div class="space-y-3">
+                ${a.redFlags.map(f => `
+                  <div class="p-4 rounded-lg border-l-4 ${f.severity === 'CRITICAL' ? 'bg-red-50 border-red-500' : f.severity === 'HIGH' ? 'bg-orange-50 border-orange-500' : 'bg-yellow-50 border-yellow-500'}">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-semibold text-gray-900">${f.title}</p>
+                        <p class="text-sm text-gray-600 mt-1">${f.detail}</p>
+                      </div>
+                      <span class="px-2 py-1 rounded text-xs font-bold ${f.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' : f.severity === 'HIGH' ? 'bg-orange-100 text-orange-800' : 'bg-yellow-100 text-yellow-800'}">
+                        ${formatCurrency(f.impact)}/mo
+                      </span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Cost Comparison Grid -->
+          <div class="grid md:grid-cols-2 gap-6">
+            <!-- Cost Breakdown -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+              <h3 class="text-lg font-bold text-gray-900 mb-4">💰 Cost Breakdown</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between py-2 border-b"><span class="text-gray-600">Monthly Volume</span><span class="font-semibold">${formatCurrency(a.input.volume)}</span></div>
+                <div class="flex justify-between py-2 border-b"><span class="text-gray-600">Transactions</span><span class="font-semibold">${a.input.transactions.toLocaleString()}</span></div>
+                <div class="flex justify-between py-2 border-b"><span class="text-gray-600">Average Ticket</span><span class="font-semibold">${formatCurrencyExact(a.input.avgTicket)}</span></div>
+                <div class="pt-2">
+                  <div class="flex justify-between py-2"><span class="text-gray-600">True Interchange</span><span class="font-semibold">${formatCurrencyExact(a.trueCosts.interchange)}</span></div>
+                  <div class="flex justify-between py-2"><span class="text-gray-600">Assessments</span><span class="font-semibold">${formatCurrencyExact(a.trueCosts.assessments)}</span></div>
+                  <div class="flex justify-between py-2 border-t font-bold"><span class="text-gray-900">True Wholesale</span><span class="text-green-600">${formatCurrencyExact(a.trueCosts.wholesale)}</span></div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-4 mt-4">
+                  <div class="flex justify-between"><span class="text-red-700 font-medium">Current Total Fees</span><span class="font-bold text-red-700">${formatCurrencyExact(a.current.totalFees)}</span></div>
+                  <div class="flex justify-between mt-2"><span class="text-red-600 text-sm">Processor Markup</span><span class="font-semibold text-red-600">${formatCurrencyExact(a.markup.amount)} (${formatPercent(a.markup.rate)})</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PCBancard Options -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+              <h3 class="text-lg font-bold text-gray-900 mb-4">✨ PCBancard Options</h3>
+              
+              <!-- Dual Pricing -->
+              <div class="rounded-lg p-4 mb-4 ${a.recommended === 'dualPricing' ? 'bg-indigo-50 border-2 border-indigo-500' : 'bg-gray-50 border border-gray-200'}">
+                ${a.recommended === 'dualPricing' ? '<span class="inline-block bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded mb-2">RECOMMENDED</span>' : ''}
+                <h4 class="font-bold text-gray-900">Dual Pricing Program</h4>
+                <p class="text-sm text-gray-600 mt-1">Customer pays 3.99% service fee for cards</p>
+                <div class="mt-3 space-y-2">
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Monthly Cost</span><span class="font-semibold">${formatCurrencyExact(a.pcbancard.dualPricing.total)}</span></div>
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Effective Rate</span><span class="font-semibold">${formatPercent(a.pcbancard.dualPricing.rate)}</span></div>
+                  <div class="flex justify-between text-sm font-bold text-green-600 pt-2 border-t"><span>Monthly Savings</span><span>${formatCurrency(a.pcbancard.dualPricing.savings)}</span></div>
+                  <div class="flex justify-between text-sm font-bold text-green-600"><span>Annual Savings</span><span>${formatCurrency(a.pcbancard.dualPricing.annualSavings)}</span></div>
+                </div>
+              </div>
+
+              <!-- IC+ -->
+              <div class="rounded-lg p-4 ${a.recommended === 'interchangePlus' ? 'bg-indigo-50 border-2 border-indigo-500' : 'bg-gray-50 border border-gray-200'}">
+                ${a.recommended === 'interchangePlus' ? '<span class="inline-block bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded mb-2">RECOMMENDED</span>' : ''}
+                <h4 class="font-bold text-gray-900">Interchange Plus</h4>
+                <p class="text-sm text-gray-600 mt-1">True interchange + 0.20% + $0.10/txn</p>
+                <div class="mt-3 space-y-2">
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Monthly Cost</span><span class="font-semibold">${formatCurrencyExact(a.pcbancard.interchangePlus.total)}</span></div>
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Effective Rate</span><span class="font-semibold">${formatPercent(a.pcbancard.interchangePlus.rate)}</span></div>
+                  <div class="flex justify-between text-sm font-bold text-green-600 pt-2 border-t"><span>Monthly Savings</span><span>${formatCurrency(a.pcbancard.interchangePlus.savings)}</span></div>
+                  <div class="flex justify-between text-sm font-bold text-green-600"><span>Annual Savings</span><span>${formatCurrency(a.pcbancard.interchangePlus.annualSavings)}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rate Comparison Bars -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">📊 Rate Comparison</h3>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between text-sm mb-1"><span class="text-gray-600">Current Processor</span><span class="font-semibold text-red-600">${formatPercent(a.current.effectiveRate)}</span></div>
+                <div class="h-6 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-red-500 rounded-full" style="width: ${Math.min(a.current.effectiveRate / 4 * 100, 100)}%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1"><span class="text-gray-600">True Interchange</span><span class="font-semibold text-blue-600">${formatPercent(a.trueCosts.wholesaleRate)}</span></div>
+                <div class="h-6 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: ${Math.min(a.trueCosts.wholesaleRate / 4 * 100, 100)}%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1"><span class="text-gray-600">PCBancard IC+</span><span class="font-semibold text-green-600">${formatPercent(a.pcbancard.interchangePlus.rate)}</span></div>
+                <div class="h-6 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500 rounded-full" style="width: ${Math.min(a.pcbancard.interchangePlus.rate / 4 * 100, 100)}%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1"><span class="text-gray-600">PCBancard Dual Pricing</span><span class="font-semibold text-emerald-600">${formatPercent(a.pcbancard.dualPricing.rate)}</span></div>
+                <div class="h-6 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width: ${Math.max(a.pcbancard.dualPricing.rate / 4 * 100, 2)}%"></div></div>
+              </div>
+            </div>
+            <p class="mt-4 text-center text-sm text-gray-500">Lower is better • Dual Pricing shifts cost to cardholder</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTalkingPoints() {
+      const tp = talkingPointsData;
+      return `
+        <div class="space-y-6 fade-in">
+          <!-- Stats Banner -->
+          <div class="bg-indigo-600 rounded-xl p-4 text-white">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div><p class="text-indigo-200 text-xs uppercase">Current Rate</p><p class="text-xl font-bold">${formatPercent(analysisData.current.effectiveRate)}</p></div>
+              <div><p class="text-indigo-200 text-xs uppercase">True Wholesale</p><p class="text-xl font-bold">${formatPercent(analysisData.trueCosts.wholesaleRate)}</p></div>
+              <div><p class="text-indigo-200 text-xs uppercase">Monthly Savings</p><p class="text-xl font-bold">${formatCurrency(analysisData.maxSavings)}</p></div>
+              <div><p class="text-indigo-200 text-xs uppercase">Annual Savings</p><p class="text-xl font-bold">${formatCurrency(analysisData.maxAnnualSavings)}</p></div>
+            </div>
+          </div>
+
+          <!-- Opening Statement -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">🎯 Opening Statement</h3>
+              <button onclick="copyText(talkingPointsData.opening, this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <pre class="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed font-sans">${tp.opening}</pre>
+            </div>
+          </div>
+
+          <!-- Key Facts -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">📊 Key Facts</h3>
+              <button onclick="copyText(talkingPointsData.keyFacts.join('\\n'), this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <ul class="space-y-2">
+              ${tp.keyFacts.map(f => `<li class="flex items-start gap-2"><span class="text-indigo-500 font-bold">•</span><span class="text-gray-700">${f}</span></li>`).join('')}
+            </ul>
+          </div>
+
+          <!-- Discovery Questions -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">❓ Discovery Questions</h3>
+              <button onclick="copyText(talkingPointsData.questions.join('\\n\\n'), this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <ul class="space-y-3">
+              ${tp.questions.map((q, i) => `
+                <li class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <span class="bg-indigo-100 text-indigo-700 font-bold w-6 h-6 rounded-full flex items-center justify-center text-sm flex-shrink-0">${i+1}</span>
+                  <span class="text-gray-700">${q}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+
+          <!-- Objection Handlers -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">🛡️ Objection Handlers</h3>
+            <div class="space-y-3">
+              ${Object.entries(tp.objections).map(([key, obj]) => `
+                <details class="border rounded-lg overflow-hidden">
+                  <summary class="p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer font-medium text-gray-900">"${obj.q}"</summary>
+                  <div class="p-4 border-t bg-white">
+                    <div class="flex justify-end mb-2">
+                      <button onclick="copyText(talkingPointsData.objections.${key}.a, this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">${obj.a}</p>
+                  </div>
+                </details>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Dual Pricing Pitch -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">💳 Dual Pricing Pitch</h3>
+              <button onclick="copyText(talkingPointsData.dualPricingPitch, this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <pre class="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed font-sans">${tp.dualPricingPitch}</pre>
+            </div>
+          </div>
+
+          <!-- IC+ Pitch -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">📈 Interchange Plus Pitch</h3>
+              <button onclick="copyText(talkingPointsData.icPlusPitch, this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <pre class="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed font-sans">${tp.icPlusPitch}</pre>
+            </div>
+          </div>
+
+          <!-- Closing -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-lg font-bold text-gray-900">🎬 Closing Statement</h3>
+              <button onclick="copyText(talkingPointsData.closing, this)" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">📋 Copy</button>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <pre class="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed font-sans">${tp.closing}</pre>
+            </div>
+          </div>
+
+          <!-- Print Button -->
+          <div class="bg-gray-100 rounded-xl p-6 text-center">
+            <p class="text-gray-600 mb-3">Need a printable version?</p>
+            <button onclick="window.print()" class="bg-gray-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-700">
+              🖨️ Print Talking Points
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // EVENT HANDLERS
+    // ============================================================
+    function fillExample(type) {
+      const examples = {
+        small: { volume: '15000', transactions: '300', totalFees: '450', merchantType: 'retail' },
+        medium: { volume: '50000', transactions: '800', totalFees: '1350', merchantType: 'retail' },
+        large: { volume: '150000', transactions: '2500', totalFees: '3800', merchantType: 'retail' },
+        restaurant: { volume: '75000', transactions: '1500', totalFees: '1950', merchantType: 'restaurant' }
+      };
+      const ex = examples[type];
+      document.getElementById('volume').value = ex.volume;
+      document.getElementById('transactions').value = ex.transactions;
+      document.getElementById('totalFees').value = ex.totalFees;
+      document.getElementById('merchantType').value = ex.merchantType;
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      
+      const data = {
+        volume: parseFloat(document.getElementById('volume').value.replace(/[,$]/g, '')),
+        transactions: parseInt(document.getElementById('transactions').value.replace(/,/g, '')),
+        totalFees: parseFloat(document.getElementById('totalFees').value.replace(/[,$]/g, '')),
+        merchantType: document.getElementById('merchantType').value,
+        processor: document.getElementById('processor').value
+      };
+
+      if (!data.volume || !data.transactions || !data.totalFees) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      analysisData = analyzeStatement(data);
+      talkingPointsData = generateTalkingPoints(analysisData);
+      currentView = 'results';
+      render();
+      window.scrollTo(0, 0);
+    }
+
+    function setView(view) {
+      currentView = view;
+      render();
+    }
+
+    function resetAnalysis() {
+      analysisData = null;
+      talkingPointsData = null;
+      currentView = 'input';
+      render();
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
