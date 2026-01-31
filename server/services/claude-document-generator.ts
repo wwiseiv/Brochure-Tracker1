@@ -42,11 +42,16 @@ function formatPercent(value: number): string {
 
 export async function generateClaudeDocument(options: ClaudeDocumentOptions): Promise<GeneratedDocument> {
   const anthropicApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-  if (!anthropicApiKey) {
+  const anthropicBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  
+  if (!anthropicApiKey || !anthropicBaseUrl) {
     throw new Error("Anthropic API key not configured");
   }
 
-  const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+  const anthropic = new Anthropic({ 
+    apiKey: anthropicApiKey,
+    baseURL: anthropicBaseUrl,
+  });
   const { parsedData, agentName, agentTitle, agentEmail, agentPhone, businessName, businessAddress, businessDescription, selectedEquipment } = options;
 
   const merchantName = businessName || parsedData.merchantName || "Valued Merchant";
