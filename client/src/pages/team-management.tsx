@@ -967,23 +967,37 @@ export default function TeamManagementPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const inviteLink = `${window.location.origin}/accept-invite?token=${invitation.token}`;
-                                    navigator.clipboard.writeText(inviteLink);
-                                    toast({
-                                      title: "Link copied!",
-                                      description: "Send this link to the person you're inviting.",
-                                    });
-                                  }}
-                                  data-testid={`button-copy-link-${invitation.id}`}
-                                >
-                                  <Copy className="h-4 w-4 mr-1" />
-                                  Copy Link
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const inviteLink = `${window.location.origin}/accept-invite?token=${invitation.token}`;
+                                      navigator.clipboard.writeText(inviteLink);
+                                      toast({
+                                        title: "Link copied!",
+                                        description: "Send this link to the person you're inviting.",
+                                      });
+                                    }}
+                                    data-testid={`button-copy-link-${invitation.id}`}
+                                  >
+                                    <Copy className="h-4 w-4 mr-1" />
+                                    Copy Link
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      cancelInvitationMutation.mutate(invitation.id);
+                                    }}
+                                    disabled={cancelInvitationMutation.isPending}
+                                    data-testid={`button-delete-invitation-${invitation.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
