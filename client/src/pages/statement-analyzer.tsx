@@ -1249,15 +1249,25 @@ ${new Date().toLocaleDateString()}
                     )}
 
                     {extractionStep === "idle" && (
-                      <Button 
-                        className="w-full" 
-                        onClick={uploadAndExtract}
-                        disabled={uploadedFiles.length === 0}
-                        data-testid="button-extract"
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Extract Data with AI
-                      </Button>
+                      <>
+                        <PricingConfiguration
+                          onConfigChange={setPricingConfig}
+                          initialConfig={pricingConfig}
+                          compact={true}
+                          collapsible={true}
+                          defaultCollapsed={true}
+                        />
+                        
+                        <Button 
+                          className="w-full" 
+                          onClick={uploadAndExtract}
+                          disabled={uploadedFiles.length === 0}
+                          data-testid="button-extract"
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Extract & Analyze with AI
+                        </Button>
+                      </>
                     )}
                   </div>
                 )}
