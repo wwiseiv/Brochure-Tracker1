@@ -1,16 +1,6 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
-import OpenAI from "openai";
-
-// Dynamic import for pdf-parse to avoid bundler issues
-let pdfParseModule: any = null;
-async function getPdfParse() {
-  if (!pdfParseModule) {
-    const module = await import("pdf-parse");
-    pdfParseModule = module.default || module;
-  }
-  return pdfParseModule;
-}
+import Anthropic from "@anthropic-ai/sdk";
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -41,78 +31,61 @@ interface ExtractedStatementData {
   extractionNotes: string[];
 }
 
-const EXTRACTION_PROMPT = `You are an expert at extracting data from merchant credit card processing statements. This is a CRITICAL business task - accuracy is essential.
+const EXTRACTION_PROMPT = `Analyze this merchant processing statement and extract all data.
 
-CAREFULLY analyze the provided statement text and extract ALL available data. Return ONLY valid JSON with no additional text:
-
+Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
 {
-  "merchantName": "Business name from statement header/address block (string or null)",
-  "processorName": "Processor/ISO name from header (string or null)",
-  "statementPeriod": "Statement period dates like '12/01/25 - 12/31/25' (string or null)",
-  "totalVolume": "Total amount submitted/processed in dollars (number or null)",
-  "totalTransactions": "Total number of transactions/items (number or null)",
-  "totalFees": "Total fees charged in dollars - look for 'Fees Charged' or similar (number or null)",
-  "merchantType": "Based on business name: retail, restaurant, dental, healthcare, service, etc. (string or null)",
+  "merchantName": "Business name from statement header",
+  "processorName": "Processor/ISO name (CardConnect, First Data, etc.)",
+  "statementPeriod": "Statement period dates like '12/01/25 - 12/31/25'",
+  "totalVolume": 99682.53,
+  "totalTransactions": 402,
+  "totalFees": 3307.19,
+  "merchantType": "dental/retail/restaurant/healthcare/service/etc",
   "fees": {
-    "interchange": "Interchange fees in dollars (number or null)",
-    "assessments": "Assessment/network fees in dollars (number or null)",
-    "monthlyFees": "Monthly service fees (number or null)",
-    "pciFees": "PCI compliance fees (number or null)",
-    "statementFees": "Statement fees (number or null)",
-    "batchFees": "Batch/transaction fees (number or null)",
-    "equipmentFees": "Equipment lease/rental fees (number or null)",
-    "otherFees": "Other miscellaneous fees (number or null)"
+    "interchange": 1509.27,
+    "assessments": 128.13,
+    "monthlyFees": 49.95,
+    "pciFees": 99.00,
+    "statementFees": 0,
+    "batchFees": 3.75,
+    "equipmentFees": 0,
+    "otherFees": 21.90
   },
   "cardMix": {
-    "visa": { "volume": 0, "transactions": 0 },
-    "mastercard": { "volume": 0, "transactions": 0 },
-    "discover": { "volume": 0, "transactions": 0 },
-    "amex": { "volume": 0, "transactions": 0 },
-    "debit": { "volume": 0, "transactions": 0 }
+    "visa": { "volume": 66135.27, "transactions": 265 },
+    "mastercard": { "volume": 22676.96, "transactions": 99 },
+    "discover": { "volume": 4662.54, "transactions": 21 },
+    "amex": { "volume": 6207.76, "transactions": 17 },
+    "debit": { "volume": 36389.19, "transactions": 186 }
   },
-  "confidence": "0-100 confidence score based on data clarity (number)",
-  "extractionNotes": ["List of notes about what was found or issues encountered"]
+  "confidence": 95,
+  "extractionNotes": ["Notes about extraction"]
 }
 
-EXTRACTION LOCATIONS - Look carefully in these areas:
-1. MERCHANT NAME: Usually in header block with address. Examples: "BRICKWORKS DENTAL", "ABC RESTAURANT LLC"
-2. PROCESSOR NAME: Top of statement - CardConnect, First Data, Worldpay, Fiserv, TSYS, Heartland, Elavon, etc.
-3. STATEMENT PERIOD: Usually shows "Statement Period: MM/DD/YY - MM/DD/YY"
-4. TOTAL VOLUME: Look for "Amounts Submitted", "Total Sales", "Total Amount You Submitted" - the grand total
-5. TOTAL TRANSACTIONS: Look for "Items" column total in card breakdown, or "Total Transactions"
-6. TOTAL FEES: Look for "Fees Charged" in summary, or "Total Fees" - this is often negative in statement format
-7. CARD MIX TABLE: Usually labeled "SUMMARY BY CARD TYPE" with columns for Card Type, Items, Amount
-   - Include both credit AND debit for each network (Visa + Visa Debit = total Visa)
-   - AMEX may be labeled "AMEXCT043" or similar
-   - Discover may be labeled "DCVR ACQ" or similar
-
 CRITICAL RULES:
-1. Numbers should be positive values without currency symbols or commas
+1. Numbers should be positive values without $ or commas
 2. If fees show as negative (like -$3,307.19), convert to positive: 3307.19
-3. For card mix, ADD credit + debit together for each network (e.g., MASTERCARD + Mastercard Debit = mastercard total)
-4. Look at EVERY page of multi-page statements
-5. The "Amount Funded to Your Bank" = Volume - Fees
-6. If you see data but aren't 100% certain, extract it and note uncertainty in extractionNotes
-
-Return ONLY the JSON object, no markdown, no code blocks, no explanations.`;
+3. For card mix, ADD credit + debit together (e.g., VISA + Visa Debit = visa total)
+4. Look at EVERY page of the statement
+5. "Amount Funded to Bank" = Volume - Fees`;
 
 export async function extractStatementFromFiles(
   files: Array<{ path: string; mimeType: string; name: string }>
 ): Promise<ExtractedStatementData> {
-  const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const anthropicApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+  const anthropicBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
   
-  if (!openaiApiKey || !openaiBaseUrl) {
-    throw new Error("OpenAI API not configured for document extraction");
+  if (!anthropicApiKey || !anthropicBaseUrl) {
+    throw new Error("Claude API not configured for document extraction");
   }
 
-  const openai = new OpenAI({
-    apiKey: openaiApiKey,
-    baseURL: openaiBaseUrl,
+  const anthropic = new Anthropic({
+    apiKey: anthropicApiKey,
+    baseURL: anthropicBaseUrl,
   });
 
   const objectStorage = new ObjectStorageService();
-  let combinedText = "";
   
   for (const file of files) {
     try {
@@ -121,141 +94,184 @@ export async function extractStatementFromFiles(
       if (file.mimeType.includes("spreadsheet") || file.mimeType.includes("excel") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
         const textContent = await extractExcelAsText(file.path, objectStorage);
         console.log(`[StatementExtractor] Excel content extracted, length: ${textContent.length}`);
-        combinedText += `\n--- Excel/CSV Content from ${file.name} ---\n${textContent}\n`;
+        return await analyzeTextWithClaude(anthropic, textContent, file.name);
+        
       } else if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
-        console.log(`[StatementExtractor] Processing PDF: ${file.name}`);
-        const pdfText = await extractPdfText(file.path, objectStorage);
-        console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText.length}`);
-        combinedText += `\n--- PDF Content from ${file.name} ---\n${pdfText}\n`;
+        console.log(`[StatementExtractor] Processing PDF with Claude native support: ${file.name}`);
+        const buffer = await getFileBuffer(file.path, objectStorage);
+        console.log(`[StatementExtractor] PDF buffer size: ${buffer.length}`);
+        return await analyzePDFWithClaude(anthropic, buffer);
+        
       } else if (file.mimeType.startsWith("image/")) {
-        console.log(`[StatementExtractor] Processing image: ${file.name} - will use vision`);
-        const base64Data = await getFileAsBase64(file.path, objectStorage);
-        const imageResult = await analyzeImageWithVision(openai, base64Data, file.mimeType);
-        combinedText += `\n--- Image Content from ${file.name} ---\n${imageResult}\n`;
+        console.log(`[StatementExtractor] Processing image: ${file.name}`);
+        const buffer = await getFileBuffer(file.path, objectStorage);
+        const base64Data = buffer.toString("base64");
+        console.log(`[StatementExtractor] Image base64 length: ${base64Data.length}`);
+        return await analyzeImageWithClaude(anthropic, base64Data, file.mimeType);
+        
       } else {
         console.log(`[StatementExtractor] Unsupported file type: ${file.mimeType}`);
       }
     } catch (error: any) {
       console.error(`[StatementExtractor] Error processing file ${file.name}:`, error?.message || error);
+      throw error;
     }
   }
 
-  if (!combinedText.trim()) {
-    throw new Error("No text could be extracted from the files");
-  }
+  throw new Error("No valid files could be processed");
+}
 
-  console.log(`[StatementExtractor] Total extracted text length: ${combinedText.length}`);
-  console.log(`[StatementExtractor] First 500 chars: ${combinedText.substring(0, 500)}`);
+async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
+  console.log(`[StatementExtractor] Analyzing PDF with Claude, buffer size: ${buffer.length}`);
+  
+  const base64 = buffer.toString("base64");
+  console.log(`[StatementExtractor] PDF base64 length: ${base64.length}`);
   
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a payment processing statement analyzer. Extract key data from merchant statements accurately. Always return valid JSON."
-        },
-        {
-          role: "user",
-          content: `Analyze this merchant processing statement and extract the data.\n\nSTATEMENT TEXT:\n${combinedText}\n\n${EXTRACTION_PROMPT}`
-        }
-      ],
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
       max_tokens: 4096,
-      temperature: 0.1,
-      response_format: { type: "json_object" }
-    });
-
-    const responseText = response.choices[0]?.message?.content || "";
-    console.log(`[StatementExtractor] OpenAI response length: ${responseText.length}`);
-
-    try {
-      const extracted = JSON.parse(responseText) as ExtractedStatementData;
-      
-      if (!extracted.confidence) {
-        extracted.confidence = 50;
-      }
-      if (!extracted.extractionNotes) {
-        extracted.extractionNotes = [];
-      }
-
-      console.log(`[StatementExtractor] Successfully extracted data with confidence: ${extracted.confidence}`);
-      return extracted;
-    } catch (parseError) {
-      console.error("[StatementExtractor] JSON parse error:", parseError, "Response:", responseText);
-      return {
-        confidence: 0,
-        extractionNotes: ["Failed to parse AI response. Please enter data manually."]
-      };
-    }
-  } catch (error: any) {
-    console.error("[StatementExtractor] OpenAI API error:", error?.message || error);
-    throw new Error(`AI analysis failed: ${error?.message || "Unknown error"}`);
-  }
-}
-
-async function extractPdfText(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
-  console.log(`[StatementExtractor] extractPdfText called with path: ${objectPath}`);
-  
-  try {
-    const file = await objectStorage.getObjectEntityFile(objectPath);
-    const [buffer] = await file.download();
-    console.log(`[StatementExtractor] PDF downloaded, buffer size: ${buffer.length}`);
-    
-    const pdfParse = await getPdfParse();
-    const pdfData = await pdfParse(buffer);
-    console.log(`[StatementExtractor] PDF parsed, text length: ${pdfData.text.length}, pages: ${pdfData.numpages}`);
-    
-    return pdfData.text;
-  } catch (error: any) {
-    console.error(`[StatementExtractor] PDF extraction error:`, error?.message || error);
-    throw new Error(`Failed to extract text from PDF: ${error?.message}`);
-  }
-}
-
-async function analyzeImageWithVision(openai: OpenAI, base64Data: string, mimeType: string): Promise<string> {
-  console.log(`[StatementExtractor] Analyzing image with vision, base64 length: ${base64Data.length}`);
-  
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
       messages: [
         {
           role: "user",
           content: [
             {
-              type: "text",
-              text: "Extract ALL text from this merchant processing statement image. Include all numbers, dates, amounts, card types, and fee details. Return the raw text content."
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: base64
+              }
             },
             {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Data}`,
-                detail: "high"
-              }
+              type: "text",
+              text: EXTRACTION_PROMPT
             }
           ]
         }
-      ],
-      max_tokens: 4096
+      ]
     });
 
-    return response.choices[0]?.message?.content || "";
+    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[StatementExtractor] Claude response length: ${responseText.length}`);
+    
+    return parseExtractedData(responseText);
   } catch (error: any) {
-    console.error("[StatementExtractor] Vision API error:", error?.message || error);
-    return "";
+    console.error("[StatementExtractor] Claude PDF analysis error:", error?.message || error);
+    throw new Error(`PDF analysis failed: ${error?.message || "Unknown error"}`);
   }
 }
 
-async function getFileAsBase64(objectPath: string, objectStorage: ObjectStorageService): Promise<string> {
-  console.log(`[StatementExtractor] getFileAsBase64 called with path: ${objectPath}`);
+async function analyzeImageWithClaude(anthropic: Anthropic, base64Data: string, mimeType: string): Promise<ExtractedStatementData> {
+  console.log(`[StatementExtractor] Analyzing image with Claude, base64 length: ${base64Data.length}`);
+  
+  const mediaType = mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mediaType,
+                data: base64Data
+              }
+            },
+            {
+              type: "text",
+              text: EXTRACTION_PROMPT
+            }
+          ]
+        }
+      ]
+    });
+
+    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[StatementExtractor] Claude image response length: ${responseText.length}`);
+    
+    return parseExtractedData(responseText);
+  } catch (error: any) {
+    console.error("[StatementExtractor] Claude image analysis error:", error?.message || error);
+    throw new Error(`Image analysis failed: ${error?.message || "Unknown error"}`);
+  }
+}
+
+async function analyzeTextWithClaude(anthropic: Anthropic, text: string, filename: string): Promise<ExtractedStatementData> {
+  console.log(`[StatementExtractor] Analyzing text with Claude, length: ${text.length}`);
+  
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: `This is spreadsheet data from file "${filename}":\n\n${text}\n\n${EXTRACTION_PROMPT}`
+        }
+      ]
+    });
+
+    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[StatementExtractor] Claude text response length: ${responseText.length}`);
+    
+    return parseExtractedData(responseText);
+  } catch (error: any) {
+    console.error("[StatementExtractor] Claude text analysis error:", error?.message || error);
+    throw new Error(`Text analysis failed: ${error?.message || "Unknown error"}`);
+  }
+}
+
+function parseExtractedData(responseText: string): ExtractedStatementData {
+  try {
+    // Remove markdown code blocks if present
+    let jsonStr = responseText;
+    const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1];
+    } else {
+      const rawMatch = responseText.match(/\{[\s\S]*\}/);
+      if (rawMatch) {
+        jsonStr = rawMatch[0];
+      }
+    }
+    
+    const extracted = JSON.parse(jsonStr) as ExtractedStatementData;
+    
+    if (!extracted.confidence) {
+      extracted.confidence = 50;
+    }
+    if (!extracted.extractionNotes) {
+      extracted.extractionNotes = [];
+    }
+
+    console.log(`[StatementExtractor] Successfully extracted data with confidence: ${extracted.confidence}`);
+    return extracted;
+  } catch (parseError) {
+    console.error("[StatementExtractor] JSON parse error:", parseError, "Response:", responseText.substring(0, 500));
+    return {
+      confidence: 0,
+      extractionNotes: ["Failed to parse AI response. Please enter data manually."]
+    };
+  }
+}
+
+async function getFileBuffer(objectPath: string, objectStorage: ObjectStorageService): Promise<Buffer> {
+  console.log(`[StatementExtractor] getFileBuffer called with path: ${objectPath}`);
   
   try {
     const file = await objectStorage.getObjectEntityFile(objectPath);
+    console.log(`[StatementExtractor] Got file object for: ${objectPath}`);
     const [buffer] = await file.download();
     console.log(`[StatementExtractor] Downloaded file, buffer size: ${buffer.length}`);
-    return buffer.toString("base64");
+    return buffer;
   } catch (error: any) {
-    console.error(`[StatementExtractor] getFileAsBase64 error:`, error?.message || error);
+    console.error(`[StatementExtractor] getFileBuffer error:`, error?.message || error);
     throw error;
   }
 }
