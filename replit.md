@@ -47,7 +47,7 @@ Preferred communication style: Simple, everyday language.
     - **Presentation Training ("Teach Me the Presentation")**: Interactive 8-module training for the PCBancard Dual Pricing presentation, including persuasion psychology, objection handling, and closing strategies.
     - **Proposal Generator**: Generate professional branded proposals (PDF/Word) by parsing merchant data from statements, selecting equipment, and using Claude AI for content generation.
     - **Statement Analyzer**: Analyze merchant processing statements to identify savings, extract data using AI vision, calculate true interchange costs, detect red flags, and generate sales scripts. Features multi-file upload, few-shot learning for extraction, a fee dictionary, and PII redaction.
-    - **AI-Powered Prospecting**: Discover and manage local business prospects using xAI Grok-4 Responses API with web_search tool for real-time business discovery, MCC code filtering, and a pipeline system with claim functionality.
+    - **AI-Powered Prospecting**: Discover and manage local business prospects using xAI Grok-4 Responses API with web_search tool for real-time business discovery, MCC code filtering, and a pipeline system with claim functionality. Prospect detail Sheet includes voice dictation for notes, scrollable layout optimized for iOS Safari, and a prominent "Convert to Merchant" CTA showing available features (E-Sign, Meeting Recording, Proposals).
     - **AI Help Chatbot**: Floating Claude AI assistant for app feature inquiries.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
