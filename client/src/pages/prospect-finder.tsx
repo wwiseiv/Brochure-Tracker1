@@ -48,6 +48,9 @@ import {
   Grid3x3,
   AlertCircle,
   ExternalLink,
+  Navigation,
+  Mail,
+  Clock,
 } from "lucide-react";
 
 interface MCCCategory {
@@ -73,9 +76,14 @@ interface DiscoveredBusiness {
   zipCode: string;
   phone: string | null;
   website: string | null;
+  email: string | null;
   businessType: string;
   mccCode: string;
   confidence: number;
+  hoursOfOperation: string | null;
+  ownerName: string | null;
+  yearEstablished: string | null;
+  description: string | null;
 }
 
 interface SearchResult {
@@ -123,17 +131,13 @@ export default function ProspectFinderPage() {
 
   const searchMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/prospects/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          zipCode,
-          mccCodes: selectedMCCCodes,
-          radius: parseInt(radius),
-          maxResults: parseInt(maxResults),
-        }),
+      const response = await apiRequest("POST", "/api/prospects/search", {
+        zipCode,
+        mccCodes: selectedMCCCodes,
+        radius: parseInt(radius),
+        maxResults: parseInt(maxResults),
       });
-      return response as SearchResult;
+      return await response.json() as SearchResult;
     },
     onSuccess: (data) => {
       setSearchResults(data);
@@ -163,15 +167,11 @@ export default function ProspectFinderPage() {
 
   const claimMutation = useMutation({
     mutationFn: async (business: DiscoveredBusiness) => {
-      const response = await apiRequest("/api/prospects/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ business }),
-      });
-      return response;
+      const response = await apiRequest("POST", "/api/prospects/claim", { business });
+      return await response.json();
     },
     onSuccess: (data, business) => {
-      setClaimedBusinesses((prev) => new Set([...prev, business.name]));
+      setClaimedBusinesses((prev) => new Set(Array.from(prev).concat(business.name)));
       queryClient.invalidateQueries({ queryKey: ["/api/prospects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/prospects/pipeline"] });
       toast({
@@ -514,44 +514,98 @@ export default function ProspectFinderPage() {
                 const isClaimed = claimedBusinesses.has(business.name);
                 const isClaiming = claimingId === business.name;
                 const confidenceBadge = getConfidenceBadge(business.confidence);
+                const fullAddress = `${business.address}, ${business.city}, ${business.state} ${business.zipCode}`;
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
 
                 return (
                   <Card key={`${business.name}-${business.zipCode}`} className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="font-semibold">{business.name}</h3>
                           <Badge variant={confidenceBadge.variant} className="text-xs">
                             {confidenceBadge.label}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {business.address}, {business.city}, {business.state} {business.zipCode}
+                          {fullAddress}
                         </p>
+                        {business.description && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">
+                            {business.description}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
+                    <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-2">
                       <Badge variant="outline" className="text-xs">
                         {business.businessType}
                       </Badge>
+                      {business.yearEstablished && (
+                        <Badge variant="secondary" className="text-xs">
+                          Est. {business.yearEstablished}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="space-y-1 text-sm mb-3">
+                      {business.ownerName && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <User className="w-3 h-3" />
+                          <span>Owner: {business.ownerName}</span>
+                        </div>
+                      )}
+                      {business.hoursOfOperation && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span>{business.hoursOfOperation}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Action Buttons */}
+                    <div className="flex gap-2 mb-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
+                        data-testid={`button-directions-${business.name.replace(/\s+/g, "-")}`}
+                      >
+                        <Navigation className="w-4 h-4 mr-1" />
+                        Directions
+                      </Button>
                       {business.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {business.phone}
-                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => window.open(`tel:${business.phone}`, "_self")}
+                          data-testid={`button-call-${business.name.replace(/\s+/g, "-")}`}
+                        >
+                          <Phone className="w-4 h-4 mr-1" />
+                          Call
+                        </Button>
                       )}
                       {business.website && (
-                        <a
-                          href={business.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-primary hover:underline"
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => window.open(business.website!, "_blank", "noopener,noreferrer")}
                         >
-                          <Globe className="w-3 h-3" />
-                          Website
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                          <Globe className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {business.email && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => window.open(`mailto:${business.email}`, "_self")}
+                        >
+                          <Mail className="w-4 h-4" />
+                        </Button>
                       )}
                     </div>
 

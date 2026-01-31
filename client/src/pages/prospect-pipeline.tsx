@@ -42,6 +42,9 @@ import {
   FileText,
   Trash2,
   ExternalLink,
+  Navigation,
+  Mail,
+  User,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -59,6 +62,10 @@ interface Prospect {
   mccCode: string | null;
   mccDescription: string | null;
   businessType: string | null;
+  hoursOfOperation: string | null;
+  ownerName: string | null;
+  yearEstablished: string | null;
+  businessDescription: string | null;
   status: string;
   notes: string | null;
   nextFollowupDate: string | null;
@@ -121,12 +128,8 @@ export default function ProspectPipelinePage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
-      const response = await apiRequest(`/api/prospects/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      return response;
+      const response = await apiRequest("PATCH", `/api/prospects/${id}`, updates);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prospects"] });
@@ -140,13 +143,10 @@ export default function ProspectPipelinePage() {
 
   const convertMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest(`/api/prospects/${id}/convert`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      return response;
+      const response = await apiRequest("POST", `/api/prospects/${id}/convert`);
+      return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { merchant: { businessName: string } }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/prospects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/prospects/pipeline"] });
       queryClient.invalidateQueries({ queryKey: ["/api/merchants"] });
@@ -163,7 +163,7 @@ export default function ProspectPipelinePage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest(`/api/prospects/${id}`, { method: "DELETE" });
+      await apiRequest("DELETE", `/api/prospects/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prospects"] });
@@ -327,7 +327,7 @@ export default function ProspectPipelinePage() {
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-3">
                     {prospect.businessType && (
                       <Badge variant="outline">{prospect.businessType}</Badge>
                     )}
@@ -342,6 +342,39 @@ export default function ProspectPipelinePage() {
                         <Clock className="w-3 h-3" />
                         Follow-up: {format(new Date(prospect.nextFollowupDate), "MMM d")}
                       </span>
+                    )}
+                  </div>
+                  
+                  {/* Quick Action Buttons */}
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const address = `${prospect.addressLine1 || ""}, ${prospect.city}, ${prospect.state} ${prospect.zipCode}`;
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank", "noopener,noreferrer");
+                      }}
+                      data-testid={`button-directions-${prospect.id}`}
+                    >
+                      <Navigation className="w-4 h-4 mr-1" />
+                      Directions
+                    </Button>
+                    {prospect.phone && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`tel:${prospect.phone}`, "_self");
+                        }}
+                        data-testid={`button-call-${prospect.id}`}
+                      >
+                        <Phone className="w-4 h-4 mr-1" />
+                        Call
+                      </Button>
                     )}
                   </div>
                 </Card>
@@ -360,7 +393,35 @@ export default function ProspectPipelinePage() {
               </SheetHeader>
 
               <div className="space-y-6 pb-24">
+                {/* Quick Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      const address = `${selectedProspect.addressLine1 || ""}, ${selectedProspect.city}, ${selectedProspect.state} ${selectedProspect.zipCode}`;
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank", "noopener,noreferrer");
+                    }}
+                    data-testid="button-detail-directions"
+                  >
+                    <Navigation className="w-4 h-4 mr-2" />
+                    Get Directions
+                  </Button>
+                  {selectedProspect.phone && (
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => window.open(`tel:${selectedProspect.phone}`, "_self")}
+                      data-testid="button-detail-call"
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      Call Now
+                    </Button>
+                  )}
+                </div>
+
+                {/* Contact Information */}
                 <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Contact Information</h4>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <MapPin className="w-4 h-4" />
                     <span>
@@ -372,6 +433,14 @@ export default function ProspectPipelinePage() {
                       <Phone className="w-4 h-4 text-muted-foreground" />
                       <a href={`tel:${selectedProspect.phone}`} className="text-primary">
                         {selectedProspect.phone}
+                      </a>
+                    </div>
+                  )}
+                  {selectedProspect.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <a href={`mailto:${selectedProspect.email}`} className="text-primary">
+                        {selectedProspect.email}
                       </a>
                     </div>
                   )}
@@ -389,11 +458,36 @@ export default function ProspectPipelinePage() {
                       </a>
                     </div>
                   )}
+                </div>
+
+                {/* Business Details */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Business Details</h4>
                   {selectedProspect.businessType && (
                     <div className="flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-muted-foreground" />
                       <Badge variant="outline">{selectedProspect.businessType}</Badge>
+                      {selectedProspect.yearEstablished && (
+                        <Badge variant="secondary">Est. {selectedProspect.yearEstablished}</Badge>
+                      )}
                     </div>
+                  )}
+                  {selectedProspect.ownerName && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <User className="w-4 h-4" />
+                      <span>Owner: <span className="text-foreground font-medium">{selectedProspect.ownerName}</span></span>
+                    </div>
+                  )}
+                  {selectedProspect.hoursOfOperation && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      <span>{selectedProspect.hoursOfOperation}</span>
+                    </div>
+                  )}
+                  {selectedProspect.businessDescription && (
+                    <p className="text-sm text-muted-foreground italic bg-muted/50 p-3 rounded-md">
+                      {selectedProspect.businessDescription}
+                    </p>
                   )}
                 </div>
 

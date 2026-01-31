@@ -1915,6 +1915,11 @@ export const prospects = pgTable("prospects", {
   businessType: varchar("business_type", { length: 100 }),
   riskLevel: integer("risk_level").default(1),
   
+  hoursOfOperation: varchar("hours_of_operation", { length: 255 }),
+  ownerName: varchar("owner_name", { length: 255 }),
+  yearEstablished: varchar("year_established", { length: 10 }),
+  businessDescription: text("business_description"),
+  
   source: varchar("source", { length: 50 }).default("ai_search"),
   aiConfidenceScore: numeric("ai_confidence_score", { precision: 3, scale: 2 }),
   searchQuery: text("search_query"),

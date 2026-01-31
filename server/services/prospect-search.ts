@@ -20,9 +20,14 @@ export interface DiscoveredBusiness {
   zipCode: string;
   phone: string | null;
   website: string | null;
+  email: string | null;
   businessType: string;
   mccCode: string;
   confidence: number;
+  hoursOfOperation: string | null;
+  ownerName: string | null;
+  yearEstablished: string | null;
+  description: string | null;
 }
 
 export interface SearchResult {
@@ -48,7 +53,7 @@ export async function searchLocalBusinesses(
     ...bt.searchTerms,
   ]);
 
-  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit. Search for real, currently operating local businesses matching these criteria:
+  const searchPrompt = `You are a business research assistant helping a sales representative find local businesses to visit in person. Search the web for real, currently operating local businesses matching these criteria:
 
 SEARCH PARAMETERS:
 - Location: Within ${radius} miles of ZIP code ${zipCode}
@@ -56,34 +61,50 @@ SEARCH PARAMETERS:
 - Search Terms to Use: ${allSearchTerms.slice(0, 20).join(", ")}
 - Number of Results Needed: ${maxResults}
 
-REQUIREMENTS:
-1. Only return REAL businesses that currently exist and are operating
-2. Include complete address information (street, city, state, zip)
-3. Prioritize independent local businesses over national chains
+CRITICAL REQUIREMENTS:
+1. Use web search to find REAL, VERIFIED businesses that currently exist and are operating
+2. Include COMPLETE address information (exact street address, city, state, zip) - the sales rep needs to physically visit
+3. Prioritize independent local businesses over national chains (they're better prospects)
 4. Focus on businesses likely to accept card payments
-5. Exclude businesses that are permanently closed
-6. Verify businesses exist by searching for them
+5. Exclude businesses that are permanently closed or temporarily closed
+6. Search Google Maps, Yelp, Yellow Pages, and business directories for accurate info
 
-For each business found, provide:
-- Business Name (official name as it appears on their signage/listing)
-- Full Street Address
+GATHER AS MUCH CONTACT INFO AS POSSIBLE - the sales rep needs to:
+- Call ahead to schedule meetings
+- Send emails to decision makers
+- Visit in person during business hours
+- Know who the owner/manager is
+
+For each business found, provide ALL available information:
+- Business Name (official name as it appears on signage/listing)
+- Full Street Address (exact, for GPS navigation)
 - City, State, ZIP
-- Phone Number (if available, format: (555) 123-4567)
-- Website (if available)
+- Phone Number (format: (555) 123-4567) - ESSENTIAL for calling ahead
+- Website URL - for researching before visit
+- Email address (if available from website or listings)
+- Hours of Operation (e.g., "Mon-Fri 9am-5pm, Sat 10am-3pm")
+- Owner/Manager Name (if available from business listings or website)
+- Year Established (if available)
+- Brief Description (what they specialize in, size, notable features)
 - Primary Business Type from the categories I provided
 - MCC Code (the 4-digit merchant category code that best matches)
-- Confidence score (0.0-1.0) that this is a real, operating business
+- Confidence score (0.0-1.0) that this is a real, currently operating business
 
 Return ONLY a valid JSON array with no additional text or explanation. Start with [ and end with ]:
 [
   {
-    "name": "Example Business Name",
-    "address": "123 Main Street",
+    "name": "Joe's Italian Kitchen",
+    "address": "1234 Main Street",
     "city": "Indianapolis",
     "state": "IN",
     "zipCode": "46032",
     "phone": "(317) 555-1234",
-    "website": "https://example.com",
+    "website": "https://joesitaliankitchen.com",
+    "email": "info@joesitaliankitchen.com",
+    "hoursOfOperation": "Tue-Sun 11am-10pm, Closed Mon",
+    "ownerName": "Joe Rossi",
+    "yearEstablished": "2018",
+    "description": "Family-owned Italian restaurant with 50 seats, known for homemade pasta",
     "businessType": "Restaurant",
     "mccCode": "5812",
     "confidence": 0.95
@@ -136,6 +157,11 @@ Return ONLY a valid JSON array with no additional text or explanation. Start wit
       ...b,
       phone: b.phone || null,
       website: b.website || null,
+      email: b.email || null,
+      hoursOfOperation: b.hoursOfOperation || null,
+      ownerName: b.ownerName || null,
+      yearEstablished: b.yearEstablished || null,
+      description: b.description || null,
       confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
     }));
 
