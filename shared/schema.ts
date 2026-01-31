@@ -1228,6 +1228,33 @@ export const insertPresentationQuizSchema = createInsertSchema(presentationQuizz
 export type InsertPresentationQuiz = z.infer<typeof insertPresentationQuizSchema>;
 export type PresentationQuiz = typeof presentationQuizzes.$inferSelect;
 
+// Presentation Practice Responses table (stores user practice attempts with AI feedback)
+export const presentationPracticeResponses = pgTable("presentation_practice_responses", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  lessonId: integer("lesson_id").notNull().references(() => presentationLessons.id),
+  userId: varchar("user_id").notNull(),
+  practiceResponse: text("practice_response").notNull(),
+  aiFeedback: text("ai_feedback"),
+  feedbackScore: integer("feedback_score"), // 1-100 score from AI
+  strengths: text("strengths").array(), // What the user did well
+  improvements: text("improvements").array(), // Areas to improve
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const presentationPracticeResponsesRelations = relations(presentationPracticeResponses, ({ one }) => ({
+  lesson: one(presentationLessons, {
+    fields: [presentationPracticeResponses.lessonId],
+    references: [presentationLessons.id],
+  }),
+}));
+
+export const insertPresentationPracticeResponseSchema = createInsertSchema(presentationPracticeResponses).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPresentationPracticeResponse = z.infer<typeof insertPresentationPracticeResponseSchema>;
+export type PresentationPracticeResponse = typeof presentationPracticeResponses.$inferSelect;
+
 // Extended types for presentation training
 export type PresentationModuleWithLessons = PresentationModule & {
   lessons: PresentationLesson[];
