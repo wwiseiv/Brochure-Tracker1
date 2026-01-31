@@ -367,7 +367,7 @@ export default function EquipIQPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
       <div className="px-4 py-6 max-w-md mx-auto md:max-w-2xl lg:max-w-4xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -398,7 +398,7 @@ export default function EquipIQPage() {
           </TabsList>
 
           <TabsContent value="chat" className="mt-0">
-            <Card className="h-[calc(100vh-280px)] flex flex-col">
+            <Card className="h-[calc(100vh-320px)] min-h-[300px] flex flex-col">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Bot className="w-5 h-5 text-primary" />

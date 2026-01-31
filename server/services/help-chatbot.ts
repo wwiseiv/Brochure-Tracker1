@@ -77,7 +77,7 @@ export async function getHelpResponse(
     ];
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20250401',
+      model: 'claude-haiku-4-5',
       max_tokens: 1024,
       system: SYSTEM_CONTEXT,
       messages: messages
