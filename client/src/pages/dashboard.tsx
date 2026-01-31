@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure, UserPreferences, UserPermissions } from "@shared/schema";
@@ -127,31 +128,59 @@ export default function DashboardPage() {
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
           <div className="flex items-center gap-2">
-            <Link href="/activity">
-              <Button variant="ghost" size="icon" data-testid="button-activity-feed">
-                <Activity className="h-5 w-5 text-emerald-600" />
-              </Button>
-            </Link>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Link href="/activity">
+                  <Button variant="ghost" size="icon" data-testid="button-activity-feed">
+                    <Activity className="h-5 w-5 text-emerald-600" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View team activity feed</p>
+              </TooltipContent>
+            </Tooltip>
             {isAdmin && (
-              <Link href="/admin">
-                <Button variant="ghost" size="icon" data-testid="button-admin-dashboard">
-                  <Shield className="h-5 w-5 text-purple-600" />
-                </Button>
-              </Link>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href="/admin">
+                    <Button variant="ghost" size="icon" data-testid="button-admin-dashboard">
+                      <Shield className="h-5 w-5 text-purple-600" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Admin dashboard</p>
+                </TooltipContent>
+              </Tooltip>
             )}
             {isRM && (
-              <Link href="/manager">
-                <Button variant="ghost" size="icon" data-testid="button-rm-dashboard">
-                  <Briefcase className="h-5 w-5 text-blue-600" />
-                </Button>
-              </Link>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href="/manager">
+                    <Button variant="ghost" size="icon" data-testid="button-rm-dashboard">
+                      <Briefcase className="h-5 w-5 text-blue-600" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Manager dashboard</p>
+                </TooltipContent>
+              </Tooltip>
             )}
-            <Link href="/profile">
-              <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-user">
-                <AvatarImage src={user?.profileImageUrl || undefined} />
-                <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
-              </Avatar>
-            </Link>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Link href="/profile">
+                  <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-user">
+                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
+                  </Avatar>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Your profile</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -179,52 +208,73 @@ export default function DashboardPage() {
                 </div>
               </div>
               {isOnline && pendingCount > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={syncPendingDrops}
-                  disabled={isSyncing}
-                  className="gap-1.5 shrink-0"
-                  data-testid="button-sync-drops"
-                >
-                  {isSyncing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Syncing
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Sync Now
-                    </>
-                  )}
-                </Button>
+                <Tooltip delayDuration={700}>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={syncPendingDrops}
+                      disabled={isSyncing}
+                      className="gap-1.5 shrink-0"
+                      data-testid="button-sync-drops"
+                    >
+                      {isSyncing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Syncing
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          Sync Now
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Sync offline drops</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           </Card>
         )}
 
-        <Link href="/scan">
-          <Button 
-            className="w-full min-h-touch-lg gap-3 text-lg font-semibold shadow-lg"
-            data-testid="button-scan-drop"
-          >
-            <QrCode className="w-7 h-7" />
-            Scan & Drop
-          </Button>
-        </Link>
+        <Tooltip delayDuration={700}>
+          <TooltipTrigger asChild>
+            <Link href="/scan">
+              <Button 
+                className="w-full min-h-touch-lg gap-3 text-lg font-semibold shadow-lg"
+                data-testid="button-scan-drop"
+              >
+                <QrCode className="w-7 h-7" />
+                Scan & Drop
+              </Button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Record a new brochure drop</p>
+          </TooltipContent>
+        </Tooltip>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <section>
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h2 className="text-lg font-semibold">Today's Pickups</h2>
               <div className="flex items-center gap-2">
-                <Link href="/route">
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
-                    <Route className="w-4 h-4" />
-                    Plan Route
-                  </Button>
-                </Link>
+                <Tooltip delayDuration={700}>
+                  <TooltipTrigger asChild>
+                    <Link href="/route">
+                      <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
+                        <Route className="w-4 h-4" />
+                        Plan Route
+                      </Button>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Optimize your driving route</p>
+                  </TooltipContent>
+                </Tooltip>
                 <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                   {todaysPickups.length}
                 </span>
@@ -237,12 +287,19 @@ export default function DashboardPage() {
                   <DropCard key={drop.id} drop={drop} variant="urgent" />
                 ))}
                 {todaysPickups.length > 3 && (
-                  <Link href="/history?filter=today">
-                    <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
-                      View all {todaysPickups.length} pickups
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                  <Tooltip delayDuration={700}>
+                    <TooltipTrigger asChild>
+                      <Link href="/history?filter=today">
+                        <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
+                          View all {todaysPickups.length} pickups
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View all today's scheduled pickups</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
             ) : (
@@ -253,12 +310,19 @@ export default function DashboardPage() {
           <section className="md:block hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Coming Up</h2>
-              <Link href="/history?filter=upcoming">
-                <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-upcoming-grid">
-                  View all
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href="/history?filter=upcoming">
+                    <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-upcoming-grid">
+                      View all
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View all upcoming pickups</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             {upcomingPickups.length > 0 ? (
               <div className="space-y-3">
@@ -440,12 +504,19 @@ export default function DashboardPage() {
           <section className="md:hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Coming Up</h2>
-              <Link href="/history?filter=upcoming">
-                <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-all-upcoming">
-                  View all
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href="/history?filter=upcoming">
+                    <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-all-upcoming">
+                      View all
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View all upcoming pickups</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="space-y-3">
               {upcomingPickups.slice(0, 2).map((drop) => (

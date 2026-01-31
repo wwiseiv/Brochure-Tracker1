@@ -3,12 +3,12 @@ import { Home, QrCode, User, Store, MessageSquare, FileSignature, HelpCircle } f
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navItems = [
-  { path: "/", icon: Home, label: "Home" },
-  { path: "/scan", icon: QrCode, label: "Scan" },
-  { path: "/esign", icon: FileSignature, label: "E-Sign" },
-  { path: "/coach", icon: MessageSquare, label: "Coach" },
-  { path: "/merchants", icon: Store, label: "Merchants" },
-  { path: "/profile", icon: User, label: "Profile" },
+  { path: "/", icon: Home, label: "Home", tooltip: "Go to home screen" },
+  { path: "/scan", icon: QrCode, label: "Scan", tooltip: "Scan & drop a brochure" },
+  { path: "/esign", icon: FileSignature, label: "E-Sign", tooltip: "Electronic signature documents" },
+  { path: "/coach", icon: MessageSquare, label: "Coach", tooltip: "AI sales coaching" },
+  { path: "/merchants", icon: Store, label: "Merchants", tooltip: "View your merchants" },
+  { path: "/profile", icon: User, label: "Profile", tooltip: "Your profile & settings" },
 ];
 
 export function BottomNav() {
@@ -22,19 +22,26 @@ export function BottomNav() {
           const Icon = item.icon;
           
           return (
-            <Link key={item.path} href={item.path}>
-              <button
-                data-testid={`nav-${item.label.toLowerCase()}`}
-                className={`flex flex-col items-center justify-center gap-1 min-w-[54px] min-h-touch py-2 px-1.5 rounded-lg transition-colors ${
-                  isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover-elevate"
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-[11px] font-medium">{item.label}</span>
-              </button>
-            </Link>
+            <Tooltip key={item.path} delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Link href={item.path}>
+                  <button
+                    data-testid={`nav-${item.label.toLowerCase()}`}
+                    className={`flex flex-col items-center justify-center gap-1 min-w-[54px] min-h-touch py-2 px-1.5 rounded-lg transition-colors ${
+                      isActive
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover-elevate"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-[11px] font-medium">{item.label}</span>
+                  </button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{item.tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
           );
         })}
       </div>

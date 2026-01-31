@@ -52,6 +52,7 @@ import {
   Mail,
   Clock,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MCCCategory {
   id: string;
@@ -241,20 +242,34 @@ export default function ProspectFinderPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Link href="/">
+                  <Button variant="ghost" size="icon" data-testid="button-back">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Go back</p>
+              </TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-600" />
               <h1 className="text-lg font-semibold">Prospect Finder</h1>
             </div>
           </div>
-          <Badge className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white">
-            <Sparkles className="w-3 h-3 mr-1" />
-            AI-Powered
-          </Badge>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Badge className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white cursor-help">
+                <Sparkles className="w-3 h-3 mr-1" />
+                AI-Powered
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Uses AI to find real local businesses</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </header>
 
@@ -298,16 +313,22 @@ export default function ProspectFinderPage() {
                 {selectedMCCDetails.slice(0, 4).map((mcc) => {
                   const IconComponent = getCategoryIcon(mcc.category);
                   return (
-                    <Badge
-                      key={mcc.code}
-                      className="cursor-pointer bg-primary text-primary-foreground"
-                      onClick={() => toggleMCCCode(mcc.code)}
-                      data-testid={`badge-mcc-${mcc.code}`}
-                    >
-                      <IconComponent className="w-3 h-3 mr-1" />
-                      {mcc.title.length > 20 ? mcc.title.slice(0, 20) + "..." : mcc.title}
-                      <X className="w-3 h-3 ml-1" />
-                    </Badge>
+                    <Tooltip key={mcc.code} delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          className="cursor-pointer bg-primary text-primary-foreground"
+                          onClick={() => toggleMCCCode(mcc.code)}
+                          data-testid={`badge-mcc-${mcc.code}`}
+                        >
+                          <IconComponent className="w-3 h-3 mr-1" />
+                          {mcc.title.length > 20 ? mcc.title.slice(0, 20) + "..." : mcc.title}
+                          <X className="w-3 h-3 ml-1" />
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Remove this business type</p>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 })}
                 {selectedMCCDetails.length > 4 && (
@@ -315,16 +336,23 @@ export default function ProspectFinderPage() {
                     +{selectedMCCDetails.length - 4} more
                   </Badge>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1 border-dashed"
-                  onClick={() => setShowMCCSheet(true)}
-                  data-testid="button-add-business-types"
-                >
-                  <Plus className="w-3 h-3" />
-                  {selectedMCCCodes.length === 0 ? "Select Types" : "Add More"}
-                </Button>
+                <Tooltip delayDuration={700}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 border-dashed"
+                      onClick={() => setShowMCCSheet(true)}
+                      data-testid="button-add-business-types"
+                    >
+                      <Plus className="w-3 h-3" />
+                      {selectedMCCCodes.length === 0 ? "Select Types" : "Add More"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Select additional business types</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -363,24 +391,31 @@ export default function ProspectFinderPage() {
               </div>
             </div>
 
-            <Button
-              className="w-full gap-2"
-              disabled={!canSearch || searchMutation.isPending}
-              onClick={() => searchMutation.mutate()}
-              data-testid="button-search-prospects"
-            >
-              {searchMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Searching with AI...
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  Find Prospects
-                </>
-              )}
-            </Button>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Button
+                  className="w-full gap-2"
+                  disabled={!canSearch || searchMutation.isPending}
+                  onClick={() => searchMutation.mutate()}
+                  data-testid="button-search-prospects"
+                >
+                  {searchMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Searching with AI...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      Find Prospects
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Search for businesses matching your criteria</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </Card>
 
@@ -567,73 +602,108 @@ export default function ProspectFinderPage() {
 
                     {/* Quick Action Buttons */}
                     <div className="flex gap-2 mb-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
-                        data-testid={`button-directions-${business.name.replace(/\s+/g, "-")}`}
-                      >
-                        <Navigation className="w-4 h-4 mr-1" />
-                        Directions
-                      </Button>
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
+                            data-testid={`button-directions-${business.name.replace(/\s+/g, "-")}`}
+                          >
+                            <Navigation className="w-4 h-4 mr-1" />
+                            Directions
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Get directions to this business</p>
+                        </TooltipContent>
+                      </Tooltip>
                       {business.phone && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => window.open(`tel:${business.phone}`, "_self")}
-                          data-testid={`button-call-${business.name.replace(/\s+/g, "-")}`}
-                        >
-                          <Phone className="w-4 h-4 mr-1" />
-                          Call
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => window.open(`tel:${business.phone}`, "_self")}
+                              data-testid={`button-call-${business.name.replace(/\s+/g, "-")}`}
+                            >
+                              <Phone className="w-4 h-4 mr-1" />
+                              Call
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Call this business</p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                       {business.website && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => window.open(business.website!, "_blank", "noopener,noreferrer")}
-                        >
-                          <Globe className="w-4 h-4" />
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(business.website!, "_blank", "noopener,noreferrer")}
+                            >
+                              <Globe className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Visit website</p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                       {business.email && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => window.open(`mailto:${business.email}`, "_self")}
-                        >
-                          <Mail className="w-4 h-4" />
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`mailto:${business.email}`, "_self")}
+                            >
+                              <Mail className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Send email</p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
 
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={isClaimed ? "secondary" : "default"}
-                      disabled={isClaimed || isClaiming}
-                      onClick={() => handleClaim(business)}
-                      data-testid={`button-claim-${business.name.replace(/\s+/g, "-")}`}
-                    >
-                      {isClaimed ? (
-                        <>
-                          <Check className="w-4 h-4 mr-1" />
-                          Claimed
-                        </>
-                      ) : isClaiming ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                          Claiming...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-1" />
-                          Claim Prospect
-                        </>
-                      )}
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          variant={isClaimed ? "secondary" : "default"}
+                          disabled={isClaimed || isClaiming}
+                          onClick={() => handleClaim(business)}
+                          data-testid={`button-claim-${business.name.replace(/\s+/g, "-")}`}
+                        >
+                          {isClaimed ? (
+                            <>
+                              <Check className="w-4 h-4 mr-1" />
+                              Claimed
+                            </>
+                          ) : isClaiming ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              Claiming...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4 mr-1" />
+                              Claim Prospect
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isClaimed ? "Already added to your pipeline" : "Add this business to your pipeline"}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </Card>
                 );
               })}
