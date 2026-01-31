@@ -1,0 +1,1746 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2026-01-31",
+    "source": "SignaPay Credit & Underwriting Policy Guidelines",
+    "note": "Level 1 = Low Risk, Level 2 = Moderate Risk. Level 3 and Prohibited categories excluded."
+  },
+  "categories": [
+    { "id": "food", "name": "Food & Dining", "icon": "utensils", "color": "#F97316" },
+    { "id": "retail", "name": "Retail Stores", "icon": "shopping-bag", "color": "#8B5CF6" },
+    { "id": "services", "name": "Professional Services", "icon": "briefcase", "color": "#3B82F6" },
+    { "id": "automotive", "name": "Automotive", "icon": "car", "color": "#EF4444" },
+    { "id": "healthcare", "name": "Healthcare & Medical", "icon": "heart-pulse", "color": "#10B981" },
+    { "id": "entertainment", "name": "Entertainment & Recreation", "icon": "ticket", "color": "#EC4899" },
+    { "id": "home", "name": "Home & Garden", "icon": "home", "color": "#14B8A6" },
+    { "id": "personal", "name": "Personal Services", "icon": "user", "color": "#F59E0B" },
+    { "id": "education", "name": "Education", "icon": "graduation-cap", "color": "#6366F1" },
+    { "id": "transportation", "name": "Transportation", "icon": "truck", "color": "#64748B" },
+    { "id": "utilities", "name": "Utilities & Telecom", "icon": "zap", "color": "#0EA5E9" },
+    { "id": "other", "name": "Other Services", "icon": "grid-3x3", "color": "#78716C" }
+  ],
+  "mccCodes": [
+    {
+      "code": "4119",
+      "title": "Ambulance Services",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["ambulance", "emergency medical transport", "EMS", "medical transport"]
+    },
+    {
+      "code": "7996",
+      "title": "Amusement Parks, Circuses, Carnivals, and Fortune Tellers",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["amusement park", "carnival", "circus", "theme park", "fair"]
+    },
+    {
+      "code": "7998",
+      "title": "Aquariums, Seaquariums, Dolphinariums, and Zoos",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["aquarium", "zoo", "wildlife park", "marine park", "animal sanctuary"]
+    },
+    {
+      "code": "5970",
+      "title": "Artist's Supply and Craft Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["art supplies", "craft store", "hobby shop", "art materials", "craft supplies"]
+    },
+    {
+      "code": "5542",
+      "title": "Automated Fuel Dispensers",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["gas station", "fuel pump", "self-service gas", "automated fuel"]
+    },
+    {
+      "code": "5533",
+      "title": "Automotive Parts and Accessories Stores",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["auto parts", "car parts", "automotive accessories", "car accessories"]
+    },
+    {
+      "code": "7538",
+      "title": "Automotive Service Shops (Non-Dealer)",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["auto repair", "car mechanic", "automotive service", "car repair shop"]
+    },
+    {
+      "code": "5532",
+      "title": "Automotive Tire Stores",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["tire shop", "tire store", "wheel and tire", "tire dealer"]
+    },
+    {
+      "code": "5462",
+      "title": "Bakeries",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["bakery", "bread shop", "pastry shop", "cake shop", "boulangerie"]
+    },
+    {
+      "code": "7230",
+      "title": "Beauty and Barber Shops",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["barber", "barbershop", "beauty salon", "hair salon", "hairdresser"]
+    },
+    {
+      "code": "5940",
+      "title": "Bicycle Shops – Sales and Service",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["bike shop", "bicycle store", "cycling shop", "bike repair"]
+    },
+    {
+      "code": "5942",
+      "title": "Book Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["bookstore", "book shop", "bookseller", "books"]
+    },
+    {
+      "code": "5192",
+      "title": "Books, Periodicals and Newspapers",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["newsstand", "magazine shop", "periodicals", "newspaper stand"]
+    },
+    {
+      "code": "7933",
+      "title": "Bowling Alleys",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["bowling alley", "bowling center", "bowling lanes"]
+    },
+    {
+      "code": "8244",
+      "title": "Business and Secretarial Schools",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["business school", "secretarial school", "vocational training"]
+    },
+    {
+      "code": "4899",
+      "title": "Cable, Satellite and Other Pay Television/Radio/Streaming Services",
+      "level": 1,
+      "category": "utilities",
+      "searchTerms": ["cable TV", "satellite TV", "streaming service", "television provider"]
+    },
+    {
+      "code": "5946",
+      "title": "Camera and Photographic Supply Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["camera store", "photo supplies", "photography equipment", "camera shop"]
+    },
+    {
+      "code": "5441",
+      "title": "Candy, Nut, and Confectionery Stores",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["candy store", "confectionery", "sweet shop", "chocolate shop"]
+    },
+    {
+      "code": "7542",
+      "title": "Car Washes",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["car wash", "auto wash", "vehicle wash", "detailing"]
+    },
+    {
+      "code": "7217",
+      "title": "Carpet and Upholstery Cleaning",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["carpet cleaning", "upholstery cleaning", "rug cleaning", "steam cleaning"]
+    },
+    {
+      "code": "8398",
+      "title": "Charitable Social Service Organizations",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["charity", "nonprofit", "social services", "charitable organization"]
+    },
+    {
+      "code": "8351",
+      "title": "Child Care Services",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["daycare", "childcare", "preschool", "child care center", "nursery"]
+    },
+    {
+      "code": "5641",
+      "title": "Children's and Infants' Wear Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["kids clothing", "children's clothing", "baby clothes", "infant wear"]
+    },
+    {
+      "code": "8041",
+      "title": "Chiropractors",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["chiropractor", "chiropractic", "spine adjustment", "chiropractic clinic"]
+    },
+    {
+      "code": "5993",
+      "title": "Cigar Stores and Stands",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["cigar shop", "tobacco shop", "smoke shop", "cigar lounge"]
+    },
+    {
+      "code": "7296",
+      "title": "Clothing Rental – Costumes, Uniforms, Formal Wear",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["costume rental", "tuxedo rental", "formal wear rental", "uniform rental"]
+    },
+    {
+      "code": "8220",
+      "title": "Colleges, Universities, Professional Schools, and Junior Colleges",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["college", "university", "community college", "professional school"]
+    },
+    {
+      "code": "5139",
+      "title": "Commercial Footwear",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["work boots", "commercial footwear", "safety shoes", "industrial footwear"]
+    },
+    {
+      "code": "5734",
+      "title": "Computer Software Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["software store", "computer software", "tech software", "software retailer"]
+    },
+    {
+      "code": "8241",
+      "title": "Correspondence Schools",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["online school", "distance learning", "correspondence course"]
+    },
+    {
+      "code": "5977",
+      "title": "Cosmetic Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["cosmetics", "makeup store", "beauty store", "skincare shop"]
+    },
+    {
+      "code": "4215",
+      "title": "Courier Services – Air and Ground, and Freight Forwarders",
+      "level": 1,
+      "category": "transportation",
+      "searchTerms": ["courier", "delivery service", "freight", "shipping", "messenger service"]
+    },
+    {
+      "code": "9211",
+      "title": "Court Costs, Including Alimony and Child Support",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["court costs", "legal fees", "court payments"]
+    },
+    {
+      "code": "5451",
+      "title": "Dairy Products Stores",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["dairy store", "cheese shop", "milk store", "dairy products"]
+    },
+    {
+      "code": "8021",
+      "title": "Dentists and Orthodontists",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["dentist", "dental office", "orthodontist", "dental clinic"]
+    },
+    {
+      "code": "5311",
+      "title": "Department Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["department store", "retail store", "general merchandise"]
+    },
+    {
+      "code": "8011",
+      "title": "Doctors and Physicians (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["doctor", "physician", "medical clinic", "doctor's office", "medical practice"]
+    },
+    {
+      "code": "5813",
+      "title": "Drinking Places (Alcoholic Beverages) – Bars, Taverns, Nightclubs",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["bar", "tavern", "nightclub", "pub", "cocktail lounge"]
+    },
+    {
+      "code": "5912",
+      "title": "Drug Stores and Pharmacies",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["pharmacy", "drugstore", "chemist", "apothecary"]
+    },
+    {
+      "code": "7216",
+      "title": "Dry Cleaners",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["dry cleaner", "dry cleaning", "laundry service", "cleaners"]
+    },
+    {
+      "code": "5099",
+      "title": "Durable Goods (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["durable goods", "wholesale goods", "general merchandise"]
+    },
+    {
+      "code": "7841",
+      "title": "DVD/Video Tape Rental Stores",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["video rental", "DVD rental", "movie rental"]
+    },
+    {
+      "code": "5812",
+      "title": "Eating Places and Restaurants",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["restaurant", "diner", "cafe", "eatery", "bistro", "dining"]
+    },
+    {
+      "code": "5997",
+      "title": "Electric Razor Stores – Sales and Service",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["electric razor", "shaver store", "grooming equipment"]
+    },
+    {
+      "code": "7629",
+      "title": "Electrical and Small Appliance Repair Shops",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["appliance repair", "electrical repair", "small appliance service"]
+    },
+    {
+      "code": "5065",
+      "title": "Electrical Parts and Equipment",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["electrical supplies", "electrical equipment", "wiring supplies"]
+    },
+    {
+      "code": "5732",
+      "title": "Electronics Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["electronics store", "tech store", "gadget shop", "consumer electronics"]
+    },
+    {
+      "code": "8211",
+      "title": "Elementary and Secondary Schools",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["school", "elementary school", "high school", "private school"]
+    },
+    {
+      "code": "5651",
+      "title": "Family Clothing Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["clothing store", "family clothes", "apparel store", "fashion store"]
+    },
+    {
+      "code": "5814",
+      "title": "Fast Food Restaurants",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["fast food", "quick service restaurant", "QSR", "drive-thru"]
+    },
+    {
+      "code": "9222",
+      "title": "Fines",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["fine payment", "penalty payment", "citation payment"]
+    },
+    {
+      "code": "5718",
+      "title": "Fireplace, Fireplace Screens and Accessories Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["fireplace store", "hearth shop", "fireplace accessories"]
+    },
+    {
+      "code": "5992",
+      "title": "Florists",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["florist", "flower shop", "floral design", "flower delivery"]
+    },
+    {
+      "code": "5193",
+      "title": "Florists Supplies, Nursery Stock and Flowers",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["nursery", "garden center", "plant nursery", "floral supplies"]
+    },
+    {
+      "code": "5422",
+      "title": "Freezer and Locker Meat Provisioners",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["meat locker", "freezer meat", "butcher", "meat provisioner"]
+    },
+    {
+      "code": "5681",
+      "title": "Furriers and Fur Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["fur shop", "furrier", "fur coat store"]
+    },
+    {
+      "code": "5947",
+      "title": "Gift, Card, Novelty and Souvenir Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["gift shop", "card store", "souvenir shop", "novelty store"]
+    },
+    {
+      "code": "5231",
+      "title": "Glass, Paint, and Wallpaper Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["paint store", "glass shop", "wallpaper store", "paint supplies"]
+    },
+    {
+      "code": "5950",
+      "title": "Glassware/Crystal Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["glassware", "crystal shop", "glass store", "fine china"]
+    },
+    {
+      "code": "9399",
+      "title": "Government Services (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["government services", "municipal services", "public services"]
+    },
+    {
+      "code": "5411",
+      "title": "Grocery Stores and Supermarkets",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["grocery store", "supermarket", "food market", "grocery"]
+    },
+    {
+      "code": "5251",
+      "title": "Hardware Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["hardware store", "home improvement", "tool store", "hardware"]
+    },
+    {
+      "code": "5072",
+      "title": "Hardware, Equipment and Supplies",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["hardware supplies", "equipment store", "industrial supplies"]
+    },
+    {
+      "code": "7298",
+      "title": "Health and Beauty Spas",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["spa", "day spa", "wellness spa", "beauty spa", "health spa"]
+    },
+    {
+      "code": "1711",
+      "title": "Heating, Plumbing, and Air Conditioning Contractors",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["HVAC", "plumber", "heating contractor", "AC repair", "plumbing"]
+    },
+    {
+      "code": "5945",
+      "title": "Hobby, Toy, and Game Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["toy store", "hobby shop", "game store", "toy shop"]
+    },
+    {
+      "code": "5200",
+      "title": "Home Supply Warehouse Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["home improvement warehouse", "building supplies", "home depot style"]
+    },
+    {
+      "code": "5722",
+      "title": "Household Appliance Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["appliance store", "household appliances", "kitchen appliances"]
+    },
+    {
+      "code": "780",
+      "title": "Landscaping and Horticultural Services",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["landscaping", "lawn care", "garden service", "landscaper"]
+    },
+    {
+      "code": "7211",
+      "title": "Laundries – Family and Commercial",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["laundromat", "laundry", "wash and fold", "coin laundry"]
+    },
+    {
+      "code": "7210",
+      "title": "Laundry, Cleaning, and Garment Services",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["laundry service", "garment cleaning", "clothing care"]
+    },
+    {
+      "code": "7011",
+      "title": "Lodging – Hotels, Motels, Resorts",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["hotel", "motel", "resort", "inn", "lodging", "accommodation"]
+    },
+    {
+      "code": "5948",
+      "title": "Luggage and Leather Goods Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["luggage store", "leather goods", "bag shop", "travel accessories"]
+    },
+    {
+      "code": "5211",
+      "title": "Lumber and Building Materials Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["lumber yard", "building materials", "construction supplies"]
+    },
+    {
+      "code": "4468",
+      "title": "Marinas, Marine Service, and Supplies",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["marina", "boat dock", "marine supplies", "boat services"]
+    },
+    {
+      "code": "7297",
+      "title": "Massage Parlors",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["massage", "massage therapy", "therapeutic massage", "massage studio"]
+    },
+    {
+      "code": "8099",
+      "title": "Medical Services and Health Practitioners (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["medical services", "health practitioner", "healthcare provider"]
+    },
+    {
+      "code": "5047",
+      "title": "Medical, Dental, Ophthalmic and Hospital Equipment and Supplies",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["medical supplies", "dental equipment", "hospital supplies"]
+    },
+    {
+      "code": "5611",
+      "title": "Men's and Boys' Clothing and Accessories Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["men's clothing", "menswear", "men's fashion", "boys clothing"]
+    },
+    {
+      "code": "5691",
+      "title": "Men's and Women's Clothing Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["clothing store", "apparel", "fashion boutique", "clothes shop"]
+    },
+    {
+      "code": "5137",
+      "title": "Men's, Women's, and Children's Uniforms and Commercial Clothing",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["uniform store", "work uniforms", "commercial clothing"]
+    },
+    {
+      "code": "5999",
+      "title": "Miscellaneous and Specialty Retail Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["specialty shop", "unique retail", "specialty store"]
+    },
+    {
+      "code": "5699",
+      "title": "Miscellaneous Apparel and Accessory Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["accessories shop", "apparel accessories", "fashion accessories"]
+    },
+    {
+      "code": "5499",
+      "title": "Miscellaneous Food Stores – Convenience Stores and Specialty Markets",
+      "level": 1,
+      "category": "food",
+      "searchTerms": ["convenience store", "specialty food", "corner store", "mini mart"]
+    },
+    {
+      "code": "5399",
+      "title": "Miscellaneous General Merchandise",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["general store", "variety store", "general merchandise"]
+    },
+    {
+      "code": "5719",
+      "title": "Miscellaneous Home Furnishing Specialty Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["home decor", "home furnishings", "interior decor", "home accessories"]
+    },
+    {
+      "code": "2741",
+      "title": "Miscellaneous Publishing and Printing",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["printing", "publishing", "print shop", "printer"]
+    },
+    {
+      "code": "7699",
+      "title": "Miscellaneous Repair Shops and Related Services",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["repair shop", "fix-it shop", "repair services"]
+    },
+    {
+      "code": "7832",
+      "title": "Motion Picture Theaters",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["movie theater", "cinema", "movie house", "film theater"]
+    },
+    {
+      "code": "5013",
+      "title": "Motor Vehicle Supplies and New Parts",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["auto parts", "car parts", "vehicle supplies", "new auto parts"]
+    },
+    {
+      "code": "5733",
+      "title": "Music Stores – Musical Instruments, Pianos, and Sheet Music",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["music store", "instrument store", "piano store", "guitar shop"]
+    },
+    {
+      "code": "5994",
+      "title": "News Dealers and Newsstands",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["newsstand", "news dealer", "magazine stand"]
+    },
+    {
+      "code": "5199",
+      "title": "Nondurable Goods (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["nondurable goods", "consumables", "disposable goods"]
+    },
+    {
+      "code": "5261",
+      "title": "Nurseries and Lawn and Garden Supply Stores",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["garden center", "plant nursery", "lawn and garden", "garden supply"]
+    },
+    {
+      "code": "8043",
+      "title": "Opticians, Optical Goods, and Eyeglasses",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["optician", "eyeglasses", "optical shop", "glasses store"]
+    },
+    {
+      "code": "8042",
+      "title": "Optometrists and Ophthalmologists",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["optometrist", "eye doctor", "ophthalmologist", "eye care"]
+    },
+    {
+      "code": "8031",
+      "title": "Osteopaths",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["osteopath", "osteopathic medicine", "DO", "osteopathy"]
+    },
+    {
+      "code": "5921",
+      "title": "Package Stores – Beer, Wine, and Liquor",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["liquor store", "wine shop", "beer store", "bottle shop"]
+    },
+    {
+      "code": "5198",
+      "title": "Paints, Varnishes and Supplies",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["paint store", "paint supplies", "coating supplies"]
+    },
+    {
+      "code": "7523",
+      "title": "Parking Lots, Parking Meters and Garages",
+      "level": 1,
+      "category": "transportation",
+      "searchTerms": ["parking lot", "parking garage", "parking facility"]
+    },
+    {
+      "code": "5933",
+      "title": "Pawn Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["pawn shop", "pawn broker", "pawn store"]
+    },
+    {
+      "code": "5995",
+      "title": "Pet Shops, Pet Foods and Supplies Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["pet store", "pet shop", "pet supplies", "pet food"]
+    },
+    {
+      "code": "5172",
+      "title": "Petroleum and Petroleum Products",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["petroleum", "oil products", "fuel products"]
+    },
+    {
+      "code": "7395",
+      "title": "Photofinishing Laboratories and Photo Developing",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["photo lab", "photo developing", "photo printing", "film processing"]
+    },
+    {
+      "code": "7221",
+      "title": "Photographic Studios",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["photography studio", "photo studio", "portrait studio", "photographer"]
+    },
+    {
+      "code": "5044",
+      "title": "Photographic, Photocopy, Microfilm Equipment and Supplies",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["photo equipment", "copier supplies", "imaging equipment"]
+    },
+    {
+      "code": "5131",
+      "title": "Piece Goods, Notions, and Other Dry Goods",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["fabric store", "sewing notions", "dry goods", "textile shop"]
+    },
+    {
+      "code": "5074",
+      "title": "Plumbing and Heating Equipment and Supplies",
+      "level": 1,
+      "category": "home",
+      "searchTerms": ["plumbing supplies", "heating supplies", "plumbing equipment"]
+    },
+    {
+      "code": "8049",
+      "title": "Podiatrists and Chiropodists",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["podiatrist", "foot doctor", "chiropodist", "foot care"]
+    },
+    {
+      "code": "9402",
+      "title": "Postal Services – Government Only",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["post office", "postal service", "mail service"]
+    },
+    {
+      "code": "7992",
+      "title": "Public Golf Courses",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["golf course", "public golf", "golf club", "driving range"]
+    },
+    {
+      "code": "5735",
+      "title": "Record Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["record store", "vinyl shop", "music shop", "CD store"]
+    },
+    {
+      "code": "7999",
+      "title": "Recreation Services (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["recreation", "leisure activities", "entertainment venue"]
+    },
+    {
+      "code": "5973",
+      "title": "Religious Goods Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["religious goods", "church supplies", "spiritual shop"]
+    },
+    {
+      "code": "8661",
+      "title": "Religious Organizations",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["church", "religious organization", "place of worship", "temple", "mosque"]
+    },
+    {
+      "code": "8299",
+      "title": "Schools and Educational Services (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["school", "educational services", "learning center", "tutoring"]
+    },
+    {
+      "code": "5541",
+      "title": "Service Stations (With or without Ancillary Services)",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["gas station", "service station", "filling station", "fuel station"]
+    },
+    {
+      "code": "5949",
+      "title": "Sewing, Needlework, Fabric and Piece Goods Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["fabric store", "sewing shop", "needlework supplies", "quilting shop"]
+    },
+    {
+      "code": "7251",
+      "title": "Shoe Repair Shops, Shoe Shine Parlors",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["shoe repair", "cobbler", "shoe shine", "shoe service"]
+    },
+    {
+      "code": "5661",
+      "title": "Shoe Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["shoe store", "footwear shop", "shoe shop"]
+    },
+    {
+      "code": "2842",
+      "title": "Specialty Cleaning, Polishing and Sanitation Preparations",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["cleaning supplies", "sanitation products", "janitorial supplies"]
+    },
+    {
+      "code": "7032",
+      "title": "Sporting and Recreational Camps",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["sports camp", "recreational camp", "summer camp", "athletic camp"]
+    },
+    {
+      "code": "5941",
+      "title": "Sporting Goods Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["sporting goods", "sports store", "athletic equipment", "sports shop"]
+    },
+    {
+      "code": "5655",
+      "title": "Sports and Riding Apparel Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["sports apparel", "athletic wear", "riding gear", "activewear"]
+    },
+    {
+      "code": "5943",
+      "title": "Stationery Stores, Office and School Supply Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["office supplies", "stationery store", "school supplies"]
+    },
+    {
+      "code": "5111",
+      "title": "Stationery, Office Supplies, Printing and Writing Paper",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["office supplies", "paper products", "stationery"]
+    },
+    {
+      "code": "5697",
+      "title": "Tailors, Seamstresses, Mending, and Alterations",
+      "level": 1,
+      "category": "personal",
+      "searchTerms": ["tailor", "alterations", "seamstress", "clothing alterations"]
+    },
+    {
+      "code": "9311",
+      "title": "Tax Payments",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["tax payment", "IRS payment", "property tax"]
+    },
+    {
+      "code": "7276",
+      "title": "Tax Preparation Services",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["tax preparation", "tax preparer", "tax service", "accountant"]
+    },
+    {
+      "code": "7534",
+      "title": "Tire Retreading and Repair Shops",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["tire repair", "tire retreading", "tire service"]
+    },
+    {
+      "code": "4784",
+      "title": "Tolls and Bridge Fees",
+      "level": 1,
+      "category": "transportation",
+      "searchTerms": ["toll booth", "bridge toll", "road toll"]
+    },
+    {
+      "code": "7033",
+      "title": "Trailer Parks and Campgrounds",
+      "level": 1,
+      "category": "other",
+      "searchTerms": ["campground", "RV park", "trailer park", "camping"]
+    },
+    {
+      "code": "4789",
+      "title": "Transportation Services (Not Elsewhere Classified)",
+      "level": 1,
+      "category": "transportation",
+      "searchTerms": ["transportation", "shuttle service", "transit"]
+    },
+    {
+      "code": "2791",
+      "title": "Typesetting, Plate Making and Related Services",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["typesetting", "printing services", "plate making"]
+    },
+    {
+      "code": "5978",
+      "title": "Typewriter Stores – Sales, Rentals, and Service",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["typewriter repair", "office machines", "typewriter service"]
+    },
+    {
+      "code": "5931",
+      "title": "Used Merchandise and Secondhand Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["thrift store", "secondhand shop", "consignment", "used goods"]
+    },
+    {
+      "code": "4900",
+      "title": "Utilities – Electric, Gas, Water, and Sanitary",
+      "level": 1,
+      "category": "utilities",
+      "searchTerms": ["utility company", "electric company", "water utility", "gas company"]
+    },
+    {
+      "code": "5331",
+      "title": "Variety Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["variety store", "dollar store", "discount store", "five and dime"]
+    },
+    {
+      "code": "742",
+      "title": "Veterinary Services",
+      "level": 1,
+      "category": "healthcare",
+      "searchTerms": ["veterinarian", "vet clinic", "animal hospital", "pet clinic"]
+    },
+    {
+      "code": "7993",
+      "title": "Video Amusement Game Supplies",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["arcade supplies", "video game equipment", "amusement games"]
+    },
+    {
+      "code": "7994",
+      "title": "Video Game Arcades/Establishments",
+      "level": 1,
+      "category": "entertainment",
+      "searchTerms": ["arcade", "video game arcade", "gaming center"]
+    },
+    {
+      "code": "8249",
+      "title": "Vocational and Trade Schools",
+      "level": 1,
+      "category": "education",
+      "searchTerms": ["trade school", "vocational school", "technical school"]
+    },
+    {
+      "code": "7631",
+      "title": "Watch, Clock and Jewelry Repair",
+      "level": 1,
+      "category": "services",
+      "searchTerms": ["watch repair", "jewelry repair", "clock repair"]
+    },
+    {
+      "code": "5698",
+      "title": "Wig and Toupee Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["wig shop", "hair pieces", "toupee store"]
+    },
+    {
+      "code": "5631",
+      "title": "Women's Accessory and Specialty Shops",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["women's accessories", "ladies accessories", "fashion accessories"]
+    },
+    {
+      "code": "5621",
+      "title": "Women's Ready-To-Wear Stores",
+      "level": 1,
+      "category": "retail",
+      "searchTerms": ["women's clothing", "ladies fashion", "women's apparel"]
+    },
+    {
+      "code": "5935",
+      "title": "Wrecking and Salvage Yards",
+      "level": 1,
+      "category": "automotive",
+      "searchTerms": ["salvage yard", "junkyard", "auto wrecking", "car salvage"]
+    },
+    {
+      "code": "8931",
+      "title": "Accounting, Auditing, and Bookkeeping Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["accountant", "bookkeeper", "CPA", "accounting firm", "auditor"]
+    },
+    {
+      "code": "7311",
+      "title": "Advertising Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["advertising agency", "marketing agency", "ad agency"]
+    },
+    {
+      "code": "7623",
+      "title": "Air Conditioning and Refrigeration Repair Shops",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["AC repair", "refrigeration repair", "HVAC service"]
+    },
+    {
+      "code": "5937",
+      "title": "Antique Reproductions",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["antique reproductions", "replica furniture", "vintage reproductions"]
+    },
+    {
+      "code": "5932",
+      "title": "Antique Shops – Sales, Repairs, and Restoration Services",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["antique shop", "antique store", "antiques dealer"]
+    },
+    {
+      "code": "8911",
+      "title": "Architectural, Engineering, and Surveying Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["architect", "engineering firm", "surveyor", "architectural services"]
+    },
+    {
+      "code": "5971",
+      "title": "Art Dealers and Galleries",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["art gallery", "art dealer", "fine art", "art studio"]
+    },
+    {
+      "code": "7512",
+      "title": "Automobile Rental Agency",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["car rental", "auto rental", "vehicle rental"]
+    },
+    {
+      "code": "7531",
+      "title": "Automotive Body Repair Shops",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["body shop", "collision repair", "auto body", "car body repair"]
+    },
+    {
+      "code": "7535",
+      "title": "Automotive Paint Shops",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["auto paint", "car painting", "vehicle painting"]
+    },
+    {
+      "code": "7929",
+      "title": "Bands, Orchestras, and Miscellaneous Entertainers",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["band", "orchestra", "entertainer", "musician", "DJ"]
+    },
+    {
+      "code": "7932",
+      "title": "Billiard and Pool Establishments",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["pool hall", "billiards", "snooker club"]
+    },
+    {
+      "code": "5551",
+      "title": "Boat Dealers",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["boat dealer", "marine dealer", "boat sales", "yacht dealer"]
+    },
+    {
+      "code": "4457",
+      "title": "Boat Rentals and Leasing",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["boat rental", "yacht charter", "boat lease"]
+    },
+    {
+      "code": "4131",
+      "title": "Bus Lines",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["bus company", "charter bus", "bus line", "coach service"]
+    },
+    {
+      "code": "7399",
+      "title": "Business Services (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["business services", "consulting", "professional services"]
+    },
+    {
+      "code": "5561",
+      "title": "Camper, Recreational and Utility Trailer Dealers",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["RV dealer", "camper sales", "trailer dealer"]
+    },
+    {
+      "code": "5511",
+      "title": "Car and Truck Dealers (New and Used)",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["car dealer", "auto dealer", "car dealership", "truck dealer"]
+    },
+    {
+      "code": "5521",
+      "title": "Car and Truck Dealers (Used Only)",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["used car dealer", "pre-owned vehicles", "used auto sales"]
+    },
+    {
+      "code": "1750",
+      "title": "Carpentry Contractors",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["carpenter", "carpentry", "woodworking contractor"]
+    },
+    {
+      "code": "5811",
+      "title": "Caterers",
+      "level": 2,
+      "category": "food",
+      "searchTerms": ["catering", "caterer", "event catering", "food service"]
+    },
+    {
+      "code": "5169",
+      "title": "Chemicals and Allied Products",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["chemical supplier", "industrial chemicals", "chemical products"]
+    },
+    {
+      "code": "8641",
+      "title": "Civic, Social, and Fraternal Associations",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["civic organization", "social club", "fraternal organization"]
+    },
+    {
+      "code": "7349",
+      "title": "Cleaning, Maintenance, and Janitorial Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["janitorial", "cleaning service", "commercial cleaning", "maintenance"]
+    },
+    {
+      "code": "5046",
+      "title": "Commercial Equipment (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["commercial equipment", "business equipment", "industrial equipment"]
+    },
+    {
+      "code": "7333",
+      "title": "Commercial Photography, Art, and Graphics",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["commercial photography", "graphic design", "commercial art"]
+    },
+    {
+      "code": "7941",
+      "title": "Commercial Sports, Professional Sports Clubs",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["sports club", "athletic club", "sports team", "fitness club"]
+    },
+    {
+      "code": "5045",
+      "title": "Computers and Computer Peripheral Equipment and Software",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["computer store", "IT equipment", "computer sales"]
+    },
+    {
+      "code": "1771",
+      "title": "Concrete Work Contractors",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["concrete contractor", "cement work", "concrete services"]
+    },
+    {
+      "code": "5039",
+      "title": "Construction Materials (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["construction supplies", "building materials", "contractor supplies"]
+    },
+    {
+      "code": "7277",
+      "title": "Counseling Services – Debt, Marriage, and Personal",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["counselor", "therapist", "counseling", "life coach"]
+    },
+    {
+      "code": "7911",
+      "title": "Dance Halls, Studios and Schools",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["dance studio", "dance school", "dance lessons"]
+    },
+    {
+      "code": "7393",
+      "title": "Detective Agencies, Protective Services, and Security Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["security company", "private investigator", "security guard", "detective"]
+    },
+    {
+      "code": "5817",
+      "title": "Digital Goods – Applications",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["software apps", "digital applications", "mobile apps"]
+    },
+    {
+      "code": "5816",
+      "title": "Digital Goods – Games",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["video games", "digital games", "game downloads"]
+    },
+    {
+      "code": "5818",
+      "title": "Digital Goods – Large Digital Goods Merchant",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["digital products", "digital downloads", "software sales"]
+    },
+    {
+      "code": "5815",
+      "title": "Digital Goods Media – Books, Movies, Music",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["digital media", "ebooks", "digital music", "streaming"]
+    },
+    {
+      "code": "5714",
+      "title": "Drapery, Window Covering, and Upholstery Stores",
+      "level": 2,
+      "category": "home",
+      "searchTerms": ["drapery", "window treatments", "curtains", "upholstery"]
+    },
+    {
+      "code": "5122",
+      "title": "Drugs, Drug Proprietaries, and Druggist Sundries",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["drug wholesaler", "pharmaceutical", "medical supplies"]
+    },
+    {
+      "code": "5552",
+      "title": "Electric Vehicle Charging",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["EV charging", "electric car charging", "charging station"]
+    },
+    {
+      "code": "1731",
+      "title": "Electrical Contractors",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["electrician", "electrical contractor", "electrical services"]
+    },
+    {
+      "code": "7622",
+      "title": "Electronics Repair Shops",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["electronics repair", "device repair", "tech repair"]
+    },
+    {
+      "code": "7361",
+      "title": "Employment Agencies and Temporary Help Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["staffing agency", "temp agency", "employment service", "recruiter"]
+    },
+    {
+      "code": "7394",
+      "title": "Equipment, Tool, Furniture, and Appliance Rental and Leasing",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["equipment rental", "tool rental", "furniture rental"]
+    },
+    {
+      "code": "7342",
+      "title": "Exterminating and Disinfecting Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["pest control", "exterminator", "pest management"]
+    },
+    {
+      "code": "5713",
+      "title": "Floor Covering Stores",
+      "level": 2,
+      "category": "home",
+      "searchTerms": ["flooring store", "carpet store", "tile store", "floor covering"]
+    },
+    {
+      "code": "5983",
+      "title": "Fuel Dealers – Fuel Oil, Wood, Coal, and Liquefied Petroleum",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["fuel dealer", "heating oil", "propane dealer", "firewood"]
+    },
+    {
+      "code": "7261",
+      "title": "Funeral Services and Crematories",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["funeral home", "mortuary", "crematory", "funeral services"]
+    },
+    {
+      "code": "7641",
+      "title": "Furniture – Reupholstery, Repair, and Refinishing",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["furniture repair", "upholstery", "furniture refinishing"]
+    },
+    {
+      "code": "5712",
+      "title": "Furniture, Home Furnishings, and Equipment Stores",
+      "level": 2,
+      "category": "home",
+      "searchTerms": ["furniture store", "home furnishings", "furniture shop"]
+    },
+    {
+      "code": "1520",
+      "title": "General Contractors – Residential and Commercial",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["general contractor", "construction company", "builder", "remodeling"]
+    },
+    {
+      "code": "5975",
+      "title": "Hearing Aids – Sales, Service, and Supply",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["hearing aids", "audiologist", "hearing center"]
+    },
+    {
+      "code": "8062",
+      "title": "Hospitals",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["hospital", "medical center", "healthcare facility"]
+    },
+    {
+      "code": "5085",
+      "title": "Industrial Supplies (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["industrial supplies", "manufacturing supplies", "industrial equipment"]
+    },
+    {
+      "code": "6300",
+      "title": "Insurance Sales, Underwriting, and Premiums",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["insurance agent", "insurance broker", "insurance agency"]
+    },
+    {
+      "code": "5944",
+      "title": "Jewelry Stores, Watches, Clocks, and Silverware Stores",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["jewelry store", "jeweler", "watch store", "fine jewelry"]
+    },
+    {
+      "code": "8111",
+      "title": "Legal Services and Attorneys",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["lawyer", "attorney", "law firm", "legal services"]
+    },
+    {
+      "code": "4111",
+      "title": "Local and Suburban Commuter Passenger Transportation",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["transit", "commuter service", "public transportation"]
+    },
+    {
+      "code": "7392",
+      "title": "Management, Consulting, and Public Relations Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["consultant", "management consulting", "PR firm", "business consultant"]
+    },
+    {
+      "code": "5262",
+      "title": "Marketplaces",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["marketplace", "bazaar", "flea market", "market"]
+    },
+    {
+      "code": "1740",
+      "title": "Masonry, Stonework, Tile Setting, Plastering and Insulation Contractors",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["mason", "tile contractor", "stone work", "plastering"]
+    },
+    {
+      "code": "8071",
+      "title": "Medical and Dental Laboratories",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["medical lab", "dental lab", "laboratory services", "diagnostic lab"]
+    },
+    {
+      "code": "7997",
+      "title": "Membership Clubs (Sports, Recreation, Athletic)",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["country club", "fitness club", "sports club", "athletic club", "gym"]
+    },
+    {
+      "code": "5051",
+      "title": "Metal Service Centers and Offices",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["metal supplier", "steel service", "metal fabrication"]
+    },
+    {
+      "code": "5599",
+      "title": "Miscellaneous Automotive, Aircraft, and Farm Equipment Dealers",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["farm equipment", "aircraft dealer", "equipment dealer"]
+    },
+    {
+      "code": "7299",
+      "title": "Miscellaneous Personal Services (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "personal",
+      "searchTerms": ["personal services", "concierge", "errand service"]
+    },
+    {
+      "code": "5271",
+      "title": "Mobile Home Dealers",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["mobile home dealer", "manufactured homes", "trailer homes"]
+    },
+    {
+      "code": "7829",
+      "title": "Motion Picture and Video Tape Production and Distribution",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["video production", "film production", "movie production"]
+    },
+    {
+      "code": "4214",
+      "title": "Motor Freight Carriers and Trucking",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["trucking company", "freight carrier", "moving company", "logistics"]
+    },
+    {
+      "code": "7519",
+      "title": "Motor Home and Recreational Vehicle Rentals",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["RV rental", "motorhome rental", "camper rental"]
+    },
+    {
+      "code": "5592",
+      "title": "Motor Homes Dealers",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["RV dealer", "motorhome sales", "recreational vehicle dealer"]
+    },
+    {
+      "code": "5571",
+      "title": "Motorcycle Shops and Dealers",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["motorcycle dealer", "bike shop", "motorcycle sales"]
+    },
+    {
+      "code": "8050",
+      "title": "Nursing and Personal Care Facilities",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["nursing home", "care facility", "assisted living", "senior care"]
+    },
+    {
+      "code": "5021",
+      "title": "Office and Commercial Furniture",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["office furniture", "commercial furniture", "business furniture"]
+    },
+    {
+      "code": "5976",
+      "title": "Orthopedic Goods – Prosthetic Devices",
+      "level": 2,
+      "category": "healthcare",
+      "searchTerms": ["orthopedic supplies", "prosthetics", "medical devices"]
+    },
+    {
+      "code": "4112",
+      "title": "Passenger Railways",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["railway", "train service", "passenger rail"]
+    },
+    {
+      "code": "8651",
+      "title": "Political Organizations",
+      "level": 2,
+      "category": "other",
+      "searchTerms": ["political organization", "political party", "PAC"]
+    },
+    {
+      "code": "5094",
+      "title": "Precious Stones and Metals, Watches and Jewelry",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["precious metals", "gold dealer", "diamond dealer", "gems"]
+    },
+    {
+      "code": "8999",
+      "title": "Professional Services (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["professional services", "consulting", "specialist services"]
+    },
+    {
+      "code": "4225",
+      "title": "Public Warehousing and Storage",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["warehouse", "storage facility", "self storage", "warehousing"]
+    },
+    {
+      "code": "7338",
+      "title": "Quick Copy, Reproduction, and Blueprinting Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["copy center", "print shop", "blueprinting", "reproduction"]
+    },
+    {
+      "code": "4011",
+      "title": "Railroads",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["railroad", "freight rail", "railway"]
+    },
+    {
+      "code": "6513",
+      "title": "Real Estate Agents and Managers",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["real estate agent", "realtor", "property management", "real estate broker"]
+    },
+    {
+      "code": "1761",
+      "title": "Roofing, Siding, and Sheet Metal Work Contractors",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["roofing contractor", "roofer", "siding contractor"]
+    },
+    {
+      "code": "5598",
+      "title": "Snowmobile Dealers",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["snowmobile dealer", "snow sports", "powersports"]
+    },
+    {
+      "code": "1799",
+      "title": "Special Trade Contractors (Not Elsewhere Classified)",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["specialty contractor", "trade contractor", "subcontractor"]
+    },
+    {
+      "code": "5972",
+      "title": "Stamp and Coin Stores",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["coin shop", "stamp store", "numismatics", "collectibles"]
+    },
+    {
+      "code": "7339",
+      "title": "Stenographic and Secretarial Support",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["secretarial services", "transcription", "administrative support"]
+    },
+    {
+      "code": "5996",
+      "title": "Swimming Pools – Sales and Service",
+      "level": 2,
+      "category": "home",
+      "searchTerms": ["pool service", "pool store", "swimming pool", "pool contractor"]
+    },
+    {
+      "code": "4121",
+      "title": "Taxicabs and Limousines",
+      "level": 2,
+      "category": "transportation",
+      "searchTerms": ["taxi", "cab company", "limousine service", "car service"]
+    },
+    {
+      "code": "4812",
+      "title": "Telecommunication Equipment and Telephone Sales",
+      "level": 2,
+      "category": "utilities",
+      "searchTerms": ["telecom equipment", "phone sales", "telecommunications"]
+    },
+    {
+      "code": "4814",
+      "title": "Telecommunication Services",
+      "level": 2,
+      "category": "utilities",
+      "searchTerms": ["phone service", "telecommunications", "telecom provider"]
+    },
+    {
+      "code": "4821",
+      "title": "Telegraph Services",
+      "level": 2,
+      "category": "utilities",
+      "searchTerms": ["telegraph", "wire service", "message service"]
+    },
+    {
+      "code": "5998",
+      "title": "Tent and Awning Shops",
+      "level": 2,
+      "category": "retail",
+      "searchTerms": ["tent shop", "awning store", "canopy", "shade structures"]
+    },
+    {
+      "code": "7922",
+      "title": "Ticket Agencies and Theatrical Producers",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["ticket agency", "box office", "event tickets", "theater producer"]
+    },
+    {
+      "code": "7991",
+      "title": "Tourist Attractions and Exhibits",
+      "level": 2,
+      "category": "entertainment",
+      "searchTerms": ["tourist attraction", "museum", "exhibit", "landmark"]
+    },
+    {
+      "code": "7549",
+      "title": "Towing Services",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["tow truck", "towing service", "roadside assistance"]
+    },
+    {
+      "code": "7513",
+      "title": "Truck and Utility Trailer Rentals",
+      "level": 2,
+      "category": "automotive",
+      "searchTerms": ["truck rental", "trailer rental", "moving truck"]
+    },
+    {
+      "code": "7692",
+      "title": "Welding Services",
+      "level": 2,
+      "category": "services",
+      "searchTerms": ["welding", "welder", "metal fabrication", "welding shop"]
+    }
+  ]
+}

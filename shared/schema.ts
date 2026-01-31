@@ -1874,3 +1874,135 @@ export const insertExtractionCorrectionSchema = createInsertSchema(extractionCor
 });
 export type InsertExtractionCorrection = z.infer<typeof insertExtractionCorrectionSchema>;
 export type ExtractionCorrection = typeof extractionCorrections.$inferSelect;
+
+// ============================================
+// AI-Powered Prospect Finder
+// ============================================
+
+export const PROSPECT_STATUSES = [
+  "discovered",
+  "contacted", 
+  "qualified",
+  "proposal_sent",
+  "negotiating",
+  "won",
+  "lost",
+  "disqualified"
+] as const;
+export type ProspectStatus = typeof PROSPECT_STATUSES[number];
+
+export const PROSPECT_SOURCES = ["ai_search", "manual", "import"] as const;
+export type ProspectSource = typeof PROSPECT_SOURCES[number];
+
+export const prospects = pgTable("prospects", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  
+  businessName: varchar("business_name", { length: 255 }).notNull(),
+  dbaName: varchar("dba_name", { length: 255 }),
+  addressLine1: varchar("address_line1", { length: 255 }),
+  addressLine2: varchar("address_line2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  zipCode: varchar("zip_code", { length: 10 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  website: varchar("website", { length: 500 }),
+  
+  mccCode: varchar("mcc_code", { length: 4 }),
+  mccDescription: varchar("mcc_description", { length: 255 }),
+  businessType: varchar("business_type", { length: 100 }),
+  riskLevel: integer("risk_level").default(1),
+  
+  source: varchar("source", { length: 50 }).default("ai_search"),
+  aiConfidenceScore: numeric("ai_confidence_score", { precision: 3, scale: 2 }),
+  searchQuery: text("search_query"),
+  
+  status: varchar("status", { length: 20 }).default("discovered").notNull(),
+  
+  lastContactDate: timestamp("last_contact_date"),
+  nextFollowupDate: timestamp("next_followup_date"),
+  contactAttempts: integer("contact_attempts").default(0),
+  notes: text("notes"),
+  
+  convertedToMerchantId: integer("converted_to_merchant_id").references(() => merchants.id),
+  convertedAt: timestamp("converted_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const prospectsRelations = relations(prospects, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [prospects.organizationId],
+    references: [organizations.id],
+  }),
+  convertedMerchant: one(merchants, {
+    fields: [prospects.convertedToMerchantId],
+    references: [merchants.id],
+  }),
+  activities: many(prospectActivities),
+}));
+
+export const insertProspectSchema = createInsertSchema(prospects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProspect = z.infer<typeof insertProspectSchema>;
+export type Prospect = typeof prospects.$inferSelect;
+
+export const prospectActivities = pgTable("prospect_activities", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  prospectId: integer("prospect_id").notNull().references(() => prospects.id, { onDelete: "cascade" }),
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const prospectActivitiesRelations = relations(prospectActivities, ({ one }) => ({
+  prospect: one(prospects, {
+    fields: [prospectActivities.prospectId],
+    references: [prospects.id],
+  }),
+}));
+
+export const insertProspectActivitySchema = createInsertSchema(prospectActivities).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProspectActivity = z.infer<typeof insertProspectActivitySchema>;
+export type ProspectActivity = typeof prospectActivities.$inferSelect;
+
+export const prospectSearches = pgTable("prospect_searches", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  zipCode: varchar("zip_code", { length: 10 }).notNull(),
+  businessTypes: text("business_types").array(),
+  radiusMiles: integer("radius_miles").default(10),
+  resultsCount: integer("results_count"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const prospectSearchesRelations = relations(prospectSearches, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [prospectSearches.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertProspectSearchSchema = createInsertSchema(prospectSearches).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProspectSearch = z.infer<typeof insertProspectSearchSchema>;
+export type ProspectSearch = typeof prospectSearches.$inferSelect;
