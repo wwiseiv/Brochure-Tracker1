@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
   QrCode, MapPin, Mic, Bell, CheckCircle2, ArrowRight, Package, GraduationCap, 
-  Users, TrendingUp, FileSignature, Brain, Presentation, Cpu, Sparkles, Store
+  Users, TrendingUp, FileSignature, Brain, Presentation, Cpu, Sparkles, Store,
+  Search, Camera, Navigation, Globe
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import pcbLogoLight from "@/assets/pcb_logo_light.png";
@@ -27,6 +28,29 @@ const coreFeatures = [
     icon: Package,
     title: "Inventory Control",
     description: "Full chain of custody tracking with low-stock alerts and transfers",
+  },
+];
+
+const prospectingFeatures = [
+  {
+    icon: Search,
+    title: "AI Prospect Finder",
+    description: "Discover local businesses using AI-powered web search with MCC code filtering",
+  },
+  {
+    icon: Camera,
+    title: "Business Card Scanner",
+    description: "Snap a photo of any business card to instantly add prospects with AI OCR",
+  },
+  {
+    icon: Navigation,
+    title: "Maps Integration",
+    description: "Get directions to prospects and make calls with one tap from your pipeline",
+  },
+  {
+    icon: Globe,
+    title: "Territory Builder",
+    description: "Build and manage your sales pipeline with claim tracking and follow-ups",
   },
 ];
 
@@ -131,6 +155,28 @@ export default function LandingPage() {
               <Card key={index} className="p-4 flex flex-col items-center text-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Icon className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </div>
+              </Card>
+            );
+          })}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold text-center mb-2">AI-Powered Prospecting</h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">Find new merchants and build your pipeline faster</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {prospectingFeatures.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <Card key={index} className="p-4 flex flex-col items-center text-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-6 h-6 text-blue-500" />
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">{feature.title}</h3>
