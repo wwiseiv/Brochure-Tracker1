@@ -36,6 +36,7 @@ import ESignRequestDetailPage from "@/pages/esign-request-detail";
 import CompleteProfilePage from "@/pages/complete-profile";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
+import { FloatingHelpButton } from "@/components/BottomNav";
 
 import { useLocation } from "wouter";
 
@@ -121,8 +122,10 @@ function RMRoute() {
 
 function AuthenticatedRouter() {
   return (
-    <Switch>
-      <Route path="/" component={DashboardPage} />
+    <>
+      <FloatingHelpButton />
+      <Switch>
+        <Route path="/" component={DashboardPage} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/team" component={TeamManagementRoute} />
       <Route path="/manager" component={RMRoute} />
@@ -150,7 +153,8 @@ function AuthenticatedRouter() {
       <Route path="/help" component={HelpPage} />
       <Route path="/email" component={EmailDrafterPage} />
       <Route component={NotFound} />
-    </Switch>
+      </Switch>
+    </>
   );
 }
 
