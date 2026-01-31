@@ -56,7 +56,15 @@ import {
   Search,
   X,
   FileSignature,
-  GraduationCap
+  GraduationCap,
+  Calculator,
+  FileSpreadsheet,
+  DollarSign,
+  Rocket,
+  Star,
+  Copy,
+  FileDown,
+  Upload
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -763,6 +771,57 @@ export default function HelpPage() {
     },
   ];
 
+  const statementAnalyzerFeatures: HelpItem[] = [
+    {
+      title: "Upload Statements",
+      description: "Upload merchant processing statements (PDF, images, Excel/CSV). AI automatically extracts all the key data - volumes, rates, fees, and more.",
+      link: "/coach",
+      icon: <Upload className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "AI Data Extraction",
+      description: "Gemini AI reads statements and pulls out card volumes, effective rates, monthly fees, and processor markup. No manual data entry needed.",
+      link: "/coach",
+      icon: <Brain className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Configure Pricing",
+      description: "Set your pricing before analysis: Dual Pricing monthly fee, IC+ markup rates, or Surcharge percentages. AI calculates savings with your rates.",
+      link: "/coach",
+      icon: <DollarSign className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Red Flag Detection",
+      description: "AI identifies issues: high effective rates, hidden fees, expensive equipment leases, and PCI compliance charges. Know what to pitch against.",
+      link: "/coach",
+      icon: <AlertCircle className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Competitor Insights",
+      description: "Get talking points for Square, Stripe, Clover, Heartland, Worldpay, and First Data. Know each processor's weaknesses.",
+      link: "/coach",
+      icon: <Target className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Sales Scripts",
+      description: "Get ready-to-use scripts: opening statements, discovery questions, objection handlers with expandable responses, and closing statements.",
+      link: "/coach",
+      icon: <MessageSquare className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Export Options",
+      description: "Copy for email/CRM, export to Excel (multi-sheet), save as PDF, or generate Word documents for agents or merchants.",
+      link: "/coach",
+      icon: <FileDown className="w-5 h-5 text-rose-600" />,
+    },
+    {
+      title: "Self-Improving AI",
+      description: "The system learns from past extractions. Mark results as 'Looks Good' or report issues - AI uses feedback to improve future accuracy.",
+      link: "/coach",
+      icon: <Sparkles className="w-5 h-5 text-rose-600" />,
+    },
+  ];
+
   const presentationFeatures: HelpItem[] = [
     {
       title: "8 Training Modules",
@@ -837,6 +896,93 @@ export default function HelpPage() {
           )}
         </div>
 
+        {!searchQuery && (
+          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Rocket className="w-5 h-5 text-primary" />
+                Quick Links
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("statement")}
+                  data-testid="quicklink-statement"
+                >
+                  <FileSpreadsheet className="w-3 h-3 mr-1" />
+                  Statement Analyzer
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("proposal")}
+                  data-testid="quicklink-proposal"
+                >
+                  <FileText className="w-3 h-3 mr-1" />
+                  Proposals
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("e-sign")}
+                  data-testid="quicklink-esign"
+                >
+                  <FileSignature className="w-3 h-3 mr-1" />
+                  E-Signatures
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("coach")}
+                  data-testid="quicklink-coach"
+                >
+                  <Brain className="w-3 h-3 mr-1" />
+                  AI Coach
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("equipiq")}
+                  data-testid="quicklink-equipiq"
+                >
+                  <Package className="w-3 h-3 mr-1" />
+                  EquipIQ
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("drop")}
+                  data-testid="quicklink-drops"
+                >
+                  <ClipboardList className="w-3 h-3 mr-1" />
+                  Drops
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("offline")}
+                  data-testid="quicklink-offline"
+                >
+                  <WifiOff className="w-3 h-3 mr-1" />
+                  Offline Mode
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setSearchQuery("presentation")}
+                  data-testid="quicklink-training"
+                >
+                  <GraduationCap className="w-3 h-3 mr-1" />
+                  Training
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {(() => {
           const query = searchQuery.toLowerCase().trim();
           
@@ -848,6 +994,7 @@ export default function HelpPage() {
             { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
             { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
             { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users" },
+            { title: "Statement Analyzer", description: "Upload merchant statements, extract data with AI, identify savings opportunities, and generate sales scripts.", items: statementAnalyzerFeatures, badge: "Sales Tool" },
             { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users" },
             { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users" },
             { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
@@ -1079,7 +1226,121 @@ export default function HelpPage() {
                   AI analyzes your interactions with each merchant - visit frequency, notes, outcomes - and predicts how likely they are to convert. Higher scores mean hotter prospects. Use lead scores to prioritize your follow-up efforts.
                 </AccordionContent>
               </AccordionItem>
+              <AccordionItem value="item-17">
+                <AccordionTrigger className="text-sm">How do I analyze a merchant's processing statement?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Go to Coach {">"} Statement Analyzer. Upload the merchant's statement (PDF, image, or Excel file). AI extracts volumes, rates, and fees automatically. Configure your pricing, then click Analyze to see savings, red flags, and get ready-to-use sales scripts.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-18">
+                <AccordionTrigger className="text-sm">What file types can Statement Analyzer handle?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Statement Analyzer accepts <strong>PDF</strong> files, <strong>images</strong> (JPG, PNG), and <strong>Excel/CSV</strong> files. For best results, upload clear, readable PDFs. If the merchant only has paper statements, take a photo - AI can read images too.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-19">
+                <AccordionTrigger className="text-sm">How do I send documents for e-signature?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Go to E-Sign Documents from the Coach page. Select a template (application, agreement, etc.), add signer emails, and click Send. SignNow emails the merchant a secure link. Track status in real-time: Sent, Viewed, Signed, or Declined.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-20">
+                <AccordionTrigger className="text-sm">How do I create a professional proposal?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Use the Proposal Generator from the Coach page. Upload pricing PDFs, select equipment from the catalog, and choose your output format: Claude AI (professional write-up), Replit Native (fast PDF/Word), or Gamma (AI-designed presentation). Get branded proposals in seconds.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-21">
+                <AccordionTrigger className="text-sm">What are the export options in Statement Analyzer?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  <strong>Copy for Email:</strong> Plain text for pasting into email/CRM.<br/>
+                  <strong>Export to Excel:</strong> Multi-sheet workbook with analysis, issues, and scripts.<br/>
+                  <strong>Save as PDF:</strong> Print-ready document.<br/>
+                  <strong>Agent Word:</strong> Full analysis for your records.<br/>
+                  <strong>Merchant Word:</strong> Clean version to share with merchants.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-22">
+                <AccordionTrigger className="text-sm">How does the AI learning system improve over time?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  When Statement Analyzer extracts data, you can mark it "Looks Good" (correct) or "Report Issue" (needs fixing). Your feedback trains the AI. Over time, it recognizes processor formats better and makes fewer mistakes. Past extractions help improve future ones.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-23">
+                <AccordionTrigger className="text-sm">Can I set my own pricing for savings calculations?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Yes! Before analyzing a statement, expand the Pricing Configuration panel. Set your Dual Pricing monthly fee, IC+ markup, Surcharge rate, or use Quick Presets (Standard, Aggressive, Premium). AI uses your rates to calculate potential savings.
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-500" />
+              Pro Tips
+            </CardTitle>
+            <CardDescription>
+              Power-user shortcuts to work faster
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">Quick Statement Analysis</p>
+                <p className="text-muted-foreground">Set up your pricing presets once, then use "Upload & Analyze" to extract data and calculate savings in one step.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Copy className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">Copy Sales Scripts</p>
+                <p className="text-muted-foreground">After analyzing a statement, use "Copy for Email" to quickly paste talking points into your email or CRM notes.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Mic className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">Voice-First Workflow</p>
+                <p className="text-muted-foreground">Use voice notes in drops and voice chat in AI Coach. It's faster than typing and captures more details.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Calculator className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">Customize Pricing</p>
+                <p className="text-muted-foreground">Use "Aggressive" pricing preset to show maximum savings, or set your own rates to match your actual offering.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Brain className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">AI Coach Before Calls</p>
+                <p className="text-muted-foreground">Do a quick role-play before important meetings. Practice objection handling for the specific merchant type.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium">Daily Edge + Coffee</p>
+                <p className="text-muted-foreground">Start each morning with Daily Edge content. 5 minutes of mindset training compounds into major sales performance gains.</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
