@@ -399,4 +399,28 @@
   [role="tablist"] {
     display: none !important;
   }
+
+  /* Agent-only content - hidden in merchant PDF mode */
+  body.print-merchant-mode .agent-only-content {
+    display: none !important;
+  }
+
+  /* Better page break control for statement analyzer */
+  .statement-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 1rem;
+  }
+
+  /* Force page break before specific sections */
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Compact cards for print */
+  .print-compact {
+    padding: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
 }

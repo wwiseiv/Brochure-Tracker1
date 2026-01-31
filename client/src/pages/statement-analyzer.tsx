@@ -775,12 +775,27 @@ ${new Date().toLocaleDateString()}
     });
   };
 
-  const downloadPDF = () => {
-    window.print();
-    toast({ 
-      title: "Print Dialog Opened", 
-      description: "Select 'Save as PDF' to download a shareable document" 
-    });
+  const downloadAgentPDF = () => {
+    document.body.classList.remove("print-merchant-mode");
+    setTimeout(() => {
+      window.print();
+      toast({ 
+        title: "Agent PDF", 
+        description: "Includes all sales talking points, AI insights, and competitor intelligence" 
+      });
+    }, 100);
+  };
+
+  const downloadMerchantPDF = () => {
+    document.body.classList.add("print-merchant-mode");
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("print-merchant-mode");
+      toast({ 
+        title: "Merchant PDF", 
+        description: "Clean version for sharing with the merchant" 
+      });
+    }, 100);
   };
 
   const handleQuickFill = (type: keyof typeof quickFillExamples) => {
@@ -1570,12 +1585,22 @@ ${new Date().toLocaleDateString()}
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={downloadPDF}
+                    onClick={downloadAgentPDF}
                     className="gap-2"
-                    data-testid="button-download-pdf"
+                    data-testid="button-download-agent-pdf"
                   >
                     <Download className="h-4 w-4" />
-                    Save as PDF
+                    Agent PDF
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={downloadMerchantPDF}
+                    className="gap-2"
+                    data-testid="button-download-merchant-pdf"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Merchant PDF
                   </Button>
                   <Button 
                     variant="ghost" 
@@ -1593,7 +1618,7 @@ ${new Date().toLocaleDateString()}
           </Card>
 
           {/* Savings Hero */}
-          <Card className="bg-gradient-to-r from-green-500 to-emerald-600 border-0 text-white overflow-hidden">
+          <Card className="bg-gradient-to-r from-green-500 to-emerald-600 border-0 text-white overflow-hidden statement-section">
             <CardContent className="p-6">
               <div className="text-center mb-6">
                 <p className="text-green-100 text-sm font-medium uppercase tracking-wide">Maximum Savings Opportunity</p>
@@ -1628,9 +1653,9 @@ ${new Date().toLocaleDateString()}
             </CardContent>
           </Card>
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-2 gap-6 print:grid-cols-1">
             {/* Cost Breakdown */}
-            <Card>
+            <Card className="statement-section">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
@@ -1682,7 +1707,7 @@ ${new Date().toLocaleDateString()}
             </Card>
 
             {/* PCBancard Options */}
-            <Card>
+            <Card className="statement-section">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5" />
@@ -1751,7 +1776,7 @@ ${new Date().toLocaleDateString()}
           </div>
 
           {/* Rate Comparison Visual */}
-          <Card>
+          <Card className="statement-section">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
@@ -1817,7 +1842,7 @@ ${new Date().toLocaleDateString()}
 
           {/* Red Flags */}
           {results.analysis.redFlags.length > 0 && (
-            <Card className="border-red-200 dark:border-red-800">
+            <Card className="border-red-200 dark:border-red-800 statement-section">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300">
                   <AlertTriangle className="h-5 w-5" />
@@ -1854,8 +1879,8 @@ ${new Date().toLocaleDateString()}
             </Card>
           )}
 
-          {/* Talking Points */}
-          <Card>
+          {/* Talking Points - Agent Only */}
+          <Card className="agent-only-content statement-section">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
@@ -2025,7 +2050,7 @@ ${new Date().toLocaleDateString()}
           </Card>
 
           {/* Value Propositions */}
-          <Card>
+          <Card className="statement-section">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5" />
@@ -2044,9 +2069,9 @@ ${new Date().toLocaleDateString()}
             </CardContent>
           </Card>
 
-          {/* AI Analysis (if enabled) */}
+          {/* AI Analysis (if enabled) - Agent Only */}
           {results.aiAnalysis && (
-            <Card className="border-purple-200 dark:border-purple-800">
+            <Card className="border-purple-200 dark:border-purple-800 agent-only-content statement-section">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
                   <Sparkles className="h-5 w-5" />
@@ -2083,9 +2108,9 @@ ${new Date().toLocaleDateString()}
             </Card>
           )}
 
-          {/* Competitor Insights (if available) */}
+          {/* Competitor Insights (if available) - Agent Only */}
           {results.competitorInsights && (
-            <Card>
+            <Card className="agent-only-content statement-section">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5" />
