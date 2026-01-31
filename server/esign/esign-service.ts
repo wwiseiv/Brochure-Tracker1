@@ -64,8 +64,8 @@ export class ESignatureService {
 
   private initializeProviders() {
     // Initialize provider configurations from environment
-    // SignNow requires client id, client secret, AND password to be fully configured
-    if (process.env.SIGNNOW_CLIENT_ID && process.env.SIGNNOW_CLIENT_SECRET && process.env.SIGNNOW_PASSWORD) {
+    // SignNow requires client id, client secret, username, AND password to be fully configured
+    if (process.env.SIGNNOW_CLIENT_ID && process.env.SIGNNOW_CLIENT_SECRET && process.env.SIGNNOW_USERNAME && process.env.SIGNNOW_PASSWORD) {
       this.providers.set("signnow", {
         clientId: process.env.SIGNNOW_CLIENT_ID,
         clientSecret: process.env.SIGNNOW_CLIENT_SECRET,
@@ -332,10 +332,10 @@ export class ESignatureService {
     }
 
     const password = process.env.SIGNNOW_PASSWORD;
-    const username = "wwiseiv@gmail.com"; // TODO: Make configurable
+    const username = process.env.SIGNNOW_USERNAME;
     
-    if (!password) {
-      console.error("[SignNow] Missing password");
+    if (!password || !username) {
+      console.error("[SignNow] Missing username or password");
       return null;
     }
 
