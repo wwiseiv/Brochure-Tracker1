@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RoleplayScenario, RoleplaySession, UserPermissions } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -613,14 +614,21 @@ function DailyEdgeSection() {
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsChatOpen(false)}
-              data-testid="button-close-daily-edge-chat"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsChatOpen(false)}
+                  data-testid="button-close-daily-edge-chat"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Close chat</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1335,14 +1343,21 @@ export default function CoachPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 bg-background border-b px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleBack}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleBack}
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Go back</p>
+            </TooltipContent>
+          </Tooltip>
           <div className="flex-1">
             <h1 className="text-lg font-semibold flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
@@ -1350,19 +1365,26 @@ export default function CoachPage() {
             </h1>
           </div>
           {sessionId && !showFeedback && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => endSessionMutation.mutate()}
-              disabled={endSessionMutation.isPending}
-              data-testid="button-end-session"
-            >
-              {endSessionMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "End Session"
-              )}
-            </Button>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => endSessionMutation.mutate()}
+                  disabled={endSessionMutation.isPending}
+                  data-testid="button-end-session"
+                >
+                  {endSessionMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "End Session"
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>End coaching session</p>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
       </header>
@@ -1724,23 +1746,30 @@ export default function CoachPage() {
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       {msg.role === "assistant" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 h-7 text-xs"
-                          onClick={() => handleSpeak(msg.content)}
-                          disabled={speakMutation.isPending || isPlaying}
-                          data-testid="button-speak"
-                        >
-                          {speakMutation.isPending ? (
-                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                          ) : isPlaying ? (
-                            <Pause className="w-3 h-3 mr-1" />
-                          ) : (
-                            <Volume2 className="w-3 h-3 mr-1" />
-                          )}
-                          {isPlaying ? "Playing..." : "Listen"}
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-2 h-7 text-xs"
+                              onClick={() => handleSpeak(msg.content)}
+                              disabled={speakMutation.isPending || isPlaying}
+                              data-testid="button-speak"
+                            >
+                              {speakMutation.isPending ? (
+                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                              ) : isPlaying ? (
+                                <Pause className="w-3 h-3 mr-1" />
+                              ) : (
+                                <Volume2 className="w-3 h-3 mr-1" />
+                              )}
+                              {isPlaying ? "Playing..." : "Listen"}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Listen to response</p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>
@@ -1815,28 +1844,42 @@ export default function CoachPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Button
-                      size="icon"
-                      variant={isRecording ? "destructive" : "outline"}
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={isTranscribing || sendMessageMutation.isPending}
-                      data-testid="button-mic"
-                      className={isRecording ? "animate-pulse" : ""}
-                    >
-                      {isTranscribing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Mic className="w-4 h-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      onClick={handleSend}
-                      disabled={!inputMessage.trim() || sendMessageMutation.isPending || isRecording || isTranscribing}
-                      data-testid="button-send"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant={isRecording ? "destructive" : "outline"}
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={isTranscribing || sendMessageMutation.isPending}
+                          data-testid="button-mic"
+                          className={isRecording ? "animate-pulse" : ""}
+                        >
+                          {isTranscribing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Mic className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isRecording ? "Stop recording" : "Start voice recording"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          onClick={handleSend}
+                          disabled={!inputMessage.trim() || sendMessageMutation.isPending || isRecording || isTranscribing}
+                          data-testid="button-send"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Send message</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
                 </div>

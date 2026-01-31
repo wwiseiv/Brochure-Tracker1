@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ExtractedCardData {
   businessName?: string;
@@ -171,14 +172,21 @@ export default function BusinessCardScanner() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3 p-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/prospects/pipeline")}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setLocation("/prospects/pipeline")}
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Go back</p>
+            </TooltipContent>
+          </Tooltip>
           <div>
             <h1 className="font-semibold">Scan Business Card</h1>
             <p className="text-xs text-muted-foreground">Add prospect from card photo</p>
@@ -209,19 +217,33 @@ export default function BusinessCardScanner() {
               </p>
             </div>
             <div className="flex flex-col gap-3 max-w-xs mx-auto">
-              <Button onClick={handleCapture} className="w-full" data-testid="button-take-photo">
-                <Camera className="w-4 h-4 mr-2" />
-                Take Photo
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleCapture}
-                className="w-full"
-                data-testid="button-upload-photo"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Image
-              </Button>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleCapture} className="w-full" data-testid="button-take-photo">
+                    <Camera className="w-4 h-4 mr-2" />
+                    Take Photo
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Take photo of business card</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={handleCapture}
+                    className="w-full"
+                    data-testid="button-upload-photo"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Image
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Upload business card image</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="pt-4 border-t">
               <p className="text-xs text-muted-foreground">
@@ -248,17 +270,31 @@ export default function BusinessCardScanner() {
                 )}
               </div>
               <div className="flex gap-2 mt-3">
-                <Button variant="outline" onClick={handleReset} className="flex-1" data-testid="button-retake">
-                  Retake
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleCapture}
-                  className="flex-1"
-                  data-testid="button-choose-another"
-                >
-                  Choose Another
-                </Button>
+                <Tooltip delayDuration={700}>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" onClick={handleReset} className="flex-1" data-testid="button-retake">
+                      Retake
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Retake photo</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={700}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={handleCapture}
+                      className="flex-1"
+                      data-testid="button-choose-another"
+                    >
+                      Choose Another
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Choose another image</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </Card>
 
@@ -412,24 +448,31 @@ export default function BusinessCardScanner() {
 
       {extractedData && editedData && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
-          <Button
-            onClick={handleSave}
-            disabled={saveMutation.isPending || !editedData.businessName}
-            className="w-full"
-            data-testid="button-save-prospect"
-          >
-            {saveMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                Add to My Pipeline
-              </>
-            )}
-          </Button>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleSave}
+                disabled={saveMutation.isPending || !editedData.businessName}
+                className="w-full"
+                data-testid="button-save-prospect"
+              >
+                {saveMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Add to My Pipeline
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Save prospect to pipeline</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
     </div>

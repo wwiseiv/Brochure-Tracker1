@@ -54,6 +54,7 @@ import {
   File
 } from "lucide-react";
 import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ParsedProposal {
   merchantName: string;
@@ -3035,45 +3036,66 @@ export default function ProposalGeneratorPage() {
       </Card>
 
       <div className="flex gap-4">
-        <Button
-          variant="outline"
-          onClick={() => setStep("review")}
-          data-testid="button-back-review"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => handleGenerate(false)}
-          disabled={generateMutation.isPending || isGeneratingClaude}
-          data-testid="button-generate-basic"
-        >
-          {(generateMutation.isPending || isGeneratingClaude) ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <FileText className="w-4 h-4 mr-2" />
-          )}
-          Basic Proposal
-        </Button>
-        <Button
-          className="flex-1"
-          onClick={() => handleGenerate(true)}
-          disabled={generateMutation.isPending || isGeneratingClaude}
-          data-testid="button-generate-ai"
-        >
-          {(generateMutation.isPending || isGeneratingClaude) ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {isGeneratingClaude ? "Claude is writing..." : "Generating..."}
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              Generate with AI Enhancement
-            </>
-          )}
-        </Button>
+        <Tooltip delayDuration={700}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={() => setStep("review")}
+              data-testid="button-back-review"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Go back to review</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip delayDuration={700}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={() => handleGenerate(false)}
+              disabled={generateMutation.isPending || isGeneratingClaude}
+              data-testid="button-generate-basic"
+            >
+              {(generateMutation.isPending || isGeneratingClaude) ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4 mr-2" />
+              )}
+              Basic Proposal
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Generate basic proposal</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip delayDuration={700}>
+          <TooltipTrigger asChild>
+            <Button
+              className="flex-1"
+              onClick={() => handleGenerate(true)}
+              disabled={generateMutation.isPending || isGeneratingClaude}
+              data-testid="button-generate-ai"
+            >
+              {(generateMutation.isPending || isGeneratingClaude) ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {isGeneratingClaude ? "Claude is writing..." : "Generating..."}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate with AI Enhancement
+                </>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Generate AI-enhanced proposal</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -3101,38 +3123,52 @@ export default function ProposalGeneratorPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            <a
-              href={`/api/proposals/${generatedProposalId}/download/pdf`}
-              download
-              className="block"
-              data-testid="download-pdf"
-            >
-              <Button variant="outline" className="w-full h-auto py-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-8 h-8 text-red-500" />
-                  <div className="text-left">
-                    <p className="font-medium">Download PDF</p>
-                    <p className="text-sm text-muted-foreground">Professional PDF document</p>
-                  </div>
-                </div>
-              </Button>
-            </a>
-            <a
-              href={`/api/proposals/${generatedProposalId}/download/docx`}
-              download
-              className="block"
-              data-testid="download-docx"
-            >
-              <Button variant="outline" className="w-full h-auto py-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-8 h-8 text-blue-500" />
-                  <div className="text-left">
-                    <p className="font-medium">Download Word</p>
-                    <p className="text-sm text-muted-foreground">Editable DOCX document</p>
-                  </div>
-                </div>
-              </Button>
-            </a>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <a
+                  href={`/api/proposals/${generatedProposalId}/download/pdf`}
+                  download
+                  className="block"
+                  data-testid="download-pdf"
+                >
+                  <Button variant="outline" className="w-full h-auto py-4">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-8 h-8 text-red-500" />
+                      <div className="text-left">
+                        <p className="font-medium">Download PDF</p>
+                        <p className="text-sm text-muted-foreground">Professional PDF document</p>
+                      </div>
+                    </div>
+                  </Button>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Download proposal as PDF</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <a
+                  href={`/api/proposals/${generatedProposalId}/download/docx`}
+                  download
+                  className="block"
+                  data-testid="download-docx"
+                >
+                  <Button variant="outline" className="w-full h-auto py-4">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-8 h-8 text-blue-500" />
+                      <div className="text-left">
+                        <p className="font-medium">Download Word</p>
+                        <p className="text-sm text-muted-foreground">Editable DOCX document</p>
+                      </div>
+                    </div>
+                  </Button>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Download proposal as Word document</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {gammaUrl && (
@@ -3234,14 +3270,21 @@ export default function ProposalGeneratorPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container flex items-center gap-4 h-14 px-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/")}
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Go back</p>
+            </TooltipContent>
+          </Tooltip>
           <div>
             <h1 className="font-semibold">Proposal Generator</h1>
             <p className="text-xs text-muted-foreground">Create professional proposals</p>

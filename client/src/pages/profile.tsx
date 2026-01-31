@@ -33,6 +33,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { Link } from "wouter";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
 
 interface UserRole {
@@ -191,7 +192,14 @@ export default function ProfilePage() {
 
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-4">
-            <Settings className="w-5 h-5 text-muted-foreground" />
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Settings className="w-5 h-5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Settings</p>
+              </TooltipContent>
+            </Tooltip>
             <h3 className="font-semibold">Notification Settings</h3>
           </div>
           
@@ -384,16 +392,23 @@ export default function ProfilePage() {
         </Card>
 
         <div className="pt-4">
-          <Button
-            variant="outline"
-            className="w-full min-h-touch gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => logout()}
-            disabled={isLoggingOut}
-            data-testid="button-logout"
-          >
-            <LogOut className="w-5 h-5" />
-            {isLoggingOut ? "Logging out..." : "Log Out"}
-          </Button>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full min-h-touch gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => logout()}
+                disabled={isLoggingOut}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-5 h-5" />
+                {isLoggingOut ? "Logging out..." : "Log Out"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Sign out</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </main>
 

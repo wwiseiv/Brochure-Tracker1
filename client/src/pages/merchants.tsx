@@ -16,6 +16,7 @@ import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeI
 import { BottomNav } from "@/components/BottomNav";
 import { ExportDialog } from "@/components/ExportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Search,
   ChevronRight,
@@ -160,7 +161,14 @@ export default function MerchantsPage() {
       <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-4 space-y-4">
         <div className="flex flex-col gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Search merchants</p>
+              </TooltipContent>
+            </Tooltip>
             <Input
               placeholder="Search merchants..."
               value={searchQuery}
@@ -171,20 +179,29 @@ export default function MerchantsPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Sort by:</span>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-              <SelectTrigger 
-                className="w-[160px] min-h-touch" 
-                data-testid="select-sort-merchants"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lastVisit">Last Visit</SelectItem>
-                <SelectItem value="leadScore">Lead Score</SelectItem>
-                <SelectItem value="name">Name (A-Z)</SelectItem>
-                <SelectItem value="drops">Total Drops</SelectItem>
-              </SelectContent>
-            </Select>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <span>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                    <SelectTrigger 
+                      className="w-[160px] min-h-touch" 
+                      data-testid="select-sort-merchants"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lastVisit">Last Visit</SelectItem>
+                      <SelectItem value="leadScore">Lead Score</SelectItem>
+                      <SelectItem value="name">Name (A-Z)</SelectItem>
+                      <SelectItem value="drops">Total Drops</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Sort merchants</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
