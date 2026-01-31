@@ -37,6 +37,20 @@ Preferred communication style: Simple, everyday language.
 - **Inventory Management**: Track agent inventory, low-stock alerts, and transfer history.
 - **Referral Tracking**: Log and manage merchant referrals.
 - **Team Activity Feed**: Real-time activity timeline.
+- **Deal Pipeline/CRM System**: Full 14-stage sales pipeline with comprehensive deal management:
+    - **14 Pipeline Stages**: prospect → cold_call → appointment_set → presentation_made → proposal_sent → statement_analysis → negotiating → follow_up → documents_sent → documents_signed → sold → dead → installation_scheduled → active_merchant
+    - **Phase Grouping**: Prospecting, Active Selling, Closing, Post-Sale phases with visual grouping
+    - **Deal Cards**: Temperature badges (Hot/Warm/Cold), estimated commission, follow-up indicators
+    - **Kanban & List Views**: Toggle between board and list views
+    - **Deal Detail Sheet**: Business info, contacts, deal info, activity timeline, attachments, follow-up tracker with voice notes
+    - **Follow-up Tracking**: Track 1-5 follow-up attempts with outcomes and scheduling
+    - **Today View**: Daily action center showing follow-ups due, appointments, stale deals, quarterly check-ins
+    - **Manager Views**: Team pipeline view and analytics dashboard (for master_admin and relationship_manager roles)
+    - **Pipeline Analytics**: Win rates, conversion by stage, average time in stage, top performers
+    - **AI Tool Integration**: Link Statement Analyzer and Proposal Generator outputs to deals
+    - **E-Sign Sync**: SignNow status automatically syncs with deal stages
+    - **Convert Flows**: Prospect Finder → Deal conversion, Deal → Active Merchant conversion
+    - **Quarterly Check-ins**: Scheduled check-ins for active merchants with reminders
 - **AI-Powered Features**:
     - **Voice Note Summaries & Lead Scoring**: AI-generated summaries and lead quality scores.
     - **AI Role-Play Coach**: Conversational AI for sales training with voice I/O, performance feedback, and email reporting, supporting various difficulty levels and personas. Integrates with Google Drive for custom training materials.
