@@ -837,7 +837,26 @@ ${new Date().toLocaleDateString()}
 
                 {uploadedFiles.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Files to analyze ({uploadedFiles.length})</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Files to analyze ({uploadedFiles.length})</p>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          uploadedFiles.forEach(f => {
+                            if (f.preview) URL.revokeObjectURL(f.preview);
+                          });
+                          setUploadedFiles([]);
+                          setExtractedData(null);
+                          setExtractionStep("idle");
+                        }}
+                        className="text-muted-foreground hover:text-destructive"
+                        data-testid="button-clear-all-files"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Clear All
+                      </Button>
+                    </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {uploadedFiles.map((f, i) => (
                         <div 
@@ -859,7 +878,7 @@ ${new Date().toLocaleDateString()}
                           {f.uploading && <Loader2 className="h-4 w-4 animate-spin" />}
                           {f.uploaded && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                           {f.error && <XCircle className="h-4 w-4 text-red-500" />}
-                          {!f.uploading && !f.uploaded && (
+                          {!f.uploading && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
