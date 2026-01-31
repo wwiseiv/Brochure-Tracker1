@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCBancard - Prospect Finder Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #6C5CE7;
+      --primary-dark: #5849C2;
+      --primary-light: #A29BFE;
+      --success: #00B894;
+      --warning: #FDCB6E;
+      --danger: #E74C3C;
+      --text-primary: #1A1A2E;
+      --text-secondary: #636E72;
+      --text-muted: #B2BEC3;
+      --bg-primary: #F8F9FD;
+      --bg-card: #FFFFFF;
+      --border: #E8ECF4;
+      --shadow-sm: 0 2px 8px rgba(108, 92, 231, 0.08);
+      --shadow-md: 0 4px 20px rgba(108, 92, 231, 0.12);
+      --shadow-lg: 0 8px 40px rgba(108, 92, 231, 0.16);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Mobile Frame */
+    .phone-frame {
+      max-width: 430px;
+      margin: 20px auto;
+      background: var(--bg-primary);
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-primary);
+    }
+
+    .logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: var(--bg-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: var(--border);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Main Content */
+    .main-content {
+      padding: 20px;
+    }
+
+    /* Scan & Drop Bar (Existing) */
+    .scan-drop-bar {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all 0.3s;
+      margin-bottom: 24px;
+    }
+
+    .scan-drop-bar:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .scan-drop-bar svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* NEW: Prospect Finder Card */
+    .prospect-finder-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-new {
+      background: linear-gradient(135deg, var(--success), #00CEC9);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .ai-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #667EEA, #764BA2);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .ai-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Search Form */
+    .search-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-with-icon {
+      position: relative;
+    }
+
+    .input-with-icon svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-muted);
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 14px 14px 14px 44px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-family: inherit;
+      transition: all 0.2s;
+      background: var(--bg-primary);
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--bg-card);
+      box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1);
+    }
+
+    .input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Business Type Selector */
+    .business-type-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .type-chip {
+      padding: 10px 14px;
+      border: 2px solid var(--border);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-primary);
+    }
+
+    .type-chip:hover {
+      border-color: var(--primary-light);
+      background: var(--bg-card);
+    }
+
+    .type-chip.selected {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+    }
+
+    .type-chip svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .more-types-btn {
+      padding: 10px 14px;
+      border: 2px dashed var(--border);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--primary);
+      background: transparent;
+    }
+
+    .more-types-btn:hover {
+      border-color: var(--primary);
+      background: rgba(108, 92, 231, 0.05);
+    }
+
+    /* Row Options */
+    .options-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .options-row .input-group {
+      flex: 1;
+    }
+
+    .select-field {
+      width: 100%;
+      padding: 14px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--bg-primary);
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23636E72' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    .select-field:focus {
+      outline: none;
+      border-color: var(--primary);
+      background-color: var(--bg-card);
+    }
+
+    /* Search Button */
+    .search-btn {
+      width: 100%;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+    }
+
+    .search-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
+    }
+
+    .search-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Pipeline Preview */
+    .pipeline-preview {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .pipeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .pipeline-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .view-all-link {
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pipeline-stages {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .stage-card {
+      flex: 0 0 auto;
+      min-width: 100px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-md);
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+
+    .stage-count {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .stage-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .stage-card.hot .stage-count {
+      color: var(--danger);
+    }
+
+    .stage-card.warm .stage-count {
+      color: var(--warning);
+    }
+
+    .stage-card.won .stage-count {
+      color: var(--success);
+    }
+
+    /* Search Results Modal */
+    .results-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 26, 46, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .results-overlay.active {
+      display: flex;
+    }
+
+    .results-sheet {
+      background: var(--bg-card);
+      width: 100%;
+      max-width: 430px;
+      max-height: 90vh;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      overflow: hidden;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
+      }
+      to {
+        transform: translateY(0);
+      }
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 12px auto;
+    }
+
+    .sheet-header {
+      padding: 0 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sheet-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .sheet-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .sheet-body {
+      padding: 20px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    /* Prospect Result Card */
+    .prospect-card {
+      background: var(--bg-primary);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .prospect-card:hover {
+      border-color: var(--primary-light);
+    }
+
+    .prospect-card.claimed {
+      background: linear-gradient(135deg, rgba(108, 92, 231, 0.05), rgba(108, 92, 231, 0.1));
+      border-color: var(--primary);
+    }
+
+    .prospect-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .prospect-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .prospect-category {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .confidence-badge {
+      background: var(--success);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .confidence-badge.medium {
+      background: var(--warning);
+      color: var(--text-primary);
+    }
+
+    .prospect-address {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .prospect-address svg {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .prospect-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .prospect-btn {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .prospect-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .prospect-btn.primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+    }
+
+    .prospect-btn.primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .prospect-btn.secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--border);
+    }
+
+    .prospect-btn.secondary:hover {
+      border-color: var(--primary);
+      background: rgba(108, 92, 231, 0.05);
+    }
+
+    .prospect-btn.claimed {
+      background: var(--success);
+      color: white;
+      border: none;
+    }
+
+    /* Today's Pickups Section (Existing) */
+    .pickups-section {
+      margin-bottom: 24px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .section-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .route-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border: 2px solid var(--border);
+      border-radius: 100px;
+      background: var(--bg-card);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .count-badge {
+      background: var(--bg-primary);
+      padding: 4px 10px;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .empty-state h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+    }
+
+    /* Stats Row */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-card.alert {
+      border-color: rgba(231, 76, 60, 0.3);
+      background: rgba(231, 76, 60, 0.05);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-card.alert .stat-value {
+      color: var(--danger);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* Page Tabs for Navigation */
+    .page-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      padding: 4px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .page-tab {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: transparent;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-secondary);
+    }
+
+    .page-tab.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Page Indicator */
+    .page-indicator {
+      text-align: center;
+      padding: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: var(--bg-primary);
+      margin: -20px -20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Animation Classes */
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .phone-frame {
+        margin: 0;
+      }
+    }
+
+    /* All Business Types Modal */
+    .types-modal-content {
+      padding: 20px;
+    }
+
+    .types-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .type-option {
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .type-option:hover {
+      border-color: var(--primary-light);
+    }
+
+    .type-option.selected {
+      border-color: var(--primary);
+      background: rgba(108, 92, 231, 0.1);
+    }
+
+    .type-option input {
+      display: none;
+    }
+
+    .type-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .type-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .type-count {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    /* Search Loader */
+    .search-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .loader-animation {
+      width: 60px;
+      height: 60px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loader-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .loader-subtext {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M16 4L28 10V22L16 28L4 22V10L16 4Z" fill="#6C5CE7"/>
+          <path d="M16 4L28 10L16 16L4 10L16 4Z" fill="#A29BFE"/>
+          <path d="M16 16V28L4 22V10L16 16Z" fill="#5849C2"/>
+        </svg>
+        PCBancard
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </button>
+        <button class="icon-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </button>
+        <div class="avatar">WW</div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Existing: Scan & Drop Bar -->
+      <div class="scan-drop-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Scan & Drop
+      </div>
+
+      <!-- NEW: Prospect Finder Card -->
+      <div class="prospect-finder-card fade-in">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 class="card-title">
+              Find Prospects
+              <span class="badge-new">NEW</span>
+            </h2>
+            <p class="card-subtitle">Discover local businesses to pitch</p>
+          </div>
+          <div class="ai-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            AI Powered
+          </div>
+        </div>
+
+        <form class="search-form">
+          <div class="input-group">
+            <label class="input-label">Location</label>
+            <div class="input-with-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <input type="text" class="input-field" placeholder="Enter zip code" value="46032">
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label class="input-label">Business Type</label>
+            <div class="business-type-selector">
+              <div class="type-chip selected">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                  <line x1="6" y1="1" x2="6" y2="4"/>
+                  <line x1="10" y1="1" x2="10" y2="4"/>
+                  <line x1="14" y1="1" x2="14" y2="4"/>
+                </svg>
+                Restaurants
+              </div>
+              <div class="type-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="9" cy="21" r="1"/>
+                  <circle cx="20" cy="21" r="1"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
+                Retail
+              </div>
+              <div class="type-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Home Services
+              </div>
+              <button type="button" class="more-types-btn" onclick="showAllTypes()">
+                + 150 More
+              </button>
+            </div>
+          </div>
+
+          <div class="options-row">
+            <div class="input-group">
+              <label class="input-label">Radius</label>
+              <select class="select-field">
+                <option>5 miles</option>
+                <option selected>10 miles</option>
+                <option>15 miles</option>
+                <option>25 miles</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Results</label>
+              <select class="select-field">
+                <option>10 businesses</option>
+                <option selected>25 businesses</option>
+                <option>50 businesses</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="button" class="search-btn" onclick="showResults()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Find Prospects
+          </button>
+        </form>
+      </div>
+
+      <!-- NEW: Pipeline Preview -->
+      <div class="pipeline-preview fade-in" style="animation-delay: 0.1s">
+        <div class="pipeline-header">
+          <h3 class="pipeline-title">My Prospect Pipeline</h3>
+          <a href="#" class="view-all-link">
+            View All
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </a>
+        </div>
+        <div class="pipeline-stages">
+          <div class="stage-card">
+            <div class="stage-count">12</div>
+            <div class="stage-label">New</div>
+          </div>
+          <div class="stage-card hot">
+            <div class="stage-count">5</div>
+            <div class="stage-label">Contacted</div>
+          </div>
+          <div class="stage-card warm">
+            <div class="stage-count">3</div>
+            <div class="stage-label">Qualified</div>
+          </div>
+          <div class="stage-card">
+            <div class="stage-count">2</div>
+            <div class="stage-label">Proposal</div>
+          </div>
+          <div class="stage-card won">
+            <div class="stage-count">8</div>
+            <div class="stage-label">Won</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Existing: Today's Pickups Section -->
+      <div class="pickups-section">
+        <div class="section-header">
+          <h3 class="section-title">Today's Pickups</h3>
+          <div class="section-actions">
+            <button class="route-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+              </svg>
+              Plan Route
+            </button>
+            <span class="count-badge">0</span>
+          </div>
+        </div>
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <h3>No pickups scheduled for today</h3>
+          <p>When you have brochures due for pickup today, they'll appear here.</p>
+        </div>
+      </div>
+
+      <!-- Existing: Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            0
+          </div>
+          <div class="stat-label">Upcoming (7 days)</div>
+        </div>
+        <div class="stat-card alert">
+          <div class="stat-value">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            2
+          </div>
+          <div class="stat-label">Overdue</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Search Results Overlay -->
+  <div class="results-overlay" id="resultsOverlay">
+    <div class="results-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3 class="sheet-title">Prospects Found</h3>
+        <p class="sheet-subtitle">23 restaurants near 46032 • <span style="color: var(--success)">3 claimed</span></p>
+      </div>
+      <div class="sheet-body" id="resultsBody">
+        <!-- Results will be populated here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- All Types Modal -->
+  <div class="results-overlay" id="typesOverlay">
+    <div class="results-sheet" style="max-height: 80vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3 class="sheet-title">Select Business Types</h3>
+        <p class="sheet-subtitle">Choose categories to search for prospects</p>
+      </div>
+      <div class="types-modal-content">
+        <div class="types-grid">
+          <div class="type-option selected">
+            <div class="type-icon" style="background: #FEF3C7;">🍽️</div>
+            <div>
+              <div class="type-name">Food & Dining</div>
+              <div class="type-count">24 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #E0E7FF;">🛍️</div>
+            <div>
+              <div class="type-name">Retail</div>
+              <div class="type-count">45 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #DBEAFE;">💼</div>
+            <div>
+              <div class="type-name">Services</div>
+              <div class="type-count">32 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #FEE2E2;">🚗</div>
+            <div>
+              <div class="type-name">Automotive</div>
+              <div class="type-count">18 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #D1FAE5;">❤️</div>
+            <div>
+              <div class="type-name">Healthcare</div>
+              <div class="type-count">15 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #FCE7F3;">🎭</div>
+            <div>
+              <div class="type-name">Entertainment</div>
+              <div class="type-count">12 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #CCFBF1;">🏠</div>
+            <div>
+              <div class="type-name">Home & Garden</div>
+              <div class="type-count">14 types</div>
+            </div>
+          </div>
+          <div class="type-option">
+            <div class="type-icon" style="background: #FEF9C3;">👤</div>
+            <div>
+              <div class="type-name">Personal</div>
+              <div class="type-count">11 types</div>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="search-btn" style="margin-top: 20px;" onclick="hideAllTypes()">
+          Apply Selection
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const sampleProspects = [
+      {
+        name: "Bella Italia Trattoria",
+        category: "Restaurant • Italian",
+        address: "1234 Main Street, Carmel, IN 46032",
+        phone: "(317) 555-0123",
+        confidence: 95,
+        claimed: true
+      },
+      {
+        name: "Golden Dragon Chinese",
+        category: "Restaurant • Chinese",
+        address: "5678 Rangeline Rd, Carmel, IN 46032",
+        phone: "(317) 555-0456",
+        confidence: 92,
+        claimed: true
+      },
+      {
+        name: "Sunrise Café & Bakery",
+        category: "Bakery • Café",
+        address: "910 City Center Dr, Carmel, IN 46032",
+        phone: "(317) 555-0789",
+        confidence: 88,
+        claimed: true
+      },
+      {
+        name: "Taco Loco Mexican Grill",
+        category: "Restaurant • Mexican",
+        address: "2468 Keystone Way, Carmel, IN 46032",
+        phone: "(317) 555-1234",
+        confidence: 91,
+        claimed: false
+      },
+      {
+        name: "Sushi Express",
+        category: "Restaurant • Japanese",
+        address: "1357 Hazel Dell Pkwy, Carmel, IN 46032",
+        phone: "(317) 555-5678",
+        confidence: 78,
+        claimed: false
+      },
+      {
+        name: "BBQ Pit Masters",
+        category: "Restaurant • BBQ",
+        address: "8642 Merchants Dr, Carmel, IN 46032",
+        phone: "(317) 555-9012",
+        confidence: 85,
+        claimed: false
+      }
+    ];
+
+    function showResults() {
+      const overlay = document.getElementById('resultsOverlay');
+      const body = document.getElementById('resultsBody');
+      
+      // Show loading first
+      body.innerHTML = `
+        <div class="search-loader">
+          <div class="loader-animation"></div>
+          <div class="loader-text">Searching for local businesses...</div>
+          <div class="loader-subtext">AI is finding the best prospects for you</div>
+        </div>
+      `;
+      
+      overlay.classList.add('active');
+      
+      // Simulate AI search delay
+      setTimeout(() => {
+        body.innerHTML = sampleProspects.map(p => `
+          <div class="prospect-card ${p.claimed ? 'claimed' : ''}">
+            <div class="prospect-top">
+              <div>
+                <div class="prospect-name">${p.name}</div>
+                <div class="prospect-category">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                  </svg>
+                  ${p.category}
+                </div>
+              </div>
+              <span class="confidence-badge ${p.confidence < 85 ? 'medium' : ''}">${p.confidence}%</span>
+            </div>
+            <div class="prospect-address">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              ${p.address}
+            </div>
+            <div class="prospect-actions">
+              ${p.claimed ? `
+                <button class="prospect-btn claimed">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  Claimed
+                </button>
+              ` : `
+                <button class="prospect-btn primary">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  Claim
+                </button>
+              `}
+              <button class="prospect-btn secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/>
+                </svg>
+                Call
+              </button>
+              <button class="prospect-btn secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="19" cy="12" r="1"/>
+                  <circle cx="5" cy="12" r="1"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }, 2000);
+    }
+
+    function hideResults() {
+      document.getElementById('resultsOverlay').classList.remove('active');
+    }
+
+    function showAllTypes() {
+      document.getElementById('typesOverlay').classList.add('active');
+    }
+
+    function hideAllTypes() {
+      document.getElementById('typesOverlay').classList.remove('active');
+    }
+
+    // Close overlays on background click
+    document.getElementById('resultsOverlay').addEventListener('click', function(e) {
+      if (e.target === this) hideResults();
+    });
+
+    document.getElementById('typesOverlay').addEventListener('click', function(e) {
+      if (e.target === this) hideAllTypes();
+    });
+
+    // Toggle type options
+    document.querySelectorAll('.type-option').forEach(opt => {
+      opt.addEventListener('click', function() {
+        this.classList.toggle('selected');
+      });
+    });
+  </script>
+</body>
+</html>
