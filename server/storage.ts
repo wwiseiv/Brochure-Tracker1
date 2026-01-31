@@ -129,9 +129,28 @@ import {
   type InsertProposal,
   statementExtractions,
   type StatementExtraction,
+  deals,
+  dealActivities,
+  dealAttachments,
+  pipelineStageConfig,
+  lossReasons,
+  type Deal,
+  type InsertDeal,
+  type DealActivity,
+  type InsertDealActivity,
+  type DealAttachment,
+  type InsertDealAttachment,
+  type PipelineStageConfig,
+  type InsertPipelineStageConfig,
+  type LossReason,
+  type InsertLossReason,
+  type DealWithRelations,
+  type PipelineStage,
+  DEFAULT_PIPELINE_STAGES,
+  DEFAULT_LOSS_REASONS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
 
 export interface IStorage {
   // Brochures
@@ -262,6 +281,44 @@ export interface IStorage {
   getUserPresentationProgress(userId: string): Promise<PresentationProgress[]>;
   getUserLessonProgress(userId: string, lessonId: number): Promise<PresentationProgress | undefined>;
   upsertPresentationProgress(data: InsertPresentationProgress): Promise<PresentationProgress>;
+  
+  // Deal Pipeline
+  getDeal(id: number): Promise<Deal | undefined>;
+  getDealWithRelations(id: number): Promise<DealWithRelations | undefined>;
+  getDealsByAgent(agentId: string): Promise<Deal[]>;
+  getDealsByOrganization(orgId: number): Promise<Deal[]>;
+  getDealsByStage(orgId: number, stage: PipelineStage): Promise<Deal[]>;
+  createDeal(deal: InsertDeal): Promise<Deal>;
+  updateDeal(id: number, data: Partial<Deal>): Promise<Deal | undefined>;
+  changeDealStage(id: number, newStage: PipelineStage, agentId: string, reason?: string): Promise<Deal | undefined>;
+  deleteDeal(id: number): Promise<boolean>;
+  archiveDeal(id: number): Promise<Deal | undefined>;
+  
+  // Deal Activities
+  getDealActivities(dealId: number): Promise<DealActivity[]>;
+  createDealActivity(activity: InsertDealActivity): Promise<DealActivity>;
+  
+  // Deal Attachments
+  getDealAttachments(dealId: number): Promise<DealAttachment[]>;
+  createDealAttachment(attachment: InsertDealAttachment): Promise<DealAttachment>;
+  deleteDealAttachment(id: number): Promise<boolean>;
+  
+  // Pipeline Stage Config
+  getPipelineStageConfig(orgId: number): Promise<PipelineStageConfig[]>;
+  initializePipelineStageConfig(orgId: number): Promise<PipelineStageConfig[]>;
+  updatePipelineStageConfig(id: number, data: Partial<PipelineStageConfig>): Promise<PipelineStageConfig | undefined>;
+  
+  // Loss Reasons
+  getLossReasons(orgId: number): Promise<LossReason[]>;
+  initializeLossReasons(orgId: number): Promise<LossReason[]>;
+  createLossReason(data: InsertLossReason): Promise<LossReason>;
+  updateLossReason(id: number, data: Partial<LossReason>): Promise<LossReason | undefined>;
+  deleteLossReason(id: number): Promise<boolean>;
+  
+  // Pipeline Analytics
+  getDealCountsByStage(orgId: number): Promise<{stage: string; count: number}[]>;
+  getDealsNeedingFollowUp(agentId: string): Promise<Deal[]>;
+  getStaleDeals(orgId: number, maxDaysInStage?: number): Promise<Deal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1878,6 +1935,277 @@ export class DatabaseStorage implements IStorage {
       .where(eq(statementExtractions.id, id))
       .returning();
     return updated;
+  }
+
+  // Deal Pipeline
+  async getDeal(id: number): Promise<Deal | undefined> {
+    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
+    return deal;
+  }
+
+  async getDealWithRelations(id: number): Promise<DealWithRelations | undefined> {
+    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
+    if (!deal) return undefined;
+    
+    const activities = await db.select().from(dealActivities)
+      .where(eq(dealActivities.dealId, id))
+      .orderBy(desc(dealActivities.activityAt));
+    
+    const attachments = await db.select().from(dealAttachments)
+      .where(eq(dealAttachments.dealId, id))
+      .orderBy(desc(dealAttachments.createdAt));
+    
+    return {
+      ...deal,
+      activities,
+      attachments,
+    };
+  }
+
+  async getDealsByAgent(agentId: string): Promise<Deal[]> {
+    return db.select().from(deals)
+      .where(and(eq(deals.assignedAgentId, agentId), eq(deals.archived, false)))
+      .orderBy(desc(deals.updatedAt));
+  }
+
+  async getDealsByOrganization(orgId: number): Promise<Deal[]> {
+    return db.select().from(deals)
+      .where(and(eq(deals.organizationId, orgId), eq(deals.archived, false)))
+      .orderBy(desc(deals.updatedAt));
+  }
+
+  async getDealsByStage(orgId: number, stage: PipelineStage): Promise<Deal[]> {
+    return db.select().from(deals)
+      .where(and(
+        eq(deals.organizationId, orgId),
+        eq(deals.currentStage, stage),
+        eq(deals.archived, false)
+      ))
+      .orderBy(desc(deals.updatedAt));
+  }
+
+  async createDeal(deal: InsertDeal): Promise<Deal> {
+    const [created] = await db.insert(deals).values(deal).returning();
+    return created;
+  }
+
+  async updateDeal(id: number, data: Partial<Deal>): Promise<Deal | undefined> {
+    const { id: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db.update(deals)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(deals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async changeDealStage(id: number, newStage: PipelineStage, agentId: string, reason?: string): Promise<Deal | undefined> {
+    const deal = await this.getDeal(id);
+    if (!deal) return undefined;
+
+    const previousStage = deal.currentStage;
+    const now = new Date();
+
+    const [updated] = await db.update(deals)
+      .set({
+        currentStage: newStage,
+        previousStage: previousStage,
+        stageEnteredAt: now,
+        updatedAt: now,
+        lastActivityAt: now,
+        lastActivityType: 'stage_change',
+        ...(newStage === 'sold' ? { wonAt: now } : {}),
+        ...(newStage === 'dead' ? { closedAt: now, closedReason: reason } : {}),
+      })
+      .where(eq(deals.id, id))
+      .returning();
+
+    if (updated) {
+      await db.insert(dealActivities).values({
+        dealId: id,
+        organizationId: deal.organizationId,
+        activityType: 'stage_change',
+        agentId: agentId,
+        fromStage: previousStage,
+        toStage: newStage,
+        stageChangeReason: reason,
+        description: `Stage changed from ${previousStage} to ${newStage}`,
+        isSystemGenerated: false,
+      });
+    }
+
+    return updated;
+  }
+
+  async deleteDeal(id: number): Promise<boolean> {
+    const result = await db.delete(deals).where(eq(deals.id, id));
+    return true;
+  }
+
+  async archiveDeal(id: number): Promise<Deal | undefined> {
+    const [updated] = await db.update(deals)
+      .set({ archived: true, archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(deals.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Deal Activities
+  async getDealActivities(dealId: number): Promise<DealActivity[]> {
+    return db.select().from(dealActivities)
+      .where(eq(dealActivities.dealId, dealId))
+      .orderBy(desc(dealActivities.activityAt));
+  }
+
+  async createDealActivity(activity: InsertDealActivity): Promise<DealActivity> {
+    const [created] = await db.insert(dealActivities).values(activity).returning();
+    
+    await db.update(deals)
+      .set({
+        lastActivityAt: new Date(),
+        lastActivityType: activity.activityType,
+        updatedAt: new Date(),
+      })
+      .where(eq(deals.id, activity.dealId));
+    
+    return created;
+  }
+
+  // Deal Attachments
+  async getDealAttachments(dealId: number): Promise<DealAttachment[]> {
+    return db.select().from(dealAttachments)
+      .where(eq(dealAttachments.dealId, dealId))
+      .orderBy(desc(dealAttachments.createdAt));
+  }
+
+  async createDealAttachment(attachment: InsertDealAttachment): Promise<DealAttachment> {
+    const [created] = await db.insert(dealAttachments).values(attachment).returning();
+    return created;
+  }
+
+  async deleteDealAttachment(id: number): Promise<boolean> {
+    await db.delete(dealAttachments).where(eq(dealAttachments.id, id));
+    return true;
+  }
+
+  // Pipeline Stage Config
+  async getPipelineStageConfig(orgId: number): Promise<PipelineStageConfig[]> {
+    return db.select().from(pipelineStageConfig)
+      .where(eq(pipelineStageConfig.organizationId, orgId))
+      .orderBy(pipelineStageConfig.stageOrder);
+  }
+
+  async initializePipelineStageConfig(orgId: number): Promise<PipelineStageConfig[]> {
+    const existing = await this.getPipelineStageConfig(orgId);
+    if (existing.length > 0) return existing;
+
+    const configs = DEFAULT_PIPELINE_STAGES.map(stage => ({
+      ...stage,
+      organizationId: orgId,
+    }));
+
+    const created = await db.insert(pipelineStageConfig).values(configs).returning();
+    return created;
+  }
+
+  async updatePipelineStageConfig(id: number, data: Partial<PipelineStageConfig>): Promise<PipelineStageConfig | undefined> {
+    const { id: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db.update(pipelineStageConfig)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(pipelineStageConfig.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Loss Reasons
+  async getLossReasons(orgId: number): Promise<LossReason[]> {
+    return db.select().from(lossReasons)
+      .where(eq(lossReasons.organizationId, orgId))
+      .orderBy(lossReasons.sortOrder);
+  }
+
+  async initializeLossReasons(orgId: number): Promise<LossReason[]> {
+    const existing = await this.getLossReasons(orgId);
+    if (existing.length > 0) return existing;
+
+    const reasons = DEFAULT_LOSS_REASONS.map(reason => ({
+      ...reason,
+      organizationId: orgId,
+    }));
+
+    const created = await db.insert(lossReasons).values(reasons).returning();
+    return created;
+  }
+
+  async createLossReason(data: InsertLossReason): Promise<LossReason> {
+    const [created] = await db.insert(lossReasons).values(data).returning();
+    return created;
+  }
+
+  async updateLossReason(id: number, data: Partial<LossReason>): Promise<LossReason | undefined> {
+    const { id: _, createdAt, ...updateData } = data as any;
+    const [updated] = await db.update(lossReasons)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(lossReasons.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLossReason(id: number): Promise<boolean> {
+    await db.delete(lossReasons).where(eq(lossReasons.id, id));
+    return true;
+  }
+
+  // Pipeline Analytics
+  async getDealCountsByStage(orgId: number): Promise<{stage: string; count: number}[]> {
+    const result = await db.select({
+      stage: deals.currentStage,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(deals)
+      .where(and(eq(deals.organizationId, orgId), eq(deals.archived, false)))
+      .groupBy(deals.currentStage);
+    
+    return result;
+  }
+
+  async getDealsNeedingFollowUp(agentId: string): Promise<Deal[]> {
+    const now = new Date();
+    return db.select().from(deals)
+      .where(and(
+        eq(deals.assignedAgentId, agentId),
+        eq(deals.archived, false),
+        lte(deals.nextFollowUpAt, now)
+      ))
+      .orderBy(deals.nextFollowUpAt);
+  }
+
+  async getStaleDeals(orgId: number, maxDaysInStage?: number): Promise<Deal[]> {
+    const stageConfigs = await this.getPipelineStageConfig(orgId);
+    if (stageConfigs.length === 0) return [];
+
+    const now = new Date();
+    const staleDeals: Deal[] = [];
+    
+    for (const config of stageConfigs) {
+      if (config.staleThresholdDays <= 0 || config.isTerminal) continue;
+      
+      const thresholdDays = maxDaysInStage ?? config.staleThresholdDays;
+      const thresholdDate = new Date(now.getTime() - thresholdDays * 24 * 60 * 60 * 1000);
+      
+      const dealsInStage = await db.select().from(deals)
+        .where(and(
+          eq(deals.organizationId, orgId),
+          eq(deals.currentStage, config.stageKey),
+          eq(deals.archived, false),
+          lte(deals.stageEnteredAt, thresholdDate)
+        ));
+      
+      staleDeals.push(...dealsInStage);
+    }
+
+    return staleDeals.sort((a, b) => 
+      new Date(a.stageEnteredAt).getTime() - new Date(b.stageEnteredAt).getTime()
+    );
   }
 }
 
