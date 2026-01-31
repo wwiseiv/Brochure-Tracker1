@@ -92,6 +92,46 @@ export default function PresentationTrainingPage() {
     enabled: !!selectedLessonId,
   });
 
+  interface SavedPracticeResponse {
+    id: number;
+    lessonId: number;
+    practiceResponse: string;
+    aiFeedback: string | null;
+    feedbackScore: number | null;
+    strengths: string[] | null;
+    improvements: string[] | null;
+    createdAt: string;
+  }
+
+  const { data: savedResponses, isLoading: responsesLoading } = useQuery<{ responses: SavedPracticeResponse[] }>({
+    queryKey: ["/api/presentation/practice-responses", selectedLessonId],
+    queryFn: async () => {
+      const res = await fetch(`/api/presentation/practice-responses/${selectedLessonId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch practice responses");
+      return res.json();
+    },
+    enabled: !!selectedLessonId,
+  });
+
+  const savePracticeResponseMutation = useMutation({
+    mutationFn: async (data: { lessonId: number; practiceResponse: string; aiFeedback: string }) => {
+      const res = await apiRequest("POST", "/api/presentation/practice-responses", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/presentation/practice-responses", selectedLessonId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/presentation/modules"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/presentation/lessons", selectedLessonId] });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to save response",
+        description: "Your response was not saved. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const markCompleteMutation = useMutation({
     mutationFn: async (lessonId: number) => {
       const res = await apiRequest("POST", `/api/presentation/progress/${lessonId}`, {
@@ -168,9 +208,15 @@ export default function PresentationTrainingPage() {
       const data = await res.json();
       setPracticeFeedback(data.feedback);
       
+      savePracticeResponseMutation.mutate({
+        lessonId: currentLesson.id,
+        practiceResponse: practiceResponse.trim(),
+        aiFeedback: data.feedback,
+      });
+      
       toast({
         title: "Feedback received!",
-        description: "Review the AI feedback below.",
+        description: "Your practice response has been saved.",
       });
     } catch (error) {
       toast({
@@ -577,6 +623,49 @@ export default function PresentationTrainingPage() {
                         {practiceFeedback}
                       </div>
                     </Card>
+                  )}
+                  
+                  {responsesLoading && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Loading previous attempts...</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!responsesLoading && savedResponses?.responses && savedResponses.responses.length > 0 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <h4 className="text-sm font-medium text-muted-foreground">Previous Attempts ({savedResponses.responses.length})</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {savedResponses.responses.slice(0, 3).map((response) => (
+                          <Card key={response.id} className="p-3 bg-muted/30" data-testid={`card-practice-response-${response.id}`}>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              {new Date(response.createdAt).toLocaleDateString(undefined, { 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                            <p className="text-sm mb-2 line-clamp-2">{response.practiceResponse}</p>
+                            {response.aiFeedback && (
+                              <details className="group">
+                                <summary className="text-xs text-primary cursor-pointer hover:underline">
+                                  View feedback
+                                </summary>
+                                <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap border-l-2 border-primary/20 pl-3">
+                                  {response.aiFeedback}
+                                </div>
+                              </details>
+                            )}
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </Card>
               )}
