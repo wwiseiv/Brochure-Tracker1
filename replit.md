@@ -72,6 +72,13 @@ Preferred communication style: Simple, everyday language.
             - `pushSubscriptions` table for subscriber management
             - Service worker with action buttons ("View Results", "Dismiss")
     - **AI Help Chatbot**: Floating Claude AI assistant for app feature inquiries.
+    - **Email Digest System**: AI-powered daily/weekly email summaries with:
+        - **Timezone-Aware Scheduling**: Cron job runs every 15 minutes, respects user's timezone and preferred send time
+        - **Customizable Content**: Toggle appointments, follow-ups, stale deals, pipeline summary, recent wins, AI tips, quarterly check-ins, referrals
+        - **Claude AI Generation**: Personalized, motivating email content using Claude claude-sonnet-4-20250514
+        - **Resend Integration**: Professional HTML emails with PCBancard branding
+        - **Settings UI**: Configure preferences in Profile page with test email functionality
+        - **History Tracking**: Full log of sent digests with status and content metrics
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats and member management.
