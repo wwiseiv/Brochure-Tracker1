@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSwipeable } from "react-swipeable";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -92,6 +100,36 @@ const DEAL_STAGE_CONFIG: Record<string, { label: string; color: string; icon: an
 
 const PHASES = ["All", "Prospecting", "Active Selling", "Closing", "Post-Sale"] as const;
 
+const STAGE_ORDER = [
+  "prospect", "cold_call", "appointment_set", "presentation_made",
+  "proposal_sent", "statement_analysis", "negotiating", "follow_up",
+  "documents_sent", "documents_signed", "sold", "installation_scheduled", "active_merchant"
+];
+
+const TERMINAL_STAGES = ["sold", "dead", "active_merchant"];
+
+const DEFAULT_LOSS_REASONS = [
+  "Went with competitor",
+  "Price too high", 
+  "No longer interested",
+  "Business closed",
+  "Wrong fit",
+  "Lost contact",
+  "Timing not right",
+  "Using existing processor",
+  "Other"
+];
+
+const FOLLOW_UP_CADENCE = [
+  { day: 1, label: "Tomorrow" },
+  { day: 3, label: "In 3 days" },
+  { day: 7, label: "In 1 week" },
+  { day: 14, label: "In 2 weeks" },
+  { day: 21, label: "In 3 weeks" },
+];
+
+const MAX_FOLLOW_UP_ATTEMPTS = 5;
+
 const TEMPERATURE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   hot: { label: "Hot", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: Flame },
   warm: { label: "Warm", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", icon: Thermometer },
@@ -121,6 +159,29 @@ export default function DealPipelinePage() {
   const [followUpOutcome, setFollowUpOutcome] = useState<string>("");
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [nextFollowUpDate, setNextFollowUpDate] = useState("");
+
+  const [showLossReasonDialog, setShowLossReasonDialog] = useState(false);
+  const [pendingDeadDeal, setPendingDeadDeal] = useState<Deal | null>(null);
+  const [selectedLossReason, setSelectedLossReason] = useState<string>("");
+  const [lossNotes, setLossNotes] = useState("");
+  const [swipingDealId, setSwipingDealId] = useState<number | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+
+  const [showCreateDealSheet, setShowCreateDealSheet] = useState(false);
+  const [newDealForm, setNewDealForm] = useState({
+    businessName: "",
+    businessPhone: "",
+    businessEmail: "",
+    businessAddress: "",
+    businessCity: "",
+    businessState: "",
+    businessZip: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    estimatedMonthlyVolume: "",
+    temperature: "warm",
+  });
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -153,6 +214,36 @@ export default function DealPipelinePage() {
       return res.json();
     },
     enabled: !!selectedDeal?.id,
+  });
+
+  const createDealMutation = useMutation({
+    mutationFn: async (data: typeof newDealForm) => {
+      const response = await apiRequest("POST", "/api/deals", data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/pipeline-counts"] });
+      setShowCreateDealSheet(false);
+      setNewDealForm({
+        businessName: "",
+        businessPhone: "",
+        businessEmail: "",
+        businessAddress: "",
+        businessCity: "",
+        businessState: "",
+        businessZip: "",
+        contactName: "",
+        contactPhone: "",
+        contactEmail: "",
+        estimatedMonthlyVolume: "",
+        temperature: "warm",
+      });
+      toast({ title: "Deal created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create deal", variant: "destructive" });
+    },
   });
 
   const updateDealMutation = useMutation({
@@ -400,6 +491,77 @@ export default function DealPipelinePage() {
     }
   };
 
+  const getNextStage = useCallback((currentStage: string): string | null => {
+    const currentIndex = STAGE_ORDER.indexOf(currentStage);
+    if (currentIndex === -1 || currentIndex >= STAGE_ORDER.length - 1) return null;
+    return STAGE_ORDER[currentIndex + 1];
+  }, []);
+
+  const getPreviousStage = useCallback((currentStage: string): string | null => {
+    const currentIndex = STAGE_ORDER.indexOf(currentStage);
+    if (currentIndex <= 0) return null;
+    return STAGE_ORDER[currentIndex - 1];
+  }, []);
+
+  const handleSwipeAdvance = useCallback((deal: Deal) => {
+    if (TERMINAL_STAGES.includes(deal.currentStage)) {
+      toast({ title: "Cannot advance", description: "This deal is in a terminal stage" });
+      return;
+    }
+    const nextStage = getNextStage(deal.currentStage);
+    if (nextStage) {
+      changeStageMutation.mutate({ id: deal.id, stage: nextStage });
+      toast({ 
+        title: "Stage Advanced", 
+        description: `${deal.businessName} moved to ${DEAL_STAGE_CONFIG[nextStage]?.label}` 
+      });
+    }
+    setSwipingDealId(null);
+    setSwipeDirection(null);
+  }, [changeStageMutation, toast, getNextStage]);
+
+  const handleSwipeBack = useCallback((deal: Deal) => {
+    const prevStage = getPreviousStage(deal.currentStage);
+    if (prevStage) {
+      changeStageMutation.mutate({ id: deal.id, stage: prevStage });
+      toast({ 
+        title: "Stage Moved Back", 
+        description: `${deal.businessName} moved to ${DEAL_STAGE_CONFIG[prevStage]?.label}` 
+      });
+    } else {
+      setPendingDeadDeal(deal);
+      setShowLossReasonDialog(true);
+    }
+    setSwipingDealId(null);
+    setSwipeDirection(null);
+  }, [changeStageMutation, toast, getPreviousStage]);
+
+  const handleMarkDead = () => {
+    if (!pendingDeadDeal || !selectedLossReason) {
+      toast({ title: "Please select a loss reason", variant: "destructive" });
+      return;
+    }
+    updateDealMutation.mutate({
+      id: pendingDeadDeal.id,
+      updates: { 
+        closedReason: selectedLossReason,
+        notes: lossNotes ? `${pendingDeadDeal.notes || ''}\n\nLoss reason: ${selectedLossReason}\n${lossNotes}` : pendingDeadDeal.notes,
+      },
+    });
+    changeStageMutation.mutate({ id: pendingDeadDeal.id, stage: "dead" });
+    setShowLossReasonDialog(false);
+    setPendingDeadDeal(null);
+    setSelectedLossReason("");
+    setLossNotes("");
+    toast({ title: "Deal marked as lost" });
+  };
+
+  const getSuggestedFollowUpDate = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0];
+  };
+
   const getStagesForPhase = (phase: string): string[] => {
     if (phase === "All") return Object.keys(DEAL_STAGE_CONFIG);
     return Object.entries(DEAL_STAGE_CONFIG)
@@ -456,17 +618,62 @@ export default function DealPipelinePage() {
     );
   };
 
-  const renderDealCard = (deal: Deal) => {
+  const SwipeableDealCard = ({ deal }: { deal: Deal }) => {
     const hasUpcomingFollowUp = deal.nextFollowUpAt && new Date(deal.nextFollowUpAt) > new Date();
     const isOverdueFollowUp = deal.nextFollowUpAt && new Date(deal.nextFollowUpAt) <= new Date();
+    const followUpCount = deal.followUpAttemptCount || 0;
+    const canAdvance = getNextStage(deal.currentStage) !== null;
+    const canGoBack = getPreviousStage(deal.currentStage) !== null;
+
+    const isTerminalStage = TERMINAL_STAGES.includes(deal.currentStage);
+    
+    const swipeHandlers = useSwipeable({
+      onSwipedRight: () => canAdvance && !isTerminalStage && handleSwipeAdvance(deal),
+      onSwipedLeft: () => {
+        if (canGoBack) {
+          handleSwipeBack(deal);
+        } else if (!isTerminalStage) {
+          setPendingDeadDeal(deal);
+          setShowLossReasonDialog(true);
+        }
+      },
+      onSwiping: (eventData) => {
+        if (eventData.dir === "Right" && canAdvance && !isTerminalStage) {
+          setSwipingDealId(deal.id);
+          setSwipeDirection("right");
+        } else if (eventData.dir === "Left" && (canGoBack || !isTerminalStage)) {
+          setSwipingDealId(deal.id);
+          setSwipeDirection("left");
+        }
+      },
+      onTouchEndOrOnMouseUp: () => {
+        setSwipingDealId(null);
+        setSwipeDirection(null);
+      },
+      trackMouse: false,
+      preventScrollOnSwipe: true,
+      delta: 50,
+    });
 
     return (
-      <Card
-        key={deal.id}
-        className="p-4 cursor-pointer hover-elevate"
-        onClick={() => handleOpenDeal(deal)}
-        data-testid={`deal-card-${deal.id}`}
-      >
+      <div {...swipeHandlers} className="relative">
+        {swipingDealId === deal.id && swipeDirection === "right" && (
+          <div className="absolute inset-y-0 left-0 w-16 bg-green-500/20 rounded-l-lg flex items-center justify-center">
+            <ChevronRight className="w-6 h-6 text-green-600" />
+          </div>
+        )}
+        {swipingDealId === deal.id && swipeDirection === "left" && (
+          <div className="absolute inset-y-0 right-0 w-16 bg-red-500/20 rounded-r-lg flex items-center justify-center">
+            <XCircle className="w-6 h-6 text-red-600" />
+          </div>
+        )}
+        <Card
+          className={`p-4 cursor-pointer hover-elevate transition-transform ${
+            swipingDealId === deal.id && swipeDirection === "right" ? "translate-x-4" : ""
+          } ${swipingDealId === deal.id && swipeDirection === "left" ? "-translate-x-4" : ""}`}
+          onClick={() => handleOpenDeal(deal)}
+          data-testid={`deal-card-${deal.id}`}
+        >
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -499,6 +706,11 @@ export default function DealPipelinePage() {
               {deal.contactName}
             </span>
           )}
+          {followUpCount > 0 && (
+            <Badge variant="outline" className="text-xs">
+              Follow-up {followUpCount} of {MAX_FOLLOW_UP_ATTEMPTS}
+            </Badge>
+          )}
           {isOverdueFollowUp && (
             <span className="flex items-center gap-1 text-red-600">
               <AlertCircle className="w-3 h-3" />
@@ -522,7 +734,6 @@ export default function DealPipelinePage() {
         <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
           {deal.businessPhone && (
             <Button
-              size="sm"
               variant="outline"
               className="flex-1"
               onClick={(e) => {
@@ -535,9 +746,22 @@ export default function DealPipelinePage() {
               Call
             </Button>
           )}
+          {deal.businessPhone && (
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(`sms:${deal.businessPhone}`, "_self");
+              }}
+              data-testid={`button-text-${deal.id}`}
+            >
+              <MessageSquare className="w-4 h-4 mr-1" />
+              Text
+            </Button>
+          )}
           {deal.businessAddress && (
             <Button
-              size="sm"
               variant="outline"
               className="flex-1"
               onClick={(e) => {
@@ -553,7 +777,12 @@ export default function DealPipelinePage() {
           )}
         </div>
       </Card>
+      </div>
     );
+  };
+
+  const renderDealCard = (deal: Deal) => {
+    return <SwipeableDealCard key={deal.id} deal={deal} />;
   };
 
   const renderKanbanView = () => {
@@ -724,12 +953,10 @@ export default function DealPipelinePage() {
                     ? "Try adjusting your filters"
                     : "Create your first deal to get started"}
                 </p>
-                <Link href="/deals/new">
-                  <Button className="gap-2" data-testid="button-create-deal">
-                    <Plus className="w-4 h-4" />
-                    Create Deal
-                  </Button>
-                </Link>
+                <Button className="gap-2" onClick={() => setShowCreateDealSheet(true)} data-testid="button-create-deal">
+                  <Plus className="w-4 h-4" />
+                  Create Deal
+                </Button>
               </div>
             ) : viewMode === "kanban" ? (
               renderKanbanView()
@@ -742,15 +969,14 @@ export default function DealPipelinePage() {
         )}
       </main>
 
-      <Link href="/deals/new">
-        <Button
-          className="fixed bottom-24 right-4 h-14 w-14 rounded-full shadow-lg z-30"
-          size="icon"
-          data-testid="add-deal-fab"
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
-      </Link>
+      <Button
+        className="fixed bottom-24 right-4 h-14 w-14 rounded-full shadow-lg z-30"
+        size="icon"
+        onClick={() => setShowCreateDealSheet(true)}
+        data-testid="add-deal-fab"
+      >
+        <Plus className="w-6 h-6" />
+      </Button>
 
       <Sheet open={!!selectedDeal} onOpenChange={(open) => {
         if (!open) {
@@ -1112,10 +1338,25 @@ export default function DealPipelinePage() {
                       <div className="space-y-2">
                         <Label className="text-xs flex items-center gap-1">
                           <CalendarPlus className="w-3 h-3" />
-                          Next Follow-up Date (optional)
+                          Next Follow-up Date
                         </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {FOLLOW_UP_CADENCE.map(({ day, label }) => (
+                            <Button
+                              key={day}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setNextFollowUpDate(getSuggestedFollowUpDate(day))}
+                              className={nextFollowUpDate === getSuggestedFollowUpDate(day) ? "ring-2 ring-primary" : ""}
+                              data-testid={`button-followup-day-${day}`}
+                            >
+                              {label}
+                            </Button>
+                          ))}
+                        </div>
                         <Input
-                          type="datetime-local"
+                          type="date"
                           value={nextFollowUpDate}
                           onChange={(e) => setNextFollowUpDate(e.target.value)}
                           data-testid="input-next-followup-date"
@@ -1359,6 +1600,182 @@ export default function DealPipelinePage() {
               </div>
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={showLossReasonDialog} onOpenChange={setShowLossReasonDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark Deal as Lost</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Why was this deal lost?</Label>
+              <Select value={selectedLossReason} onValueChange={setSelectedLossReason}>
+                <SelectTrigger data-testid="select-loss-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEFAULT_LOSS_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Additional notes (optional)</Label>
+              <Textarea
+                value={lossNotes}
+                onChange={(e) => setLossNotes(e.target.value)}
+                placeholder="Add any additional context..."
+                data-testid="input-loss-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowLossReasonDialog(false);
+              setPendingDeadDeal(null);
+              setSelectedLossReason("");
+              setLossNotes("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleMarkDead}
+              disabled={!selectedLossReason}
+              data-testid="button-confirm-dead"
+            >
+              Mark as Lost
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={showCreateDealSheet} onOpenChange={setShowCreateDealSheet}>
+        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
+          <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
+            <SheetTitle>Create New Deal</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="space-y-2">
+              <Label>Business Name *</Label>
+              <Input
+                value={newDealForm.businessName}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, businessName: e.target.value }))}
+                placeholder="Business name"
+                data-testid="input-business-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Business Phone</Label>
+              <Input
+                value={newDealForm.businessPhone}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, businessPhone: e.target.value }))}
+                placeholder="555-123-4567"
+                type="tel"
+                data-testid="input-business-phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Business Email</Label>
+              <Input
+                value={newDealForm.businessEmail}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, businessEmail: e.target.value }))}
+                placeholder="email@business.com"
+                type="email"
+                data-testid="input-business-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input
+                value={newDealForm.businessAddress}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, businessAddress: e.target.value }))}
+                placeholder="123 Main St"
+                data-testid="input-address"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={newDealForm.businessCity}
+                  onChange={(e) => setNewDealForm(prev => ({ ...prev, businessCity: e.target.value }))}
+                  placeholder="City"
+                  data-testid="input-city"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={newDealForm.businessState}
+                  onChange={(e) => setNewDealForm(prev => ({ ...prev, businessState: e.target.value }))}
+                  placeholder="CA"
+                  maxLength={2}
+                  data-testid="input-state"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Zip</Label>
+                <Input
+                  value={newDealForm.businessZip}
+                  onChange={(e) => setNewDealForm(prev => ({ ...prev, businessZip: e.target.value }))}
+                  placeholder="90210"
+                  data-testid="input-zip"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Contact Name</Label>
+              <Input
+                value={newDealForm.contactName}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, contactName: e.target.value }))}
+                placeholder="John Smith"
+                data-testid="input-contact-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Temperature</Label>
+              <Select value={newDealForm.temperature} onValueChange={(v) => setNewDealForm(prev => ({ ...prev, temperature: v }))}>
+                <SelectTrigger data-testid="select-temperature">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hot">Hot</SelectItem>
+                  <SelectItem value="warm">Warm</SelectItem>
+                  <SelectItem value="cold">Cold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Estimated Monthly Volume</Label>
+              <Input
+                value={newDealForm.estimatedMonthlyVolume}
+                onChange={(e) => setNewDealForm(prev => ({ ...prev, estimatedMonthlyVolume: e.target.value }))}
+                placeholder="$10,000"
+                data-testid="input-volume"
+              />
+            </div>
+          </div>
+          <div className="border-t p-4 flex-shrink-0">
+            <Button
+              className="w-full"
+              onClick={() => createDealMutation.mutate(newDealForm)}
+              disabled={createDealMutation.isPending || !newDealForm.businessName.trim()}
+              data-testid="button-submit-deal"
+            >
+              {createDealMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              Create Deal
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
 
