@@ -9387,6 +9387,7 @@ Generate the following content in JSON format:
 
       // Fire-and-forget: trigger background processing via internal endpoint
       const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      console.log(`[ProspectJobs] Triggering background processing for job ${job.id}`);
       fetch(`${baseUrl}/api/internal/process-prospect-job`, {
         method: "POST",
         headers: {
@@ -9394,6 +9395,8 @@ Generate the following content in JSON format:
           "X-Internal-Secret": INTERNAL_SECRET,
         },
         body: JSON.stringify({ jobId: job.id }),
+      }).then(response => {
+        console.log(`[ProspectJobs] Internal endpoint response: ${response.status}`);
       }).catch(err => {
         console.error("[ProspectJobs] Failed to trigger background processing:", err);
       });

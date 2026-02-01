@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startEmailDigestCron } from "./cron";
+import { recoverStuckProspectJobs } from "./services/job-recovery";
 
 const app = express();
 const httpServer = createServer(app);
@@ -95,6 +96,11 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Recover any stuck background jobs from previous server runs
+      recoverStuckProspectJobs().catch(err => {
+        console.error("[Startup] Failed to recover stuck jobs:", err);
+      });
       
       // Start the email digest cron job
       startEmailDigestCron();

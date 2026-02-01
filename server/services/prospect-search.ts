@@ -159,18 +159,33 @@ REQUIREMENTS:
 Return ONLY a valid JSON array with this format (no markdown, no explanation):
 [{"name":"Business Name","address":"123 Main St","city":"City","state":"IN","zipCode":"${zipCode}","phone":"(555) 123-4567","website":"https://example.com","email":null,"hoursOfOperation":"Mon-Fri 9am-5pm","description":"Brief description","businessType":"${primarySearchTerms[0] || 'Business'}","mccCode":"0000","confidence":0.9}]`;
 
-  const response = await fetch("https://api.x.ai/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: "grok-4",
-      tools: [{ type: "web_search" }],
-      input: searchPrompt
-    })
-  });
+  // Add timeout to prevent hanging (90 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.x.ai/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "grok-4",
+        tools: [{ type: "web_search" }],
+        input: searchPrompt
+      }),
+      signal: controller.signal
+    });
+  } catch (fetchError: any) {
+    clearTimeout(timeoutId);
+    if (fetchError.name === 'AbortError') {
+      throw new Error("Grok API call timed out after 90 seconds");
+    }
+    throw fetchError;
+  }
+  clearTimeout(timeoutId);
 
   console.log("[ProspectSearch] Grok response status:", response.status);
 
