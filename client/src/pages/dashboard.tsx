@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropCard } from "@/components/DropCard";
 import { EmptyState } from "@/components/EmptyState";
+import { ProspectingAdviceCoach } from "@/components/ProspectingAdviceCoach";
 import { DashboardSkeleton } from "@/components/LoadingState";
 import { BottomNav } from "@/components/BottomNav";
 import { LocationReminder } from "@/components/LocationReminder";
@@ -635,6 +636,8 @@ export default function DashboardPage() {
                 </div>
               </Card>
             </Link>
+
+            <ProspectingAdviceCoach />
           </div>
         </section>
 
