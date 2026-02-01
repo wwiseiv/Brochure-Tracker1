@@ -10155,6 +10155,42 @@ Generate the following content in JSON format:
   // MARKETING FLYER GENERATION API
   // ============================================================================
 
+  // Personalize a static template with rep contact info
+  app.post("/api/marketing/personalize", isAuthenticated, async (req: any, res) => {
+    try {
+      const { templateUrl, repName, repPhone, repEmail } = req.body;
+      
+      if (!templateUrl) {
+        return res.status(400).json({ error: 'Template URL is required' });
+      }
+      
+      if (!repName || !repPhone || !repEmail) {
+        return res.status(400).json({ error: 'Contact information is required (name, phone, email)' });
+      }
+
+      const { personalizeStaticTemplate } = await import('./services/marketingGenerator');
+      
+      // Convert relative URL to full URL for Playwright
+      const host = req.protocol + '://' + req.get('host');
+      const fullTemplateUrl = templateUrl.startsWith('http') ? templateUrl : host + templateUrl;
+      
+      const personalizedUrl = await personalizeStaticTemplate(fullTemplateUrl, {
+        name: repName,
+        phone: repPhone,
+        email: repEmail,
+      });
+      
+      res.json({ 
+        success: true, 
+        personalizedUrl,
+        message: 'Template personalized successfully'
+      });
+    } catch (error) {
+      console.error('Error personalizing template:', error);
+      res.status(500).json({ error: 'Failed to personalize template' });
+    }
+  });
+
   app.post("/api/marketing/generate", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

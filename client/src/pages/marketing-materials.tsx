@@ -449,20 +449,77 @@ export default function MarketingMaterialsPage() {
     setSheetOpen(true);
   };
 
-  const handleDownload = () => {
+  const [isPersonalizing, setIsPersonalizing] = useState(false);
+
+  const handleDownload = async () => {
     if (!selectedTemplate) return;
     
-    const link = document.createElement("a");
-    link.href = selectedTemplate.thumbnailUrl;
-    link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({
-      title: "Download Started",
-      description: "Your marketing flyer is being downloaded.",
-    });
+    // Check if contact info is filled in
+    if (!repName.trim() || !repPhone.trim() || !repEmail.trim()) {
+      toast({
+        title: "Contact Info Required",
+        description: "Please fill in your name, phone, and email before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For static templates, personalize with contact info
+    if (selectedTemplate.isStatic) {
+      setIsPersonalizing(true);
+      try {
+        const response = await apiRequest("POST", "/api/marketing/personalize", {
+          templateUrl: selectedTemplate.thumbnailUrl,
+          repName: repName.trim(),
+          repPhone: repPhone.trim(),
+          repEmail: repEmail.trim(),
+        });
+        
+        const data = await response.json();
+        
+        if (data.personalizedUrl) {
+          const link = document.createElement("a");
+          link.href = data.personalizedUrl;
+          link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-personalized.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          toast({
+            title: "Download Started",
+            description: "Your personalized flyer with contact info is being downloaded.",
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Personalization Failed",
+          description: "Could not add your contact info to the flyer. Downloading original instead.",
+          variant: "destructive",
+        });
+        // Fallback to original download
+        const link = document.createElement("a");
+        link.href = selectedTemplate.thumbnailUrl;
+        link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        setIsPersonalizing(false);
+      }
+    } else {
+      // For custom/saved templates, download as-is
+      const link = document.createElement("a");
+      link.href = selectedTemplate.thumbnailUrl;
+      link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download Started",
+        description: "Your marketing flyer is being downloaded.",
+      });
+    }
   };
 
   const handleEmailCopy = () => {
@@ -777,16 +834,26 @@ ${repEmail}`;
 
                 <TabsContent value="download" className="space-y-4 mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Download this flyer to share with prospects. Print it or send it digitally.
+                    Download this flyer with your contact info added. Print it or send it digitally.
                   </p>
                   <Button 
                     size="lg"
                     className="w-full gap-2 min-h-12" 
                     onClick={handleDownload}
+                    disabled={isPersonalizing}
                     data-testid="button-download-flyer"
                   >
-                    <Download className="w-4 h-4" />
-                    Download Flyer
+                    {isPersonalizing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Adding Your Info...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        Download Personalized Flyer
+                      </>
+                    )}
                   </Button>
                 </TabsContent>
 
@@ -829,10 +896,20 @@ ${repEmail}`;
                       size="lg"
                       className="w-full gap-2 min-h-12" 
                       onClick={handleDownload}
+                      disabled={isPersonalizing}
                       data-testid="button-download-before-email"
                     >
-                      <Download className="w-4 h-4" />
-                      1. Download Flyer First
+                      {isPersonalizing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adding Your Info...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          1. Download Flyer First
+                        </>
+                      )}
                     </Button>
                     <Button 
                       variant="outline" 

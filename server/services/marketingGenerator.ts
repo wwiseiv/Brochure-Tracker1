@@ -569,3 +569,115 @@ export async function getUserGenerationJobs(userId: string): Promise<FlyerGenera
 export async function deleteGenerationJob(jobId: number): Promise<void> {
   await db.delete(marketingGenerationJobs).where(eq(marketingGenerationJobs.id, jobId));
 }
+
+// Personalize a static template with rep contact info
+export async function personalizeStaticTemplate(
+  templateUrl: string,
+  repInfo: { name: string; phone: string; email: string }
+): Promise<string> {
+  const timestamp = Date.now();
+  const publicDir = path.join(process.cwd(), 'client', 'public', 'marketing', 'personalized');
+  
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+
+  // Generate HTML that overlays contact info on template
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personalized Flyer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #ffffff;
+    }
+    .container {
+      position: relative;
+      width: 816px;
+      height: 1056px;
+    }
+    .template-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: white;
+    }
+    .contact-overlay {
+      position: absolute;
+      bottom: 80px;
+      right: 40px;
+      background: rgba(124, 92, 252, 0.95);
+      padding: 16px 24px;
+      border-radius: 12px;
+      color: white;
+      text-align: right;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .contact-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .contact-details {
+      font-size: 14px;
+      line-height: 1.5;
+      opacity: 0.95;
+    }
+    .contact-badge {
+      position: absolute;
+      bottom: 80px;
+      left: 40px;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .contact-badge img {
+      height: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="${templateUrl}" alt="Flyer Template" class="template-image">
+    <div class="contact-overlay">
+      <div class="contact-name">${repInfo.name}</div>
+      <div class="contact-details">
+        ${repInfo.phone}<br>
+        ${repInfo.email}
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const { chromium } = await import('playwright');
+    
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    
+    await page.setViewportSize({ width: 816, height: 1056 });
+    await page.setContent(html, { waitUntil: 'networkidle', timeout: 30000 });
+    
+    // Wait for the template image to load
+    await page.waitForTimeout(1000);
+    
+    const pngFilename = `personalized_${timestamp}.png`;
+    const pngPath = path.join(publicDir, pngFilename);
+    
+    await page.screenshot({ path: pngPath, fullPage: true });
+    await browser.close();
+    
+    console.log('[MarketingGenerator] Personalized template:', pngFilename);
+    return `/marketing/personalized/${pngFilename}`;
+  } catch (error) {
+    console.error('[MarketingGenerator] Failed to personalize template:', error);
+    throw new Error('Failed to personalize template. Please try again.');
+  }
+}
