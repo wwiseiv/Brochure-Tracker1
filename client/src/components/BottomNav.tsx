@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3 } from "lucide-react";
+import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3, GraduationCap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UserRole {
@@ -14,7 +14,7 @@ const navItems = [
   { path: "/today", icon: CalendarCheck, label: "Today", tooltip: "Today's tasks and actions" },
   { path: "/scan", icon: QrCode, label: "Scan", tooltip: "Scan & drop a brochure" },
   { path: "/esign", icon: FileSignature, label: "E-Sign", tooltip: "Electronic signature documents" },
-  { path: "/merchants", icon: Store, label: "Merchants", tooltip: "View your merchants" },
+  { path: "/coach", icon: GraduationCap, label: "Coach", tooltip: "AI coaching & training tools" },
   { path: "/profile", icon: User, label: "Profile", tooltip: "Your profile & settings" },
 ];
 
