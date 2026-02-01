@@ -1,5 +1,7 @@
-import type { Express } from "express";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import type { Express, Request, Response } from "express";
+import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
+import { randomUUID } from "crypto";
+import multer from "multer";
 
 /**
  * Register object storage routes for file uploads.
@@ -13,6 +15,12 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
  * - Add file metadata storage (save to database after upload)
  * - Add ACL policies for access control
  */
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
 export function registerObjectStorageRoutes(app: Express): void {
   const objectStorageService = new ObjectStorageService();
 
@@ -80,6 +88,55 @@ export function registerObjectStorageRoutes(app: Express): void {
         return res.status(404).json({ error: "Object not found" });
       }
       return res.status(500).json({ error: "Failed to serve object" });
+    }
+  });
+
+  /**
+   * Direct proxy upload endpoint - bypasses browser CORS issues with GCS.
+   * POST /api/uploads/proxy
+   * 
+   * Uses multipart/form-data for file upload.
+   * Returns the object path for later retrieval.
+   */
+  app.post("/api/uploads/proxy", upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      const objectId = randomUUID();
+      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+
+      // Parse bucket and object name from path
+      const pathWithoutLeadingSlash = fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
+      const [bucketName, ...rest] = pathWithoutLeadingSlash.split("/");
+      const objectName = rest.join("/");
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      // Upload the file buffer directly to GCS
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype || "application/octet-stream",
+        metadata: {
+          originalName: req.file.originalname
+        }
+      });
+
+      const objectPath = `/objects/uploads/${objectId}`;
+
+      res.json({
+        objectPath,
+        metadata: {
+          name: req.file.originalname,
+          size: req.file.size,
+          contentType: req.file.mimetype
+        }
+      });
+    } catch (error) {
+      console.error("Error in proxy upload:", error);
+      res.status(500).json({ error: "Failed to upload file" });
     }
   });
 }

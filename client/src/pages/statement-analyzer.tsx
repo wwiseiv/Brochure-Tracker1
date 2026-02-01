@@ -783,28 +783,22 @@ export default function StatementAnalyzer() {
       });
 
       try {
-        const urlResponse = await fetch("/api/uploads/request-url", {
+        // Use proxy upload to avoid browser CORS issues with GCS
+        const formData = new FormData();
+        formData.append("file", uploadFile.file);
+
+        const uploadResponse = await fetch("/api/uploads/proxy", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: uploadFile.file.name,
-            size: uploadFile.file.size,
-            contentType: uploadFile.file.type || "application/octet-stream"
-          })
+          body: formData
         });
 
-        if (!urlResponse.ok) {
-          throw new Error("Failed to get upload URL");
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json().catch(() => ({}));
+          console.error("Proxy upload failed:", uploadResponse.status, errorData);
+          throw new Error(`Upload failed: ${uploadResponse.status}`);
         }
 
-        const { uploadURL, objectPath } = await urlResponse.json();
-
-        await fetch(uploadURL, {
-          method: "PUT",
-          body: uploadFile.file,
-          headers: { "Content-Type": uploadFile.file.type || "application/octet-stream" }
-        });
-
+        const { objectPath } = await uploadResponse.json();
         const textContent = await readFileAsText(uploadFile.file);
 
         setUploadedFiles(prev => {
@@ -863,27 +857,22 @@ export default function StatementAnalyzer() {
       });
 
       try {
-        const urlResponse = await fetch("/api/uploads/request-url", {
+        // Use proxy upload to avoid browser CORS issues with GCS
+        const formData = new FormData();
+        formData.append("file", uploadFile.file);
+
+        const uploadResponse = await fetch("/api/uploads/proxy", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: uploadFile.file.name,
-            size: uploadFile.file.size,
-            contentType: uploadFile.file.type || "application/octet-stream"
-          })
+          body: formData
         });
 
-        if (!urlResponse.ok) {
-          throw new Error("Failed to get upload URL");
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json().catch(() => ({}));
+          console.error("Proxy upload failed:", uploadResponse.status, errorData);
+          throw new Error(`Upload failed: ${uploadResponse.status}`);
         }
 
-        const { uploadURL, objectPath } = await urlResponse.json();
-
-        await fetch(uploadURL, {
-          method: "PUT",
-          body: uploadFile.file,
-          headers: { "Content-Type": uploadFile.file.type || "application/octet-stream" }
-        });
+        const { objectPath } = await uploadResponse.json();
 
         setUploadedFiles(prev => {
           const updated = [...prev];
@@ -898,6 +887,7 @@ export default function StatementAnalyzer() {
         });
 
       } catch (error) {
+        console.error("Upload error:", error);
         setUploadedFiles(prev => {
           const updated = [...prev];
           updated[i] = { ...updated[i], uploading: false, error: "Upload failed" };
@@ -913,7 +903,7 @@ export default function StatementAnalyzer() {
       setExtractionStep("idle");
       toast({
         title: "Upload Failed",
-        description: "No files could be uploaded",
+        description: "No files could be uploaded. Please try again.",
         variant: "destructive"
       });
     }
