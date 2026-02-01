@@ -1,7 +1,7 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
-import { createRequire } from "module";
+import * as pdfParseModule from "pdf-parse";
 import {
   identifyProcessor,
   findSimilarExtractions,
@@ -9,9 +9,8 @@ import {
   buildFewShotPrompt
 } from "./learning-service";
 
-// pdf-parse is a CommonJS module, use createRequire for ESM compatibility
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+// Handle both ESM and CJS module formats
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 interface ExtractedStatementData {
   merchantName?: string;

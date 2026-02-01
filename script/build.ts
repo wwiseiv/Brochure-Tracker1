@@ -2,6 +2,34 @@ import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
+// Packages that must be external due to dynamic requires, native modules, or ESM issues
+const forceExternal = [
+  "puppeteer",
+  "playwright",
+  "openid-client",
+  "@anthropic-ai/sdk",
+  "@google-cloud/storage",
+  "@google/genai",
+  "@google/generative-ai",
+  "googleapis",
+  "google-auth-library",
+  "html-pdf-node",
+  "mammoth",
+  "pdf-parse",
+  "cheerio",
+  "resend",
+  "web-push",
+  "docx",
+  "exceljs",
+  "pdf-lib",
+  "handlebars",
+  "openai",
+  "p-limit",
+  "p-retry",
+  "memoizee",
+  "framer-motion",
+];
+
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
@@ -44,7 +72,11 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
+  
+  // Mark deps as external if they're not in allowlist OR if they're in forceExternal
+  const externals = allDeps.filter(
+    (dep) => !allowlist.includes(dep) || forceExternal.includes(dep)
+  );
 
   await esbuild({
     entryPoints: ["server/index.ts"],
