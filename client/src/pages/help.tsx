@@ -1402,6 +1402,39 @@ export default function HelpPage() {
                   Yes! Before analyzing a statement, expand the Pricing Configuration panel. Set your Dual Pricing monthly fee, IC+ markup, Surcharge rate, or use Quick Presets (Standard, Aggressive, Premium). AI uses your rates to calculate potential savings.
                 </AccordionContent>
               </AccordionItem>
+              <AccordionItem value="item-24">
+                <AccordionTrigger className="text-sm">How do I use the Deal Pipeline?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Go to the Deal Pipeline from the Dashboard. Create new deals by tapping the + button, then track them through 14 stages from Prospect to Active Merchant. Use swipe gestures on mobile to quickly advance deals to the next stage.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-25">
+                <AccordionTrigger className="text-sm">What are the 14 pipeline stages?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  <strong>Prospecting:</strong> Prospect, Cold Call, Appointment Set.<br/>
+                  <strong>Active Selling:</strong> Presentation Made, Proposal Sent, Statement Analysis, Negotiating, Follow-Up.<br/>
+                  <strong>Closing:</strong> Documents Sent, Documents Signed, Won, Lost.<br/>
+                  <strong>Post-Sale:</strong> Installation Scheduled, Active Merchant.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-26">
+                <AccordionTrigger className="text-sm">How do I track follow-ups on a deal?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Open a deal and tap "Record Follow-Up". Choose the method (call, text, email, in-person) and outcome (scheduled meeting, left voicemail, etc.). Schedule your next follow-up with quick presets like "tomorrow" or "in 1 week". Track up to 5 attempts per deal.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-27">
+                <AccordionTrigger className="text-sm">What are temperature badges?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Temperature badges (Hot, Warm, Cold) help you prioritize deals. <strong>Hot</strong> = urgent, likely to close soon. <strong>Warm</strong> = interested but not urgent. <strong>Cold</strong> = needs nurturing. Set the temperature when creating or editing a deal.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-28">
+                <AccordionTrigger className="text-sm">How do I convert a won deal to an active merchant?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  When a deal moves to the "Active Merchant" stage, tap "Convert to Merchant" in the deal details. This creates a full merchant profile with all the business info, ready for ongoing relationship management and quarterly check-ins.
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </CardContent>
         </Card>

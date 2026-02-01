@@ -31,6 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ArrowLeft,
   Search,
   Building2,
@@ -850,33 +855,48 @@ export default function DealPipelinePage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="/">
+                  <Button variant="ghost" size="icon" data-testid="button-back">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Back to Dashboard</TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
               <h1 className="text-lg font-semibold">Deal Pipeline</h1>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant={viewMode === "list" ? "default" : "outline"}
-              size="icon"
-              onClick={() => setViewMode("list")}
-              data-testid="button-list-view"
-            >
-              <LayoutList className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === "kanban" ? "default" : "outline"}
-              size="icon"
-              onClick={() => setViewMode("kanban")}
-              data-testid="button-kanban-view"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === "list" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("list")}
+                  data-testid="button-list-view"
+                >
+                  <LayoutList className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>List view</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === "kanban" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setViewMode("kanban")}
+                  data-testid="button-kanban-view"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Kanban board</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -969,15 +989,20 @@ export default function DealPipelinePage() {
         )}
       </main>
 
-      <Button
-        className="fixed right-4 h-14 w-14 rounded-full shadow-lg z-30"
-        style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
-        size="icon"
-        onClick={() => setShowCreateDealSheet(true)}
-        data-testid="add-deal-fab"
-      >
-        <Plus className="w-6 h-6" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            className="fixed right-4 h-14 w-14 rounded-full shadow-lg z-30"
+            style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
+            size="icon"
+            onClick={() => setShowCreateDealSheet(true)}
+            data-testid="add-deal-fab"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Create new deal</TooltipContent>
+      </Tooltip>
 
       <Sheet open={!!selectedDeal} onOpenChange={(open) => {
         if (!open) {
