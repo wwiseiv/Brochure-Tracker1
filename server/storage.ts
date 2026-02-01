@@ -154,6 +154,12 @@ import {
   pushSubscriptions,
   type PushSubscription,
   type InsertPushSubscription,
+  emailDigestPreferences,
+  emailDigestHistory,
+  type EmailDigestPreferences,
+  type InsertEmailDigestPreferences,
+  type EmailDigestHistory,
+  type InsertEmailDigestHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -287,6 +293,15 @@ export interface IStorage {
   createUserPermissions(userId: string): Promise<UserPermissions>;
   updateUserPermissions(userId: string, data: Partial<UserPermissions>): Promise<UserPermissions | undefined>;
   getAllUserPermissions(): Promise<UserPermissions[]>;
+  
+  // Email Digest Methods
+  getEmailDigestPreferences(userId: string): Promise<EmailDigestPreferences | undefined>;
+  createEmailDigestPreferences(data: InsertEmailDigestPreferences): Promise<EmailDigestPreferences>;
+  updateEmailDigestPreferences(userId: string, data: Partial<InsertEmailDigestPreferences>): Promise<EmailDigestPreferences | undefined>;
+  getEmailDigestHistory(userId: string, limit?: number): Promise<EmailDigestHistory[]>;
+  createEmailDigestHistory(data: InsertEmailDigestHistory): Promise<EmailDigestHistory>;
+  updateEmailDigestHistory(id: number, data: Partial<InsertEmailDigestHistory>): Promise<EmailDigestHistory | undefined>;
+  getDueEmailDigests(digestType: 'daily' | 'weekly'): Promise<EmailDigestPreferences[]>;
   
   // Presentation Training
   getPresentationModules(): Promise<PresentationModule[]>;
@@ -1858,6 +1873,55 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUserPermissions(): Promise<UserPermissions[]> {
     return db.select().from(userPermissions);
+  }
+
+  // Email Digest Methods
+  async getEmailDigestPreferences(userId: string): Promise<EmailDigestPreferences | undefined> {
+    const [prefs] = await db.select().from(emailDigestPreferences).where(eq(emailDigestPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createEmailDigestPreferences(data: InsertEmailDigestPreferences): Promise<EmailDigestPreferences> {
+    const [prefs] = await db.insert(emailDigestPreferences).values(data).returning();
+    return prefs;
+  }
+
+  async updateEmailDigestPreferences(userId: string, data: Partial<InsertEmailDigestPreferences>): Promise<EmailDigestPreferences | undefined> {
+    const [prefs] = await db.update(emailDigestPreferences)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(emailDigestPreferences.userId, userId))
+      .returning();
+    return prefs;
+  }
+
+  async getEmailDigestHistory(userId: string, limit = 20): Promise<EmailDigestHistory[]> {
+    return db.select().from(emailDigestHistory)
+      .where(eq(emailDigestHistory.userId, userId))
+      .orderBy(desc(emailDigestHistory.createdAt))
+      .limit(limit);
+  }
+
+  async createEmailDigestHistory(data: InsertEmailDigestHistory): Promise<EmailDigestHistory> {
+    const [history] = await db.insert(emailDigestHistory).values(data).returning();
+    return history;
+  }
+
+  async updateEmailDigestHistory(id: number, data: Partial<InsertEmailDigestHistory>): Promise<EmailDigestHistory | undefined> {
+    const [history] = await db.update(emailDigestHistory)
+      .set(data)
+      .where(eq(emailDigestHistory.id, id))
+      .returning();
+    return history;
+  }
+
+  async getDueEmailDigests(digestType: 'daily' | 'weekly'): Promise<EmailDigestPreferences[]> {
+    if (digestType === 'daily') {
+      return db.select().from(emailDigestPreferences)
+        .where(eq(emailDigestPreferences.dailyDigestEnabled, true));
+    } else {
+      return db.select().from(emailDigestPreferences)
+        .where(eq(emailDigestPreferences.weeklyDigestEnabled, true));
+    }
   }
 
   // Presentation Training
