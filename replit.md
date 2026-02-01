@@ -72,6 +72,13 @@ Preferred communication style: Simple, everyday language.
             - `pushSubscriptions` table for subscriber management
             - Service worker with action buttons ("View Results", "Dismiss")
     - **AI Help Chatbot**: Floating Claude AI assistant for app feature inquiries.
+    - **AI-Powered Marketing Materials**: Industry-specific professional flyer templates for sales reps to share with prospects. Features:
+        - Template gallery with 12 industry-specific dual pricing flyers (Liquor Stores, Restaurants & Bars, Pizzerias, Food Trucks, Automotive, Veterinarians, Salons & Spas, Rock & Gravel, B2B Level 2&3, HotSauce POS, Merchant Cash Advance, General)
+        - Industry filtering and search functionality
+        - Rep contact info auto-fill from profile
+        - One-click download for flyers
+        - Email body copy generator for easy sharing
+        - Mobile-first responsive design
     - **Email Digest System**: AI-powered daily/weekly email summaries with:
         - **Timezone-Aware Scheduling**: Cron job runs every 15 minutes, respects user's timezone and preferred send time
         - **Customizable Content**: Toggle appointments, follow-ups, stale deals, pipeline summary, recent wins, AI tips, quarterly check-ins, referrals

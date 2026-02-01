@@ -1,0 +1,262 @@
+Below is a **copy/paste-ready framework** you can drop into Replit as the product/engineering spec for your **Marketing Material Generator module**. It’s designed to solve two problems:
+
+1. **Template Fill Mode**: take your existing 1-page PDF slicks → auto-place rep contact info → download PDF / attach to email
+2. **Generate New Mode**: use your existing slick library as “training examples” (RAG) → create a brand-consistent new one-page slick for a new vertical on the fly → auto-place rep contact info → download / email
+
+I’m also explicitly baking in a “reality check”: **fully automatic placement detection on arbitrary PDFs is possible, but brittle**. The spec below uses a *best-practice hybrid*: “auto-detect + one-time confirmation UI,” and it strongly encourages upgrading templates to **named PDF form fields** for near-perfect reliability.
+
+---
+
+## Paste this into Replit as the build plan / spec
+
+```text
+PROJECT: Marketing Material Generator (Module in Field Sales Intelligence Suite)
+
+GOAL
+Create a “Marketing Materials” module where reps can:
+A) Choose an existing 1-page brochure (PDF) from a thumbnail gallery, then instantly generate a rep-branded PDF (auto-filled contact block) for download and email attachment.
+B) Create a brand-consistent NEW 1-page slick for a new industry/vertical using RAG over existing brochures + LLM + Google image generation (Nano Banana), then auto-fill rep contact block and export to PDF.
+
+PRIMARY USER STORIES
+1) Rep Profile
+- Rep enters and saves: first_name, last_name, email, phone, title (optional), company_web_url.
+- Stored per user and used as default autofill.
+
+2) Template Fill Mode (Existing brochures)
+- Rep opens Marketing Materials → sees thumbnails grouped by Industry/Use Case.
+- Rep clicks a brochure → preview loads.
+- Rep sees their info is already filled (or can override fields).
+- Rep clicks: [Download PDF] or [Email PDF].
+- System generates a new PDF with rep info placed in the correct location and returns a downloadable file (and/or emails it).
+
+3) Admin Upload + Library Management
+- Admin uploads PDFs to the system.
+- System auto-generates a thumbnail and attempts to auto-classify industry tags.
+- System attempts to auto-detect where rep contact fields belong (phone/email/web/name).
+- Admin gets a one-time “Template Mapper” screen to confirm/adjust placement boxes if needed.
+- Template becomes available to reps.
+
+4) Generate New Mode (New vertical on-the-fly)
+- Rep selects: “Create new one-page slick”
+- Rep enters a simple prompt (notes box) + optional details:
+  - industry/vertical
+  - top 3 pains
+  - top 3 outcomes
+  - offer components (dual pricing / interchange-plus / POS / loyalty / faster funding, etc.)
+  - proof points allowed (must be verified, no hallucinated claims)
+- System:
+  a) Uses RAG to retrieve the closest existing brochures and brand style examples.
+  b) Drafts copy consistent with our tone + compliance rules.
+  c) Generates 1–3 images/icons in our style via Google Nano Banana image model.
+  d) Assembles a one-page layout using our house template (HTML/CSS) and exports PDF.
+  e) Auto-inserts rep contact info and returns PDF for download/email.
+- The generated output is stored back into the library with tags so the system “gets smarter.”
+
+NON-FUNCTIONAL REQUIREMENTS
+- Fast: Template Fill Mode must feel instant (<2–4 seconds typical).
+- Reliable: Placement must be correct every time (use fallback mapping UI).
+- Secure: Auth + permissions (admin vs rep), logging for generated materials.
+- Brand-safe: enforce logo usage, fonts, colors, and no unapproved claims.
+- Offline-ish: reps in field should be able to download quickly; email sending optional.
+
+TECH STACK (RECOMMENDED)
+Frontend:
+- Next.js (App Router) + Tailwind + pdf.js for PDF preview
+Backend:
+- Node/TypeScript (Next API routes or Express)
+- Postgres for data + pgvector for embeddings (or any vector store)
+PDF + Image:
+- Thumbnail generation: pdf.js or poppler (server-side) to render page 1 → PNG
+- PDF writing: pdf-lib (overlay text into existing PDFs) OR “HTML → PDF” (Playwright) for newly generated slicks
+RAG:
+- Text extraction: pdfplumber or pdf.js text extraction (server)
+- Embeddings + retrieval: pgvector
+LLM Orchestration:
+- A simple agent pipeline (tool-calls) with guardrails
+Image generation:
+- Google Gemini image generation models (Nano Banana / Nano Banana Pro) via Gemini API.
+
+NOTE ON GOOGLE IMAGE MODELS
+Use Google’s Nano Banana models for image generation/editing: the Gemini API documents Nano Banana as `gemini-2.5-flash-image` and Nano Banana Pro as `gemini-3-pro-image-preview` and notes SynthID watermarking. Ensure we comply with watermarking + usage rules and avoid generating disallowed logos/brands.
+
+DATA MODEL (POSTGRES)
+users
+- id (pk)
+- name
+- email (login)
+- role (admin|rep)
+- rep_first_name
+- rep_last_name
+- rep_email
+- rep_phone
+- rep_title (nullable)
+- rep_web_url
+- created_at, updated_at
+
+templates
+- id (pk)
+- name
+- description
+- industry_tags (text[])
+- pdf_storage_url
+- thumbnail_url
+- status (draft|active|archived)
+- created_by, created_at
+
+template_fields  (key to “auto place rep info”)
+- id (pk)
+- template_id (fk)
+- field_key (enum: rep_name, rep_email, rep_phone, rep_web_url)
+- page_number (int, usually 0)
+- x, y, width, height (float)  // PDF coordinate space
+- font_name, font_size, color (optional overrides)
+- align (left|center|right)
+- is_verified (bool)  // set true after admin confirms mapping
+
+generated_assets
+- id (pk)
+- user_id
+- template_id (nullable if custom)
+- mode (template_fill|custom_generate)
+- input_payload (jsonb)  // prompt + options
+- output_pdf_url
+- preview_png_url
+- created_at
+
+rag_documents
+- id
+- template_id (nullable)
+- doc_type (brochure_text|brochure_layout|brand_guidelines|offer_snippets)
+- content (text)
+- embedding (vector)
+- metadata (jsonb)
+
+INGESTION PIPELINE (FOR EXISTING PDF BROCHURES)
+On upload:
+1) Store original PDF.
+2) Render page 1 to PNG thumbnail.
+3) Extract text blocks + coordinates (best effort).
+4) Auto-tag industry using:
+   - filename heuristics + LLM classification from extracted text.
+5) Auto-detect contact block placement (best effort):
+   Priority A (BEST): detect existing PDF form fields (AcroForm) with names like:
+     rep_name, rep_email, rep_phone, rep_web_url
+   Priority B: detect placeholder text tokens if present:
+     {{rep_name}}, {{rep_phone}}, etc.
+   Priority C: heuristic detection on extracted text:
+     - look near bottom/footer for patterns: “Phone”, “Email”, “Website”, or icon-adjacent text blocks
+     - detect sequences of empty lines / underscores near known labels
+   Priority D (Vision fallback): render PDF page to image and send to a vision-capable model to propose bounding boxes for phone/email/web icons and adjacent blank space.
+6) Save suggested bounding boxes into template_fields with is_verified=false.
+7) Admin UI “Template Mapper” opens:
+   - Shows PDF preview + draggable/resizable boxes for each field
+   - Admin confirms placement once → is_verified=true
+   - From then on generation is deterministic and instant.
+
+PDF GENERATION (TEMPLATE FILL MODE)
+Input: template_id, rep fields (default from user profile), optional overrides
+Steps:
+1) Load PDF.
+2) For each template_field (rep_name/phone/email/web):
+   - Overlay text into the specified bounding box using pdf-lib
+   - Apply font sizing logic:
+     - start at font_size; shrink-to-fit if text overflows width
+3) Optionally add clickable links:
+   - mailto: for email
+   - tel: for phone
+   - https:// for web
+4) Output new PDF to storage and return download URL.
+
+UI (TEMPLATE FILL MODE)
+- Left: Filters (Industry tags, “Most used”, Search)
+- Grid: Thumbnails
+- Click → Detail drawer:
+  - preview
+  - rep fields (editable)
+  - buttons: Download PDF / Email PDF
+
+EMAILING
+Option 1 (simple): Generate PDF → provide “Copy link” + “Open mailto:” prefilled subject/body (attachment manual)
+Option 2 (full): Integrate email sending (SendGrid/SMTP/O365/Gmail) so user can:
+  - choose recipient
+  - subject/body templates
+  - attach generated PDF
+  - send and log activity
+
+RAG + CUSTOM GENERATION MODE (NEW VERTICAL SLICKS)
+Inputs:
+- user prompt + optional structured fields (industry, pains, outcomes, offer components)
+Pipeline (agentic steps):
+1) Industry classifier:
+   - infer industry and use-case
+2) Retrieve:
+   - top 5–10 similar brochures from rag_documents (by embedding similarity)
+   - retrieve “brand style” docs (tone, disclaimers, logo rules)
+3) Draft copy:
+   - headline, subhead, 3–5 benefit bullets, 3 proof points (only approved), CTA
+   - ensure it fits a one-page layout
+4) Image generation:
+   - call Google Nano Banana model to generate 1–3 relevant visuals/icons in our brand style
+   - ban competitor logos and any misleading claims
+5) Layout assembly:
+   - Use a fixed HTML/CSS “one-page slick” template with slots:
+     header (logo + headline)
+     body (bullets + mini sections)
+     visual area
+     CTA strip
+     rep contact footer block (standardized placement)
+   - Render HTML → PDF using Playwright
+6) Auto-fill rep info into footer block (same as template fields but fixed in the HTML template).
+7) Return PDF + store generated asset + ingest back into RAG for future retrieval.
+
+QUALITY / COMPLIANCE GUARDRAILS
+- No hallucinated stats: only use approved claims from a whitelist or internal docs.
+- Add optional “disclaimer slot” based on product (dual pricing, etc.).
+- If the user prompt requests disallowed content or competitor impersonation, refuse and suggest safe alternative.
+- Keep outputs visually consistent: fonts, spacing, logo placement rules.
+
+PERMISSIONS
+- Admin can upload/edit/archive templates and approve mapping.
+- Reps can generate from approved templates and create custom slicks.
+- Optional: limit custom generation by role, daily quota, or manager approval.
+
+MILESTONES
+Phase 1 (Fast Win): Template Fill Mode
+- PDF library + thumbnails + rep profile + manual mapper + pdf overlay generator + download.
+Phase 2: Auto-detection improvements
+- Heuristics + optional vision bounding box proposals; keep admin confirmation step.
+Phase 3: RAG tagging + search
+- Industry auto-tag + embedding search + “similar templates” suggestions.
+Phase 4: Custom Generation Mode
+- RAG retrieve → copy → Nano Banana images → HTML → PDF → store back to library.
+Phase 5: Email integration + activity logging
+- Send PDF from app and log into prospecting pipeline.
+```
+
+---
+
+## Key design choices (so Replit doesn’t build the wrong thing)
+
+### 1) “Automatic placement” should still have a one-time confirmation UI
+
+Even with vision + heuristics, some PDFs will be ambiguous (icons are purely graphical, no text anchors, etc.). The right product pattern is:
+
+* **Auto-suggest placement** (best effort)
+* **Admin confirms once** (drag boxes)
+* **Then it’s perfect forever** for that template
+
+That still feels “fully automated” to the field rep, which is what matters.
+
+### 2) The “best” long-term solution is PDF form fields or a house layout
+
+If you can, update templates to include **named fields** (AcroForm) like `rep_phone`, `rep_email`. That makes placement deterministic with zero ML. If you’re generating new slicks, use a **house HTML layout** so the rep contact block is always in the same spot.
+
+### 3) Nano Banana / Gemini image generation is real and documented
+
+The Gemini API docs describe Nano Banana models for image generation: Nano Banana (`gemini-2.5-flash-image`) and Nano Banana Pro (`gemini-3-pro-image-preview`) and mention SynthID watermarking. ([Google AI for Developers][1])
+
+---
+
+If you want, I can also write the **exact Replit “build prompt”** in a stricter “task list + file tree + endpoints + pseudocode” format (so it generates code more reliably), but the spec above is already structured for an engineer/agent to implement without guessing.
+
+[1]: https://ai.google.dev/gemini-api/docs/image-generation?utm_source=chatgpt.com "Nano Banana image generation | Gemini API"

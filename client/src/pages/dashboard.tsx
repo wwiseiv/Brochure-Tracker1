@@ -12,7 +12,7 @@ import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera, FileImage } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
@@ -445,6 +445,43 @@ export default function DashboardPage() {
               </Card>
             </Link>
           </div>
+        </section>
+
+        {/* AI-Powered Marketing Section */}
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AI-Powered Marketing
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Professional marketing materials for your prospects
+            </p>
+          </div>
+          
+          <Link href="/marketing">
+            <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-marketing-materials">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+                    <FileImage className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold">Marketing Materials</h3>
+                      <Badge variant="secondary">
+                        New
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Industry-specific flyers ready to share
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              </div>
+            </Card>
+          </Link>
         </section>
 
         {/* Leaderboard Section - Only shows when user has permission */}

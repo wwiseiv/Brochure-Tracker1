@@ -2711,3 +2711,91 @@ export type DealWithRelations = Deal & {
   prospect?: Prospect | null;
   merchant?: Merchant | null;
 };
+
+// Marketing Industry Tags
+export const MARKETING_INDUSTRIES = [
+  "liquor_stores",
+  "restaurants_bars",
+  "pizzerias",
+  "food_trucks",
+  "automotive",
+  "veterinarians",
+  "salons_spas",
+  "rock_gravel",
+  "b2b_level23",
+  "merchant_cash_advance",
+  "general",
+  "pos_hotsauce"
+] as const;
+export type MarketingIndustry = typeof MARKETING_INDUSTRIES[number];
+
+// Marketing Templates - Pre-designed flyer templates
+export const marketingTemplates = pgTable("marketing_templates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  industry: varchar("industry", { length: 50 }).notNull(),
+  thumbnailUrl: text("thumbnail_url").notNull(),
+  pdfUrl: text("pdf_url"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMarketingTemplateSchema = createInsertSchema(marketingTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMarketingTemplate = z.infer<typeof insertMarketingTemplateSchema>;
+export type MarketingTemplate = typeof marketingTemplates.$inferSelect;
+
+// Generated Marketing Materials - Track materials sent by reps
+export const generatedMarketingMaterials = pgTable("generated_marketing_materials", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  templateId: integer("template_id").references(() => marketingTemplates.id),
+  
+  repName: varchar("rep_name", { length: 200 }),
+  repPhone: varchar("rep_phone", { length: 30 }),
+  repEmail: varchar("rep_email", { length: 255 }),
+  
+  recipientBusinessName: varchar("recipient_business_name", { length: 255 }),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  
+  generatedPdfUrl: text("generated_pdf_url"),
+  sentAt: timestamp("sent_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const generatedMarketingMaterialsRelations = relations(generatedMarketingMaterials, ({ one }) => ({
+  template: one(marketingTemplates, {
+    fields: [generatedMarketingMaterials.templateId],
+    references: [marketingTemplates.id],
+  }),
+}));
+
+export const insertGeneratedMarketingMaterialSchema = createInsertSchema(generatedMarketingMaterials).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertGeneratedMarketingMaterial = z.infer<typeof insertGeneratedMarketingMaterialSchema>;
+export type GeneratedMarketingMaterial = typeof generatedMarketingMaterials.$inferSelect;
+
+// Default Marketing Templates (pre-seeded)
+export const DEFAULT_MARKETING_TEMPLATES: Omit<InsertMarketingTemplate, 'id'>[] = [
+  { name: "Liquor Stores Dual Pricing", description: "Perfect for liquor stores looking to eliminate processing fees", industry: "liquor_stores", thumbnailUrl: "/marketing/liquor-stores.png", pdfUrl: "/marketing/liquor-stores.pdf", isActive: true, sortOrder: 1 },
+  { name: "Restaurants & Bars", description: "For restaurants and bars ready to save on credit card fees", industry: "restaurants_bars", thumbnailUrl: "/marketing/restaurants-bars.png", isActive: true, sortOrder: 2 },
+  { name: "Pizzerias", description: "Tailored messaging for pizzerias and delivery businesses", industry: "pizzerias", thumbnailUrl: "/marketing/pizzerias.png", isActive: true, sortOrder: 3 },
+  { name: "Food Trucks", description: "Mobile-friendly solutions for food truck operators", industry: "food_trucks", thumbnailUrl: "/marketing/food-trucks.png", isActive: true, sortOrder: 4 },
+  { name: "Automotive Industry", description: "For auto repair shops and car dealerships", industry: "automotive", thumbnailUrl: "/marketing/automotive.png", isActive: true, sortOrder: 5 },
+  { name: "Veterinarians", description: "Specialized for veterinary clinics and animal hospitals", industry: "veterinarians", thumbnailUrl: "/marketing/veterinarians.png", isActive: true, sortOrder: 6 },
+  { name: "Salons & Spas", description: "Beauty and wellness industry focused flyer", industry: "salons_spas", thumbnailUrl: "/marketing/salons-spas.png", isActive: true, sortOrder: 7 },
+  { name: "Rock & Gravel Businesses", description: "For construction materials and aggregate suppliers", industry: "rock_gravel", thumbnailUrl: "/marketing/rock-gravel.png", isActive: true, sortOrder: 8 },
+  { name: "Level 2 & 3 Processing (B2B)", description: "Lower rates for businesses accepting corporate cards", industry: "b2b_level23", thumbnailUrl: "/marketing/b2b-level23.png", isActive: true, sortOrder: 9 },
+  { name: "HotSauce POS", description: "Restaurant POS system with dual pricing built-in", industry: "pos_hotsauce", thumbnailUrl: "/marketing/hotsauce-pos.png", isActive: true, sortOrder: 10 },
+  { name: "Merchant Cash Advance", description: "Fast funding for business owners", industry: "merchant_cash_advance", thumbnailUrl: "/marketing/cash-advance.png", isActive: true, sortOrder: 11 },
+  { name: "Who is PCBancard?", description: "General company overview flyer", industry: "general", thumbnailUrl: "/marketing/pcbancard-intro.png", isActive: true, sortOrder: 12 },
+];

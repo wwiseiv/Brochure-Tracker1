@@ -1,0 +1,310 @@
+Here’s the **exact “build prompt”** you can paste into Replit’s agent so it generates the module cleanly, without guessing. I’m writing it as an engineering task spec with a required file tree, endpoints, DB schema, and the two-mode workflow (template fill + custom generate).
+
+I’m also updating the Gemini model IDs and embeddings guidance so you don’t build on deprecated stuff: **Gemini 2.5 Flash Image (“Nano Banana”) is `gemini-2.5-flash-image`** ([Google Cloud Documentation][1]) and **Nano Banana Pro (“Gemini 3 Pro Image”) is `gemini-3-pro-image-preview`** ([Google Cloud Documentation][2]). For embeddings, Google’s docs show **`text-embedding-004` shut down Jan 14, 2026**, and the recommended replacement is **`gemini-embedding-001`** ([Google AI for Developers][3]) (which matters because today is Feb 1, 2026).
+
+---
+
+```text
+REPLIT BUILD PROMPT — ADD “MARKETING MATERIALS” MODULE
+
+You are implementing a new module inside my existing Field Sales Intelligence Suite web app:
+Module name: Marketing Materials
+Location in UI: under the Sales & Prospecting Pipeline area as a new feature.
+
+HIGH-LEVEL GOAL
+Reps can:
+1) Select an existing 1-page brochure PDF from a thumbnail gallery, auto-insert their contact info into the correct spot(s), then download as a PDF (and optionally email it).
+2) Create a brand-consistent NEW 1-page slick for a new industry/vertical using:
+   - RAG over existing brochures (to learn structure/tone/offer language),
+   - LLM copy generation with strict guardrails,
+   - Google Gemini image generation (“Nano Banana” / “Nano Banana Pro”) for visuals,
+   - HTML→PDF rendering for layout,
+   - Auto-insert rep contact info into the footer/contact block.
+Then save it back into the library so the system gets smarter.
+
+CRITICAL PRODUCT REQUIREMENT: “AUTO PLACE REP INFO” MUST BE RELIABLE
+Fully automatic placement on arbitrary PDFs is brittle; implement a hybrid:
+- Auto-detect best-effort placement
+- Admin confirms ONCE per template using a “Template Mapper” UI (drag/resize boxes)
+- After verification, generation is deterministic and instant for reps.
+
+ASSUMPTIONS ABOUT STACK (ADAPT IF MY REPO DIFFERS)
+- If the repo already uses Next.js: implement as Next App Router pages + API routes.
+- If repo uses Express/React: implement equivalent routes and pages.
+- Use Postgres + Prisma if not already present; if already using Drizzle/Knex, adapt.
+- Store PDFs and thumbnails in existing storage approach; if none exists, store locally in /uploads for MVP with a simple file-serving route.
+
+PHASED DELIVERY (BUT IN THIS BUILD, IMPLEMENT PHASE 1–3 FULLY, AND PHASE 4 AS WORKING “BASIC” VERSION)
+Phase 1 (Must ship): Template Fill Mode MVP
+- Upload PDFs (admin), generate thumbnails, tag industry, map contact placements, generate filled PDF, download.
+Phase 2 (Must ship): Template Mapper UI + Verified placement system
+Phase 3 (Must ship): Library gallery with filters + Rep profile storage
+Phase 4 (Basic working version): Custom generation mode using RAG + Gemini images + HTML→PDF
+- It can be “basic but functional” with 1 house layout template and 1–2 images.
+
+DATA MODEL (CREATE MIGRATIONS)
+If tables already exist, integrate; otherwise create these:
+
+Table: users (or extend existing user table)
+- id (pk)
+- role: 'admin' | 'rep'
+- rep_first_name (string)
+- rep_last_name (string)
+- rep_email (string)
+- rep_phone (string)
+- rep_title (string nullable)
+- rep_web_url (string)
+
+Table: templates
+- id (pk)
+- name (string)
+- description (string nullable)
+- industry_tags (string[] or JSON)
+- pdf_url (string)        // storage path
+- thumbnail_url (string)  // storage path
+- status: 'draft' | 'active' | 'archived'
+- created_by (fk users)
+- created_at, updated_at
+
+Table: template_fields
+- id (pk)
+- template_id (fk templates)
+- field_key ENUM: 'rep_name' | 'rep_email' | 'rep_phone' | 'rep_web_url'
+- page_number INT default 0
+- x FLOAT, y FLOAT, width FLOAT, height FLOAT   // PDF points coordinate space, origin bottom-left
+- font_size FLOAT default 11
+- align ENUM 'left'|'center'|'right' default 'left'
+- is_verified BOOLEAN default false
+
+Table: generated_assets
+- id (pk)
+- user_id (fk users)
+- template_id (fk templates nullable)
+- mode ENUM 'template_fill'|'custom_generate'
+- input_payload JSONB
+- output_pdf_url (string)
+- preview_png_url (string nullable)
+- created_at
+
+Table: rag_documents (Phase 4)
+- id (pk)
+- template_id (fk templates nullable)
+- doc_type ENUM 'brochure_text'|'brand_rules'|'offer_snippets'|'generated_slick_text'
+- content TEXT
+- embedding VECTOR (pgvector) or JSON array if pgvector not available
+- metadata JSONB
+- created_at
+
+ROUTES / ENDPOINTS (IMPLEMENT)
+AUTH: Respect existing auth; restrict admin endpoints to admin role.
+
+1) Rep profile
+- GET  /api/marketing/me/profile
+- PUT  /api/marketing/me/profile
+
+2) Templates library
+- GET  /api/marketing/templates?tag=...&q=...&status=active
+- GET  /api/marketing/templates/:id
+- POST /api/marketing/templates        (admin upload PDF + thumbnail + tags)
+- PUT  /api/marketing/templates/:id    (admin edit name/desc/tags/status)
+- DELETE optional: archive via status
+
+3) Template fields (placement)
+- GET  /api/marketing/templates/:id/fields
+- PUT  /api/marketing/templates/:id/fields   (admin saves boxes + sets is_verified=true)
+
+4) Generate filled PDF from template (rep)
+- POST /api/marketing/templates/:id/generate
+Request body:
+{
+  overrides?: { rep_first_name, rep_last_name, rep_email, rep_phone, rep_web_url, rep_title }
+}
+Response: { downloadUrl }
+
+5) Custom generation (basic working) — Phase 4
+- POST /api/marketing/custom/generate
+Request:
+{
+  industry: string,
+  prompt: string,
+  pains?: string[],
+  outcomes?: string[],
+  offer_components?: string[],
+  tone?: 'professional'|'punchy'|'minimal',
+  image_count?: 1|2|3
+}
+Response: { downloadUrl, templateIdCreated? }
+
+PDF PROCESSING IMPLEMENTATION DETAILS (DO NOT SKIP)
+A) Template Fill Mode overlay (existing PDFs)
+- Use pdf-lib to overlay text onto an existing PDF.
+- For each field, write within bounding box (x,y,width,height).
+- Implement shrink-to-fit font sizing:
+  - Start at field.font_size
+  - Measure text width; reduce size until it fits within width or minimum size threshold.
+- Create clickable links when appropriate:
+  - email => mailto:
+  - phone => tel:
+  - web => https://...
+- Output a new PDF buffer and save to storage.
+
+B) Thumbnail generation
+- Easiest reliable MVP: do it client-side in admin upload:
+  - Use pdf.js in browser to render page 1 to canvas → PNG
+  - Upload PNG alongside PDF to backend
+- Backend stores both, returns template record.
+
+C) Template Mapper UI and Coordinate Conversion
+- Use pdf.js to display PDF page in browser.
+- Admin drags/resizes boxes over the rendered page.
+- Convert screen coords to PDF coords:
+  - pdf.js viewport provides scale and page width/height in pixels.
+  - If admin box is (x_px, y_px, w_px, h_px) from top-left origin:
+    x_pdf = x_px / scale
+    y_pdf = (pageHeight_px - (y_px + h_px)) / scale
+    w_pdf = w_px / scale
+    h_pdf = h_px / scale
+- Store x_pdf, y_pdf, w_pdf, h_pdf in template_fields as PDF points.
+
+AUTO-DETECTION (BEST EFFORT, BUT ALWAYS ALLOW ADMIN CONFIRMATION)
+When admin uploads template:
+- Attempt to detect if PDF has AcroForm fields with names resembling rep_name/rep_email/rep_phone/rep_web_url.
+- If not found, create default suggested placements:
+  - heuristic: bottom footer region boxes aligned left to right
+  - mark is_verified=false
+- Admin must confirm once via Template Mapper.
+
+CUSTOM GENERATION MODE (PHASE 4 BASIC BUT WORKING)
+Implement a working pipeline:
+1) RAG Retrieve
+- Extract text from all existing templates (pdf-parse or pdf.js text extractor on server).
+- Embed and store in rag_documents with metadata tags.
+- Embeddings:
+  - Use Google embedding model `gemini-embedding-001` (recommended replacement).
+  - NOTE: `text-embedding-004` is deprecated and shut down; do not use it.
+
+2) Copy Draft
+- Call text LLM to create:
+  - headline
+  - subhead
+  - 5 bullet benefits
+  - 3 mini-sections (e.g., “How it works”, “Why it matters”, “Next step”)
+  - CTA
+- Guardrails:
+  - No invented stats.
+  - Only use approved product claims. Put unknown claims behind placeholders or omit.
+
+3) Images via Gemini image models
+- Use:
+  - `gemini-2.5-flash-image` for fast images (“Nano Banana”)
+  - optional: `gemini-3-pro-image-preview` for higher quality (“Nano Banana Pro”)
+- Generate 1–3 visuals relevant to the industry prompt.
+- Must avoid competitor logos and protected brands.
+
+4) Layout & PDF export
+- Use ONE fixed HTML/CSS “house template” for a one-page slick:
+  - header: company logo + headline
+  - body: bullets + sections
+  - visuals: right-side or mid-banner
+  - footer: rep contact block (standard location)
+- Render HTML→PDF using Playwright (server-side).
+- Insert rep info into footer directly from user profile/overrides.
+- Save the generated PDF, create a generated_assets record.
+- OPTIONAL: ingest the generated copy text into rag_documents for future retrieval.
+
+UI REQUIREMENTS (IMPLEMENT)
+Marketing Materials main page:
+- Filters: search + industry tags
+- Grid of thumbnails (templates)
+- Clicking opens a right-side panel:
+  - PDF preview
+  - rep fields (auto-filled from saved profile; can override)
+  - buttons: Download PDF (required), Email PDF (optional for later)
+
+Admin area:
+- “Upload Template” form:
+  - name, description, tags
+  - PDF upload
+  - generate thumbnail (client-side) and upload
+- After upload, auto-navigate to Template Mapper:
+  - pdf preview + draggable boxes for rep_name, rep_phone, rep_email, rep_web_url
+  - save confirms mapping (sets is_verified=true)
+
+FILES / FOLDER STRUCTURE (CREATE)
+If Next.js app router:
+- app/(pipeline)/marketing-materials/page.tsx
+- app/(pipeline)/marketing-materials/[id]/page.tsx (optional)
+- app/admin/marketing-templates/page.tsx
+- app/admin/marketing-templates/[id]/mapper/page.tsx
+
+Components:
+- components/marketing/TemplateGrid.tsx
+- components/marketing/TemplatePreviewDrawer.tsx
+- components/marketing/RepProfileForm.tsx
+- components/marketing/AdminUploadTemplate.tsx
+- components/marketing/TemplateMapper.tsx
+
+API routes:
+- app/api/marketing/me/profile/route.ts
+- app/api/marketing/templates/route.ts
+- app/api/marketing/templates/[id]/route.ts
+- app/api/marketing/templates/[id]/fields/route.ts
+- app/api/marketing/templates/[id]/generate/route.ts
+- app/api/marketing/custom/generate/route.ts
+
+Lib:
+- lib/marketing/pdfFill.ts            // pdf-lib overlay
+- lib/marketing/storage.ts            // store/retrieve PDFs + thumbs
+- lib/marketing/rag.ts                // embed + retrieve
+- lib/marketing/gemini.ts             // Gemini calls (text + images + embeddings)
+- lib/marketing/guardrails.ts         // claim restrictions + sanitization
+- prisma/schema.prisma + migrations
+
+ENV VARS (ADD)
+- DATABASE_URL
+- GEMINI_API_KEY
+- STORAGE_BASE_URL or UPLOAD_DIR
+- APP_BASE_URL
+
+DELIVERABLES / ACCEPTANCE TESTS
+1) Admin can upload a 1-page PDF and see it appear as a thumbnail in the library.
+2) Admin can map the rep fields once and save (is_verified=true).
+3) Rep can set profile info once.
+4) Rep selects a template and generates a filled PDF with correct placement 100% of the time.
+5) Download works reliably.
+6) Custom generate endpoint creates a 1-page PDF using the house layout and at least 1 generated image, then auto-fills rep contact footer.
+
+IMPORTANT IMPLEMENTATION NOTE
+Do not build a solution that “guesses placement every time” during generation; use stored verified template_fields.
+If detection fails, it must still work via admin mapping.
+
+NOW DO THIS:
+- Inspect repo and determine existing stack/auth/db.
+- Implement DB migrations or integrate with existing DB layer.
+- Implement pages, components, API routes, and PDF generation logic.
+- Provide brief README with local dev instructions and where to set env vars.
+```
+
+---
+
+## Minimal “email attach” path you can add later (fastest win)
+
+If you want reps to “attach to email” without building a full mail system yet, do this first:
+
+* Generate PDF → show **Download** button + **Copy Link** + **Open Email Draft** (mailto with prefilled subject/body and the link).
+  Later, if you want true sending/attachments in-app, integrate SendGrid or your preferred provider.
+
+---
+
+## Two small but important upgrades that will save you pain
+
+1. **Standardize future templates**: move new slick creation to the “house HTML template” path so rep info placement is always deterministic.
+2. **Force one-time mapping**: even with fancy auto-detection, your reliability comes from storing verified coordinates.
+
+---
+
+If you want the **second prompt** that tells Replit how to implement the **Template Mapper drag/resize UI** (with exact coordinate conversion code + React component skeleton), say “Mapper prompt” and I’ll paste it in one block you can drop straight into Replit.
+
+[1]: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash-image?utm_source=chatgpt.com "Gemini 2.5 Flash Image | Generative AI on Vertex AI"
+[2]: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro-image?utm_source=chatgpt.com "Gemini 3 Pro Image | Generative AI on Vertex AI"
+[3]: https://ai.google.dev/gemini-api/docs/deprecations?utm_source=chatgpt.com "Gemini deprecations | Gemini API - Google AI for Developers"
