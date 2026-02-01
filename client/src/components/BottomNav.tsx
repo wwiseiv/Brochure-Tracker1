@@ -32,7 +32,7 @@ export function BottomNav() {
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
 
   const displayItems = isManager 
-    ? [...navItems.slice(0, 4), ...managerNavItems, navItems[5]] 
+    ? [...navItems.slice(0, 5), ...managerNavItems, navItems[5]] 
     : navItems;
 
   return (
