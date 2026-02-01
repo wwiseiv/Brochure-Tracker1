@@ -12,7 +12,7 @@ import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera, FileImage } from "lucide-react";
+import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera, FileImage, Target, Mail, FileSignature, Phone, ClipboardList, Flame, Thermometer, Snowflake, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
@@ -72,6 +72,38 @@ export default function DashboardPage() {
     enabled: shouldFetchLeaderboard,
     retry: false, // Don't retry on 403
   });
+
+  // Fetch deals for pipeline/CRM stats
+  interface Deal {
+    id: number;
+    businessName: string;
+    stage: string;
+    temperature: string;
+    nextFollowUp: string | null;
+    estimatedCommission: number | null;
+  }
+  
+  interface TodayItems {
+    followUpsDue: Deal[];
+    appointmentsToday: Deal[];
+    staleDeals: Deal[];
+    quarterlyCheckIns: any[];
+  }
+
+  const { data: deals = [] } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
+
+  const { data: todayItems } = useQuery<TodayItems>({
+    queryKey: ["/api/deals/today"],
+  });
+
+  // Calculate pipeline stats
+  const activeDeals = deals.filter(d => !["sold", "dead", "active_merchant"].includes(d.stage));
+  const hotDeals = activeDeals.filter(d => d.temperature === "hot").length;
+  const warmDeals = activeDeals.filter(d => d.temperature === "warm").length;
+  const coldDeals = activeDeals.filter(d => d.temperature === "cold").length;
+  const totalPipelineValue = activeDeals.reduce((sum, d) => sum + (d.estimatedCommission || 0), 0);
 
   const isAdmin = userRole?.role === "master_admin";
   const isRM = userRole?.role === "relationship_manager";
@@ -362,6 +394,165 @@ export default function DashboardPage() {
             </Card>
           </Link>
         </div>
+
+        {/* Deal Pipeline & CRM Section */}
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Target className="w-5 h-5 text-emerald-600" />
+              Deal Pipeline & CRM
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Track deals, follow-ups, and close more sales
+            </p>
+          </div>
+
+          {/* Today's Action Items */}
+          {todayItems && (todayItems.followUpsDue?.length > 0 || todayItems.appointmentsToday?.length > 0) && (
+            <Card className="p-4 mb-4 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" data-testid="card-today-actions">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  Today's Actions
+                </h3>
+                <Link href="/today">
+                  <Button variant="ghost" size="sm" className="gap-1 text-emerald-600" data-testid="button-view-today">
+                    View All
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm">
+                    <span className="font-semibold">{todayItems.followUpsDue?.length || 0}</span> follow-ups due
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm">
+                    <span className="font-semibold">{todayItems.appointmentsToday?.length || 0}</span> appointments
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Pipeline Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <Link href="/prospects/pipeline">
+              <Card className="p-3 hover-elevate cursor-pointer" data-testid="card-active-deals">
+                <div className="flex items-center gap-2 mb-1">
+                  <ClipboardList className="w-4 h-4 text-emerald-600" />
+                  <span className="font-semibold text-xl">{activeDeals.length}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Active Deals</p>
+              </Card>
+            </Link>
+            <Link href="/prospects/pipeline?temp=hot">
+              <Card className="p-3 hover-elevate cursor-pointer" data-testid="card-hot-deals">
+                <div className="flex items-center gap-2 mb-1">
+                  <Flame className="w-4 h-4 text-red-500" />
+                  <span className="font-semibold text-xl">{hotDeals}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Hot Deals</p>
+              </Card>
+            </Link>
+            <Link href="/prospects/pipeline?temp=warm">
+              <Card className="p-3 hover-elevate cursor-pointer" data-testid="card-warm-deals">
+                <div className="flex items-center gap-2 mb-1">
+                  <Thermometer className="w-4 h-4 text-orange-500" />
+                  <span className="font-semibold text-xl">{warmDeals}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Warm Deals</p>
+              </Card>
+            </Link>
+            <Card className="p-3" data-testid="card-pipeline-value">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <span className="font-semibold text-xl">${Math.round(totalPipelineValue).toLocaleString()}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Pipeline Value</p>
+            </Card>
+          </div>
+
+          {/* CRM Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Link href="/today">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-today-view">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                      <ClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Today View</h3>
+                      <p className="text-xs text-muted-foreground">Daily action center</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                </div>
+              </Card>
+            </Link>
+
+            <Link href="/email">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-email-drafter">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                      <Mail className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">Email Drafter</h3>
+                        <Badge variant="secondary" className="text-xs">AI</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Write professional emails</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                </div>
+              </Card>
+            </Link>
+
+            <Link href="/esign">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-esign">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
+                      <FileSignature className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">E-Sign Documents</h3>
+                      <p className="text-xs text-muted-foreground">Send contracts for signature</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                </div>
+              </Card>
+            </Link>
+
+            {(isAdmin || isRM) && (
+              <Link href="/pipeline-analytics">
+                <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-pipeline-analytics">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Pipeline Analytics</h3>
+                        <p className="text-xs text-muted-foreground">Team performance & metrics</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  </div>
+                </Card>
+              </Link>
+            )}
+          </div>
+        </section>
 
         {/* AI-Powered Prospecting Section */}
         <section>
