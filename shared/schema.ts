@@ -2114,6 +2114,66 @@ export const insertStatementAnalysisJobSchema = createInsertSchema(statementAnal
 export type InsertStatementAnalysisJob = z.infer<typeof insertStatementAnalysisJobSchema>;
 export type StatementAnalysisJob = typeof statementAnalysisJobs.$inferSelect;
 
+// Proposal Parse Jobs for background processing
+export const PROPOSAL_PARSE_JOB_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+export type ProposalParseJobStatus = typeof PROPOSAL_PARSE_JOB_STATUSES[number];
+
+export const proposalParseJobs = pgTable("proposal_parse_jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  // Job Configuration
+  jobName: varchar("job_name", { length: 255 }),
+  fileNames: text("file_names").array(),
+  filePaths: text("file_paths").array(),
+  fileMimeTypes: text("file_mime_types").array(),
+  
+  // Job Status for Background Processing
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  progress: integer("progress").default(0),
+  progressMessage: varchar("progress_message", { length: 255 }),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Results (stored as JSONB when complete)
+  parsedData: jsonb("parsed_data"),
+  extractionWarnings: text("extraction_warnings").array(),
+  
+  // Error Handling
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  
+  // Notification Tracking
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const proposalParseJobsRelations = relations(proposalParseJobs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [proposalParseJobs.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertProposalParseJobSchema = createInsertSchema(proposalParseJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+  completedAt: true,
+  parsedData: true,
+  extractionWarnings: true,
+  errorMessage: true,
+  notificationSent: true,
+  notificationSentAt: true,
+});
+export type InsertProposalParseJob = z.infer<typeof insertProposalParseJobSchema>;
+export type ProposalParseJob = typeof proposalParseJobs.$inferSelect;
+
 // Push notification subscriptions for web push
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
