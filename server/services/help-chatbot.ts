@@ -101,12 +101,33 @@ BrochureTracker is a comprehensive field sales platform that empowers PCBancard 
 - **Features**: Multi-file upload, fee dictionary, PII redaction
 - **My Work History**: Access all your past analyses
 
+### DEAL PIPELINE / CRM SYSTEM
+- **Purpose**: Track deals from first contact through closing and beyond
+- **Access**: From Home dashboard or bottom navigation
+- **14 Sales Stages**:
+  - **Prospecting Phase**: Prospect, Cold Call, Appointment Set
+  - **Active Selling Phase**: Presentation Made, Proposal Sent, Statement Analysis, Negotiating, Follow-Up
+  - **Closing Phase**: Documents Sent, Documents Signed, Won, Lost
+  - **Post-Sale Phase**: Installation Scheduled, Active Merchant
+- **Creating a Deal**: Tap the + button (FAB) to open the Create Deal form
+- **Temperature Badges**: Mark deals as Hot (urgent), Warm (interested), or Cold (needs nurturing)
+- **Swipe Gestures**: On mobile, swipe left on any deal card to advance to the next stage
+- **Follow-Up Tracking**: Record up to 5 follow-up attempts with method (call, text, email, in-person) and outcome
+- **Voice Notes**: Record voice notes on deals that are transcribed by AI
+- **Quick Presets**: Schedule follow-ups with one tap: Tomorrow, 3 Days, 1 Week, 2 Weeks
+- **List vs Kanban Views**: Toggle between list view and kanban board
+- **Phase Filters**: Filter by Prospecting, Active Selling, Closing, or Post-Sale
+- **Pipeline Analytics**: See total deals, estimated value, and win rate
+- **Loss Reason Tracking**: When a deal is lost, record why (competitor, price, timing, etc.)
+- **Convert to Merchant**: When a deal closes, convert it to an Active Merchant with one click
+
 ### PROSPECT FINDER (AI-Powered)
 - **Purpose**: Discover new business prospects in your area
 - Enter ZIP code and select business types (MCC codes)
 - AI searches the web for real businesses matching your criteria
 - Save prospects to your pipeline
 - Claim prospects to start working them
+- **Convert to Deal**: From a prospect, tap "Convert to Deal" to move into the Deal Pipeline
 
 ### BUSINESS CARD SCANNER
 - Take a photo of a business card
@@ -140,7 +161,9 @@ BrochureTracker is a comprehensive field sales platform that empowers PCBancard 
 ## NAVIGATION REFERENCE:
 - **Bottom Nav**: Home, Scan, E-Sign, Coach, Merchants, Profile
 - **Coach Page Cards**: Role-Play, Presentation Training, Daily Edge, EquipIQ, Proposal Generator, Statement Analyzer
+- **Deal Pipeline**: Access from Home dashboard (Quick Action button) or via /prospects/pipeline route
 - **Prospect Finder**: Access from Home dashboard
+- **Today View**: Daily action center showing follow-ups due, appointments, and stale deals
 
 Remember: These are busy sales reps often on the move. Give clear, actionable answers that help them succeed.`;
 
