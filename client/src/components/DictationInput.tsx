@@ -7,7 +7,7 @@ import { useDictation } from "@/hooks/use-dictation";
 import { cn } from "@/lib/utils";
 
 interface DictationInputProps {
-  value: string;
+  value?: string;
   onChange: (value: string) => void;
   placeholder?: string;
   multiline?: boolean;
@@ -41,17 +41,19 @@ export function DictationInput({
     appendToExisting: true,
   });
 
+  const currentValue = value ?? "";
+  
   useEffect(() => {
-    if (transcript && transcript !== value) {
+    if (transcript && transcript !== currentValue) {
       onChange(transcript);
     }
-  }, [transcript, onChange, value]);
+  }, [transcript, onChange, currentValue]);
 
   const handleMicClick = () => {
     if (isListening) {
       stopListening();
     } else {
-      startListening(value);
+      startListening(currentValue);
     }
   };
 
@@ -62,7 +64,7 @@ export function DictationInput({
   };
 
   const inputProps = {
-    value,
+    value: currentValue,
     onChange: handleInputChange,
     placeholder,
     disabled: disabled || isListening,
