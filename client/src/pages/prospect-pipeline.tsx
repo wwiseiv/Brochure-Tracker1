@@ -1682,11 +1682,14 @@ export default function DealPipelinePage() {
       </Dialog>
 
       <Sheet open={showCreateDealSheet} onOpenChange={setShowCreateDealSheet}>
-        <SheetContent side="bottom" className="h-[90vh] md:h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
+        <SheetContent side="bottom" className="h-[85vh] md:h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
           <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
             <SheetTitle>Create New Deal</SheetTitle>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div 
+            className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 pb-40" 
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          >
             <div className="space-y-2">
               <Label>Business Name *</Label>
               <Input
