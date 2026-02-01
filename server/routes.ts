@@ -9661,5 +9661,145 @@ Generate the following content in JSON format:
     }
   });
 
+  // ============================================================================
+  // EMAIL DIGEST API
+  // ============================================================================
+
+  // GET /api/email-digest/preferences - Get user's email digest preferences
+  app.get("/api/email-digest/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let prefs = await storage.getEmailDigestPreferences(userId);
+      
+      if (!prefs) {
+        return res.json({
+          dailyDigestEnabled: false,
+          weeklyDigestEnabled: false,
+          emailAddress: '',
+          timezone: 'America/New_York',
+          dailySendTime: '06:00',
+          weeklySendDay: 'monday',
+          weeklySendTime: '06:00',
+          includeAppointments: true,
+          includeFollowups: true,
+          includeStaleDeals: true,
+          includePipelineSummary: true,
+          includeRecentWins: true,
+          includeAiTips: true,
+          includeQuarterlyCheckins: true,
+          includeNewReferrals: true,
+          appointmentLookaheadDays: 1,
+          staleDealThresholdDays: 7,
+        });
+      }
+      
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Error getting email digest preferences:', error);
+      res.status(500).json({ message: 'Failed to get preferences' });
+    }
+  });
+
+  // PUT /api/email-digest/preferences - Update user's preferences
+  app.put("/api/email-digest/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = req.body;
+      
+      let prefs = await storage.getEmailDigestPreferences(userId);
+      
+      if (prefs) {
+        prefs = await storage.updateEmailDigestPreferences(userId, data);
+      } else {
+        prefs = await storage.createEmailDigestPreferences({
+          userId,
+          ...data,
+        });
+      }
+      
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Error updating email digest preferences:', error);
+      res.status(500).json({ message: 'Failed to update preferences' });
+    }
+  });
+
+  // POST /api/email-digest/test - Send a test digest email
+  app.post("/api/email-digest/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { digestType = 'daily' } = req.body;
+      
+      const prefs = await storage.getEmailDigestPreferences(userId);
+      if (!prefs || !prefs.emailAddress) {
+        return res.status(400).json({ message: 'Please set your email address first' });
+      }
+      
+      const { gatherDigestData, generateDigestContent, sendDigestEmail } = await import("./services/email-digest");
+      
+      const data = await gatherDigestData(userId, prefs.timezone, {
+        includeAppointments: prefs.includeAppointments,
+        includeFollowups: prefs.includeFollowups,
+        includeStaleDeals: prefs.includeStaleDeals,
+        includePipelineSummary: prefs.includePipelineSummary,
+        includeRecentWins: prefs.includeRecentWins,
+        includeQuarterlyCheckins: prefs.includeQuarterlyCheckins,
+        includeNewReferrals: prefs.includeNewReferrals,
+        appointmentLookaheadDays: prefs.appointmentLookaheadDays,
+        staleDealThresholdDays: prefs.staleDealThresholdDays,
+      }, digestType);
+      
+      const userName = (req.user.claims as any).first_name || 'Sales Rep';
+      const digest = await generateDigestContent(data, userName, digestType, prefs.includeAiTips);
+      
+      const appUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN}`
+        : 'http://localhost:5000';
+      
+      const result = await sendDigestEmail(prefs.emailAddress, digest, appUrl);
+      
+      if (result.success) {
+        await storage.createEmailDigestHistory({
+          userId,
+          digestType,
+          appointmentsCount: data.appointments.length,
+          followupsCount: data.followups.length,
+          staleDealsCount: data.staleDeals.length,
+          pipelineValue: data.pipelineSummary.totalValue,
+          status: 'sent',
+          sentAt: new Date(),
+          subjectLine: digest.subject,
+          emailProviderId: result.messageId,
+        });
+        
+        res.json({ success: true, message: 'Test email sent!' });
+      } else {
+        await storage.createEmailDigestHistory({
+          userId,
+          digestType,
+          status: 'failed',
+          errorMessage: result.error,
+        });
+        res.status(500).json({ success: false, message: result.error });
+      }
+    } catch (error: any) {
+      console.error('Error sending test digest:', error);
+      res.status(500).json({ message: 'Failed to send test email' });
+    }
+  });
+
+  // GET /api/email-digest/history - Get user's digest history
+  app.get("/api/email-digest/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const history = await storage.getEmailDigestHistory(userId, limit);
+      res.json(history);
+    } catch (error: any) {
+      console.error('Error getting email digest history:', error);
+      res.status(500).json({ message: 'Failed to get history' });
+    }
+  });
+
   return httpServer;
 }
