@@ -288,8 +288,8 @@ export default function LandingPage() {
             const Icon = feature.icon;
             return (
               <Card key={index} className="p-4 flex flex-col items-center text-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">{feature.title}</h3>
