@@ -1875,8 +1875,10 @@ Format your response as JSON:
   app.get("/api/invitations", isAuthenticated, requireRole("master_admin"), ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
-      const invitations = await storage.getInvitationsByOrg(membership.organization.id);
-      res.json(invitations);
+      const allInvitations = await storage.getInvitationsByOrg(membership.organization.id);
+      // Only return pending invitations - accepted ones should not show in pending list
+      const pendingInvitations = allInvitations.filter(inv => inv.status === "pending");
+      res.json(pendingInvitations);
     } catch (error) {
       console.error("Error fetching invitations:", error);
       res.status(500).json({ error: "Failed to fetch invitations" });
