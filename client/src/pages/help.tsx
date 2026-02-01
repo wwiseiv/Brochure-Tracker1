@@ -70,6 +70,8 @@ import {
   ChevronRight,
   Flame,
   LayoutGrid,
+  Megaphone,
+  Image,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -569,6 +571,39 @@ export default function HelpPage() {
       description: "Download your referral data as a CSV or Excel spreadsheet. Perfect for tracking and reporting.",
       link: "/referrals",
       icon: <Download className="w-5 h-5 text-pink-600" />,
+    },
+  ];
+
+  const marketingMaterialsFeatures: HelpItem[] = [
+    {
+      title: "Marketing Flyer Library",
+      description: "Access 26+ professional marketing flyers for different industries - liquor stores, restaurants, automotive, veterinarians, salons, and more.",
+      link: "/marketing",
+      icon: <LayoutGrid className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "AI-Generated Flyers",
+      description: "Create custom marketing flyers using AI. Describe your target business and let AI generate personalized copy and hero images.",
+      link: "/marketing",
+      icon: <Wand2 className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Save to Library",
+      description: "Save your AI-generated flyers to your personal library for future use. Build a collection of proven marketing materials.",
+      link: "/marketing",
+      icon: <Download className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Email Copy Generator",
+      description: "Get pre-written email body text to accompany your flyers. Just copy, paste into your email, and attach the flyer.",
+      link: "/marketing",
+      icon: <Mail className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Industry Filters",
+      description: "Filter flyers by industry to quickly find the right material for your prospect. Search by name or browse by category.",
+      link: "/marketing",
+      icon: <Search className="w-5 h-5 text-orange-600" />,
     },
   ];
 
@@ -1119,6 +1154,7 @@ export default function HelpPage() {
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
+            { title: "Marketing Materials", description: "Professional flyers and AI-generated marketing content for every industry.", items: marketingMaterialsFeatures, badge: "New" },
             { title: "AI-Powered Prospecting", description: "Find new merchants with AI search, scan business cards, and build your sales pipeline.", items: prospectingFeatures, badge: "New" },
             { title: "Deal Pipeline & CRM", description: "Track every deal through a 14-stage sales pipeline with follow-up tracking, temperature badges, and conversion analytics.", items: dealPipelineFeatures, badge: "CRM" },
             { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },

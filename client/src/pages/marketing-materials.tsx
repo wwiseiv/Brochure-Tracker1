@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BottomNav } from "@/components/BottomNav";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -433,11 +434,18 @@ ${repEmail}`;
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Link href="/">
+                <Button variant="ghost" size="icon" data-testid="button-back">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Back to dashboard</p>
+            </TooltipContent>
+          </Tooltip>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
             <h1 className="text-lg font-semibold" data-testid="page-title">Marketing Materials</h1>
@@ -625,20 +633,27 @@ ${repEmail}`;
                             </>
                           )}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="min-h-12 min-w-12 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteClick(job.jobId)}
-                          disabled={deleteMutation.isPending && deletingJobId === job.jobId}
-                          data-testid={`button-delete-job-${job.jobId}`}
-                        >
-                          {deleteMutation.isPending && deletingJobId === job.jobId ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="min-h-12 min-w-12 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteClick(job.jobId)}
+                              disabled={deleteMutation.isPending && deletingJobId === job.jobId}
+                              data-testid={`button-delete-job-${job.jobId}`}
+                            >
+                              {deleteMutation.isPending && deletingJobId === job.jobId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Delete flyer</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                   )}
