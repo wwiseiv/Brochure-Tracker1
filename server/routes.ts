@@ -9494,6 +9494,37 @@ Generate the following content in JSON format:
     }
   });
 
+  // DELETE /api/prospect-finder/jobs/:id - Delete a search job
+  app.delete("/api/prospect-finder/jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProspectSearchJob(id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Ensure user owns this job
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Delete the job
+      await db.delete(prospectSearches).where(eq(prospectSearches.id, id));
+      
+      res.json({ success: true, message: "Job deleted" });
+    } catch (error: any) {
+      console.error("[ProspectJobs] Delete job error:", error);
+      res.status(500).json({ error: "Failed to delete search job" });
+    }
+  });
+
   // POST /api/internal/process-prospect-job - Internal endpoint for background processing
   app.post("/api/internal/process-prospect-job", async (req, res) => {
     // Verify internal secret header

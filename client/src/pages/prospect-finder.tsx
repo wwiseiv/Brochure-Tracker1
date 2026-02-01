@@ -58,6 +58,7 @@ import {
   List,
   Info,
   Eye,
+  Trash2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -220,6 +221,27 @@ export default function ProspectFinderPage() {
     onError: (error: Error) => {
       toast({
         title: "Failed to retry",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const response = await apiRequest("DELETE", `/api/prospect-finder/jobs/${jobId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Deleted",
+        description: "Search job removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/prospect-finder/jobs"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete",
         description: error.message || "Please try again",
         variant: "destructive",
       });
@@ -721,6 +743,25 @@ export default function ProspectFinderPage() {
                           {statusDisplay.label}
                         </Badge>
                       )}
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            disabled={deleteJobMutation.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteJobMutation.mutate(job.id);
+                            }}
+                            data-testid={`button-delete-${job.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete this search</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 );
