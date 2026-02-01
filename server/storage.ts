@@ -166,6 +166,15 @@ export interface IStorage {
   createDrop(drop: InsertDrop): Promise<Drop>;
   updateDrop(id: number, data: Partial<Drop>): Promise<Drop | undefined>;
   
+  // Merchants
+  getMerchant(id: number): Promise<Merchant | undefined>;
+  getMerchantsByOrg(orgId: number): Promise<Merchant[]>;
+  getMerchantsByAgentIds(orgId: number, agentIds: string[]): Promise<Merchant[]>;
+  getMerchantByBusinessName(orgId: number, businessName: string): Promise<Merchant | undefined>;
+  createMerchant(data: InsertMerchant): Promise<Merchant>;
+  updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined>;
+  deleteMerchant(id: number, userId: string): Promise<boolean>;
+  
   // Reminders
   getReminder(id: number): Promise<Reminder | undefined>;
   getRemindersByDrop(dropId: number): Promise<Reminder[]>;
@@ -628,7 +637,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMerchantsByAgentIds(orgId: number, agentIds: string[]): Promise<Merchant[]> {
-    if (agentIds.length === 0) return [];
+    // Get sample merchants that are visible to everyone
+    const sampleMerchants = await db.select().from(merchants)
+      .where(and(eq(merchants.orgId, orgId), eq(merchants.isSample, true)))
+      .orderBy(desc(merchants.lastVisitAt));
+    
+    if (agentIds.length === 0) return sampleMerchants;
     
     // Get unique merchant IDs from drops made by these agents
     const dropsWithMerchants = await db
@@ -642,11 +656,37 @@ export class DatabaseStorage implements IStorage {
     
     const merchantIds = [...new Set(dropsWithMerchants.map(d => d.merchantId).filter(Boolean))] as number[];
     
-    if (merchantIds.length === 0) return [];
+    // Get agent's own merchants (non-sample)
+    let agentMerchants: Merchant[] = [];
+    if (merchantIds.length > 0) {
+      agentMerchants = await db.select().from(merchants)
+        .where(and(
+          eq(merchants.orgId, orgId), 
+          inArray(merchants.id, merchantIds),
+          eq(merchants.isSample, false)
+        ))
+        .orderBy(desc(merchants.lastVisitAt));
+    }
     
-    return db.select().from(merchants)
-      .where(and(eq(merchants.orgId, orgId), inArray(merchants.id, merchantIds)))
-      .orderBy(desc(merchants.lastVisitAt));
+    // Combine sample merchants + agent's own merchants, avoiding duplicates
+    const sampleIds = new Set(sampleMerchants.map(m => m.id));
+    const uniqueAgentMerchants = agentMerchants.filter(m => !sampleIds.has(m.id));
+    
+    return [...sampleMerchants, ...uniqueAgentMerchants];
+  }
+  
+  async deleteMerchant(id: number, userId: string): Promise<boolean> {
+    // Only allow deletion if user created the merchant or it's a sample
+    const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id));
+    if (!merchant) return false;
+    
+    // Allow deletion if user created it OR if it's a sample merchant
+    if (merchant.createdBy === userId || merchant.isSample) {
+      await db.delete(merchants).where(eq(merchants.id, id));
+      return true;
+    }
+    
+    return false;
   }
 
   async getMerchantByBusinessName(orgId: number, businessName: string): Promise<Merchant | undefined> {
