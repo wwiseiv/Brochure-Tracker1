@@ -362,13 +362,20 @@ export default function StatementAnalyzer() {
           title: "Data Extracted",
           description: `Confidence: ${data.extracted.confidence}%${processorInfo}. Review and edit as needed.`
         });
+      } else {
+        setExtractionStep("idle");
+        toast({
+          title: "Extraction Failed",
+          description: data.error || "Could not extract data from the statement. Please try again or enter manually.",
+          variant: "destructive"
+        });
       }
     },
     onError: (error: Error) => {
       setExtractionStep("idle");
       toast({
         title: "Extraction Failed",
-        description: error.message,
+        description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive"
       });
     }
