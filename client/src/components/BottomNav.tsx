@@ -44,21 +44,20 @@ export function BottomNav() {
 
   const navContent = (
     <nav 
-      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border"
+      className="bg-card border-t border-border"
       style={{ 
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
         zIndex: 2147483647,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        transform: 'translate3d(0, 0, 0)',
-        WebkitTransform: 'translate3d(0, 0, 0)',
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
-        willChange: 'transform',
-        position: 'fixed',
-        contain: 'layout style paint'
+        WebkitTransform: 'translateZ(0)',
+        transform: 'translateZ(0)'
       }}
       data-testid="bottom-nav"
     >
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div className="flex items-center justify-around flex-wrap gap-1 h-16 max-w-lg mx-auto px-2">
         {displayItems.map((item) => {
           const isActive = location === item.path || 
             (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||

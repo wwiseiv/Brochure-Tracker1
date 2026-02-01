@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Deal } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Deal, StatementAnalysisJob } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -48,7 +48,10 @@ import {
   Share2,
   Pencil,
   Brain,
-  ThumbsUp
+  ThumbsUp,
+  Clock,
+  History,
+  Eye
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Link } from "wouter";
@@ -224,10 +227,40 @@ export default function StatementAnalyzer() {
   const [correctionValue, setCorrectionValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDealId, setSelectedDealId] = useState<string>("");
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [showMyAnalyses, setShowMyAnalyses] = useState(false);
 
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
+
+  const { data: jobsData, isLoading: jobsLoading } = useQuery<{ jobs: StatementAnalysisJob[] }>({
+    queryKey: ["/api/statement-analysis/jobs"],
+    refetchInterval: (query) => {
+      const data = query.state.data as { jobs: StatementAnalysisJob[] } | undefined;
+      const hasPendingJobs = data?.jobs?.some(j => j.status === "pending" || j.status === "processing");
+      return hasPendingJobs ? 5000 : false;
+    },
+  });
+
+  const jobs = jobsData?.jobs || [];
+  const pendingJobs = jobs.filter(j => j.status === "pending" || j.status === "processing");
+  const completedJobs = jobs.filter(j => j.status === "completed");
+  const failedJobs = jobs.filter(j => j.status === "failed");
+
+  useEffect(() => {
+    if (selectedJobId) {
+      const job = jobs.find(j => j.id === selectedJobId);
+      if (job?.status === "completed" && job.results) {
+        setResults(job.results as AnalysisResult);
+        toast({
+          title: "Analysis Complete",
+          description: `${job.jobName || "Statement"} analysis is ready!`
+        });
+        setSelectedJobId(null);
+      }
+    }
+  }, [jobs, selectedJobId]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -391,6 +424,46 @@ export default function StatementAnalyzer() {
     }
   });
 
+  const createJobMutation = useMutation({
+    mutationFn: async (params: { 
+      jobName: string; 
+      fileNames: string[]; 
+      fileUrls: string[]; 
+      extractedTexts: string[];
+      merchantType: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/statement-analysis/jobs", params);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.job?.id) {
+        setSelectedJobId(data.job.id);
+        setExtractionStep("idle");
+        setUploadedFiles([]);
+        queryClient.invalidateQueries({ queryKey: ["/api/statement-analysis/jobs"] });
+        toast({
+          title: "Processing in Background",
+          description: "Your statement is being analyzed. You can navigate away and come back later."
+        });
+      } else {
+        toast({
+          title: "Job Creation Failed",
+          description: data.error || "Failed to create analysis job",
+          variant: "destructive"
+        });
+        setExtractionStep("idle");
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Job Creation Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      setExtractionStep("idle");
+    }
+  });
+
   const correctionMutation = useMutation({
     mutationFn: async (params: { extractionId: number; fieldName: string; originalValue: string; correctedValue: string }) => {
       const response = await apiRequest(
@@ -551,6 +624,141 @@ export default function StatementAnalyzer() {
       updated.splice(index, 1);
       return updated;
     });
+  };
+
+  const loadJobResults = (job: StatementAnalysisJob) => {
+    if (job.status === "completed" && job.results) {
+      setResults(job.results as AnalysisResult);
+      setShowMyAnalyses(false);
+    } else if (job.status === "pending" || job.status === "processing") {
+      setSelectedJobId(job.id);
+      toast({
+        title: "Still Processing",
+        description: "This analysis is still in progress. You'll be notified when it's ready."
+      });
+    } else if (job.status === "failed") {
+      toast({
+        title: "Analysis Failed",
+        description: job.errorMessage || "This analysis encountered an error.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Pending</Badge>;
+      case "processing":
+        return <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><Loader2 className="h-3 w-3 animate-spin" />Processing</Badge>;
+      case "completed":
+        return <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" />Completed</Badge>;
+      case "failed":
+        return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const formatJobDate = (date: string | Date | null) => {
+    if (!date) return "";
+    const d = new Date(date);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      if (file.type.includes("text") || file.name.endsWith(".csv")) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const uploadAndCreateJob = async () => {
+    if (uploadedFiles.length === 0) return;
+
+    setExtractionStep("uploading");
+    
+    const fileNames: string[] = [];
+    const fileUrls: string[] = [];
+    const extractedTexts: string[] = [];
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const uploadFile = uploadedFiles[i];
+      
+      setUploadedFiles(prev => {
+        const updated = [...prev];
+        updated[i] = { ...updated[i], uploading: true };
+        return updated;
+      });
+
+      try {
+        const urlResponse = await fetch("/api/uploads/request-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: uploadFile.file.name,
+            size: uploadFile.file.size,
+            contentType: uploadFile.file.type || "application/octet-stream"
+          })
+        });
+
+        if (!urlResponse.ok) {
+          throw new Error("Failed to get upload URL");
+        }
+
+        const { uploadURL, objectPath } = await urlResponse.json();
+
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: uploadFile.file,
+          headers: { "Content-Type": uploadFile.file.type || "application/octet-stream" }
+        });
+
+        const textContent = await readFileAsText(uploadFile.file);
+
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, uploaded: true, objectPath };
+          return updated;
+        });
+
+        fileNames.push(uploadFile.file.name);
+        fileUrls.push(objectPath);
+        extractedTexts.push(textContent);
+
+      } catch (error) {
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          updated[i] = { ...updated[i], uploading: false, error: "Upload failed" };
+          return updated;
+        });
+      }
+    }
+
+    if (extractedTexts.length > 0) {
+      setExtractionStep("extracting");
+      const jobName = uploadedFiles[0]?.file.name || `Analysis ${new Date().toLocaleDateString()}`;
+      createJobMutation.mutate({
+        jobName,
+        fileNames,
+        fileUrls,
+        extractedTexts,
+        merchantType: form.getValues("merchantType") || "retail"
+      });
+    } else {
+      setExtractionStep("idle");
+      toast({
+        title: "Upload Failed",
+        description: "No files could be uploaded",
+        variant: "destructive"
+      });
+    }
   };
 
   const uploadAndExtract = async () => {
@@ -1113,8 +1321,23 @@ ${new Date().toLocaleDateString()}
             <p className="text-muted-foreground">Upload or enter statement data for analysis</p>
           </div>
         </div>
-        {results && results.analysis && (
-          <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowMyAnalyses(!showMyAnalyses)}
+            className="gap-2"
+            data-testid="button-my-analyses"
+          >
+            <History className="h-4 w-4" />
+            My Analyses
+            {pendingJobs.length > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                {pendingJobs.length}
+              </Badge>
+            )}
+          </Button>
+          {results && results.analysis && (
             <Button 
               variant="default" 
               size="sm" 
@@ -1133,9 +1356,90 @@ ${new Date().toLocaleDateString()}
                 </>
               )}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {showMyAnalyses && (
+        <Card className="mb-6 print:hidden" data-testid="my-analyses-panel">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5" />
+              My Analyses
+            </CardTitle>
+            <CardDescription>
+              View your past and pending statement analyses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {jobsLoading ? (
+              <div className="space-y-2">
+                <div className="h-12 bg-muted animate-pulse rounded-lg" />
+                <div className="h-12 bg-muted animate-pulse rounded-lg" />
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No analyses yet. Upload a statement to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {jobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className={`flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedJobId === job.id 
+                        ? "border-primary bg-primary/5" 
+                        : "hover:bg-muted/50"
+                    } ${job.status === "completed" ? "hover:border-primary/50" : ""}`}
+                    onClick={() => loadJobResults(job)}
+                    data-testid={`job-item-${job.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">
+                          {job.jobName || `Analysis #${job.id}`}
+                        </p>
+                        {getStatusBadge(job.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatJobDate(job.createdAt)}
+                        {job.status === "processing" && job.progressMessage && (
+                          <span className="ml-2">{job.progressMessage}</span>
+                        )}
+                      </p>
+                    </div>
+                    {job.status === "completed" && (
+                      <Button variant="ghost" size="icon" className="shrink-0">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {(job.status === "pending" || job.status === "processing") && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedJobId && !results && (
+        <Card className="mb-6 border-blue-200 dark:border-blue-800 print:hidden" data-testid="processing-indicator">
+          <CardContent className="py-6">
+            <div className="flex items-center justify-center gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              <div>
+                <p className="font-medium">Processing in Background</p>
+                <p className="text-sm text-muted-foreground">
+                  Your statement is being analyzed. You can navigate away and come back later.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!results || !results.analysis ? (
         <Card className="max-w-2xl mx-auto">
@@ -1307,12 +1611,21 @@ ${new Date().toLocaleDateString()}
                         
                         <Button 
                           className="w-full" 
-                          onClick={uploadAndExtract}
-                          disabled={uploadedFiles.length === 0}
+                          onClick={uploadAndCreateJob}
+                          disabled={uploadedFiles.length === 0 || createJobMutation.isPending}
                           data-testid="button-extract"
                         >
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Extract & Analyze with AI
+                          {createJobMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Starting Analysis...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Parse PDF
+                            </>
+                          )}
                         </Button>
                       </>
                     )}

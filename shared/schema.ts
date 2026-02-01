@@ -2053,6 +2053,64 @@ export const insertProspectSearchSchema = createInsertSchema(prospectSearches).o
 export type InsertProspectSearch = z.infer<typeof insertProspectSearchSchema>;
 export type ProspectSearch = typeof prospectSearches.$inferSelect;
 
+// Statement Analysis Job statuses for background processing
+export const STATEMENT_JOB_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+export type StatementJobStatus = typeof STATEMENT_JOB_STATUSES[number];
+
+export const statementAnalysisJobs = pgTable("statement_analysis_jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  // Job Configuration
+  jobName: varchar("job_name", { length: 255 }),
+  fileNames: text("file_names").array(),
+  fileUrls: text("file_urls").array(),
+  extractedTexts: text("extracted_texts").array(),
+  
+  // Job Status for Background Processing
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  progress: integer("progress").default(0),
+  progressMessage: varchar("progress_message", { length: 255 }),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Results (stored as JSONB when complete)
+  results: jsonb("results"),
+  
+  // Error Handling
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  
+  // Notification Tracking
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const statementAnalysisJobsRelations = relations(statementAnalysisJobs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [statementAnalysisJobs.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertStatementAnalysisJobSchema = createInsertSchema(statementAnalysisJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+  completedAt: true,
+  results: true,
+  errorMessage: true,
+  notificationSent: true,
+  notificationSentAt: true,
+});
+export type InsertStatementAnalysisJob = z.infer<typeof insertStatementAnalysisJobSchema>;
+export type StatementAnalysisJob = typeof statementAnalysisJobs.$inferSelect;
+
 // Push notification subscriptions for web push
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

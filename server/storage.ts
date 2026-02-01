@@ -151,6 +151,9 @@ import {
   prospectSearches,
   type ProspectSearch,
   type InsertProspectSearch,
+  statementAnalysisJobs,
+  type StatementAnalysisJob,
+  type InsertStatementAnalysisJob,
   pushSubscriptions,
   type PushSubscription,
   type InsertPushSubscription,
@@ -358,6 +361,13 @@ export interface IStorage {
   getProspectSearchJobsByUser(userId: string): Promise<ProspectSearch[]>;
   updateProspectSearchJob(id: number, updates: Partial<ProspectSearch>): Promise<ProspectSearch | undefined>;
   getPendingProspectSearchJobs(): Promise<ProspectSearch[]>;
+  
+  // Statement Analysis Jobs
+  createStatementAnalysisJob(data: InsertStatementAnalysisJob): Promise<StatementAnalysisJob>;
+  getStatementAnalysisJob(id: number): Promise<StatementAnalysisJob | undefined>;
+  getStatementAnalysisJobsByUser(userId: string): Promise<StatementAnalysisJob[]>;
+  updateStatementAnalysisJob(id: number, updates: Partial<StatementAnalysisJob>): Promise<StatementAnalysisJob | undefined>;
+  getPendingStatementAnalysisJobs(): Promise<StatementAnalysisJob[]>;
   
   // Push Subscriptions
   createPushSubscription(data: InsertPushSubscription): Promise<PushSubscription>;
@@ -2383,6 +2393,38 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(prospectSearches)
       .where(eq(prospectSearches.status, "pending"))
       .orderBy(prospectSearches.createdAt);
+  }
+
+  // Statement Analysis Jobs
+  async createStatementAnalysisJob(data: InsertStatementAnalysisJob): Promise<StatementAnalysisJob> {
+    const [created] = await db.insert(statementAnalysisJobs).values(data).returning();
+    return created;
+  }
+
+  async getStatementAnalysisJob(id: number): Promise<StatementAnalysisJob | undefined> {
+    const [job] = await db.select().from(statementAnalysisJobs).where(eq(statementAnalysisJobs.id, id));
+    return job;
+  }
+
+  async getStatementAnalysisJobsByUser(userId: string): Promise<StatementAnalysisJob[]> {
+    return db.select().from(statementAnalysisJobs)
+      .where(eq(statementAnalysisJobs.agentId, userId))
+      .orderBy(desc(statementAnalysisJobs.createdAt));
+  }
+
+  async updateStatementAnalysisJob(id: number, updates: Partial<StatementAnalysisJob>): Promise<StatementAnalysisJob | undefined> {
+    const [updated] = await db
+      .update(statementAnalysisJobs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(statementAnalysisJobs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingStatementAnalysisJobs(): Promise<StatementAnalysisJob[]> {
+    return db.select().from(statementAnalysisJobs)
+      .where(eq(statementAnalysisJobs.status, "pending"))
+      .orderBy(statementAnalysisJobs.createdAt);
   }
 
   // Push Subscriptions

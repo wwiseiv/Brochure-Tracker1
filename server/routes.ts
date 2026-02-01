@@ -84,6 +84,8 @@ import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./p
 import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import proposalIntelligenceRouter from "./proposal-intelligence/api";
 import { searchLocalBusinesses } from "./services/prospect-search";
+import { analyzeStatement, type StatementData } from "./proposal-intelligence/services/statement-analysis";
+import { generateTalkingPoints } from "./proposal-intelligence/services/talking-points";
 import webpush from "web-push";
 import fs from "fs";
 import path from "path";
@@ -9601,6 +9603,293 @@ Generate the following content in JSON format:
           status: "failed",
           errorMessage: error.message || "Unknown error occurred",
           completedAt: new Date(),
+        });
+      }
+    });
+  });
+
+  // ============================================================================
+  // STATEMENT ANALYSIS BACKGROUND JOBS API
+  // ============================================================================
+
+  // POST /api/statement-analysis/jobs - Create a new background analysis job
+  app.post("/api/statement-analysis/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { jobName, fileNames, fileUrls, extractedTexts, merchantType } = req.body;
+
+      if (!extractedTexts || !Array.isArray(extractedTexts) || extractedTexts.length === 0) {
+        return res.status(400).json({ error: "extractedTexts array is required" });
+      }
+
+      // Get organization membership if available
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+
+      // Create job in database with status 'pending'
+      const job = await storage.createStatementAnalysisJob({
+        agentId: userId,
+        organizationId: orgId,
+        jobName: jobName || `Statement Analysis ${new Date().toLocaleDateString()}`,
+        fileNames: fileNames || [],
+        fileUrls: fileUrls || [],
+        extractedTexts: extractedTexts,
+        status: "pending",
+        progress: 0,
+        progressMessage: "Queued for processing",
+        retryCount: 0,
+      });
+
+      // Fire-and-forget: trigger background processing via internal endpoint
+      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      fetch(`${baseUrl}/api/statement-analysis/jobs/${job.id}/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ merchantType: merchantType || "retail" }),
+      }).catch(err => {
+        console.error("[StatementJobs] Failed to trigger background processing:", err);
+      });
+
+      res.status(201).json({
+        success: true,
+        jobId: job.id,
+        status: "pending",
+        message: "Analysis started! We'll notify you when ready.",
+      });
+    } catch (error: any) {
+      console.error("[StatementJobs] Create job error:", error);
+      res.status(500).json({ error: "Failed to create analysis job" });
+    }
+  });
+
+  // GET /api/statement-analysis/jobs - List user's analysis jobs
+  app.get("/api/statement-analysis/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const jobs = await storage.getStatementAnalysisJobsByUser(userId);
+      res.json({ jobs });
+    } catch (error: any) {
+      console.error("[StatementJobs] List jobs error:", error);
+      res.status(500).json({ error: "Failed to fetch analysis jobs" });
+    }
+  });
+
+  // GET /api/statement-analysis/jobs/:id - Get a single job with results
+  app.get("/api/statement-analysis/jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getStatementAnalysisJob(id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Ensure user owns this job
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("[StatementJobs] Get job error:", error);
+      res.status(500).json({ error: "Failed to fetch analysis job" });
+    }
+  });
+
+  // POST /api/statement-analysis/jobs/:id/process - Internal endpoint for background processing
+  app.post("/api/statement-analysis/jobs/:id/process", async (req, res) => {
+    // Verify internal secret header
+    const secret = req.headers["x-internal-secret"];
+    if (secret !== INTERNAL_SECRET) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const jobId = parseInt(req.params.id);
+    if (isNaN(jobId)) {
+      return res.status(400).json({ error: "Invalid job ID" });
+    }
+
+    const { merchantType = "retail" } = req.body;
+
+    // Return immediately
+    res.json({ received: true });
+
+    // Process job asynchronously after response
+    setImmediate(async () => {
+      try {
+        const job = await storage.getStatementAnalysisJob(jobId);
+        if (!job) {
+          console.error("[StatementJobs] Job not found for processing:", jobId);
+          return;
+        }
+
+        // Update job to 'processing'
+        await storage.updateStatementAnalysisJob(jobId, {
+          status: "processing",
+          startedAt: new Date(),
+          progressMessage: "Analyzing statement data...",
+          progress: 10,
+        });
+
+        console.log("[StatementJobs] Processing job:", jobId);
+
+        // Parse extracted text data to get statement information
+        const extractedTexts = job.extractedTexts || [];
+        if (extractedTexts.length === 0) {
+          throw new Error("No extracted text data available");
+        }
+
+        await storage.updateStatementAnalysisJob(jobId, {
+          progress: 30,
+          progressMessage: "Parsing financial data...",
+        });
+
+        // Try to parse the extracted text as JSON (from statement extractor)
+        let statementData: StatementData;
+        try {
+          // Assume the first extracted text contains JSON data from the extractor
+          const extractedData = JSON.parse(extractedTexts[0]);
+          
+          statementData = {
+            processorName: extractedData.processorName,
+            merchantName: extractedData.merchantName,
+            merchantId: extractedData.merchantId,
+            statementPeriod: extractedData.statementPeriod,
+            totalVolume: extractedData.totalVolume || 0,
+            totalTransactions: extractedData.totalTransactions || 0,
+            averageTicket: extractedData.averageTicket,
+            cardMix: extractedData.cardMix,
+            fees: {
+              interchange: extractedData.fees?.interchange,
+              assessments: extractedData.fees?.assessments,
+              processorMarkup: extractedData.fees?.processorMarkup,
+              monthlyFees: extractedData.fees?.monthlyFees,
+              pciFees: extractedData.fees?.pciFees,
+              equipmentFees: extractedData.fees?.equipmentFees,
+              otherFees: extractedData.fees?.otherFees,
+              totalFees: extractedData.fees?.totalFees || 0,
+              annual: extractedData.fees?.annual,
+            },
+            qualificationBreakdown: extractedData.qualificationBreakdown,
+            merchantType: extractedData.merchantType || merchantType,
+          };
+        } catch (parseError) {
+          // If parsing fails, try to extract basic numbers from text
+          console.log("[StatementJobs] Falling back to text parsing for job:", jobId);
+          const rawText = extractedTexts.join("\n");
+          
+          // Simple regex patterns to extract basic data
+          const volumeMatch = rawText.match(/(?:total|gross|net)\s*(?:volume|sales|processing)[\s:$]*([0-9,]+(?:\.[0-9]{2})?)/i);
+          const txnMatch = rawText.match(/(?:total|number of)\s*(?:transactions?|items?)[\s:]*([0-9,]+)/i);
+          const feesMatch = rawText.match(/(?:total|processing)\s*(?:fees?|charges?)[\s:$]*([0-9,]+(?:\.[0-9]{2})?)/i);
+          
+          const totalVolume = volumeMatch ? parseFloat(volumeMatch[1].replace(/,/g, "")) : 10000;
+          const totalTransactions = txnMatch ? parseInt(txnMatch[1].replace(/,/g, "")) : 100;
+          const totalFees = feesMatch ? parseFloat(feesMatch[1].replace(/,/g, "")) : totalVolume * 0.03;
+          
+          statementData = {
+            totalVolume,
+            totalTransactions,
+            merchantType: merchantType as any,
+            fees: { totalFees },
+          };
+        }
+
+        await storage.updateStatementAnalysisJob(jobId, {
+          progress: 60,
+          progressMessage: "Calculating savings opportunities...",
+        });
+
+        // Run the analysis
+        const analysis = analyzeStatement(statementData);
+        const talkingPoints = generateTalkingPoints(analysis);
+
+        await storage.updateStatementAnalysisJob(jobId, {
+          progress: 90,
+          progressMessage: "Generating results...",
+        });
+
+        // Compile full results
+        const results = {
+          statementData,
+          analysis,
+          talkingPoints,
+          processedAt: new Date().toISOString(),
+        };
+
+        // Save results and mark as completed
+        await storage.updateStatementAnalysisJob(jobId, {
+          status: "completed",
+          completedAt: new Date(),
+          results: results,
+          progress: 100,
+          progressMessage: "Analysis complete",
+        });
+
+        console.log("[StatementJobs] Job completed:", jobId);
+
+        // Try to send push notification if VAPID keys exist
+        const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+        const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+        const vapidSubject = process.env.VAPID_SUBJECT || "mailto:support@example.com";
+
+        if (vapidPublicKey && vapidPrivateKey) {
+          try {
+            webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+
+            const subscriptions = await storage.getPushSubscriptionsByUser(job.agentId);
+            
+            const savingsAmount = analysis.savings.dualPricing.annualSavings > 0 
+              ? `$${analysis.savings.dualPricing.annualSavings.toLocaleString()}/year potential savings`
+              : "Analysis ready";
+            
+            const payload = JSON.stringify({
+              title: "Statement Analysis Complete",
+              body: savingsAmount,
+              data: { jobId, type: "statement-analysis-complete" },
+            });
+
+            for (const sub of subscriptions) {
+              try {
+                await webpush.sendNotification({
+                  endpoint: sub.endpoint,
+                  keys: {
+                    p256dh: sub.keysP256dh,
+                    auth: sub.keysAuth,
+                  },
+                }, payload);
+              } catch (pushErr: any) {
+                console.error("[StatementJobs] Push notification failed:", pushErr.message);
+              }
+            }
+
+            // Mark notification as sent
+            await storage.updateStatementAnalysisJob(jobId, {
+              notificationSent: true,
+              notificationSentAt: new Date(),
+            });
+          } catch (notifyErr: any) {
+            console.error("[StatementJobs] Failed to send notifications:", notifyErr.message);
+          }
+        }
+      } catch (error: any) {
+        console.error("[StatementJobs] Job processing failed:", error);
+
+        // Update job with error status
+        await storage.updateStatementAnalysisJob(jobId, {
+          status: "failed",
+          errorMessage: error.message || "Unknown error occurred",
+          completedAt: new Date(),
+          progressMessage: "Analysis failed",
         });
       }
     });
