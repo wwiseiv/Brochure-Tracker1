@@ -738,8 +738,8 @@ export default function DealPipelinePage() {
         >
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h3 className="font-semibold truncate">{deal.businessName}</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold truncate max-w-[200px] sm:max-w-[250px]">{deal.businessName}</h3>
               {renderTemperatureBadge(deal.temperature)}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
