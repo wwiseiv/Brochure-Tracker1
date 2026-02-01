@@ -301,6 +301,16 @@ export default function StatementAnalyzer() {
       return response.json();
     },
     onSuccess: async (data) => {
+      // Validate the response has required structure before setting results
+      if (!data || !data.analysis || !data.analysis.summary || !data.analysis.savings) {
+        toast({
+          title: "Analysis Failed",
+          description: "Invalid response from server. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       setResults(data);
       
       if (selectedDealId && extractedData?.extractionId) {
@@ -1103,7 +1113,7 @@ ${new Date().toLocaleDateString()}
             <p className="text-muted-foreground">Upload or enter statement data for analysis</p>
           </div>
         </div>
-        {results && (
+        {results && results.analysis && (
           <div className="flex gap-2">
             <Button 
               variant="default" 
@@ -1127,7 +1137,7 @@ ${new Date().toLocaleDateString()}
         )}
       </div>
 
-      {!results ? (
+      {!results || !results.analysis ? (
         <Card className="max-w-2xl mx-auto">
           <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
