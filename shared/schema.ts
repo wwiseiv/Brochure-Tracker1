@@ -2083,6 +2083,95 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
+// Email Digest Preferences table
+export const emailDigestPreferences = pgTable("email_digest_preferences", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id", { length: 255 }).notNull().unique(),
+  organizationId: integer("organization_id"),
+  
+  // Enable/Disable
+  dailyDigestEnabled: boolean("daily_digest_enabled").default(false).notNull(),
+  weeklyDigestEnabled: boolean("weekly_digest_enabled").default(false).notNull(),
+  
+  // Delivery Settings
+  emailAddress: varchar("email_address", { length: 255 }).notNull(),
+  timezone: varchar("timezone", { length: 50 }).default("America/New_York").notNull(),
+  dailySendTime: varchar("daily_send_time", { length: 10 }).default("06:00").notNull(),
+  weeklySendDay: varchar("weekly_send_day", { length: 10 }).default("monday").notNull(),
+  weeklySendTime: varchar("weekly_send_time", { length: 10 }).default("06:00").notNull(),
+  
+  // Content Preferences
+  includeAppointments: boolean("include_appointments").default(true).notNull(),
+  includeFollowups: boolean("include_followups").default(true).notNull(),
+  includeStaleDeals: boolean("include_stale_deals").default(true).notNull(),
+  includePipelineSummary: boolean("include_pipeline_summary").default(true).notNull(),
+  includeRecentWins: boolean("include_recent_wins").default(true).notNull(),
+  includeAiTips: boolean("include_ai_tips").default(true).notNull(),
+  includeQuarterlyCheckins: boolean("include_quarterly_checkins").default(true).notNull(),
+  includeNewReferrals: boolean("include_new_referrals").default(true).notNull(),
+  
+  // Additional Settings
+  appointmentLookaheadDays: integer("appointment_lookahead_days").default(1).notNull(),
+  staleDealThresholdDays: integer("stale_deal_threshold_days").default(7).notNull(),
+  
+  // Tracking
+  lastDailySentAt: timestamp("last_daily_sent_at"),
+  lastWeeklySentAt: timestamp("last_weekly_sent_at"),
+  totalEmailsSent: integer("total_emails_sent").default(0).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const emailDigestPreferencesRelations = relations(emailDigestPreferences, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [emailDigestPreferences.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertEmailDigestPreferencesSchema = createInsertSchema(emailDigestPreferences).omit({
+  id: true,
+  lastDailySentAt: true,
+  lastWeeklySentAt: true,
+  totalEmailsSent: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailDigestPreferences = z.infer<typeof insertEmailDigestPreferencesSchema>;
+export type EmailDigestPreferences = typeof emailDigestPreferences.$inferSelect;
+
+// Email Digest History table
+export const emailDigestHistory = pgTable("email_digest_history", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  digestType: varchar("digest_type", { length: 10 }).notNull(), // 'daily' or 'weekly'
+  
+  // Content tracking
+  appointmentsCount: integer("appointments_count"),
+  followupsCount: integer("followups_count"),
+  staleDealsCount: integer("stale_deals_count"),
+  pipelineValue: integer("pipeline_value"),
+  
+  // Delivery status
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, sent, failed
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  
+  // Email metadata
+  subjectLine: text("subject_line"),
+  emailProviderId: varchar("email_provider_id", { length: 100 }),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEmailDigestHistorySchema = createInsertSchema(emailDigestHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEmailDigestHistory = z.infer<typeof insertEmailDigestHistorySchema>;
+export type EmailDigestHistory = typeof emailDigestHistory.$inferSelect;
+
 // ============================================================================
 // DEAL PIPELINE SYSTEM
 // Complete merchant services sales lifecycle management
