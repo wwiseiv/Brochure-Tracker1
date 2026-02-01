@@ -2382,6 +2382,108 @@ ${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
     }
   });
 
+  // AI Generate Text Message
+  app.post("/api/text/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { businessName, contactName, purpose, keyPoints, tone } = req.body;
+      
+      if (!businessName || !purpose) {
+        return res.status(400).json({ error: "Business name and purpose are required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are a professional text message writing assistant for sales representatives in the payment processing industry.
+Generate a brief, professional text message based on the provided context.
+
+Guidelines:
+- Keep it VERY concise (under 160 characters if possible, max 320 characters)
+- Be professional but conversational (texting style)
+- Include a clear call-to-action when appropriate
+- Don't be overly formal - it's a text, not an email
+- Don't include signature or greeting like "Dear"
+- Use first name if contact name is provided
+- Tone should be: ${tone || "friendly and professional"}
+
+Return ONLY the text message, no explanations or alternatives.`;
+
+      const userPrompt = `Generate a text message for:
+Business: ${businessName}
+${contactName ? `Contact: ${contactName}` : ""}
+Purpose: ${purpose}
+${keyPoints ? `Key points to include: ${keyPoints}` : ""}`;
+
+      console.log("Text message generation request:", { businessName, purpose });
+      
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
+      
+      const generatedText = response.choices[0]?.message?.content?.trim() || "";
+      
+      console.log("Text message generation response:", { 
+        contentLength: generatedText.length,
+        finishReason: response.choices[0]?.finish_reason 
+      });
+      
+      res.json({ text: generatedText });
+    } catch (error) {
+      console.error("Error generating text message:", error);
+      res.status(500).json({ error: "Failed to generate text message" });
+    }
+  });
+
+  // AI Polish Text Message
+  app.post("/api/text/polish", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draft, tone, context } = req.body;
+      
+      if (!draft) {
+        return res.status(400).json({ error: "Draft text is required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are a professional text message editor for sales representatives.
+Your job is to polish and improve draft text messages while keeping them concise and professional.
+
+Guidelines:
+- Keep it VERY concise (under 160 characters if possible, max 320 characters)
+- Maintain the original intent and key points
+- Make it sound natural for texting (not too formal)
+- Improve clarity and impact
+- Tone should be: ${tone || "friendly and professional"}
+${context ? `Context: ${context}` : ""}
+
+Return ONLY the polished text message, no explanations.`;
+
+      const userPrompt = `Polish this text message while keeping the core message:\n\n${draft}`;
+      
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
+      
+      const polishedText = response.choices[0]?.message?.content?.trim() || "";
+      
+      res.json({ text: polishedText });
+    } catch (error) {
+      console.error("Error polishing text message:", error);
+      res.status(500).json({ error: "Failed to polish text message" });
+    }
+  });
+
   // AI Draft Email for Referrals - generates subject and body based on email type
   app.post("/api/ai/draft-email", isAuthenticated, async (req: any, res) => {
     try {

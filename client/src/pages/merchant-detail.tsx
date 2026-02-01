@@ -59,6 +59,7 @@ import {
   FileSignature,
   Trash2,
   Star,
+  MessageSquare,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
@@ -205,6 +206,18 @@ export default function MerchantDetailPage() {
   const [polishedEmail, setPolishedEmail] = useState("");
   const [emailContext, setEmailContext] = useState("");
 
+  // Text message drafter state
+  const [showTextDrafter, setShowTextDrafter] = useState(false);
+  const [textPurpose, setTextPurpose] = useState("");
+  const [textTone, setTextTone] = useState("friendly");
+  const [textKeyPoints, setTextKeyPoints] = useState("");
+  const [generatedText, setGeneratedText] = useState("");
+  const [textCopied, setTextCopied] = useState(false);
+  // Polish text state
+  const [textDraft, setTextDraft] = useState("");
+  const [polishedText, setPolishedText] = useState("");
+  const [textContext, setTextContext] = useState("");
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const deleteMerchantMutation = useMutation({
@@ -294,6 +307,48 @@ export default function MerchantDetailPage() {
     },
   });
 
+  const generateTextMutation = useMutation({
+    mutationFn: async (data: { businessName: string; contactName: string; purpose: string; keyPoints: string; tone: string }) => {
+      const res = await apiRequest("POST", "/api/text/generate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedText(data.text);
+      toast({
+        title: "Text message generated!",
+        description: "Your text has been created. Tap to copy.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate text",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const polishTextMutation = useMutation({
+    mutationFn: async (data: { draft: string; tone: string; context: string }) => {
+      const res = await apiRequest("POST", "/api/text/polish", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setPolishedText(data.text);
+      toast({
+        title: "Text polished!",
+        description: "Your text has been refined.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to polish text",
+        variant: "destructive",
+      });
+    },
+  });
+
   const saveVoiceNoteMutation = useMutation({
     mutationFn: async (data: { transcription: string; durationSeconds?: number }) => {
       const res = await apiRequest("POST", `/api/merchants/${merchantId}/voice-notes`, data);
@@ -337,6 +392,51 @@ export default function MerchantDetailPage() {
       businessType: merchant.businessType || undefined,
       agentNotes: merchant.notes || undefined,
     });
+  };
+
+  const handlePolishText = () => {
+    if (!textDraft.trim()) {
+      toast({
+        title: "Draft required",
+        description: "Please write a draft text first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    polishTextMutation.mutate({ draft: textDraft, tone: textTone, context: textContext });
+  };
+
+  const handleGenerateText = () => {
+    if (!merchant || !textPurpose) {
+      toast({
+        title: "Missing information",
+        description: "Please select a text purpose.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateTextMutation.mutate({
+      businessName: merchant.businessName,
+      contactName: merchant.contactName || "",
+      purpose: textPurpose,
+      keyPoints: textKeyPoints,
+      tone: textTone,
+    });
+  };
+
+  const copyTextToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setTextCopied(true);
+      toast({ title: "Copied to clipboard!" });
+      setTimeout(() => setTextCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Please copy manually",
+        variant: "destructive",
+      });
+    }
   };
 
   const copyEmailToClipboard = async () => {
@@ -1057,6 +1157,268 @@ export default function MerchantDetailPage() {
                         >
                           <Mail className="w-4 h-4" />
                           Open in Email App
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </Card>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">AI Text Message</h2>
+          {!showTextDrafter ? (
+            <Card 
+              className="p-4 hover-elevate cursor-pointer" 
+              onClick={() => setShowTextDrafter(true)}
+              data-testid="card-text-drafter-expand"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium">AI Text Drafter</p>
+                  <p className="text-sm text-muted-foreground">
+                    Polish your draft or generate professional texts for {merchant.businessName}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4">
+              <Tabs defaultValue="polish" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="polish" className="min-h-touch gap-2" data-testid="tab-text-polish">
+                    <Wand2 className="w-4 h-4" />
+                    Polish Draft
+                  </TabsTrigger>
+                  <TabsTrigger value="generate" className="min-h-touch gap-2" data-testid="tab-text-generate">
+                    <Sparkles className="w-4 h-4" />
+                    Generate New
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="polish" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Your Draft Text</Label>
+                    <Textarea
+                      value={textDraft}
+                      onChange={(e) => setTextDraft(e.target.value)}
+                      placeholder="Write your text message in your own words - AI will polish it..."
+                      rows={3}
+                      data-testid="textarea-text-draft"
+                    />
+                    <p className="text-xs text-muted-foreground">{textDraft.length}/320 characters</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Tone</Label>
+                      <Select value={textTone} onValueChange={setTextTone}>
+                        <SelectTrigger data-testid="select-text-polish-tone">
+                          <SelectValue placeholder="Select tone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="friendly">Friendly</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="casual">Casual</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Context (optional)</Label>
+                      <Input
+                        value={textContext}
+                        onChange={(e) => setTextContext(e.target.value)}
+                        placeholder="e.g., Following up"
+                        data-testid="input-text-context"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handlePolishText}
+                    disabled={polishTextMutation.isPending || !textDraft.trim()}
+                    className="w-full min-h-touch gap-2"
+                    data-testid="button-polish-text"
+                  >
+                    {polishTextMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Polishing...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        Polish Text
+                      </>
+                    )}
+                  </Button>
+
+                  {polishedText && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-green-600" />
+                          Polished Text
+                        </Label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handlePolishText}
+                            disabled={polishTextMutation.isPending}
+                            data-testid="button-repolish-text"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyTextToClipboard(polishedText)}
+                            data-testid="button-copy-polished-text"
+                          >
+                            {textCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <Card className="p-3 bg-green-500/5 border-green-500/20">
+                        <p className="text-sm whitespace-pre-wrap">{polishedText}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{polishedText.length} characters</p>
+                      </Card>
+                      {merchant.businessPhone && (
+                        <Button
+                          variant="outline"
+                          className="w-full min-h-touch gap-2"
+                          onClick={() => {
+                            window.location.href = `sms:${merchant.businessPhone}?body=${encodeURIComponent(polishedText)}`;
+                          }}
+                          data-testid="button-send-polished-text"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Open in Messages App
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="generate" className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Generate a professional text message for {merchant.businessName}
+                    {merchant.contactName && ` (${merchant.contactName})`}
+                  </p>
+
+                  <div className="space-y-2">
+                    <Label>Text Purpose</Label>
+                    <Select value={textPurpose} onValueChange={setTextPurpose}>
+                      <SelectTrigger data-testid="select-text-purpose">
+                        <SelectValue placeholder="Select purpose..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="follow-up">Follow-up after visit</SelectItem>
+                        <SelectItem value="introduction">Quick introduction</SelectItem>
+                        <SelectItem value="reminder">Appointment reminder</SelectItem>
+                        <SelectItem value="thank-you">Thank you message</SelectItem>
+                        <SelectItem value="check-in">Quick check-in</SelectItem>
+                        <SelectItem value="schedule">Schedule a call</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Tone</Label>
+                      <Select value={textTone} onValueChange={setTextTone}>
+                        <SelectTrigger data-testid="select-text-tone">
+                          <SelectValue placeholder="Select tone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="friendly">Friendly</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="casual">Casual</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Key Points</Label>
+                      <Input
+                        value={textKeyPoints}
+                        onChange={(e) => setTextKeyPoints(e.target.value)}
+                        placeholder="Important points..."
+                        data-testid="input-text-key-points"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerateText}
+                    disabled={!textPurpose || generateTextMutation.isPending}
+                    className="w-full min-h-touch gap-2"
+                    data-testid="button-generate-text"
+                  >
+                    {generateTextMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate Text
+                      </>
+                    )}
+                  </Button>
+
+                  {generatedText && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-green-600" />
+                          Generated Text
+                        </Label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateText}
+                            disabled={generateTextMutation.isPending}
+                            data-testid="button-regenerate-text"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyTextToClipboard(generatedText)}
+                            data-testid="button-copy-text"
+                          >
+                            {textCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <Card className="p-3 bg-green-500/5 border-green-500/20">
+                        <p className="text-sm whitespace-pre-wrap">{generatedText}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{generatedText.length} characters</p>
+                      </Card>
+                      {merchant.businessPhone && (
+                        <Button
+                          variant="outline"
+                          className="w-full min-h-touch gap-2"
+                          onClick={() => {
+                            window.location.href = `sms:${merchant.businessPhone}?body=${encodeURIComponent(generatedText)}`;
+                          }}
+                          data-testid="button-send-text"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Open in Messages App
                         </Button>
                       )}
                     </div>
