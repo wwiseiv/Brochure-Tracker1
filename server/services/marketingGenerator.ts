@@ -57,6 +57,12 @@ export interface FlyerGenerationResult {
   heroImageUrl?: string;
   finalFlyerUrl?: string;
   errorMessage?: string;
+  userId?: string;
+  prompt?: string;
+  industry?: string;
+  savedToLibrary?: boolean;
+  generatedContent?: FlyerContent | null;
+  createdAt?: Date;
 }
 
 async function getApprovedClaims(): Promise<string[]> {
@@ -528,6 +534,12 @@ export async function getGenerationJob(jobId: number): Promise<FlyerGenerationRe
     heroImageUrl: job.heroImageUrl || undefined,
     finalFlyerUrl: job.finalFlyerUrl || undefined,
     errorMessage: job.errorMessage || undefined,
+    userId: job.userId,
+    prompt: job.prompt,
+    industry: job.industry || undefined,
+    savedToLibrary: job.savedToLibrary || false,
+    generatedContent: job.generatedContent as FlyerContent | null,
+    createdAt: job.createdAt,
   };
 }
 
@@ -544,6 +556,12 @@ export async function getUserGenerationJobs(userId: string): Promise<FlyerGenera
     heroImageUrl: job.heroImageUrl || undefined,
     finalFlyerUrl: job.finalFlyerUrl || undefined,
     errorMessage: job.errorMessage || undefined,
+    userId: job.userId,
+    prompt: job.prompt,
+    industry: job.industry || undefined,
+    savedToLibrary: job.savedToLibrary || false,
+    generatedContent: job.generatedContent as FlyerContent | null,
+    createdAt: job.createdAt,
   }));
 }
 

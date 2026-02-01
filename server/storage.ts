@@ -698,7 +698,7 @@ export class DatabaseStorage implements IStorage {
         sql`${drops.merchantId} IS NOT NULL`
       ));
     
-    const merchantIds = [...new Set(dropsWithMerchants.map(d => d.merchantId).filter(Boolean))] as number[];
+    const merchantIds = Array.from(new Set(dropsWithMerchants.map(d => d.merchantId).filter(Boolean))) as number[];
     
     // Get agent's own merchants (non-sample)
     let agentMerchants: Merchant[] = [];

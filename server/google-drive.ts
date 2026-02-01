@@ -102,7 +102,7 @@ export async function listCoachingDocuments(): Promise<Array<{id: string, name: 
 
     const allFiles: Array<{id: string, name: string, mimeType: string, path?: string}> = [];
     
-    async function processFolder(currentFolderId: string, currentPath: string = '') {
+    const processFolder = async (currentFolderId: string, currentPath: string = ''): Promise<void> => {
       const files = await listFilesInFolder(currentFolderId);
       
       for (const file of files) {
@@ -119,7 +119,7 @@ export async function listCoachingDocuments(): Promise<Array<{id: string, name: 
           });
         }
       }
-    }
+    };
 
     await processFolder(folderId);
     console.log(`Found ${allFiles.length} total files in folder tree`);
@@ -241,7 +241,7 @@ function extractTextFromPdfBuffer(buffer: Buffer): string {
     }
     
     // Dedupe and join
-    const uniqueParts = [...new Set(textParts)];
+    const uniqueParts = Array.from(new Set(textParts));
     return uniqueParts.join(' ').replace(/\s+/g, ' ').trim();
   } catch (error) {
     console.error('Error extracting text from PDF:', error);

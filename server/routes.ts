@@ -6909,10 +6909,10 @@ Generate the following content in JSON format:
         try {
           const scraped = await scrapeMerchantWebsite(merchantWebsiteUrl);
           scrapedData = {
-            description: scraped.description,
-            address: scraped.address,
-            phone: scraped.phone,
-            logoUrl: scraped.logoUrl,
+            description: scraped.data.businessDescription ?? undefined,
+            address: scraped.data.address ?? undefined,
+            phone: scraped.data.phone ?? undefined,
+            logoUrl: scraped.data.logoUrl ?? undefined,
           };
           console.log("[Proposals] Website scraped successfully:", {
             hasDescription: !!scrapedData.description,
@@ -6930,8 +6930,16 @@ Generate the following content in JSON format:
       const enrichedAddress = scrapedData.address || businessAddress;
 
       // Generate beautiful proposal content with Claude
+      const fullParsedData = {
+        ...parsedData,
+        preparedDate: new Date(),
+        agentName: agentName || "PCBancard Representative",
+        agentTitle: agentTitle || "Account Executive",
+        proposalType: parsedData.optionDualPricing ? "dual_pricing" : "interchange_plus",
+      } as const;
+
       const claudeDoc = await generateClaudeDocument({
-        parsedData,
+        parsedData: fullParsedData as any,
         agentName: agentName || "PCBancard Representative",
         agentTitle: agentTitle || "Account Executive",
         agentEmail: agentEmail || "",
@@ -6957,7 +6965,7 @@ Generate the following content in JSON format:
           merchantName,
           businessAddress,
           sections: claudeDoc.sections,
-          parsedData,
+          parsedData: fullParsedData as any,
           agentName: agentName || "PCBancard Representative",
           agentTitle: agentTitle || "Account Executive",
           agentEmail: agentEmail || "",
@@ -8107,17 +8115,19 @@ Generate the following content in JSON format:
       const membership = req.orgMembership as OrgMembershipInfo;
       const { status, mccCode, sortBy = "created_at", sortOrder = "desc", page = 1, limit = 50 } = req.query;
 
-      let query = db
-        .select()
-        .from(prospects)
-        .where(eq(prospects.agentId, agentId));
-
+      const conditions = [eq(prospects.agentId, agentId)];
+      
       if (status && typeof status === "string") {
-        query = query.where(eq(prospects.status, status));
+        conditions.push(eq(prospects.status, status));
       }
       if (mccCode && typeof mccCode === "string") {
-        query = query.where(eq(prospects.mccCode, mccCode));
+        conditions.push(eq(prospects.mccCode, mccCode));
       }
+
+      const query = db
+        .select()
+        .from(prospects)
+        .where(and(...conditions));
 
       const offset = (Number(page) - 1) * Number(limit);
       

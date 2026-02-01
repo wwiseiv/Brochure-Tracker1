@@ -201,18 +201,19 @@ export async function recordCorrection(
   correction: InsertExtractionCorrection & { isPositiveFeedback?: boolean }
 ): Promise<void> {
   const { isPositiveFeedback, ...correctionData } = correction;
+  const insertData: InsertExtractionCorrection = correctionData;
   
-  await db.insert(extractionCorrections).values(correctionData);
+  await db.insert(extractionCorrections).values(insertData);
   
   if (!isPositiveFeedback) {
     await db
       .update(statementExtractions)
       .set({ userCorrected: true })
-      .where(eq(statementExtractions.id, correctionData.extractionId));
+      .where(eq(statementExtractions.id, insertData.extractionId));
     
-    console.log(`[LearningService] Recorded correction for extraction #${correctionData.extractionId}`);
+    console.log(`[LearningService] Recorded correction for extraction #${insertData.extractionId}`);
   } else {
-    console.log(`[LearningService] Recorded verification for extraction #${correctionData.extractionId}`);
+    console.log(`[LearningService] Recorded verification for extraction #${insertData.extractionId}`);
   }
 }
 

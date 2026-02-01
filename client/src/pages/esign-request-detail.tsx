@@ -321,11 +321,11 @@ export default function ESignRequestDetailPage() {
     const relatedFields = getRelatedFields(fieldName);
     for (const related of relatedFields) {
       if (editedFieldValues[related]) return editedFieldValues[related];
-      if (request.fieldValues?.[related]) return request.fieldValues[related];
+      if (request?.fieldValues?.[related]) return request.fieldValues[related];
     }
     
     // Check original field value
-    if (request.fieldValues?.[fieldName]) return request.fieldValues[fieldName];
+    if (request?.fieldValues?.[fieldName]) return request.fieldValues[fieldName];
     
     return "";
   };

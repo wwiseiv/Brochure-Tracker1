@@ -563,6 +563,11 @@ export class ESignatureService {
       }
 
       // Step 2: Send invite for the document
+      // At this point documentId is guaranteed to be set (either from template or upload)
+      if (!documentId) {
+        console.error("[SignNow] Document ID is unexpectedly null");
+        return this.createDemoSignature(request, options.expirationDays);
+      }
       return this.sendSignNowInvite(documentId, primarySigner, request, options, accessToken);
     } catch (error) {
       console.error("[SignNow] Error sending document:", error);
