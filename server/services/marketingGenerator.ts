@@ -546,3 +546,7 @@ export async function getUserGenerationJobs(userId: string): Promise<FlyerGenera
     errorMessage: job.errorMessage || undefined,
   }));
 }
+
+export async function deleteGenerationJob(jobId: number): Promise<void> {
+  await db.delete(marketingGenerationJobs).where(eq(marketingGenerationJobs.id, jobId));
+}

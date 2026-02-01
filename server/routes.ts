@@ -10371,5 +10371,46 @@ Generate the following content in JSON format:
     }
   });
 
+  // Delete marketing generation job (admin or owner only)
+  app.delete("/api/marketing/jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+
+      const userId = req.user.claims.sub;
+      const { getGenerationJob, deleteGenerationJob } = await import('./services/marketingGenerator');
+
+      const job = await getGenerationJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      // Check if user can delete (owner or master_admin)
+      let canDelete = job.userId === userId;
+      if (!canDelete) {
+        const membership = await storage.getUserMembership(userId);
+        if (membership?.role === 'master_admin') {
+          canDelete = true;
+        }
+      }
+
+      if (!canDelete) {
+        return res.status(403).json({ error: 'Not authorized to delete this job' });
+      }
+
+      await deleteGenerationJob(jobId);
+
+      res.json({
+        success: true,
+        message: 'Marketing material deleted successfully',
+      });
+    } catch (error) {
+      console.error('Error deleting marketing job:', error);
+      res.status(500).json({ error: 'Failed to delete marketing material' });
+    }
+  });
+
   return httpServer;
 }

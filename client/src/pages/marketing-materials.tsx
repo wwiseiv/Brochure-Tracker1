@@ -38,8 +38,19 @@ import {
   BookmarkCheck,
   Heart,
   CreditCard,
-  DollarSign
+  DollarSign,
+  Trash2
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { MarketingTemplate, OrganizationMember } from "@shared/schema";
 
 interface MarketingTemplateData {
@@ -73,6 +84,7 @@ const INDUSTRY_LABELS: Record<string, { label: string; icon: React.ReactNode }> 
   tattoo_parlors: { label: "Tattoo Parlors", icon: <Scissors className="w-4 h-4" /> },
   convenience_stores: { label: "Convenience Stores", icon: <Store className="w-4 h-4" /> },
   promotions: { label: "Promotions & Incentives", icon: <DollarSign className="w-4 h-4" /> },
+  video_brochure: { label: "Video Brochure", icon: <FileText className="w-4 h-4" /> },
 };
 
 const MARKETING_INDUSTRIES = Object.keys(INDUSTRY_LABELS);
@@ -130,6 +142,9 @@ const STATIC_TEMPLATES: MarketingTemplateData[] = [
   { id: 23, name: "Attorneys & Law Firms", description: "Professional payment solutions for legal practices", industry: "attorneys_law", thumbnailUrl: "/marketing/attorneys-law.png" },
   { id: 24, name: "Tattoo Parlors", description: "Eliminate processing fees for tattoo studios", industry: "tattoo_parlors", thumbnailUrl: "/marketing/tattoo-parlors.png" },
   { id: 25, name: "Convenience Stores", description: "Pay $0 to process for convenience stores", industry: "convenience_stores", thumbnailUrl: "/marketing/convenience-stores.png" },
+  
+  // Video Brochure
+  { id: 26, name: "Video Brochure Flyer", description: "The best 5 minutes - video brochure promotional flyer", industry: "video_brochure", thumbnailUrl: "/marketing/video-brochure.pdf", pdfUrl: "/marketing/video-brochure.pdf" },
 ];
 
 export default function MarketingMaterialsPage() {
@@ -154,6 +169,8 @@ export default function MarketingMaterialsPage() {
   const [isPolling, setIsPolling] = useState(false);
   const [lastCompletedJobId, setLastCompletedJobId] = useState<number | null>(null);
   const [savingJobId, setSavingJobId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<number | null>(null);
 
   const { data: memberInfo } = useQuery<OrganizationMember>({
     queryKey: ["/api/me/member"],
@@ -218,6 +235,43 @@ export default function MarketingMaterialsPage() {
       setSavingJobId(null);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const response = await apiRequest("DELETE", `/api/marketing/jobs/${jobId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Deleted",
+        description: "Marketing material has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/jobs"] });
+      setDeleteDialogOpen(false);
+      setDeletingJobId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete marketing material.",
+        variant: "destructive",
+      });
+      setDeletingJobId(null);
+    },
+  });
+
+  const canDelete = memberInfo?.role === 'master_admin';
+
+  const handleDeleteClick = (jobId: number) => {
+    setDeletingJobId(jobId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingJobId) {
+      deleteMutation.mutate(deletingJobId);
+    }
+  };
 
   useEffect(() => {
     if (isPolling && generationJobs.length > 0) {
@@ -571,6 +625,20 @@ ${repEmail}`;
                             </>
                           )}
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-12 min-w-12 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteClick(job.jobId)}
+                          disabled={deleteMutation.isPending && deletingJobId === job.jobId}
+                          data-testid={`button-delete-job-${job.jobId}`}
+                        >
+                          {deleteMutation.isPending && deletingJobId === job.jobId ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -824,6 +892,43 @@ ${repEmail}`;
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="delete-dialog-title">Delete Marketing Material?</AlertDialogTitle>
+            <AlertDialogDescription data-testid="delete-dialog-description">
+              This action cannot be undone. This will permanently delete this marketing material from your library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              data-testid="button-cancel-delete"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeletingJobId(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
