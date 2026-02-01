@@ -19,8 +19,7 @@ const navItems = [
 ];
 
 const managerNavItems = [
-  { path: "/team-pipeline", icon: Users, label: "Team", tooltip: "Team pipeline overview" },
-  { path: "/pipeline-analytics", icon: BarChart3, label: "Analytics", tooltip: "Pipeline analytics" },
+  { path: "/team-pipeline", icon: Users, label: "Team", tooltip: "Team pipeline & analytics" },
 ];
 
 export function BottomNav() {
