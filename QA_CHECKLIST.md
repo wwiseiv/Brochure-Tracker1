@@ -178,6 +178,50 @@ See Secrets tab for:
 - SIGNNOW_USERNAME (optional)
 - GROK_API_KEY (optional)
 
+## Production Hardening Report (Feb 2026)
+
+### Build Status
+- [x] npm run build: **SUCCESS**
+- [x] TypeScript check: **PASS** (non-critical Drizzle type inference warnings)
+- [x] Bundle size: 2.26 MB client, 3.2 MB server
+- [ ] Chunk size warning: Consider code-splitting for bundles > 500 KB
+
+### E2E Test Results
+- [x] Landing page loads
+- [x] Authentication flow works
+- [x] Deal Pipeline (/prospects/pipeline) works
+- [x] Marketing Materials page works
+- [x] AI Coach page works
+- [x] Statement Analyzer page works
+- [x] Proposal Generator page works
+- [x] Help page works
+
+### Known Gaps
+
+#### Dictation Coverage (~60-70%)
+**Pages WITH Dictation:**
+- New Drop: textNotes field
+- Email Drafter: draft, agentNotes, keyPoints fields
+- Proposal Generator: repNotes field
+- Marketing Materials: custom flyer prompt
+
+**Pages MISSING Dictation:**
+- Deal Pipeline: followUpNotes, checkInNotes, lossNotes
+- Deal Pipeline: Custom voice recorder (inconsistent with DictationInput)
+
+#### TTS Coverage (~70%)
+**Pages WITH TTS (ListenButton):**
+- Email Drafter: polished email output
+- EquipIQ: AI recommendations
+- Presentation Training: all AI content sections
+
+**Pages with PARTIAL TTS:**
+- Statement Analyzer: Only dualPricingPitch and interchangePlusPitch have ListenButton
+  - Missing: keyFacts, questionsToAsk, objectionsResponses, closingStatement
+
+**Pages MISSING TTS:**
+- Coach page: AI roleplay responses (uses custom audio, not ListenButton)
+
 ## Troubleshooting
 
 ### App won't start
@@ -199,3 +243,15 @@ See Secrets tab for:
 1. Check browser console for errors
 2. Verify authentication
 3. Check API endpoints are responding
+
+## Future Improvements
+
+### Performance
+1. Implement code-splitting for large pages (coach, statement-analyzer)
+2. Lazy-load AI components
+3. Add skeleton loaders for data-heavy pages
+
+### Consistency
+1. Replace custom voice recorder in Deal Pipeline with DictationInput
+2. Add ListenButton to all AI-generated content
+3. Standardize tooltip implementations across pages
