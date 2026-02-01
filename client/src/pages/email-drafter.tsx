@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav } from "@/components/BottomNav";
+import { DictationInput } from "@/components/DictationInput";
+import { ListenButton } from "@/components/ListenButton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -203,13 +205,15 @@ export default function EmailDrafterPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="draft">Your Draft Email</Label>
-                  <Textarea
+                  <DictationInput
                     id="draft"
-                    placeholder="Hey John, just wanted to follow up on our meeting yesterday. I think our payment processing solution would be perfect for your restaurant..."
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    className="min-h-[150px]"
                     data-testid="input-draft"
+                    value={draft}
+                    onChange={setDraft}
+                    placeholder="Hey John, just wanted to follow up on our meeting yesterday. I think our payment processing solution would be perfect for your restaurant..."
+                    multiline
+                    className="min-h-[150px]"
+                    rows={4}
                   />
                 </div>
 
@@ -271,7 +275,8 @@ export default function EmailDrafterPage() {
                       <Sparkles className="w-4 h-4 text-primary" />
                       Polished Email
                     </CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                      <ListenButton text={polishedEmail} size="sm" />
                       <Button
                         variant="outline"
                         size="sm"
@@ -370,25 +375,29 @@ export default function EmailDrafterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="agentNotes">Agent Notes from Visit</Label>
-                  <Textarea
+                  <DictationInput
                     id="agentNotes"
-                    placeholder="Paste your notes from the drop here... e.g., Owner mentioned high processing fees, busy during lunch rush, interested in dual pricing..."
-                    value={agentNotes}
-                    onChange={(e) => setAgentNotes(e.target.value)}
-                    className="min-h-[100px]"
                     data-testid="input-agent-notes"
+                    value={agentNotes}
+                    onChange={setAgentNotes}
+                    placeholder="Paste your notes from the drop here... e.g., Owner mentioned high processing fees, busy during lunch rush, interested in dual pricing..."
+                    multiline
+                    className="min-h-[100px]"
+                    rows={3}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="keyPoints">Additional Key Points (optional)</Label>
-                  <Textarea
+                  <DictationInput
                     id="keyPoints"
-                    placeholder="Mention the video brochure, discuss competitive rates, schedule a demo..."
-                    value={keyPoints}
-                    onChange={(e) => setKeyPoints(e.target.value)}
-                    className="min-h-[80px]"
                     data-testid="input-key-points"
+                    value={keyPoints}
+                    onChange={setKeyPoints}
+                    placeholder="Mention the video brochure, discuss competitive rates, schedule a demo..."
+                    multiline
+                    className="min-h-[80px]"
+                    rows={3}
                   />
                 </div>
 
@@ -437,7 +446,8 @@ export default function EmailDrafterPage() {
                       <Sparkles className="w-4 h-4 text-primary" />
                       Generated Email
                     </CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                      <ListenButton text={generatedEmail} size="sm" />
                       <Button
                         variant="outline"
                         size="sm"

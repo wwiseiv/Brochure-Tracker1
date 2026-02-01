@@ -96,6 +96,9 @@ Preferred communication style: Simple, everyday language.
 - **Access Control**: Proper "Access Denied" pages.
 - **PWA Features**: Service worker for offline support.
 - **UI/UX**: Bottom navigation, improved back navigation, searchable help page.
+- **Dictation Support**: DictationInput component provides voice-to-text for major text inputs in Email Drafter, Proposal Generator, and New Drop pages.
+- **TTS Playback**: ListenButton component enables ElevenLabs text-to-speech for AI-generated content in Email Drafter, Statement Analyzer, EquipIQ, and Presentation Training.
+- **QA Tooling**: QA_CHECKLIST.md provides 30-minute verification workflow for production readiness.
 
 ### Proposal Intelligence Service
 A modular, plugin-based AI platform for generating merchant proposals.

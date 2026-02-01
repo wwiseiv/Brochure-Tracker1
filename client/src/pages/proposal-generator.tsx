@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { BottomNav } from "@/components/BottomNav";
+import { DictationInput } from "@/components/DictationInput";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { ProposalJobStep, ProposalJobStatus, ProposalJobStepStatus, PricingComparison, MerchantScrapedData, SalespersonInfo, Deal } from "@shared/schema";
@@ -2368,13 +2369,14 @@ export default function ProposalGeneratorPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rep-notes">Rep Notes</Label>
-                <Textarea
+                <DictationInput
                   id="rep-notes"
-                  placeholder="Additional notes about the merchant, their pain points, or specific needs..."
-                  value={repNotes}
-                  onChange={(e) => setRepNotes(e.target.value)}
-                  rows={3}
                   data-testid="input-rep-notes"
+                  value={repNotes}
+                  onChange={setRepNotes}
+                  placeholder="Additional notes about the merchant, their pain points, or specific needs..."
+                  multiline
+                  rows={3}
                 />
               </div>
             </CardContent>

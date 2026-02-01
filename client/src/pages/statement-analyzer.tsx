@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { ListenButton } from "@/components/ListenButton";
 import { 
   FileText, 
   AlertTriangle, 
@@ -2506,15 +2507,17 @@ ${new Date().toLocaleDateString()}
 
                 <TabsContent value="opening" className="mt-4">
                   <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10"
-                      onClick={() => copyToClipboard(results.talkingPoints.opening, "Opening")}
-                      data-testid="button-copy-opening"
-                    >
-                      {copiedText === "Opening" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+                    <div className="absolute top-2 right-2 z-10 flex gap-1">
+                      <ListenButton text={results.talkingPoints.opening} size="sm" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(results.talkingPoints.opening, "Opening")}
+                        data-testid="button-copy-opening"
+                      >
+                        {copiedText === "Opening" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     <ScrollArea className="h-[200px]">
                       <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg whitespace-pre-wrap text-sm">
                         {results.talkingPoints.opening}
@@ -2549,15 +2552,17 @@ ${new Date().toLocaleDateString()}
 
                 <TabsContent value="dual-pricing" className="mt-4">
                   <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10"
-                      onClick={() => copyToClipboard(results.talkingPoints.dualPricingPitch, "Dual Pricing Pitch")}
-                      data-testid="button-copy-dual-pricing"
-                    >
-                      {copiedText === "Dual Pricing Pitch" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+                    <div className="absolute top-2 right-2 z-10 flex gap-1">
+                      <ListenButton text={results.talkingPoints.dualPricingPitch} size="sm" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(results.talkingPoints.dualPricingPitch, "Dual Pricing Pitch")}
+                        data-testid="button-copy-dual-pricing"
+                      >
+                        {copiedText === "Dual Pricing Pitch" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     <ScrollArea className="h-[300px]">
                       <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg whitespace-pre-wrap text-sm">
                         {results.talkingPoints.dualPricingPitch}
@@ -2568,15 +2573,17 @@ ${new Date().toLocaleDateString()}
 
                 <TabsContent value="ic-plus" className="mt-4">
                   <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10"
-                      onClick={() => copyToClipboard(results.talkingPoints.interchangePlusPitch || "", "IC Plus Pitch")}
-                      data-testid="button-copy-ic-plus"
-                    >
-                      {copiedText === "IC Plus Pitch" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+                    <div className="absolute top-2 right-2 z-10 flex gap-1">
+                      <ListenButton text={results.talkingPoints.interchangePlusPitch || "If dual pricing isn't the right fit, we also offer Interchange-Plus pricing with true wholesale rates plus a small, transparent markup."} size="sm" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(results.talkingPoints.interchangePlusPitch || "", "IC Plus Pitch")}
+                        data-testid="button-copy-ic-plus"
+                      >
+                        {copiedText === "IC Plus Pitch" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     <ScrollArea className="h-[300px]">
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 rounded-lg whitespace-pre-wrap text-sm">
                         {results.talkingPoints.interchangePlusPitch || "If dual pricing isn't the right fit, we also offer Interchange-Plus pricing with true wholesale rates plus a small, transparent markup."}

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DictationInput } from "@/components/DictationInput";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -581,11 +582,15 @@ export default function NewDropPage() {
                     Text Notes (optional)
                   </FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <DictationInput 
+                      id="notes"
+                      data-testid="textarea-notes"
                       placeholder="Any additional notes about this drop..."
                       className="min-h-[100px] resize-none"
-                      {...field} 
-                      data-testid="textarea-notes"
+                      multiline
+                      rows={4}
+                      value={field.value}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

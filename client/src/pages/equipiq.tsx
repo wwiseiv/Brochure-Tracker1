@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { BottomNav } from "@/components/BottomNav";
+import { ListenButton } from "@/components/ListenButton";
 import { 
   Bot, 
   Send, 
@@ -416,15 +417,20 @@ export default function EquipIQPage() {
                         key={i}
                         className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                       >
-                        <div
-                          className={`max-w-[85%] rounded-lg px-4 py-2 ${
-                            message.role === "user"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
-                          }`}
-                          data-testid={`chat-message-${i}`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <div className={`flex items-start gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                          {message.role === "assistant" && (
+                            <ListenButton text={message.content} size="sm" className="mt-1 flex-shrink-0" />
+                          )}
+                          <div
+                            className={`max-w-[85%] rounded-lg px-4 py-2 ${
+                              message.role === "user"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted"
+                            }`}
+                            data-testid={`chat-message-${i}`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          </div>
                         </div>
                       </div>
                     ))}

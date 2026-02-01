@@ -14,6 +14,8 @@ interface DictationInputProps {
   className?: string;
   disabled?: boolean;
   rows?: number;
+  id?: string;
+  "data-testid"?: string;
 }
 
 export function DictationInput({
@@ -24,6 +26,8 @@ export function DictationInput({
   className,
   disabled = false,
   rows = 3,
+  id,
+  "data-testid": dataTestId,
 }: DictationInputProps) {
   const {
     isListening,
@@ -63,6 +67,8 @@ export function DictationInput({
     placeholder,
     disabled: disabled || isListening,
     className: cn("pr-12", className),
+    id,
+    "data-testid": dataTestId,
   };
 
   return (
@@ -71,12 +77,10 @@ export function DictationInput({
         <Textarea
           {...inputProps}
           rows={rows}
-          data-testid="textarea-dictation"
         />
       ) : (
         <Input
           {...inputProps}
-          data-testid="input-dictation"
         />
       )}
 
