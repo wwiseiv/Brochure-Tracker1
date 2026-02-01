@@ -441,7 +441,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDrop(drop: InsertDrop): Promise<Drop> {
-    const [created] = await db.insert(drops).values(drop).returning();
+    const [created] = await db.insert(drops).values(drop as any).returning();
     return created;
   }
 
@@ -465,7 +465,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReminder(reminder: InsertReminder): Promise<Reminder> {
-    const [created] = await db.insert(reminders).values(reminder).returning();
+    const [created] = await db.insert(reminders).values(reminder as any).returning();
     return created;
   }
 
@@ -597,7 +597,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrganization(data: InsertOrganization): Promise<Organization> {
-    const [created] = await db.insert(organizations).values(data).returning();
+    const [created] = await db.insert(organizations).values(data as any).returning();
     return created;
   }
 
@@ -614,7 +614,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember> {
-    const [created] = await db.insert(organizationMembers).values(data).returning();
+    const [created] = await db.insert(organizationMembers).values(data as any).returning();
     return created;
   }
 
@@ -740,7 +740,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMerchant(data: InsertMerchant): Promise<Merchant> {
-    const [created] = await db.insert(merchants).values(data).returning();
+    const [created] = await db.insert(merchants).values(data as any).returning();
     return created;
   }
 
@@ -767,15 +767,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrUpdateAgentInventory(data: InsertAgentInventory): Promise<AgentInventory> {
-    const existing = await this.getAgentInventory(data.orgId, data.agentId);
+    const inventoryData = data as { orgId: number; agentId: string };
+    const existing = await this.getAgentInventory(inventoryData.orgId, inventoryData.agentId);
     if (existing) {
       const [updated] = await db.update(agentInventory)
-        .set({ ...data, updatedAt: new Date() })
+        .set({ ...data, updatedAt: new Date() } as any)
         .where(eq(agentInventory.id, existing.id))
         .returning();
       return updated;
     }
-    const [created] = await db.insert(agentInventory).values(data).returning();
+    const [created] = await db.insert(agentInventory).values(data as any).returning();
     return created;
   }
 
@@ -788,7 +789,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInventoryLog(data: InsertInventoryLog): Promise<InventoryLog> {
-    const [created] = await db.insert(inventoryLogs).values(data).returning();
+    const [created] = await db.insert(inventoryLogs).values(data as any).returning();
     return created;
   }
 
@@ -823,7 +824,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReferral(data: InsertReferral): Promise<Referral> {
-    const [created] = await db.insert(referrals).values(data).returning();
+    const [created] = await db.insert(referrals).values(data as any).returning();
     return created;
   }
 
@@ -847,7 +848,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFollowUpSequence(data: InsertFollowUpSequence): Promise<FollowUpSequence> {
-    const [created] = await db.insert(followUpSequences).values(data).returning();
+    const [created] = await db.insert(followUpSequences).values(data as any).returning();
     return created;
   }
 
@@ -867,7 +868,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFollowUpStep(data: InsertFollowUpStep): Promise<FollowUpStep> {
-    const [created] = await db.insert(followUpSteps).values(data).returning();
+    const [created] = await db.insert(followUpSteps).values(data as any).returning();
     return created;
   }
 
@@ -893,7 +894,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFollowUpExecution(data: InsertFollowUpExecution): Promise<FollowUpExecution> {
-    const [created] = await db.insert(followUpExecutions).values(data).returning();
+    const [created] = await db.insert(followUpExecutions).values(data as any).returning();
     return created;
   }
 
@@ -904,7 +905,7 @@ export class DatabaseStorage implements IStorage {
 
   // Activity Events
   async createActivityEvent(data: InsertActivityEvent): Promise<ActivityEvent> {
-    const [created] = await db.insert(activityEvents).values(data).returning();
+    const [created] = await db.insert(activityEvents).values(data as any).returning();
     return created;
   }
 
@@ -937,7 +938,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAiSummary(data: InsertAiSummary): Promise<AiSummary> {
-    const [created] = await db.insert(aiSummaries).values(data).returning();
+    const [created] = await db.insert(aiSummaries).values(data as any).returning();
     return created;
   }
 
@@ -961,13 +962,13 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated;
     }
-    const [created] = await db.insert(leadScores).values(data).returning();
+    const [created] = await db.insert(leadScores).values(data as any).returning();
     return created;
   }
 
   // Offline Queue
   async createOfflineQueueItem(data: InsertOfflineQueue): Promise<OfflineQueue> {
-    const [created] = await db.insert(offlineQueue).values(data).returning();
+    const [created] = await db.insert(offlineQueue).values(data as any).returning();
     return created;
   }
 
@@ -1009,7 +1010,7 @@ export class DatabaseStorage implements IStorage {
 
   // Invitations
   async createInvitation(data: InsertInvitation): Promise<Invitation> {
-    const [created] = await db.insert(invitations).values(data).returning();
+    const [created] = await db.insert(invitations).values(data as any).returning();
     return created;
   }
 
@@ -1051,13 +1052,13 @@ export class DatabaseStorage implements IStorage {
 
   // Feedback
   async createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
-    const [created] = await db.insert(feedbackSubmissions).values(data).returning();
+    const [created] = await db.insert(feedbackSubmissions).values(data as any).returning();
     return created;
   }
 
   // Role-play Sessions
   async createRoleplaySession(data: InsertRoleplaySession): Promise<RoleplaySession> {
-    const [created] = await db.insert(roleplaySessions).values(data).returning();
+    const [created] = await db.insert(roleplaySessions).values(data as any).returning();
     return created;
   }
 
@@ -1092,7 +1093,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRoleplayMessage(data: InsertRoleplayMessage): Promise<RoleplayMessage> {
-    const [created] = await db.insert(roleplayMessages).values(data).returning();
+    const [created] = await db.insert(roleplayMessages).values(data as any).returning();
     return created;
   }
 
@@ -1158,7 +1159,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBrochureLocation(data: InsertBrochureLocation): Promise<BrochureLocation> {
-    const [created] = await db.insert(brochureLocations).values(data).returning();
+    const [created] = await db.insert(brochureLocations).values(data as any).returning();
     return created;
   }
 
@@ -1196,7 +1197,7 @@ export class DatabaseStorage implements IStorage {
       transferredBy,
       transferType: transferType as any,
       notes,
-    });
+    } as InsertBrochureLocationHistory);
     
     // Update current location
     const updated = await this.updateBrochureLocation(brochureId, {
@@ -1219,7 +1220,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBrochureLocationHistory(data: InsertBrochureLocationHistory): Promise<BrochureLocationHistory> {
-    const [created] = await db.insert(brochureLocationHistory).values(data).returning();
+    const [created] = await db.insert(brochureLocationHistory).values(data as any).returning();
     return created;
   }
 
@@ -1248,7 +1249,7 @@ export class DatabaseStorage implements IStorage {
       holderId: null,
       assignedBy: registeredBy,
       notes,
-    });
+    } as InsertBrochureLocation);
     
     // Record history
     await this.createBrochureLocationHistory({
@@ -1261,7 +1262,7 @@ export class DatabaseStorage implements IStorage {
       transferredBy: registeredBy,
       transferType: "register",
       notes: notes || "Initial registration to house inventory",
-    });
+    } as InsertBrochureLocationHistory);
     
     return { ...brochure, location };
   }
@@ -1282,7 +1283,7 @@ export class DatabaseStorage implements IStorage {
 
   // Meeting Recordings
   async createMeetingRecording(data: InsertMeetingRecording): Promise<MeetingRecording> {
-    const [created] = await db.insert(meetingRecordings).values(data).returning();
+    const [created] = await db.insert(meetingRecordings).values(data as any).returning();
     return created;
   }
 
@@ -1326,7 +1327,7 @@ export class DatabaseStorage implements IStorage {
 
   // Voice Notes
   async createVoiceNote(data: InsertVoiceNote): Promise<VoiceNote> {
-    const [created] = await db.insert(voiceNotes).values(data).returning();
+    const [created] = await db.insert(voiceNotes).values(data as any).returning();
     return created;
   }
 
@@ -1366,25 +1367,26 @@ export class DatabaseStorage implements IStorage {
 
   async upsertTrainingDocument(data: InsertTrainingDocument): Promise<TrainingDocument> {
     // Check if document exists
-    const existing = await this.getTrainingDocument(data.driveFileId);
+    const docData = data as any as { driveFileId: string; name: string; content: string; mimeType: string; isActive?: boolean };
+    const existing = await this.getTrainingDocument(docData.driveFileId);
     
     if (existing) {
       // Update existing document
       const [updated] = await db
         .update(trainingDocuments)
         .set({
-          name: data.name,
-          content: data.content,
-          mimeType: data.mimeType,
+          name: docData.name,
+          content: docData.content,
+          mimeType: docData.mimeType,
           syncedAt: new Date(),
-          isActive: data.isActive ?? true,
+          isActive: docData.isActive ?? true,
         })
-        .where(eq(trainingDocuments.driveFileId, data.driveFileId))
+        .where(eq(trainingDocuments.driveFileId, docData.driveFileId))
         .returning();
       return updated;
     } else {
       // Insert new document
-      const [created] = await db.insert(trainingDocuments).values(data).returning();
+      const [created] = await db.insert(trainingDocuments).values(data as any).returning();
       return created;
     }
   }
@@ -1701,7 +1703,7 @@ export class DatabaseStorage implements IStorage {
     
     const created = await db
       .insert(dailyEdgeContent)
-      .values(content)
+      .values(content as any)
       .returning();
     
     return created;
@@ -1783,7 +1785,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEquipmentVendor(data: InsertEquipmentVendor): Promise<EquipmentVendor> {
-    const [vendor] = await db.insert(equipmentVendors).values(data).returning();
+    const [vendor] = await db.insert(equipmentVendors).values(data as any).returning();
     return vendor;
   }
 
@@ -1801,7 +1803,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEquipmentProduct(data: InsertEquipmentProduct): Promise<EquipmentProduct> {
-    const [product] = await db.insert(equipmentProducts).values(data).returning();
+    const [product] = await db.insert(equipmentProducts).values(data as any).returning();
     return product;
   }
 
@@ -1824,12 +1826,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEquipmentBusinessType(data: InsertEquipmentBusinessType): Promise<EquipmentBusinessType> {
-    const [bt] = await db.insert(equipmentBusinessTypes).values(data).returning();
+    const [bt] = await db.insert(equipmentBusinessTypes).values(data as any).returning();
     return bt;
   }
 
   async createEquipmentRecommendationSession(data: InsertEquipmentRecommendationSession): Promise<EquipmentRecommendationSession> {
-    const [session] = await db.insert(equipmentRecommendationSessions).values(data).returning();
+    const [session] = await db.insert(equipmentRecommendationSessions).values(data as any).returning();
     return session;
   }
 
@@ -1840,7 +1842,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEquipmentQuizResult(data: InsertEquipmentQuizResult): Promise<EquipmentQuizResult> {
-    const [result] = await db.insert(equipmentQuizResults).values(data).returning();
+    const [result] = await db.insert(equipmentQuizResults).values(data as any).returning();
     return result;
   }
 
@@ -1892,7 +1894,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmailDigestPreferences(data: InsertEmailDigestPreferences): Promise<EmailDigestPreferences> {
-    const [prefs] = await db.insert(emailDigestPreferences).values(data).returning();
+    const [prefs] = await db.insert(emailDigestPreferences).values(data as any).returning();
     return prefs;
   }
 
@@ -1912,7 +1914,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmailDigestHistory(data: InsertEmailDigestHistory): Promise<EmailDigestHistory> {
-    const [history] = await db.insert(emailDigestHistory).values(data).returning();
+    const [history] = await db.insert(emailDigestHistory).values(data as any).returning();
     return history;
   }
 
@@ -1973,14 +1975,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertPresentationProgress(data: InsertPresentationProgress): Promise<PresentationProgress> {
-    const existing = await this.getUserLessonProgress(data.userId, data.lessonId);
+    const progressData = data as any as { userId: string; lessonId: number; completed?: boolean; practiceRecorded?: boolean; quizPassed?: boolean };
+    const existing = await this.getUserLessonProgress(progressData.userId, progressData.lessonId);
     
     if (existing) {
       const updateData: Partial<PresentationProgress> = {};
-      if (data.completed !== undefined) updateData.completed = data.completed;
-      if (data.practiceRecorded !== undefined) updateData.practiceRecorded = data.practiceRecorded;
-      if (data.quizPassed !== undefined) updateData.quizPassed = data.quizPassed;
-      if (data.completed && !existing.completedAt) updateData.completedAt = new Date();
+      if (progressData.completed !== undefined) updateData.completed = progressData.completed;
+      if (progressData.practiceRecorded !== undefined) updateData.practiceRecorded = progressData.practiceRecorded;
+      if (progressData.quizPassed !== undefined) updateData.quizPassed = progressData.quizPassed;
+      if (progressData.completed && !existing.completedAt) updateData.completedAt = new Date();
       
       const [updated] = await db.update(presentationProgress)
         .set(updateData)
@@ -1990,15 +1993,15 @@ export class DatabaseStorage implements IStorage {
     } else {
       const insertData = {
         ...data,
-        completedAt: data.completed ? new Date() : null,
+        completedAt: progressData.completed ? new Date() : null,
       };
-      const [created] = await db.insert(presentationProgress).values(insertData).returning();
+      const [created] = await db.insert(presentationProgress).values(insertData as any).returning();
       return created;
     }
   }
 
   async createProposal(data: InsertProposal): Promise<Proposal> {
-    const [created] = await db.insert(proposals).values(data).returning();
+    const [created] = await db.insert(proposals).values(data as any).returning();
     return created;
   }
 
@@ -2128,7 +2131,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDeal(deal: InsertDeal): Promise<Deal> {
-    const [created] = await db.insert(deals).values(deal).returning();
+    const [created] = await db.insert(deals).values(deal as any).returning();
     return created;
   }
 
@@ -2200,15 +2203,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDealActivity(activity: InsertDealActivity): Promise<DealActivity> {
-    const [created] = await db.insert(dealActivities).values(activity).returning();
+    const activityData = activity as any as { activityType: string; dealId: number };
+    const [created] = await db.insert(dealActivities).values(activity as any).returning();
     
     await db.update(deals)
       .set({
         lastActivityAt: new Date(),
-        lastActivityType: activity.activityType,
+        lastActivityType: activityData.activityType,
         updatedAt: new Date(),
       })
-      .where(eq(deals.id, activity.dealId));
+      .where(eq(deals.id, activityData.dealId));
     
     return created;
   }
@@ -2221,7 +2225,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDealAttachment(attachment: InsertDealAttachment): Promise<DealAttachment> {
-    const [created] = await db.insert(dealAttachments).values(attachment).returning();
+    const [created] = await db.insert(dealAttachments).values(attachment as any).returning();
     return created;
   }
 
@@ -2246,7 +2250,7 @@ export class DatabaseStorage implements IStorage {
       organizationId: orgId,
     }));
 
-    const created = await db.insert(pipelineStageConfig).values(configs).returning();
+    const created = await db.insert(pipelineStageConfig).values(configs as any).returning();
     return created;
   }
 
@@ -2275,12 +2279,12 @@ export class DatabaseStorage implements IStorage {
       organizationId: orgId,
     }));
 
-    const created = await db.insert(lossReasons).values(reasons).returning();
+    const created = await db.insert(lossReasons).values(reasons as any).returning();
     return created;
   }
 
   async createLossReason(data: InsertLossReason): Promise<LossReason> {
-    const [created] = await db.insert(lossReasons).values(data).returning();
+    const [created] = await db.insert(lossReasons).values(data as any).returning();
     return created;
   }
 
@@ -2365,7 +2369,7 @@ export class DatabaseStorage implements IStorage {
 
   // Prospect Search Jobs
   async createProspectSearchJob(data: InsertProspectSearch): Promise<ProspectSearch> {
-    const [created] = await db.insert(prospectSearches).values(data).returning();
+    const [created] = await db.insert(prospectSearches).values(data as any).returning();
     return created;
   }
 
@@ -2397,7 +2401,7 @@ export class DatabaseStorage implements IStorage {
 
   // Statement Analysis Jobs
   async createStatementAnalysisJob(data: InsertStatementAnalysisJob): Promise<StatementAnalysisJob> {
-    const [created] = await db.insert(statementAnalysisJobs).values(data).returning();
+    const [created] = await db.insert(statementAnalysisJobs).values(data as any).returning();
     return created;
   }
 
@@ -2429,27 +2433,28 @@ export class DatabaseStorage implements IStorage {
 
   // Push Subscriptions
   async createPushSubscription(data: InsertPushSubscription): Promise<PushSubscription> {
+    const pushData = data as any as { userId: string; endpoint: string; keysP256dh?: string; keysAuth?: string; userAgent?: string; organizationId?: number };
     const [existing] = await db.select().from(pushSubscriptions)
       .where(and(
-        eq(pushSubscriptions.userId, data.userId),
-        eq(pushSubscriptions.endpoint, data.endpoint)
+        eq(pushSubscriptions.userId, pushData.userId),
+        eq(pushSubscriptions.endpoint, pushData.endpoint)
       ));
     
     if (existing) {
       const [updated] = await db
         .update(pushSubscriptions)
         .set({
-          keysP256dh: data.keysP256dh,
-          keysAuth: data.keysAuth,
-          userAgent: data.userAgent,
-          organizationId: data.organizationId,
+          keysP256dh: pushData.keysP256dh,
+          keysAuth: pushData.keysAuth,
+          userAgent: pushData.userAgent,
+          organizationId: pushData.organizationId,
         })
         .where(eq(pushSubscriptions.id, existing.id))
         .returning();
       return updated;
     }
     
-    const [created] = await db.insert(pushSubscriptions).values(data).returning();
+    const [created] = await db.insert(pushSubscriptions).values(data as any).returning();
     return created;
   }
 

@@ -133,7 +133,7 @@ export async function storeExtraction(
     userCorrected: false,
   };
 
-  const [result] = await db.insert(statementExtractions).values(insertData).returning();
+  const [result] = await db.insert(statementExtractions).values(insertData as any).returning();
   console.log(`[LearningService] Stored extraction #${result.id} for ${extractionData.processorName}`);
   return result;
 }
@@ -197,23 +197,32 @@ export async function getExtractionStats(): Promise<{
   };
 }
 
+interface CorrectionInput {
+  extractionId: number;
+  fieldName: string;
+  originalValue: string;
+  correctedValue: string;
+  userId?: string;
+  orgId?: number;
+  isPositiveFeedback?: boolean;
+}
+
 export async function recordCorrection(
-  correction: InsertExtractionCorrection & { isPositiveFeedback?: boolean }
+  correction: CorrectionInput
 ): Promise<void> {
   const { isPositiveFeedback, ...correctionData } = correction;
-  const insertData: InsertExtractionCorrection = correctionData;
   
-  await db.insert(extractionCorrections).values(insertData);
+  await db.insert(extractionCorrections).values(correctionData as any);
   
   if (!isPositiveFeedback) {
     await db
       .update(statementExtractions)
       .set({ userCorrected: true })
-      .where(eq(statementExtractions.id, insertData.extractionId));
+      .where(eq(statementExtractions.id, correctionData.extractionId));
     
-    console.log(`[LearningService] Recorded correction for extraction #${insertData.extractionId}`);
+    console.log(`[LearningService] Recorded correction for extraction #${correctionData.extractionId}`);
   } else {
-    console.log(`[LearningService] Recorded verification for extraction #${insertData.extractionId}`);
+    console.log(`[LearningService] Recorded verification for extraction #${correctionData.extractionId}`);
   }
 }
 
@@ -244,7 +253,7 @@ export async function lookupFee(feeName: string): Promise<FeeDictionary | null> 
 }
 
 export async function addFee(fee: InsertFeeDictionary): Promise<FeeDictionary> {
-  const [result] = await db.insert(feeDictionary).values(fee).returning();
+  const [result] = await db.insert(feeDictionary).values(fee as any).returning();
   return result;
 }
 
@@ -441,6 +450,6 @@ export async function seedFeeDictionary(): Promise<void> {
     },
   ];
 
-  await db.insert(feeDictionary).values(fees);
+  await db.insert(feeDictionary).values(fees as any);
   console.log(`[LearningService] Seeded ${fees.length} fee dictionary entries`);
 }

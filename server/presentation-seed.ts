@@ -515,7 +515,7 @@ export async function seedPresentationContent(): Promise<void> {
   console.log("Starting presentation training content seed...");
 
   // Insert modules
-  const insertedModules = await db.insert(presentationModules).values(modulesData).returning();
+  const insertedModules = await db.insert(presentationModules).values(modulesData as any).returning();
   console.log(`Inserted ${insertedModules.length} modules`);
 
   // Create module lookup by number
@@ -530,7 +530,7 @@ export async function seedPresentationContent(): Promise<void> {
     moduleId: moduleLookup.get(moduleNumber)!,
   }));
 
-  const insertedLessons = await db.insert(presentationLessons).values(lessonsToInsert).returning();
+  const insertedLessons = await db.insert(presentationLessons).values(lessonsToInsert as any).returning();
   console.log(`Inserted ${insertedLessons.length} lessons`);
 
   // Create lesson lookup by number
@@ -548,7 +548,7 @@ export async function seedPresentationContent(): Promise<void> {
         ...q,
         lessonId,
       }));
-      await db.insert(presentationQuizzes).values(quizzesToInsert);
+      await db.insert(presentationQuizzes).values(quizzesToInsert as any);
       quizCount += quizzesToInsert.length;
     }
   }
