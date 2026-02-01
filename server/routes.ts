@@ -2623,6 +2623,38 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
     }
   });
 
+  // Delete a merchant (only if user created it or it's a sample)
+  app.delete("/api/merchants/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+      
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const userId = req.user.claims.sub;
+      const deleted = await storage.deleteMerchant(merchantId, userId);
+      
+      if (!deleted) {
+        return res.status(403).json({ error: "You can only delete merchants you created or sample merchants" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting merchant:", error);
+      res.status(500).json({ error: "Failed to delete merchant" });
+    }
+  });
+
   // Get merchant drops (drops linked via merchantId)
   app.get("/api/merchants/:id/drops", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {

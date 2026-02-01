@@ -57,6 +57,8 @@ import {
   Square,
   Wand2,
   FileSignature,
+  Trash2,
+  Star,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
@@ -202,6 +204,30 @@ export default function MerchantDetailPage() {
   const [emailDraft, setEmailDraft] = useState("");
   const [polishedEmail, setPolishedEmail] = useState("");
   const [emailContext, setEmailContext] = useState("");
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteMerchantMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/merchants/${merchantId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Merchant Deleted",
+        description: "The merchant has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants"] });
+      navigate("/merchants");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete merchant",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (data: Partial<Merchant>) => {
@@ -535,6 +561,20 @@ export default function MerchantDetailPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <span className="font-semibold truncate flex-1">{merchant.businessName}</span>
+          {merchant.isSample && (
+            <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+              <Star className="w-3 h-3 mr-1" />
+              Sample
+            </Badge>
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => setShowDeleteConfirm(true)}
+            data-testid="button-delete-merchant"
+          >
+            <Trash2 className="w-5 h-5 text-destructive" />
+          </Button>
         </div>
       </header>
 
@@ -1397,6 +1437,44 @@ export default function MerchantDetailPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               Save Notes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Merchant?</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to delete "{merchant.businessName}"? This action cannot be undone.
+          </p>
+          {merchant.isSample && (
+            <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
+              This is a sample merchant for demonstration purposes.
+            </p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="min-h-touch"
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMerchantMutation.mutate()}
+              disabled={deleteMerchantMutation.isPending}
+              className="min-h-touch gap-2"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMerchantMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
