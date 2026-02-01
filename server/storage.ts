@@ -154,6 +154,9 @@ import {
   statementAnalysisJobs,
   type StatementAnalysisJob,
   type InsertStatementAnalysisJob,
+  proposalParseJobs,
+  type ProposalParseJob,
+  type InsertProposalParseJob,
   pushSubscriptions,
   type PushSubscription,
   type InsertPushSubscription,
@@ -2469,6 +2472,40 @@ export class DatabaseStorage implements IStorage {
         eq(pushSubscriptions.userId, userId),
         eq(pushSubscriptions.endpoint, endpoint)
       ));
+  }
+
+  // Proposal Parse Jobs
+  async createProposalParseJob(data: InsertProposalParseJob): Promise<ProposalParseJob> {
+    const [created] = await db.insert(proposalParseJobs).values(data as any).returning();
+    return created;
+  }
+
+  async getProposalParseJob(id: number): Promise<ProposalParseJob | undefined> {
+    const [job] = await db.select().from(proposalParseJobs).where(eq(proposalParseJobs.id, id));
+    return job;
+  }
+
+  async getProposalParseJobsByUser(agentId: string): Promise<ProposalParseJob[]> {
+    return db.select().from(proposalParseJobs)
+      .where(eq(proposalParseJobs.agentId, agentId))
+      .orderBy(desc(proposalParseJobs.createdAt));
+  }
+
+  async updateProposalParseJob(id: number, updates: Partial<ProposalParseJob>): Promise<void> {
+    await db
+      .update(proposalParseJobs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(proposalParseJobs.id, id));
+  }
+
+  async deleteProposalParseJob(id: number): Promise<void> {
+    await db.delete(proposalParseJobs).where(eq(proposalParseJobs.id, id));
+  }
+
+  async getPendingProposalParseJobs(): Promise<ProposalParseJob[]> {
+    return db.select().from(proposalParseJobs)
+      .where(eq(proposalParseJobs.status, "pending"))
+      .orderBy(proposalParseJobs.createdAt);
   }
 }
 

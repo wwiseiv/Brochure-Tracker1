@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { prospectSearches, statementAnalysisJobs } from "@shared/schema";
+import { prospectSearches, statementAnalysisJobs, proposalParseJobs } from "@shared/schema";
 import { eq, or, lt, and } from "drizzle-orm";
 
 export async function recoverStuckProspectJobs(): Promise<void> {
@@ -79,6 +79,43 @@ export async function recoverStuckProspectJobs(): Promise<void> {
         
         console.log(`[JobRecovery] Marked statement analysis job ${job.id} as failed`);
       }
+    }
+
+    // Recover stuck proposal parse jobs
+    const stuckParseJobs = await db
+      .select()
+      .from(proposalParseJobs)
+      .where(
+        or(
+          and(
+            eq(proposalParseJobs.status, "pending"),
+            lt(proposalParseJobs.createdAt, twoMinutesAgo)
+          ),
+          and(
+            eq(proposalParseJobs.status, "processing"),
+            lt(proposalParseJobs.startedAt, twoMinutesAgo)
+          )
+        )
+      );
+
+    if (stuckParseJobs.length > 0) {
+      console.log(`[JobRecovery] Found ${stuckParseJobs.length} stuck proposal parse jobs, marking as failed`);
+      
+      for (const job of stuckParseJobs) {
+        await db
+          .update(proposalParseJobs)
+          .set({
+            status: "failed",
+            errorMessage: "Server restart - please retry parsing",
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(proposalParseJobs.id, job.id));
+        
+        console.log(`[JobRecovery] Marked proposal parse job ${job.id} as failed`);
+      }
+    } else {
+      console.log("[JobRecovery] No stuck proposal parse jobs found");
     }
   } catch (error) {
     console.error("[JobRecovery] Error recovering stuck jobs:", error);
