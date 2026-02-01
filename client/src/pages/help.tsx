@@ -66,7 +66,10 @@ import {
   FileDown,
   Upload,
   Camera,
-  Globe
+  Globe,
+  ChevronRight,
+  Flame,
+  LayoutGrid,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -608,6 +611,81 @@ export default function HelpPage() {
     },
   ];
 
+  const dealPipelineFeatures: HelpItem[] = [
+    {
+      title: "14-Stage Sales Pipeline",
+      description: "Track deals through every stage: Prospect, Cold Call, Appointment Set, Presentation, Proposal, Statement Analysis, Negotiating, Follow-Up, Docs Sent, Signed, Won/Lost, Install, and Active Merchant.",
+      link: "/deals",
+      icon: <TrendingUp className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Swipe to Advance",
+      description: "On mobile, swipe left on any deal card to quickly advance it to the next stage. The intuitive gesture makes stage management fast and easy.",
+      link: "/deals",
+      icon: <ChevronRight className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Temperature Badges",
+      description: "Classify deals as Hot, Warm, or Cold. Temperature badges help you prioritize which deals need immediate attention and which can wait.",
+      link: "/deals",
+      icon: <Flame className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Follow-Up Tracking",
+      description: "Track up to 5 follow-up attempts per deal with outcomes and methods. Schedule next follow-ups with quick presets (tomorrow, 3 days, 1 week, 2 weeks).",
+      link: "/deals",
+      icon: <Clock className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Voice Notes for Deals",
+      description: "Record voice notes directly on deal follow-ups. AI transcribes your notes so you can capture details hands-free while driving or in meetings.",
+      link: "/deals",
+      icon: <Mic className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Loss Reason Tracking",
+      description: "When a deal is lost, record why: competitor, price, timing, etc. This data helps identify patterns and improve your closing strategy.",
+      link: "/deals",
+      icon: <AlertCircle className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Phase Filters",
+      description: "Filter your pipeline by phase: Prospecting, Active Selling, Closing, or Post-Sale. Focus on the stage of the sales cycle that needs attention.",
+      link: "/deals",
+      icon: <ClipboardList className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "List & Kanban Views",
+      description: "Toggle between list view (scrollable cards) and kanban board (columns by stage). Use the view that works best for your workflow.",
+      link: "/deals",
+      icon: <LayoutGrid className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Quick Actions",
+      description: "Call, email, or get directions to any deal with one tap. Contact info and business address are always at your fingertips.",
+      link: "/deals",
+      icon: <Smartphone className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Pipeline Analytics",
+      description: "See total deals, pipeline value, and win rate at a glance. Track your sales performance and forecast commissions.",
+      link: "/deals",
+      icon: <BarChart3 className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Convert to Active Merchant",
+      description: "When a deal closes, convert it to an Active Merchant with one click. All business data carries over for ongoing relationship management.",
+      link: "/deals",
+      icon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+    },
+    {
+      title: "Quarterly Check-ins",
+      description: "For active merchants, schedule and track quarterly check-ins. Stay in touch and identify upsell opportunities with your existing customers.",
+      link: "/deals",
+      icon: <Calendar className="w-5 h-5 text-green-600" />,
+    },
+  ];
+
   const activityFeatures: HelpItem[] = [
     {
       title: "Team Activity Feed",
@@ -950,6 +1028,15 @@ export default function HelpPage() {
                 <Button 
                   variant="secondary" 
                   size="sm"
+                  onClick={() => setSearchQuery("pipeline")}
+                  data-testid="quicklink-pipeline"
+                >
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  Deal Pipeline
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
                   onClick={() => setSearchQuery("statement")}
                   data-testid="quicklink-statement"
                 >
@@ -1033,6 +1120,7 @@ export default function HelpPage() {
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
             { title: "AI-Powered Prospecting", description: "Find new merchants with AI search, scan business cards, and build your sales pipeline.", items: prospectingFeatures, badge: "New" },
+            { title: "Deal Pipeline & CRM", description: "Track every deal through a 14-stage sales pipeline with follow-up tracking, temperature badges, and conversion analytics.", items: dealPipelineFeatures, badge: "CRM" },
             { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
             { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
             { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users" },
