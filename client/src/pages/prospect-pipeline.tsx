@@ -1808,9 +1808,17 @@ export default function DealPipelinePage() {
               />
             </div>
           </div>
-          <div className="border-t p-4 flex-shrink-0 safe-area-bottom">
+          <div className="border-t p-4 flex-shrink-0 safe-area-bottom flex gap-3">
             <Button
-              className="w-full"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowCreateDealSheet(false)}
+              data-testid="button-cancel-deal"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
               onClick={() => createDealMutation.mutate(newDealForm)}
               disabled={createDealMutation.isPending || !newDealForm.businessName.trim()}
               data-testid="button-submit-deal"
