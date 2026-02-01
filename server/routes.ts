@@ -10381,6 +10381,60 @@ Generate the following content in JSON format:
     }
   });
 
+  // Get saved marketing templates from database
+  app.get("/api/marketing/templates", isAuthenticated, async (_req: any, res) => {
+    try {
+      const { marketingTemplates } = await import('@shared/schema');
+      
+      const templates = await db.select().from(marketingTemplates).orderBy(desc(marketingTemplates.createdAt));
+      
+      res.json(templates);
+    } catch (error) {
+      console.error('Error fetching marketing templates:', error);
+      res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+  });
+
+  // Delete saved marketing template (admin only)
+  app.delete("/api/marketing/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      if (isNaN(templateId)) {
+        return res.status(400).json({ error: 'Invalid template ID' });
+      }
+
+      const userId = req.user.claims.sub;
+      
+      // Only master_admin can delete templates
+      const membership = await storage.getUserMembership(userId);
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Only administrators can delete templates' });
+      }
+
+      const { marketingTemplates, marketingRagContent } = await import('@shared/schema');
+      
+      // Check if template exists
+      const [template] = await db.select().from(marketingTemplates).where(eq(marketingTemplates.id, templateId));
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+
+      // Delete associated RAG content first
+      await db.delete(marketingRagContent).where(eq(marketingRagContent.templateId, templateId));
+      
+      // Delete the template
+      await db.delete(marketingTemplates).where(eq(marketingTemplates.id, templateId));
+
+      res.json({
+        success: true,
+        message: 'Template deleted successfully',
+      });
+    } catch (error) {
+      console.error('Error deleting marketing template:', error);
+      res.status(500).json({ error: 'Failed to delete template' });
+    }
+  });
+
   // Delete marketing generation job (admin or owner only)
   app.delete("/api/marketing/jobs/:id", isAuthenticated, async (req: any, res) => {
     try {

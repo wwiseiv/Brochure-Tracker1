@@ -62,6 +62,7 @@ interface MarketingTemplateData {
   industry: string;
   thumbnailUrl: string;
   pdfUrl?: string;
+  isStatic?: boolean;
 }
 
 const INDUSTRY_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -173,9 +174,15 @@ export default function MarketingMaterialsPage() {
   const [savingJobId, setSavingJobId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState<number | null>(null);
+  const [deleteTemplateDialogOpen, setDeleteTemplateDialogOpen] = useState(false);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
 
   const { data: memberInfo } = useQuery<OrganizationMember>({
     queryKey: ["/api/me/member"],
+  });
+
+  const { data: savedTemplates = [] } = useQuery<MarketingTemplate[]>({
+    queryKey: ["/api/marketing/templates"],
   });
 
   const { data: generationJobs = [], refetch: refetchJobs } = useQuery<FlyerGenerationJob[]>({
@@ -272,6 +279,41 @@ export default function MarketingMaterialsPage() {
   const confirmDelete = () => {
     if (deletingJobId) {
       deleteMutation.mutate(deletingJobId);
+    }
+  };
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: number) => {
+      const response = await apiRequest("DELETE", `/api/marketing/templates/${templateId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Deleted",
+        description: "Template has been removed from the library.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/templates"] });
+      setDeleteTemplateDialogOpen(false);
+      setDeletingTemplateId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete template.",
+        variant: "destructive",
+      });
+      setDeletingTemplateId(null);
+    },
+  });
+
+  const handleDeleteTemplateClick = (templateId: number) => {
+    setDeletingTemplateId(templateId);
+    setDeleteTemplateDialogOpen(true);
+  };
+
+  const confirmDeleteTemplate = () => {
+    if (deletingTemplateId) {
+      deleteTemplateMutation.mutate(deletingTemplateId);
     }
   };
 
@@ -375,7 +417,18 @@ export default function MarketingMaterialsPage() {
     }
   };
 
-  const templates = STATIC_TEMPLATES;
+  const staticTemplatesWithFlag = STATIC_TEMPLATES.map(t => ({ ...t, isStatic: true }));
+  
+  const savedTemplatesFormatted: MarketingTemplateData[] = savedTemplates.map(t => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || '',
+    industry: t.industry || 'general',
+    thumbnailUrl: t.thumbnailUrl,
+    isStatic: false,
+  }));
+  
+  const templates = [...savedTemplatesFormatted, ...staticTemplatesWithFlag];
 
   const filteredTemplates = templates.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -513,10 +566,11 @@ ${repEmail}`;
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredTemplates.map((template) => {
             const industryConfig = INDUSTRY_LABELS[template.industry];
+            const canDeleteTemplate = canDelete && !template.isStatic;
             return (
               <Card
-                key={template.id}
-                className="cursor-pointer hover-elevate"
+                key={`${template.isStatic ? 'static' : 'saved'}-${template.id}`}
+                className="cursor-pointer hover-elevate relative group"
                 onClick={() => handleSelectTemplate(template)}
                 data-testid={`template-card-${template.id}`}
               >
@@ -528,6 +582,25 @@ ${repEmail}`;
                     loading="lazy"
                     data-testid={`template-image-${template.id}`}
                   />
+                  {canDeleteTemplate && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTemplateClick(template.id);
+                      }}
+                      data-testid={`button-delete-template-${template.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {!template.isStatic && (
+                    <Badge className="absolute top-2 left-2 bg-primary/80 text-primary-foreground">
+                      Custom
+                    </Badge>
+                  )}
                 </div>
                 <div className="p-3 space-y-2">
                   <h3 className="font-medium text-sm line-clamp-1" data-testid={`template-name-${template.id}`}>{template.name}</h3>
@@ -935,6 +1008,43 @@ ${repEmail}`;
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteTemplateDialogOpen} onOpenChange={setDeleteTemplateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="delete-template-dialog-title">Delete Template?</AlertDialogTitle>
+            <AlertDialogDescription data-testid="delete-template-dialog-description">
+              This action cannot be undone. This will permanently delete this template from the library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              data-testid="button-cancel-delete-template"
+              onClick={() => {
+                setDeleteTemplateDialogOpen(false);
+                setDeletingTemplateId(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteTemplate}
+              disabled={deleteTemplateMutation.isPending}
+              data-testid="button-confirm-delete-template"
+            >
+              {deleteTemplateMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Deleting...
