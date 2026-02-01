@@ -60,6 +60,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RoleplayScenario, RoleplaySession, UserPermissions } from "@shared/schema";
 import { format } from "date-fns";
+import { ListenButton } from "@/components/ListenButton";
 
 interface Message {
   id: number;
@@ -1650,9 +1651,12 @@ export default function CoachPage() {
               <div className="grid gap-4">
                 {feedback.strengths && feedback.strengths.length > 0 && (
                   <Card className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-green-700">Strengths</span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="font-medium text-green-700">Strengths</span>
+                      </div>
+                      <ListenButton text={feedback.strengths.join(". ")} size="sm" data-testid="listen-feedback-strengths" />
                     </div>
                     <ul className="text-sm space-y-1">
                       {feedback.strengths.map((s, i) => (
@@ -1667,9 +1671,12 @@ export default function CoachPage() {
 
                 {feedback.areasToImprove && feedback.areasToImprove.length > 0 && (
                   <Card className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-4 h-4 text-amber-600" />
-                      <span className="font-medium text-amber-700">Areas to Improve</span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-amber-600" />
+                        <span className="font-medium text-amber-700">Areas to Improve</span>
+                      </div>
+                      <ListenButton text={feedback.areasToImprove.join(". ")} size="sm" data-testid="listen-feedback-improve" />
                     </div>
                     <ul className="text-sm space-y-1">
                       {feedback.areasToImprove.map((a, i) => (
@@ -1684,9 +1691,12 @@ export default function CoachPage() {
 
                 {feedback.topTip && (
                   <Card className="p-3 bg-primary/5 border-primary/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="w-4 h-4 text-primary" />
-                      <span className="font-medium">Top Tip</span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-primary" />
+                        <span className="font-medium">Top Tip</span>
+                      </div>
+                      <ListenButton text={feedback.topTip} size="sm" data-testid="listen-feedback-tip" />
                     </div>
                     <p className="text-sm">{feedback.topTip}</p>
                   </Card>
@@ -1694,9 +1704,12 @@ export default function CoachPage() {
 
                 {feedback.nepqUsage && (
                   <Card className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="w-4 h-4 text-blue-600" />
-                      <span className="font-medium text-blue-700">NEPQ Technique Usage</span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-blue-700">NEPQ Technique Usage</span>
+                      </div>
+                      <ListenButton text={feedback.nepqUsage} size="sm" data-testid="listen-feedback-nepq" />
                     </div>
                     <p className="text-sm text-muted-foreground">{feedback.nepqUsage}</p>
                   </Card>

@@ -7,12 +7,13 @@ interface ListenButtonProps {
   text: string;
   size?: "sm" | "icon";
   className?: string;
+  "data-testid"?: string;
 }
 
 let globalAudioElement: HTMLAudioElement | null = null;
 let globalStopCallback: (() => void) | null = null;
 
-export function ListenButton({ text, size = "icon", className = "" }: ListenButtonProps) {
+export function ListenButton({ text, size = "icon", className = "", "data-testid": dataTestId }: ListenButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -92,7 +93,7 @@ export function ListenButton({ text, size = "icon", className = "" }: ListenButt
       onClick={handleClick}
       className={`flex-shrink-0 ${className}`}
       title={isPlaying ? "Stop listening" : "Listen to this section"}
-      data-testid="button-listen"
+      data-testid={dataTestId || "button-listen"}
       disabled={isLoading}
     >
       {isLoading ? (

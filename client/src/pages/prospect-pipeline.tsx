@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DictationInput } from "@/components/DictationInput";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -1326,10 +1327,11 @@ export default function DealPipelinePage() {
                       
                       <div className="border-t pt-3 space-y-2">
                         <Label className="text-xs">Check-in Notes</Label>
-                        <Textarea
+                        <DictationInput
                           placeholder="Record notes from check-in conversation..."
                           value={checkInNotes}
-                          onChange={(e) => setCheckInNotes(e.target.value)}
+                          onChange={setCheckInNotes}
+                          multiline
                           rows={2}
                           data-testid="textarea-checkin-notes"
                         />
@@ -1423,10 +1425,11 @@ export default function DealPipelinePage() {
                       
                       <div className="space-y-2">
                         <Label className="text-xs">Notes</Label>
-                        <Textarea
+                        <DictationInput
                           placeholder="Add follow-up notes..."
                           value={followUpNotes}
-                          onChange={(e) => setFollowUpNotes(e.target.value)}
+                          onChange={setFollowUpNotes}
+                          multiline
                           rows={2}
                           data-testid="textarea-followup-notes"
                         />
@@ -1723,10 +1726,12 @@ export default function DealPipelinePage() {
             </div>
             <div className="space-y-2">
               <Label>Additional notes (optional)</Label>
-              <Textarea
+              <DictationInput
                 value={lossNotes}
-                onChange={(e) => setLossNotes(e.target.value)}
+                onChange={setLossNotes}
                 placeholder="Add any additional context..."
+                multiline
+                rows={3}
                 data-testid="input-loss-notes"
               />
             </div>

@@ -2693,12 +2693,18 @@ ${new Date().toLocaleDateString()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">Statement Summary</h4>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h4 className="font-medium">Statement Summary</h4>
+                    <ListenButton text={results.aiAnalysis.statementSummary} size="sm" data-testid="listen-ai-summary" />
+                  </div>
                   <p className="text-sm text-muted-foreground">{results.aiAnalysis.statementSummary}</p>
                 </div>
                 {results.aiAnalysis.customTalkingPoints.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2">Custom Talking Points</h4>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="font-medium">Custom Talking Points</h4>
+                      <ListenButton text={results.aiAnalysis.customTalkingPoints.join(". ")} size="sm" data-testid="listen-ai-talking-points" />
+                    </div>
                     <ul className="text-sm space-y-1">
                       {results.aiAnalysis.customTalkingPoints.map((point, i) => (
                         <li key={i} className="flex items-start gap-2">
@@ -2711,7 +2717,10 @@ ${new Date().toLocaleDateString()}
                 )}
                 {results.aiAnalysis.personalizedClosing && (
                   <div>
-                    <h4 className="font-medium mb-2">Personalized Closing</h4>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="font-medium">Personalized Closing</h4>
+                      <ListenButton text={results.aiAnalysis.personalizedClosing} size="sm" data-testid="listen-ai-closing" />
+                    </div>
                     <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg text-sm">
                       {results.aiAnalysis.personalizedClosing}
                     </div>
@@ -2733,7 +2742,10 @@ ${new Date().toLocaleDateString()}
               <CardContent className="space-y-4">
                 {results.competitorInsights.knownIssues.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2 text-red-600">Known Issues</h4>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-red-600">Known Issues</h4>
+                      <ListenButton text={results.competitorInsights.knownIssues.join(". ")} size="sm" data-testid="listen-competitor-issues" />
+                    </div>
                     <ul className="text-sm space-y-1">
                       {results.competitorInsights.knownIssues.map((issue, i) => (
                         <li key={i} className="flex items-start gap-2">
@@ -2746,7 +2758,10 @@ ${new Date().toLocaleDateString()}
                 )}
                 {results.competitorInsights.talkingPoints.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2">Competitive Talking Points</h4>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="font-medium">Competitive Talking Points</h4>
+                      <ListenButton text={results.competitorInsights.talkingPoints.join(". ")} size="sm" data-testid="listen-competitor-talking-points" />
+                    </div>
                     <ul className="text-sm space-y-1">
                       {results.competitorInsights.talkingPoints.map((point, i) => (
                         <li key={i} className="flex items-start gap-2">
