@@ -1992,17 +1992,43 @@ export const insertProspectActivitySchema = createInsertSchema(prospectActivitie
 export type InsertProspectActivity = z.infer<typeof insertProspectActivitySchema>;
 export type ProspectActivity = typeof prospectActivities.$inferSelect;
 
+// Prospect search job statuses for background processing
+export const PROSPECT_JOB_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+export type ProspectJobStatus = typeof PROSPECT_JOB_STATUSES[number];
+
 export const prospectSearches = pgTable("prospect_searches", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   agentId: varchar("agent_id", { length: 255 }).notNull(),
   organizationId: integer("organization_id").references(() => organizations.id),
   
+  // Search Parameters
   zipCode: varchar("zip_code", { length: 10 }).notNull(),
+  locationDisplay: varchar("location_display", { length: 100 }),
   businessTypes: text("business_types").array(),
+  businessTypesDisplay: varchar("business_types_display", { length: 500 }),
   radiusMiles: integer("radius_miles").default(10),
+  maxResults: integer("max_results").default(10),
+  
+  // Job Status for Background Processing
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  progress: integer("progress").default(0),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Results (stored as JSONB when complete)
+  results: jsonb("results"),
   resultsCount: integer("results_count"),
   
+  // Error Handling
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  
+  // Notification Tracking
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const prospectSearchesRelations = relations(prospectSearches, ({ one }) => ({
@@ -2015,9 +2041,47 @@ export const prospectSearchesRelations = relations(prospectSearches, ({ one }) =
 export const insertProspectSearchSchema = createInsertSchema(prospectSearches).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+  completedAt: true,
+  results: true,
+  resultsCount: true,
+  errorMessage: true,
+  notificationSent: true,
+  notificationSentAt: true,
 });
 export type InsertProspectSearch = z.infer<typeof insertProspectSearchSchema>;
 export type ProspectSearch = typeof prospectSearches.$inferSelect;
+
+// Push notification subscriptions for web push
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  endpoint: text("endpoint").notNull(),
+  keysP256dh: text("keys_p256dh").notNull(),
+  keysAuth: text("keys_auth").notNull(),
+  userAgent: text("user_agent"),
+  
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [pushSubscriptions.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  lastUsedAt: true,
+});
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
 // ============================================================================
 // DEAL PIPELINE SYSTEM

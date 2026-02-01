@@ -46,3 +46,7 @@ integrations = ["javascript_object_storage:2.0.0", "javascript_database:1.0.0", 
 
 [userenv.shared]
 USE_VISUAL_RENDERER = "true"
+VAPID_PUBLIC_KEY = "BIi5Dw9Oj5MdMsQkrqww5Ixnj3fUvwfVYjxI2LeGf-qo4DzVtRltUglbFQgueM7mRJ2SbQGXVR7VSaxwwU5pHJ4"
+VAPID_PRIVATE_KEY = "RsLuVrAMbcViHWC5lDgEfbm_EolVtdn54FlryYNHhHo"
+VAPID_EMAIL = "support@pcbancard.com"
+INTERNAL_SECRET = "prospect-job-secret-key-2026"

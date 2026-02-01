@@ -246,24 +246,71 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push notification received');
   
-  const data = event.data?.json() || {};
-  const title = data.title || 'BrochureDrop';
-  const options = {
-    body: data.body || 'You have a new notification',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
-    data: data.data || {},
-  };
+  try {
+    const data = event.data?.json() || {};
+    const title = data.title || 'BrochureTracker';
+    
+    // Build notification options based on type
+    const options = {
+      body: data.body || 'You have a new notification',
+      icon: data.icon || '/favicon.png',
+      badge: data.badge || '/favicon.png',
+      data: data.data || {},
+      vibrate: [100, 50, 100],
+      requireInteraction: data.data?.type === 'prospect_search_complete',
+      tag: data.data?.jobId ? `prospect-job-${data.data.jobId}` : 'general',
+      renotify: true,
+    };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+    // Add actions for prospect search notifications
+    if (data.data?.type === 'prospect_search_complete' || data.data?.type === 'prospect_search_failed') {
+      options.actions = [
+        { action: 'view', title: 'View Results' },
+        { action: 'dismiss', title: 'Dismiss' }
+      ];
+    }
+
+    event.waitUntil(
+      self.registration.showNotification(title, options)
+    );
+  } catch (error) {
+    console.error('[Service Worker] Error showing notification:', error);
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
+  // Handle dismiss action
+  if (event.action === 'dismiss') return;
+
+  // Determine URL based on notification type
+  let urlToOpen = '/';
+  if (event.notification.data?.url) {
+    urlToOpen = event.notification.data.url;
+  } else if (event.notification.data?.type === 'prospect_search_complete') {
+    urlToOpen = '/prospect-finder';
+  } else if (event.notification.data?.jobId) {
+    urlToOpen = `/prospect-finder`;
+  }
+  
   event.waitUntil(
-    self.clients.openWindow(event.notification.data?.url || '/')
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        // Check if app is already open
+        for (const client of windowClients) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.focus();
+            if (urlToOpen !== '/') {
+              client.navigate(urlToOpen);
+            }
+            return;
+          }
+        }
+        // Open new window if not
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
   );
 });

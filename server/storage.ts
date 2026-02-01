@@ -148,6 +148,12 @@ import {
   type PipelineStage,
   DEFAULT_PIPELINE_STAGES,
   DEFAULT_LOSS_REASONS,
+  prospectSearches,
+  type ProspectSearch,
+  type InsertProspectSearch,
+  pushSubscriptions,
+  type PushSubscription,
+  type InsertPushSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -330,6 +336,18 @@ export interface IStorage {
   getDealsNeedingFollowUp(agentId: string): Promise<Deal[]>;
   getStaleDeals(orgId: number, maxDaysInStage?: number): Promise<Deal[]>;
   getDealsNeedingQuarterlyCheckin(agentId: string): Promise<Deal[]>;
+  
+  // Prospect Search Jobs
+  createProspectSearchJob(data: InsertProspectSearch): Promise<ProspectSearch>;
+  getProspectSearchJob(id: number): Promise<ProspectSearch | undefined>;
+  getProspectSearchJobsByUser(userId: string): Promise<ProspectSearch[]>;
+  updateProspectSearchJob(id: number, updates: Partial<ProspectSearch>): Promise<ProspectSearch | undefined>;
+  getPendingProspectSearchJobs(): Promise<ProspectSearch[]>;
+  
+  // Push Subscriptions
+  createPushSubscription(data: InsertPushSubscription): Promise<PushSubscription>;
+  getPushSubscriptionsByUser(userId: string): Promise<PushSubscription[]>;
+  deletePushSubscription(userId: string, endpoint: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2269,6 +2287,77 @@ export class DatabaseStorage implements IStorage {
         lte(deals.nextQuarterlyCheckinAt, now)
       ))
       .orderBy(deals.nextQuarterlyCheckinAt);
+  }
+
+  // Prospect Search Jobs
+  async createProspectSearchJob(data: InsertProspectSearch): Promise<ProspectSearch> {
+    const [created] = await db.insert(prospectSearches).values(data).returning();
+    return created;
+  }
+
+  async getProspectSearchJob(id: number): Promise<ProspectSearch | undefined> {
+    const [job] = await db.select().from(prospectSearches).where(eq(prospectSearches.id, id));
+    return job;
+  }
+
+  async getProspectSearchJobsByUser(userId: string): Promise<ProspectSearch[]> {
+    return db.select().from(prospectSearches)
+      .where(eq(prospectSearches.agentId, userId))
+      .orderBy(desc(prospectSearches.createdAt));
+  }
+
+  async updateProspectSearchJob(id: number, updates: Partial<ProspectSearch>): Promise<ProspectSearch | undefined> {
+    const [updated] = await db
+      .update(prospectSearches)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(prospectSearches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingProspectSearchJobs(): Promise<ProspectSearch[]> {
+    return db.select().from(prospectSearches)
+      .where(eq(prospectSearches.status, "pending"))
+      .orderBy(prospectSearches.createdAt);
+  }
+
+  // Push Subscriptions
+  async createPushSubscription(data: InsertPushSubscription): Promise<PushSubscription> {
+    const [existing] = await db.select().from(pushSubscriptions)
+      .where(and(
+        eq(pushSubscriptions.userId, data.userId),
+        eq(pushSubscriptions.endpoint, data.endpoint)
+      ));
+    
+    if (existing) {
+      const [updated] = await db
+        .update(pushSubscriptions)
+        .set({
+          keysP256dh: data.keysP256dh,
+          keysAuth: data.keysAuth,
+          userAgent: data.userAgent,
+          organizationId: data.organizationId,
+        })
+        .where(eq(pushSubscriptions.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(pushSubscriptions).values(data).returning();
+    return created;
+  }
+
+  async getPushSubscriptionsByUser(userId: string): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions)
+      .where(and(
+        eq(pushSubscriptions.userId, userId),
+        eq(pushSubscriptions.endpoint, endpoint)
+      ));
   }
 }
 

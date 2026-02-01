@@ -83,8 +83,13 @@ import { generateProposalImages, type ProposalImages } from "./proposal-images";
 import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./proposal-builder";
 import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import proposalIntelligenceRouter from "./proposal-intelligence/api";
+import { searchLocalBusinesses } from "./services/prospect-search";
+import webpush from "web-push";
 import fs from "fs";
 import path from "path";
+
+// Internal secret for background job processing
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'prospect-job-internal-key-' + Date.now();
 
 // Configure multer for file uploads (in-memory storage for audio files)
 const upload = multer({
@@ -9330,6 +9335,329 @@ Generate the following content in JSON format:
     } catch (error: any) {
       console.error("[Loss Reasons] Delete error:", error);
       res.status(500).json({ error: "Failed to delete loss reason" });
+    }
+  });
+
+  // ============================================================================
+  // PROSPECT FINDER BACKGROUND JOBS API
+  // ============================================================================
+
+  // POST /api/prospect-finder/jobs - Create a new background search job
+  app.post("/api/prospect-finder/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { location, businessTypes, businessTypesDisplay, radiusMiles, maxResults } = req.body;
+
+      if (!location) {
+        return res.status(400).json({ error: "Location (ZIP code) is required" });
+      }
+
+      // Get organization membership if available
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+
+      // Create job in database with status 'pending'
+      const job = await storage.createProspectSearchJob({
+        agentId: userId,
+        organizationId: orgId,
+        zipCode: location,
+        locationDisplay: location,
+        businessTypes: businessTypes || [],
+        businessTypesDisplay: businessTypesDisplay || "",
+        radiusMiles: radiusMiles || 10,
+        maxResults: maxResults || 10,
+        status: "pending",
+        progress: 0,
+        retryCount: 0,
+      });
+
+      // Fire-and-forget: trigger background processing via internal endpoint
+      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      fetch(`${baseUrl}/api/internal/process-prospect-job`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(err => {
+        console.error("[ProspectJobs] Failed to trigger background processing:", err);
+      });
+
+      res.status(201).json({
+        success: true,
+        jobId: job.id,
+        status: "pending",
+        message: "Search started! We'll notify you when ready.",
+      });
+    } catch (error: any) {
+      console.error("[ProspectJobs] Create job error:", error);
+      res.status(500).json({ error: "Failed to create search job" });
+    }
+  });
+
+  // GET /api/prospect-finder/jobs - List user's search jobs
+  app.get("/api/prospect-finder/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const jobs = await storage.getProspectSearchJobsByUser(userId);
+      res.json({ jobs });
+    } catch (error: any) {
+      console.error("[ProspectJobs] List jobs error:", error);
+      res.status(500).json({ error: "Failed to fetch search jobs" });
+    }
+  });
+
+  // GET /api/prospect-finder/jobs/:id - Get a single job with results
+  app.get("/api/prospect-finder/jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProspectSearchJob(id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Ensure user owns this job
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("[ProspectJobs] Get job error:", error);
+      res.status(500).json({ error: "Failed to fetch search job" });
+    }
+  });
+
+  // POST /api/prospect-finder/jobs/:id/retry - Retry a failed job
+  app.post("/api/prospect-finder/jobs/:id/retry", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProspectSearchJob(id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Ensure user owns this job
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Reset status to 'pending', clear error, increment retryCount
+      const updatedJob = await storage.updateProspectSearchJob(id, {
+        status: "pending",
+        errorMessage: null,
+        retryCount: (job.retryCount || 0) + 1,
+        progress: 0,
+      });
+
+      // Trigger background processing again
+      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      fetch(`${baseUrl}/api/internal/process-prospect-job`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ jobId: id }),
+      }).catch(err => {
+        console.error("[ProspectJobs] Failed to trigger retry processing:", err);
+      });
+
+      res.json({
+        success: true,
+        jobId: id,
+        status: "pending",
+        message: "Retry started!",
+      });
+    } catch (error: any) {
+      console.error("[ProspectJobs] Retry job error:", error);
+      res.status(500).json({ error: "Failed to retry search job" });
+    }
+  });
+
+  // POST /api/internal/process-prospect-job - Internal endpoint for background processing
+  app.post("/api/internal/process-prospect-job", async (req, res) => {
+    // Verify internal secret header
+    const secret = req.headers["x-internal-secret"];
+    if (secret !== INTERNAL_SECRET) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { jobId } = req.body;
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId required" });
+    }
+
+    // Return immediately
+    res.json({ received: true });
+
+    // Process job asynchronously after response
+    setImmediate(async () => {
+      try {
+        const job = await storage.getProspectSearchJob(jobId);
+        if (!job) {
+          console.error("[ProspectJobs] Job not found for processing:", jobId);
+          return;
+        }
+
+        // Update job to 'processing'
+        await storage.updateProspectSearchJob(jobId, {
+          status: "processing",
+          startedAt: new Date(),
+        });
+
+        console.log("[ProspectJobs] Processing job:", jobId);
+
+        // Build business types array for search
+        const businessTypesArray = (job.businessTypes || []).map((bt: string) => ({
+          code: "0000",
+          name: bt,
+          searchTerms: [bt],
+        }));
+
+        // Run the AI search
+        const searchResult = await searchLocalBusinesses({
+          zipCode: job.zipCode,
+          businessTypes: businessTypesArray,
+          radius: job.radiusMiles || 10,
+          maxResults: job.maxResults || 10,
+          agentId: job.agentId,
+          organizationId: job.organizationId || undefined,
+        });
+
+        // Save results and mark as completed
+        await storage.updateProspectSearchJob(jobId, {
+          status: "completed",
+          completedAt: new Date(),
+          results: searchResult.businesses,
+          resultsCount: searchResult.businesses.length,
+          progress: 100,
+        });
+
+        console.log("[ProspectJobs] Job completed:", jobId, "Results:", searchResult.businesses.length);
+
+        // Try to send push notification if VAPID keys exist
+        const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+        const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+        const vapidSubject = process.env.VAPID_SUBJECT || "mailto:support@example.com";
+
+        if (vapidPublicKey && vapidPrivateKey) {
+          try {
+            webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+
+            const subscriptions = await storage.getPushSubscriptionsByUser(job.agentId);
+            
+            const payload = JSON.stringify({
+              title: "Prospect Search Complete",
+              body: `Found ${searchResult.businesses.length} businesses near ${job.zipCode}`,
+              data: { jobId, type: "prospect-search-complete" },
+            });
+
+            for (const sub of subscriptions) {
+              try {
+                await webpush.sendNotification({
+                  endpoint: sub.endpoint,
+                  keys: {
+                    p256dh: sub.keysP256dh,
+                    auth: sub.keysAuth,
+                  },
+                }, payload);
+              } catch (pushErr: any) {
+                console.error("[ProspectJobs] Push notification failed:", pushErr.message);
+              }
+            }
+
+            // Mark notification as sent
+            await storage.updateProspectSearchJob(jobId, {
+              notificationSent: true,
+              notificationSentAt: new Date(),
+            });
+          } catch (notifyErr: any) {
+            console.error("[ProspectJobs] Failed to send notifications:", notifyErr.message);
+          }
+        }
+      } catch (error: any) {
+        console.error("[ProspectJobs] Job processing failed:", error);
+
+        // Update job with error status
+        await storage.updateProspectSearchJob(jobId, {
+          status: "failed",
+          errorMessage: error.message || "Unknown error occurred",
+          completedAt: new Date(),
+        });
+      }
+    });
+  });
+
+  // ============================================================================
+  // PUSH NOTIFICATIONS API
+  // ============================================================================
+
+  // GET /api/push/vapid-public-key - Get VAPID public key for push subscriptions
+  app.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || "" });
+  });
+
+  // POST /api/push/subscribe - Save push subscription
+  app.post("/api/push/subscribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subscription } = req.body;
+
+      if (!subscription || !subscription.endpoint || !subscription.keys) {
+        return res.status(400).json({ error: "Invalid subscription data" });
+      }
+
+      // Get organization membership if available
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+
+      await storage.createPushSubscription({
+        userId,
+        organizationId: orgId,
+        endpoint: subscription.endpoint,
+        keysP256dh: subscription.keys.p256dh,
+        keysAuth: subscription.keys.auth,
+        userAgent: req.headers["user-agent"] || null,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Push] Subscribe error:", error);
+      res.status(500).json({ error: "Failed to save push subscription" });
+    }
+  });
+
+  // POST /api/push/unsubscribe - Remove push subscription
+  app.post("/api/push/unsubscribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { endpoint } = req.body;
+
+      if (!endpoint) {
+        return res.status(400).json({ error: "Endpoint is required" });
+      }
+
+      await storage.deletePushSubscription(userId, endpoint);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Push] Unsubscribe error:", error);
+      res.status(500).json({ error: "Failed to remove push subscription" });
     }
   });
 

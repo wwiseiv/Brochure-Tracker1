@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Sheet,
   SheetContent,
@@ -48,10 +49,15 @@ import {
   Zap,
   Grid3x3,
   AlertCircle,
-  ExternalLink,
   Navigation,
   Mail,
   Clock,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  List,
+  Info,
+  Eye,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -95,6 +101,28 @@ interface SearchResult {
   searchId: string;
 }
 
+interface ProspectSearchJob {
+  id: number;
+  agentId: string;
+  organizationId: number | null;
+  zipCode: string;
+  locationDisplay: string | null;
+  businessTypes: string[] | null;
+  businessTypesDisplay: string | null;
+  radiusMiles: number;
+  maxResults: number;
+  status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  results: DiscoveredBusiness[] | null;
+  resultsCount: number | null;
+  errorMessage: string | null;
+  retryCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const categoryIcons: Record<string, any> = {
   food: Utensils,
   retail: ShoppingBag,
@@ -121,6 +149,7 @@ export default function ProspectFinderPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimedBusinesses, setClaimedBusinesses] = useState<Set<string>>(new Set());
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [activeJobId, setActiveJobId] = useState<number | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -130,6 +159,71 @@ export default function ProspectFinderPage() {
     codes: MCCCode[];
   }>({
     queryKey: ["/api/prospects/mcc-codes"],
+  });
+
+  const { data: jobsData, isLoading: loadingJobs } = useQuery<{ jobs: ProspectSearchJob[] }>({
+    queryKey: ["/api/prospect-finder/jobs"],
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs || [];
+      const hasPendingJobs = jobs.some(job => job.status === "pending" || job.status === "processing");
+      return hasPendingJobs ? 5000 : false;
+    },
+  });
+
+  const jobs = jobsData?.jobs || [];
+  const hasPendingJobs = jobs.some(job => job.status === "pending" || job.status === "processing");
+
+  const startBackgroundSearchMutation = useMutation({
+    mutationFn: async () => {
+      const businessTypesDisplay = selectedMCCDetails.map(m => m.title).join(", ");
+      const response = await apiRequest("POST", "/api/prospect-finder/jobs", {
+        location: zipCode,
+        businessTypes: selectedMCCCodes,
+        businessTypesDisplay,
+        radiusMiles: parseInt(radius),
+        maxResults: parseInt(maxResults),
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Search started!",
+        description: "We'll notify you when your prospect list is ready. You can navigate away.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/prospect-finder/jobs"] });
+      setZipCode("");
+      setSelectedMCCCodes([]);
+      setRadius("10");
+      setMaxResults("25");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to start search",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const retryJobMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const response = await apiRequest("POST", `/api/prospect-finder/jobs/${jobId}/retry`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Retrying search",
+        description: "We'll notify you when results are ready.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/prospect-finder/jobs"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to retry",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
   });
 
   const searchMutation = useMutation({
@@ -235,6 +329,19 @@ export default function ProspectFinderPage() {
     }
   };
 
+  const handleViewJobResults = (job: ProspectSearchJob) => {
+    if (job.status === "completed" && job.results) {
+      setActiveJobId(job.id);
+      setSearchResults({
+        businesses: job.results,
+        totalFound: job.resultsCount || job.results.length,
+        duplicatesSkipped: 0,
+        searchId: `job-${job.id}`,
+      });
+      setShowResults(true);
+    }
+  };
+
   const groupedMCCCodes = useMemo(() => {
     if (!mccData) return {};
     return mccData.codes.reduce((acc, code) => {
@@ -266,6 +373,50 @@ export default function ProspectFinderPage() {
     if (confidence >= 0.9) return { label: "High", variant: "default" as const };
     if (confidence >= 0.7) return { label: "Medium", variant: "secondary" as const };
     return { label: "Low", variant: "outline" as const };
+  };
+
+  const getJobStatusDisplay = (job: ProspectSearchJob) => {
+    switch (job.status) {
+      case "pending":
+      case "processing":
+        return {
+          icon: <Loader2 className="w-4 h-4 animate-spin text-primary" />,
+          label: "Searching...",
+          variant: "secondary" as const,
+        };
+      case "completed":
+        return {
+          icon: <CheckCircle className="w-4 h-4 text-green-600" />,
+          label: `${job.resultsCount || 0} found`,
+          variant: "default" as const,
+        };
+      case "failed":
+        return {
+          icon: <XCircle className="w-4 h-4 text-destructive" />,
+          label: "Failed",
+          variant: "destructive" as const,
+        };
+      default:
+        return {
+          icon: <Clock className="w-4 h-4 text-muted-foreground" />,
+          label: "Unknown",
+          variant: "outline" as const,
+        };
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
   };
 
   const canSearch = zipCode.length >= 5 && selectedMCCCodes.length > 0;
@@ -307,6 +458,13 @@ export default function ProspectFinderPage() {
       </header>
 
       <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+          <Info className="w-4 h-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
+            Searches run in the background - you'll get a notification when results are ready.
+          </AlertDescription>
+        </Alert>
+
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
@@ -428,14 +586,14 @@ export default function ProspectFinderPage() {
               <TooltipTrigger asChild>
                 <Button
                   className="w-full gap-2"
-                  disabled={!canSearch || searchMutation.isPending}
-                  onClick={() => searchMutation.mutate()}
+                  disabled={!canSearch || startBackgroundSearchMutation.isPending}
+                  onClick={() => startBackgroundSearchMutation.mutate()}
                   data-testid="button-search-prospects"
                 >
-                  {searchMutation.isPending ? (
+                  {startBackgroundSearchMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Searching with AI...
+                      Starting search...
                     </>
                   ) : (
                     <>
@@ -446,23 +604,130 @@ export default function ProspectFinderPage() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Search for businesses matching your criteria</p>
+                <p>Start a background search for businesses</p>
               </TooltipContent>
             </Tooltip>
           </div>
         </Card>
 
-        {!searchResults && !searchMutation.isPending && (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-8 h-8 text-purple-600" />
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+              <List className="w-5 h-5 text-indigo-600" />
             </div>
-            <h3 className="font-semibold mb-2">Ready to Find Prospects</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-              Enter a ZIP code and select business types to discover local businesses in your territory.
-            </p>
+            <div className="flex-1">
+              <h2 className="font-semibold">My Searches</h2>
+              <p className="text-sm text-muted-foreground">
+                {hasPendingJobs ? "Searches in progress..." : "Your recent search results"}
+              </p>
+            </div>
+            {hasPendingJobs && (
+              <Badge variant="secondary" className="animate-pulse">
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Active
+              </Badge>
+            )}
           </div>
-        )}
+
+          {loadingJobs ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                <Search className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                No searches yet. Start one above!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {jobs.slice(0, 10).map((job) => {
+                const statusDisplay = getJobStatusDisplay(job);
+                return (
+                  <div
+                    key={job.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
+                    onClick={() => job.status === "completed" && handleViewJobResults(job)}
+                    data-testid={`job-item-${job.id}`}
+                  >
+                    <div className="flex-shrink-0">
+                      {statusDisplay.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">
+                          {job.zipCode}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {job.radiusMiles}mi
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {job.businessTypesDisplay || "Various types"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimeAgo(job.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {job.status === "completed" && (
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewJobResults(job);
+                              }}
+                              data-testid={`button-view-results-${job.id}`}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View search results</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {job.status === "failed" && (
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={retryJobMutation.isPending}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                retryJobMutation.mutate(job.id);
+                              }}
+                              data-testid={`button-retry-${job.id}`}
+                            >
+                              <RefreshCw className="w-4 h-4 mr-1" />
+                              Retry
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Retry this search</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {(job.status === "pending" || job.status === "processing") && (
+                        <Badge variant="secondary" className="text-xs">
+                          {statusDisplay.label}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
 
         <Link href="/prospects/pipeline">
           <Card className="p-4 hover-elevate cursor-pointer">
@@ -553,7 +818,12 @@ export default function ProspectFinderPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={showResults} onOpenChange={setShowResults}>
+      <Sheet open={showResults} onOpenChange={(open) => {
+        setShowResults(open);
+        if (!open) {
+          setActiveJobId(null);
+        }
+      }}>
         <SheetContent side="bottom" className="h-[90vh] flex flex-col p-0">
           <SheetHeader className="px-4 pt-4 pb-3 border-b flex-shrink-0 sticky top-0 bg-background z-10">
             <div className="flex items-center justify-between">
@@ -621,7 +891,6 @@ export default function ProspectFinderPage() {
                       )}
                     </div>
 
-                    {/* Contact Info */}
                     <div className="space-y-1 text-sm mb-3">
                       {business.ownerName && (
                         <div className="flex items-center gap-2 text-muted-foreground">
@@ -637,7 +906,6 @@ export default function ProspectFinderPage() {
                       )}
                     </div>
 
-                    {/* Quick Action Buttons */}
                     <div className="flex gap-2 mb-3">
                       <Tooltip delayDuration={700}>
                         <TooltipTrigger asChild>
