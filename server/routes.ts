@@ -2607,6 +2607,7 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
   });
 
   // AI Prospecting Advice Coach - generates actionable prospecting ideas
+  // Uses training materials from Google Drive for RAG-enhanced responses
   app.post("/api/prospecting-advice", isAuthenticated, async (req: any, res) => {
     try {
       const { userInput } = req.body;
@@ -2623,6 +2624,22 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
           baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
         },
       });
+      
+      // Fetch custom training materials from Google Drive (Little Rock folder)
+      // Use a timeout to prevent slow Drive fetches from blocking the response
+      let driveKnowledge = '';
+      try {
+        const drivePromise = buildDriveKnowledgeContext();
+        const timeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('Drive fetch timeout')), 10000)
+        );
+        driveKnowledge = await Promise.race([drivePromise, timeoutPromise]);
+        if (driveKnowledge) {
+          console.log("Loaded Google Drive training materials for prospecting advice");
+        }
+      } catch (driveError: any) {
+        console.log("Google Drive not available or timed out, using built-in knowledge only:", driveError?.message || driveError);
+      }
       
       const businessContext = `
 You are an expert sales coach for a merchant services/payment processing company called PCBancard.
@@ -2659,6 +2676,7 @@ OBJECTION HANDLING BASICS:
 `;
 
       const prompt = `${businessContext}
+${driveKnowledge}
 
 ---
 
@@ -2670,11 +2688,13 @@ A salesperson on our team is reaching out for help. Here's what they said:
 
 Based on what they're experiencing, provide SPECIFIC, ACTIONABLE prospecting advice for TODAY.
 
+IMPORTANT: If custom training materials were provided above, incorporate specific strategies, scripts, and techniques from those materials into your advice. These are proven methods from our top performers.
+
 Your response should:
 1. ACKNOWLEDGE their situation briefly (1 sentence)
 2. Provide 3-5 SPECIFIC, ACTIONABLE ideas they can execute TODAY
 3. Each idea should be concrete - include specific places to go, types of businesses to target, and exact words to say
-4. Incorporate real-world, current sales strategies that are working
+4. When possible, reference specific techniques or scripts from the training materials
 5. Frame everything in the context of selling payment processing and video brochure products
 6. End with ONE motivational insight or mindset tip
 
@@ -2682,7 +2702,7 @@ Keep the tone encouraging but practical. These are experienced salespeople who n
 
 Format the response clearly with numbered action items. Be specific - instead of "visit local businesses," say "Walk into 5 restaurants on Main Street during the slow 2-4pm window and ask to speak with the owner about their processing statement."`;
 
-      console.log("Prospecting Advice request received:", { inputLength: userInput.length });
+      console.log("Prospecting Advice request received:", { inputLength: userInput.length, hasDriveKnowledge: driveKnowledge.length > 0 });
       
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
