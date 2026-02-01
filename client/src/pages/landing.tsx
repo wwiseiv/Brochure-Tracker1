@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { 
   QrCode, MapPin, Mic, Bell, CheckCircle2, ArrowRight, Package, GraduationCap, 
   Users, TrendingUp, FileSignature, Brain, Presentation, Cpu, Sparkles, Store,
-  Search, Camera, Navigation, Globe, FileImage, Mail, Download, Palette
+  Search, Camera, Navigation, Globe, FileImage, Mail, Download, Palette,
+  Target, ClipboardList, Phone, BarChart3
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import pcbLogoLight from "@/assets/pcb_logo_light.png";
@@ -120,6 +121,29 @@ const marketingFeatures = [
     icon: Palette,
     title: "PCBancard Branding",
     description: "Professional branded materials featuring dual pricing benefits for each industry",
+  },
+];
+
+const crmFeatures = [
+  {
+    icon: Target,
+    title: "14-Stage Pipeline",
+    description: "Track deals from prospect to active merchant with visual Kanban and list views",
+  },
+  {
+    icon: ClipboardList,
+    title: "Today View",
+    description: "Daily action center showing follow-ups, appointments, and stale deals at a glance",
+  },
+  {
+    icon: Phone,
+    title: "Follow-Up Tracker",
+    description: "Never miss a callback with temperature badges, reminders, and outcome logging",
+  },
+  {
+    icon: BarChart3,
+    title: "Pipeline Analytics",
+    description: "Win rates, stage conversion, average deal time, and top performer leaderboards",
   },
 ];
 
@@ -244,6 +268,28 @@ export default function LandingPage() {
               <Card key={index} className="p-4 flex flex-col items-center text-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center flex-shrink-0">
                   <Icon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </div>
+              </Card>
+            );
+          })}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold text-center mb-2">Deal Pipeline & CRM</h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">Manage your sales pipeline from first contact to closed deal</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {crmFeatures.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <Card key={index} className="p-4 flex flex-col items-center text-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">{feature.title}</h3>
