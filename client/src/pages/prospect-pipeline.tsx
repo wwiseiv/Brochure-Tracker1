@@ -82,7 +82,6 @@ import {
   Users,
   FileQuestion,
   Sparkles,
-  Loader2,
   RefreshCw,
   X,
 } from "lucide-react";

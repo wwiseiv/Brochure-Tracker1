@@ -56,6 +56,90 @@ import {
 import * as XLSX from "xlsx";
 import { Link } from "wouter";
 import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
+import { Component, type ReactNode, type ErrorInfo } from "react";
+
+// Error Boundary to catch rendering errors from undefined values
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class AnalysisErrorBoundary extends Component<{ children: ReactNode; onReset: () => void }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode; onReset: () => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Statement Analyzer Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-center">
+          <div className="text-red-500 text-lg font-semibold mb-2">Analysis Display Error</div>
+          <p className="text-muted-foreground mb-4">
+            The analysis data may be incomplete. This can happen when the statement doesn't contain all required data points.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false });
+              this.props.onReset();
+            }}
+            className="px-4 py-2 bg-primary text-white rounded-md"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Default savings structure for safe access
+const DEFAULT_SAVINGS = {
+  interchangePlus: {
+    monthlyCost: 0,
+    effectiveRate: 0,
+    monthlySavings: 0,
+    annualSavings: 0,
+    description: ""
+  },
+  dualPricing: {
+    monthlyCost: 0,
+    effectiveRate: 0,
+    monthlySavings: 0,
+    annualSavings: 0,
+    description: ""
+  }
+};
+
+// Helper to get safe savings with fallback
+const getSafeSavings = (analysis: any) => {
+  if (!analysis?.savings) return DEFAULT_SAVINGS;
+  return {
+    interchangePlus: {
+      monthlyCost: analysis.savings.interchangePlus?.monthlyCost ?? 0,
+      effectiveRate: analysis.savings.interchangePlus?.effectiveRate ?? 0,
+      monthlySavings: analysis.savings.interchangePlus?.monthlySavings ?? 0,
+      annualSavings: analysis.savings.interchangePlus?.annualSavings ?? 0,
+      description: analysis.savings.interchangePlus?.description ?? ""
+    },
+    dualPricing: {
+      monthlyCost: analysis.savings.dualPricing?.monthlyCost ?? 0,
+      effectiveRate: analysis.savings.dualPricing?.effectiveRate ?? 0,
+      monthlySavings: analysis.savings.dualPricing?.monthlySavings ?? 0,
+      annualSavings: analysis.savings.dualPricing?.annualSavings ?? 0,
+      description: analysis.savings.dualPricing?.description ?? ""
+    }
+  };
+};
 
 const processors = [
   "Unknown",
@@ -845,13 +929,14 @@ export default function StatementAnalyzer() {
     if (!results) return;
     
     const { analysis, talkingPoints, competitorInsights, aiAnalysis } = results;
+    const safeSavings = getSafeSavings(analysis);
     const maxSavings = Math.max(
-      analysis.savings.dualPricing.annualSavings,
-      analysis.savings.interchangePlus.annualSavings
+      safeSavings.dualPricing.annualSavings,
+      safeSavings.interchangePlus.annualSavings
     );
     const maxMonthlySavings = Math.max(
-      analysis.savings.dualPricing.monthlySavings,
-      analysis.savings.interchangePlus.monthlySavings
+      safeSavings.dualPricing.monthlySavings,
+      safeSavings.interchangePlus.monthlySavings
     );
     
     let emailText = `PCBancard Statement Analysis Report
@@ -861,33 +946,33 @@ SAVINGS OPPORTUNITY: ${formatCurrency(maxSavings)}/year (${formatCurrency(maxMon
 
 CURRENT SITUATION
 -----------------
-Monthly Volume: ${formatCurrency(analysis.summary.monthlyVolume)}
-Monthly Transactions: ${analysis.summary.monthlyTransactions.toLocaleString()}
-Average Ticket: ${formatCurrencyExact(analysis.summary.averageTicket)}
-Current Effective Rate: ${analysis.summary.currentEffectiveRate}%
-Current Monthly Fees: ${formatCurrencyExact(analysis.summary.currentTotalFees)}
+Monthly Volume: ${formatCurrency(analysis.summary?.monthlyVolume)}
+Monthly Transactions: ${(analysis.summary?.monthlyTransactions ?? 0).toLocaleString()}
+Average Ticket: ${formatCurrencyExact(analysis.summary?.averageTicket)}
+Current Effective Rate: ${safeNumber(analysis.summary?.currentEffectiveRate)}%
+Current Monthly Fees: ${formatCurrencyExact(analysis.summary?.currentTotalFees)}
 
 COST ANALYSIS
 -------------
-True Interchange Cost: ${formatCurrencyExact(analysis.costAnalysis.trueInterchange)}
-Card Brand Assessments: ${formatCurrencyExact(analysis.costAnalysis.trueAssessments)}
-True Wholesale Cost: ${formatCurrencyExact(analysis.costAnalysis.trueWholesale)} (${analysis.costAnalysis.trueWholesaleRate}%)
-Current Processor Markup: ${formatCurrencyExact(analysis.costAnalysis.processorMarkup)} (${analysis.costAnalysis.processorMarkupRate}%)
+True Interchange Cost: ${formatCurrencyExact(analysis.costAnalysis?.trueInterchange)}
+Card Brand Assessments: ${formatCurrencyExact(analysis.costAnalysis?.trueAssessments)}
+True Wholesale Cost: ${formatCurrencyExact(analysis.costAnalysis?.trueWholesale)} (${safeNumber(analysis.costAnalysis?.trueWholesaleRate)}%)
+Current Processor Markup: ${formatCurrencyExact(analysis.costAnalysis?.processorMarkup)} (${safeNumber(analysis.costAnalysis?.processorMarkupRate)}%)
 
 PCBANCARD OPTIONS
 -----------------
 
 DUAL PRICING (Recommended):
-Monthly Cost: ${formatCurrencyExact(analysis.savings.dualPricing.monthlyCost)}
-Effective Rate: ${analysis.savings.dualPricing.effectiveRate}%
-Monthly Savings: ${formatCurrency(analysis.savings.dualPricing.monthlySavings)}
-Annual Savings: ${formatCurrency(analysis.savings.dualPricing.annualSavings)}
+Monthly Cost: ${formatCurrencyExact(safeSavings.dualPricing.monthlyCost)}
+Effective Rate: ${safeNumber(safeSavings.dualPricing.effectiveRate)}%
+Monthly Savings: ${formatCurrency(safeSavings.dualPricing.monthlySavings)}
+Annual Savings: ${formatCurrency(safeSavings.dualPricing.annualSavings)}
 
 INTERCHANGE PLUS:
-Monthly Cost: ${formatCurrencyExact(analysis.savings.interchangePlus.monthlyCost)}
-Effective Rate: ${analysis.savings.interchangePlus.effectiveRate}%
-Monthly Savings: ${formatCurrency(analysis.savings.interchangePlus.monthlySavings)}
-Annual Savings: ${formatCurrency(analysis.savings.interchangePlus.annualSavings)}
+Monthly Cost: ${formatCurrencyExact(safeSavings.interchangePlus.monthlyCost)}
+Effective Rate: ${safeNumber(safeSavings.interchangePlus.effectiveRate)}%
+Monthly Savings: ${formatCurrency(safeSavings.interchangePlus.monthlySavings)}
+Annual Savings: ${formatCurrency(safeSavings.interchangePlus.annualSavings)}
 
 `;
 
@@ -1032,9 +1117,10 @@ ${new Date().toLocaleDateString()}
     if (!results) return;
     
     const { analysis, talkingPoints } = results;
+    const safeSavings = getSafeSavings(analysis);
     const maxSavings = Math.max(
-      analysis.savings.dualPricing.annualSavings,
-      analysis.savings.interchangePlus.annualSavings
+      safeSavings.dualPricing.annualSavings,
+      safeSavings.interchangePlus.annualSavings
     );
     
     const summaryData = [
@@ -1042,34 +1128,34 @@ ${new Date().toLocaleDateString()}
       ["Generated", new Date().toLocaleDateString()],
       [],
       ["CURRENT SITUATION"],
-      ["Monthly Volume", analysis.summary.monthlyVolume],
-      ["Monthly Transactions", analysis.summary.monthlyTransactions],
-      ["Average Ticket", analysis.summary.averageTicket],
-      ["Current Effective Rate (%)", analysis.summary.currentEffectiveRate],
-      ["Current Monthly Fees", analysis.summary.currentTotalFees],
+      ["Monthly Volume", analysis.summary?.monthlyVolume ?? 0],
+      ["Monthly Transactions", analysis.summary?.monthlyTransactions ?? 0],
+      ["Average Ticket", analysis.summary?.averageTicket ?? 0],
+      ["Current Effective Rate (%)", analysis.summary?.currentEffectiveRate ?? 0],
+      ["Current Monthly Fees", analysis.summary?.currentTotalFees ?? 0],
       [],
       ["COST BREAKDOWN"],
-      ["True Interchange Cost", analysis.costAnalysis.trueInterchange],
-      ["Card Brand Assessments", analysis.costAnalysis.trueAssessments],
-      ["True Wholesale Cost", analysis.costAnalysis.trueWholesale],
-      ["True Wholesale Rate (%)", analysis.costAnalysis.trueWholesaleRate],
-      ["Processor Markup", analysis.costAnalysis.processorMarkup],
-      ["Processor Markup Rate (%)", analysis.costAnalysis.processorMarkupRate],
+      ["True Interchange Cost", analysis.costAnalysis?.trueInterchange ?? 0],
+      ["Card Brand Assessments", analysis.costAnalysis?.trueAssessments ?? 0],
+      ["True Wholesale Cost", analysis.costAnalysis?.trueWholesale ?? 0],
+      ["True Wholesale Rate (%)", analysis.costAnalysis?.trueWholesaleRate ?? 0],
+      ["Processor Markup", analysis.costAnalysis?.processorMarkup ?? 0],
+      ["Processor Markup Rate (%)", analysis.costAnalysis?.processorMarkupRate ?? 0],
       [],
       ["SAVINGS ANALYSIS"],
       ["Maximum Annual Savings", maxSavings],
       [],
       ["Dual Pricing Program"],
-      ["Monthly Cost", analysis.savings.dualPricing.monthlyCost],
-      ["Effective Rate (%)", analysis.savings.dualPricing.effectiveRate],
-      ["Monthly Savings", analysis.savings.dualPricing.monthlySavings],
-      ["Annual Savings", analysis.savings.dualPricing.annualSavings],
+      ["Monthly Cost", safeSavings.dualPricing.monthlyCost],
+      ["Effective Rate (%)", safeSavings.dualPricing.effectiveRate],
+      ["Monthly Savings", safeSavings.dualPricing.monthlySavings],
+      ["Annual Savings", safeSavings.dualPricing.annualSavings],
       [],
       ["Interchange Plus"],
-      ["Monthly Cost", analysis.savings.interchangePlus.monthlyCost],
-      ["Effective Rate (%)", analysis.savings.interchangePlus.effectiveRate],
-      ["Monthly Savings", analysis.savings.interchangePlus.monthlySavings],
-      ["Annual Savings", analysis.savings.interchangePlus.annualSavings],
+      ["Monthly Cost", safeSavings.interchangePlus.monthlyCost],
+      ["Effective Rate (%)", safeSavings.interchangePlus.effectiveRate],
+      ["Monthly Savings", safeSavings.interchangePlus.monthlySavings],
+      ["Annual Savings", safeSavings.interchangePlus.annualSavings],
     ];
 
     const redFlagsData = [
@@ -1281,21 +1367,31 @@ ${new Date().toLocaleDateString()}
     analyzeMutation.mutate(data);
   };
 
-  const formatCurrency = (amount: number) => {
+  // Safe number helper to handle undefined/NaN values
+  const safeNumber = (value: number | undefined | null, fallback: number = 0): number => {
+    if (value === undefined || value === null || isNaN(value) || !isFinite(value)) {
+      return fallback;
+    }
+    return value;
+  };
+
+  const formatCurrency = (amount: number | undefined | null) => {
+    const safeAmount = safeNumber(amount, 0);
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(safeAmount);
   };
 
-  const formatCurrencyExact = (amount: number) => {
+  const formatCurrencyExact = (amount: number | undefined | null) => {
+    const safeAmount = safeNumber(amount, 0);
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(safeAmount);
   };
 
   const getFileIcon = (file: File) => {
@@ -2134,29 +2230,29 @@ ${new Date().toLocaleDateString()}
                 <p className="text-green-100 text-sm font-medium uppercase tracking-wide">Maximum Savings Opportunity</p>
                 <p className="text-5xl font-bold mt-2">
                   {formatCurrency(Math.max(
-                    results.analysis.savings.dualPricing.annualSavings,
-                    results.analysis.savings.interchangePlus.annualSavings
+                    safeNumber(results.analysis.savings?.dualPricing?.annualSavings),
+                    safeNumber(results.analysis.savings?.interchangePlus?.annualSavings)
                   ))}
                 </p>
                 <p className="text-green-100 mt-1">
                   per year ({formatCurrency(Math.max(
-                    results.analysis.savings.dualPricing.monthlySavings,
-                    results.analysis.savings.interchangePlus.monthlySavings
+                    safeNumber(results.analysis.savings?.dualPricing?.monthlySavings),
+                    safeNumber(results.analysis.savings?.interchangePlus?.monthlySavings)
                   ))}/month)
                 </p>
               </div>
               
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="bg-white/10 rounded-lg p-3">
-                  <p className="text-2xl font-bold">{results.analysis.summary.currentEffectiveRate}%</p>
+                  <p className="text-2xl font-bold">{safeNumber(results.analysis.summary?.currentEffectiveRate)}%</p>
                   <p className="text-xs text-green-100">Current Rate</p>
                 </div>
                 <div className="bg-white/10 rounded-lg p-3">
-                  <p className="text-2xl font-bold">{results.analysis.costAnalysis.trueWholesaleRate}%</p>
+                  <p className="text-2xl font-bold">{safeNumber(results.analysis.costAnalysis?.trueWholesaleRate)}%</p>
                   <p className="text-xs text-green-100">True Interchange</p>
                 </div>
                 <div className="bg-white/10 rounded-lg p-3">
-                  <p className="text-2xl font-bold">{results.analysis.savings.dualPricing.effectiveRate}%</p>
+                  <p className="text-2xl font-bold">{safeNumber(results.analysis.savings?.dualPricing?.effectiveRate)}%</p>
                   <p className="text-xs text-green-100">With Dual Pricing</p>
                 </div>
               </div>
@@ -2236,20 +2332,20 @@ ${new Date().toLocaleDateString()}
                   <div className="mt-3 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Monthly Cost</span>
-                      <span className="font-semibold">{formatCurrencyExact(results.analysis.savings.dualPricing.monthlyCost)}</span>
+                      <span className="font-semibold">{formatCurrencyExact(results.analysis.savings?.dualPricing?.monthlyCost)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Effective Rate</span>
-                      <span className="font-semibold">{results.analysis.savings.dualPricing.effectiveRate}%</span>
+                      <span className="font-semibold">{safeNumber(results.analysis.savings?.dualPricing?.effectiveRate)}%</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold text-green-600">
                       <span>Monthly Savings</span>
-                      <span>{formatCurrency(results.analysis.savings.dualPricing.monthlySavings)}</span>
+                      <span>{formatCurrency(results.analysis.savings?.dualPricing?.monthlySavings)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-green-600">
                       <span>Annual Savings</span>
-                      <span>{formatCurrency(results.analysis.savings.dualPricing.annualSavings)}</span>
+                      <span>{formatCurrency(results.analysis.savings?.dualPricing?.annualSavings)}</span>
                     </div>
                   </div>
                 </div>
@@ -2264,20 +2360,20 @@ ${new Date().toLocaleDateString()}
                   <div className="mt-3 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total Monthly Cost</span>
-                      <span className="font-semibold">{formatCurrencyExact(results.analysis.savings.interchangePlus.monthlyCost)}</span>
+                      <span className="font-semibold">{formatCurrencyExact(results.analysis.savings?.interchangePlus?.monthlyCost)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Effective Rate</span>
-                      <span className="font-semibold">{results.analysis.savings.interchangePlus.effectiveRate}%</span>
+                      <span className="font-semibold">{safeNumber(results.analysis.savings?.interchangePlus?.effectiveRate)}%</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold text-green-600">
                       <span>Monthly Savings</span>
-                      <span>{formatCurrency(results.analysis.savings.interchangePlus.monthlySavings)}</span>
+                      <span>{formatCurrency(results.analysis.savings?.interchangePlus?.monthlySavings)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-green-600">
                       <span>Annual Savings</span>
-                      <span>{formatCurrency(results.analysis.savings.interchangePlus.annualSavings)}</span>
+                      <span>{formatCurrency(results.analysis.savings?.interchangePlus?.annualSavings)}</span>
                     </div>
                   </div>
                 </div>
@@ -2298,12 +2394,12 @@ ${new Date().toLocaleDateString()}
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">Current Processor</span>
-                    <span className="font-semibold text-red-600">{results.analysis.summary.currentEffectiveRate}%</span>
+                    <span className="font-semibold text-red-600">{safeNumber(results.analysis.summary?.currentEffectiveRate)}%</span>
                   </div>
                   <div className="h-6 bg-muted rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-red-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(results.analysis.summary.currentEffectiveRate / 4 * 100, 100)}%` }}
+                      style={{ width: `${Math.min(safeNumber(results.analysis.summary?.currentEffectiveRate) / 4 * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -2311,12 +2407,12 @@ ${new Date().toLocaleDateString()}
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">True Interchange Cost</span>
-                    <span className="font-semibold text-blue-600">{results.analysis.costAnalysis.trueWholesaleRate}%</span>
+                    <span className="font-semibold text-blue-600">{safeNumber(results.analysis.costAnalysis?.trueWholesaleRate)}%</span>
                   </div>
                   <div className="h-6 bg-muted rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(results.analysis.costAnalysis.trueWholesaleRate / 4 * 100, 100)}%` }}
+                      style={{ width: `${Math.min(safeNumber(results.analysis.costAnalysis?.trueWholesaleRate) / 4 * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -2324,12 +2420,12 @@ ${new Date().toLocaleDateString()}
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">PCBancard Interchange Plus</span>
-                    <span className="font-semibold text-emerald-600">{results.analysis.savings.interchangePlus.effectiveRate}%</span>
+                    <span className="font-semibold text-emerald-600">{safeNumber(results.analysis.savings?.interchangePlus?.effectiveRate)}%</span>
                   </div>
                   <div className="h-6 bg-muted rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(results.analysis.savings.interchangePlus.effectiveRate / 4 * 100, 100)}%` }}
+                      style={{ width: `${Math.min(safeNumber(results.analysis.savings?.interchangePlus?.effectiveRate) / 4 * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -2337,12 +2433,12 @@ ${new Date().toLocaleDateString()}
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">PCBancard Dual Pricing</span>
-                    <span className="font-semibold text-green-600">{results.analysis.savings.dualPricing.effectiveRate}%</span>
+                    <span className="font-semibold text-green-600">{safeNumber(results.analysis.savings?.dualPricing?.effectiveRate)}%</span>
                   </div>
                   <div className="h-6 bg-muted rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-green-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(Math.max(results.analysis.savings.dualPricing.effectiveRate, 0.5) / 4 * 100, 100)}%` }}
+                      style={{ width: `${Math.min(Math.max(safeNumber(results.analysis.savings?.dualPricing?.effectiveRate), 0.5) / 4 * 100, 100)}%` }}
                     />
                   </div>
                 </div>

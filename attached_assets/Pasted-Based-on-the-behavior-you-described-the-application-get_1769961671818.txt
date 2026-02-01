@@ -1,0 +1,32 @@
+Based on the behavior you described—the application getting "stuck" and then crashing to a blank screen after selecting "Cost Plus"—here is the explanation of what is happening technically.
+
+The Diagnosis: "White Screen of Death"
+The "blank screen" you are seeing is a standard safety mechanism in modern web apps (React) called the "White Screen of Death." It happens when the interface tries to display data that doesn't exist, causing the entire page to crash to prevent showing incorrect financial numbers.
+
+Here is the breakdown of the failure chain:
+
+1. The Trigger: "Cost Plus" Complexity
+Dual Pricing (Default): This calculation is simple: flat rate vs. cash price. The AI only needs to find the total volume and total fees from your PDF.
+
+Cost Plus (The Breaker): This model is much harder. To calculate "Interchange Cost Plus," the AI must extract granular line-item data (Interchange fees vs. dues vs. assessments vs. markup).
+
+The Failure: If the AI fails to find one specific line item (like "Dues and Assessments") or returns a null value instead of a number, the calculation formula breaks immediately.
+
+2. The Crash: Unhandled Data Error
+Backend: The server likely processed the file but returned an "incomplete" data packet because it couldn't confidently identify the Interchange categories.
+
+Frontend: Your web browser received this incomplete data. When it tried to perform the Cost Plus math (e.g., Interchange + Markup), it tried to add a number to "nothing" (undefined).
+
+Result: This mathematical error is fatal to the page renderer, causing it to unmount everything and show a blank white screen.
+
+3. Known Issue Status
+This behavior is actually documented in your own project files. The Technology Funding Proposal explicitly lists the "Proposal Generator" status as:
+
+"Built — needs pipeline debugging".
+
+This confirms that the "pipeline" (the flow of data from the PDF -> AI -> Calculator) is known to be fragile, particularly for complex calculations like Cost Plus.
+
+Summary for Your Team
+If you need to explain this to a developer or stakeholder, you can use this summary:
+
+"The Statement Analyzer is experiencing a frontend rendering crash when selecting the Cost Plus model. The AI extraction pipeline likely fails to return required interchange line-items, resulting in undefined values being passed to the pricing calculator. The frontend lacks error boundaries to handle these missing values gracefully, causing the entire component tree to unmount (blank screen) instead of showing an error message."
