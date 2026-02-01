@@ -1,20 +1,58 @@
 import { Resend } from "resend";
 
-let resend: Resend | null = null;
+// Resend connection settings cache (not the client - client is always fresh)
+let connectionSettings: any;
 
-function getResendClient(): Resend | null {
-  if (!resend) {
+async function getCredentials() {
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken || !hostname) {
+    // Fallback to environment variable if Replit connector not available
     const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.error("RESEND_API_KEY is not configured");
-      return null;
+    if (apiKey) {
+      return { apiKey, fromEmail: "BrochureTracker <onboarding@resend.dev>" };
     }
-    resend = new Resend(apiKey);
+    throw new Error('Resend not configured - no connector or RESEND_API_KEY found');
   }
-  return resend;
+
+  connectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  if (!connectionSettings || (!connectionSettings.settings.api_key)) {
+    throw new Error('Resend not connected');
+  }
+  return { 
+    apiKey: connectionSettings.settings.api_key, 
+    fromEmail: connectionSettings.settings.from_email || "BrochureTracker <onboarding@resend.dev>" 
+  };
 }
 
-const FROM_EMAIL = "BrochureTracker <onboarding@resend.dev>";
+// WARNING: Never cache this client - tokens expire
+async function getUncachableResendClient(): Promise<{ client: Resend; fromEmail: string } | null> {
+  try {
+    const { apiKey, fromEmail } = await getCredentials();
+    return {
+      client: new Resend(apiKey),
+      fromEmail
+    };
+  } catch (error) {
+    console.error("Failed to get Resend client:", error);
+    return null;
+  }
+}
+
 const FEEDBACK_RECIPIENT = "wwiseiv@icloud.com";
 const ADDITIONAL_RECIPIENT = "wwise@pcbancard.com";
 const APP_URL = process.env.REPLIT_DEV_DOMAIN 
@@ -33,12 +71,14 @@ interface SendInvitationParams {
 export async function sendInvitationEmail(params: SendInvitationParams): Promise<boolean> {
   try {
     console.log(`Sending invitation email to ${params.to} for org ${params.organizationName}`);
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send invitation email - Resend client not configured");
       return false;
     }
+    
+    const { client, fromEmail } = resendClient;
     
     const roleLabel = params.role === "master_admin" 
       ? "Admin" 
@@ -47,7 +87,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
         : "Agent";
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: params.to,
       subject: `You're invited to join ${params.organizationName} on BrochureTracker`,
       html: `
@@ -122,12 +162,14 @@ interface SendFeedbackParams {
 
 export async function sendFeedbackEmail(params: SendFeedbackParams): Promise<boolean> {
   try {
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send feedback email - Resend client not configured");
       return false;
     }
+    
+    const { client, fromEmail } = resendClient;
     
     const typeLabel = params.type === "feature_suggestion" 
       ? "Feature Suggestion" 
@@ -136,7 +178,7 @@ export async function sendFeedbackEmail(params: SendFeedbackParams): Promise<boo
         : "Bug Report";
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: FEEDBACK_RECIPIENT,
       subject: `[BrochureTracker ${typeLabel}] ${params.subject}`,
       html: `
@@ -214,18 +256,20 @@ interface SendThankYouEmailParams {
 export async function sendThankYouEmail(params: SendThankYouEmailParams): Promise<{ success: boolean; error?: string }> {
   try {
     console.log(`Sending thank you email to ${params.to}`);
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send thank you email - Resend client not configured");
       return { success: false, error: "Email service not configured" };
     }
+
+    const { client, fromEmail } = resendClient;
 
     // Convert newlines to HTML breaks for proper formatting
     const formattedBody = params.body.replace(/\n/g, "<br>");
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: params.to,
       subject: params.subject,
       html: `
@@ -287,12 +331,14 @@ interface SendNewMemberNotificationParams {
 
 export async function sendNewMemberNotification(params: SendNewMemberNotificationParams): Promise<boolean> {
   try {
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send new member notification - Resend client not configured");
       return false;
     }
+    
+    const { client, fromEmail } = resendClient;
     
     const roleLabel = params.role === "master_admin" 
       ? "Admin" 
@@ -305,7 +351,7 @@ export async function sendNewMemberNotification(params: SendNewMemberNotificatio
       : "signed up directly";
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: params.adminEmail,
       subject: `New team member joined ${params.organizationName}`,
       html: `
@@ -395,12 +441,14 @@ interface SendMeetingRecordingParams {
 export async function sendMeetingRecordingEmail(params: SendMeetingRecordingParams): Promise<boolean> {
   try {
     console.log(`Sending meeting recording email for ${params.businessName}`);
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send meeting recording email - Resend client not configured");
       return false;
     }
+    
+    const { client, fromEmail } = resendClient;
 
     const takeawaysHtml = params.keyTakeaways && params.keyTakeaways.length > 0
       ? `
@@ -432,7 +480,7 @@ export async function sendMeetingRecordingEmail(params: SendMeetingRecordingPara
     });
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: MEETING_RECORDING_RECIPIENTS,
       subject: `New Sales Meeting Recording: ${params.businessName}`,
       html: `
@@ -552,12 +600,14 @@ interface SendRoleplaySessionEmailParams {
 export async function sendRoleplaySessionEmail(params: SendRoleplaySessionEmailParams): Promise<boolean> {
   try {
     console.log(`Sending roleplay session email for session ${params.sessionId}`);
-    const client = getResendClient();
+    const resendClient = await getUncachableResendClient();
     
-    if (!client) {
+    if (!resendClient) {
       console.error("Cannot send roleplay session email - Resend client not configured");
       return false;
     }
+    
+    const { client, fromEmail } = resendClient;
 
     const strengthsHtml = params.feedback.strengths && params.feedback.strengths.length > 0
       ? `
@@ -599,7 +649,7 @@ export async function sendRoleplaySessionEmail(params: SendRoleplaySessionEmailP
     });
 
     const { error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: MEETING_RECORDING_RECIPIENTS,
       subject: `AI Coach Session: ${params.agentName} - ${scenarioLabel} (Score: ${params.performanceScore})`,
       html: `
