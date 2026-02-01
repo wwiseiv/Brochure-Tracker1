@@ -33,7 +33,9 @@ import {
   Wand2,
   AlertCircle,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  BookmarkPlus,
+  BookmarkCheck
 } from "lucide-react";
 import type { MarketingTemplate, OrganizationMember } from "@shared/schema";
 
@@ -76,6 +78,7 @@ interface FlyerGenerationJob {
   heroImageUrl?: string;
   finalFlyerUrl?: string;
   errorMessage?: string;
+  savedToLibrary?: boolean;
 }
 
 const STATIC_TEMPLATES: MarketingTemplateData[] = [
@@ -114,6 +117,7 @@ export default function MarketingMaterialsPage() {
   const [genRepEmail, setGenRepEmail] = useState("");
   const [isPolling, setIsPolling] = useState(false);
   const [lastCompletedJobId, setLastCompletedJobId] = useState<number | null>(null);
+  const [savingJobId, setSavingJobId] = useState<number | null>(null);
 
   const { data: memberInfo } = useQuery<OrganizationMember>({
     queryKey: ["/api/me/member"],
@@ -152,6 +156,30 @@ export default function MarketingMaterialsPage() {
         description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  const saveToLibraryMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      setSavingJobId(jobId);
+      const response = await apiRequest("POST", `/api/marketing/jobs/${jobId}/save-to-library`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Saved to library!",
+        description: "This flyer is now available as a template for future use.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/jobs"] });
+      setSavingJobId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Save failed",
+        description: error.message || "Failed to save flyer to library.",
+        variant: "destructive",
+      });
+      setSavingJobId(null);
     },
   });
 
@@ -472,14 +500,40 @@ ${repEmail}`;
                           data-testid={`job-thumbnail-${job.jobId}`}
                         />
                       </div>
-                      <Button
-                        className="w-full gap-2"
-                        onClick={() => handleDownloadGeneratedFlyer(job)}
-                        data-testid={`button-download-job-${job.jobId}`}
-                      >
-                        <Download className="w-4 h-4" />
-                        Download
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 gap-2"
+                          onClick={() => handleDownloadGeneratedFlyer(job)}
+                          data-testid={`button-download-job-${job.jobId}`}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </Button>
+                        <Button
+                          variant={job.savedToLibrary ? "secondary" : "outline"}
+                          className="gap-2"
+                          onClick={() => saveToLibraryMutation.mutate(job.jobId)}
+                          disabled={job.savedToLibrary || savingJobId === job.jobId}
+                          data-testid={`button-save-library-${job.jobId}`}
+                        >
+                          {job.savedToLibrary ? (
+                            <>
+                              <BookmarkCheck className="w-4 h-4" />
+                              Saved
+                            </>
+                          ) : savingJobId === job.jobId ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Saving
+                            </>
+                          ) : (
+                            <>
+                              <BookmarkPlus className="w-4 h-4" />
+                              Save
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
 

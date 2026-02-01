@@ -2852,6 +2852,7 @@ export const marketingGenerationJobs = pgTable("marketing_generation_jobs", {
   repName: varchar("rep_name", { length: 200 }),
   repPhone: varchar("rep_phone", { length: 30 }),
   repEmail: varchar("rep_email", { length: 255 }),
+  savedToLibrary: boolean("saved_to_library").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });

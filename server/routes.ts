@@ -10200,6 +10200,7 @@ Generate the following content in JSON format:
         return res.status(400).json({ error: 'Invalid job ID' });
       }
       
+      const userId = req.user.claims.sub;
       const { getGenerationJob } = await import('./services/marketingGenerator');
       
       const job = await getGenerationJob(jobId);
@@ -10207,10 +10208,166 @@ Generate the following content in JSON format:
         return res.status(404).json({ error: 'Job not found' });
       }
       
+      // Enforce user scoping - only job owner or master_admin can access
+      let canAccess = job.userId === userId;
+      if (!canAccess) {
+        const membership = await storage.getUserMembership(userId);
+        if (membership?.role === 'master_admin') {
+          canAccess = true;
+        }
+      }
+      
+      if (!canAccess) {
+        return res.status(403).json({ error: 'Not authorized to access this job' });
+      }
+      
       res.json(job);
     } catch (error) {
       console.error('Error fetching marketing generation job:', error);
       res.status(500).json({ error: 'Failed to fetch job' });
+    }
+  });
+
+  // Save a generated flyer to the marketing library
+  app.post("/api/marketing/jobs/:id/save-to-library", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+
+      const userId = req.user.claims.sub;
+      const { getGenerationJob } = await import('./services/marketingGenerator');
+      const { marketingTemplates, marketingRagContent, marketingGenerationJobs } = await import('@shared/schema');
+
+      const job = await getGenerationJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      // Check if job belongs to user (or user is master_admin)
+      let canAccess = job.userId === userId;
+      if (!canAccess) {
+        const membership = await storage.getUserMembership(userId);
+        if (membership?.role === 'master_admin') {
+          canAccess = true;
+        }
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ error: 'Not authorized to save this job' });
+      }
+
+      if (job.status !== 'completed') {
+        return res.status(400).json({ error: 'Can only save completed jobs to library' });
+      }
+
+      if (!job.finalFlyerUrl) {
+        return res.status(400).json({ error: 'Job has no final flyer URL' });
+      }
+
+      if (job.savedToLibrary) {
+        return res.status(400).json({ error: 'This flyer has already been saved to the library' });
+      }
+
+      // Determine template name from industry
+      const industryLabels: Record<string, string> = {
+        liquor_stores: "Liquor Stores",
+        restaurants_bars: "Restaurants & Bars",
+        pizzerias: "Pizzerias",
+        food_trucks: "Food Trucks",
+        automotive: "Automotive",
+        veterinarians: "Veterinarians",
+        salons_spas: "Salons & Spas",
+        rock_gravel: "Rock & Gravel",
+        b2b_level23: "B2B / Level 2&3",
+        pos_hotsauce: "HotSauce POS",
+        merchant_cash_advance: "Cash Advance",
+        general: "General",
+      };
+      const industryLabel = industryLabels[job.industry || 'general'] || 'Custom';
+      const templateName = `${industryLabel} Custom Flyer`;
+      const description = job.prompt?.substring(0, 100) || 'AI-generated custom flyer';
+
+      // Create new template entry
+      const [newTemplate] = await db.insert(marketingTemplates).values({
+        name: templateName,
+        description,
+        industry: job.industry || 'general',
+        thumbnailUrl: job.finalFlyerUrl,
+        pdfUrl: null,
+        isActive: true,
+        sortOrder: 100,
+      }).returning();
+
+      // Extract content for RAG entries
+      const generatedContent = job.generatedContent as {
+        headline?: string;
+        subhead?: string;
+        bullets?: string[];
+        ctaText?: string;
+        ctaSubtext?: string;
+      } | null;
+
+      if (generatedContent) {
+        const ragEntries: { templateId: number; contentType: string; content: string; industry: string | null }[] = [];
+
+        if (generatedContent.headline) {
+          ragEntries.push({
+            templateId: newTemplate.id,
+            contentType: 'headline',
+            content: generatedContent.headline,
+            industry: job.industry || null,
+          });
+        }
+
+        if (generatedContent.subhead) {
+          ragEntries.push({
+            templateId: newTemplate.id,
+            contentType: 'subhead',
+            content: generatedContent.subhead,
+            industry: job.industry || null,
+          });
+        }
+
+        if (generatedContent.bullets && Array.isArray(generatedContent.bullets)) {
+          for (const bullet of generatedContent.bullets) {
+            ragEntries.push({
+              templateId: newTemplate.id,
+              contentType: 'bullet',
+              content: bullet,
+              industry: job.industry || null,
+            });
+          }
+        }
+
+        if (generatedContent.ctaText) {
+          ragEntries.push({
+            templateId: newTemplate.id,
+            contentType: 'cta',
+            content: generatedContent.ctaText,
+            industry: job.industry || null,
+          });
+        }
+
+        if (ragEntries.length > 0) {
+          await db.insert(marketingRagContent).values(ragEntries);
+        }
+      }
+
+      // Mark job as saved to library
+      await db.update(marketingGenerationJobs)
+        .set({ savedToLibrary: true })
+        .where(eq(marketingGenerationJobs.id, jobId));
+
+      res.json({
+        success: true,
+        templateId: newTemplate.id,
+        message: 'Flyer saved to library successfully',
+      });
+    } catch (error) {
+      console.error('Error saving flyer to library:', error);
+      res.status(500).json({ error: 'Failed to save flyer to library' });
     }
   });
 

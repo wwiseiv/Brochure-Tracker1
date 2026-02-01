@@ -155,7 +155,7 @@ Photorealistic, high quality, suitable for a marketing flyer.`;
     const client = getGeminiClient();
     
     const response = await client.images.generate({
-      model: 'gemini-2.0-flash-exp-image-generation',
+      model: 'gemini-2.5-flash-image',
       prompt: imagePrompt,
       n: 1,
     });
