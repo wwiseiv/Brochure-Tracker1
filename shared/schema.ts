@@ -295,6 +295,8 @@ export const merchants = pgTable("merchants", {
   totalConversions: integer("total_conversions").default(0),
   leadScore: integer("lead_score"),
   lastVisitAt: timestamp("last_visit_at"),
+  createdBy: varchar("created_by", { length: 255 }),
+  isSample: boolean("is_sample").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
