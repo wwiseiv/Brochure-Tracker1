@@ -22,9 +22,10 @@ export function NotificationPermissionPrompt({
   const [showInstructions, setShowInstructions] = useState(false);
   const [subscribeSuccess, setSubscribeSuccess] = useState(false);
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /Android/.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isMobile = isIOS || isAndroid;
 
   const handleEnableNotifications = async () => {
     const success = await subscribe();
@@ -82,7 +83,7 @@ export function NotificationPermissionPrompt({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {isIOS && isSafari ? (
+              {isIOS ? (
                 <div className="space-y-2">
                   <p className="font-medium">On iOS Safari:</p>
                   <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
