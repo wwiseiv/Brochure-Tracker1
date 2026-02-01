@@ -846,9 +846,9 @@ export default function DealPipelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20" data-testid="pipeline-page">
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div className="min-h-screen bg-background pb-24 safe-area-bottom" data-testid="pipeline-page">
+      <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/">
               <Button variant="ghost" size="icon" data-testid="button-back">
@@ -881,7 +881,7 @@ export default function DealPipelinePage() {
         </div>
       </header>
 
-      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-4">
+      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 py-4 md:py-6 space-y-4">
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -903,13 +903,13 @@ export default function DealPipelinePage() {
               </Card>
             </div>
 
-            <div className="overflow-x-auto -mx-4 px-4 pb-2">
+            <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-2" style={{ minWidth: "fit-content" }}>
                 {PHASES.map((phase) => (
                   <Button
                     key={phase}
                     variant={phaseFilter === phase ? "default" : "outline"}
-                    size="sm"
+                    className="whitespace-nowrap"
                     onClick={() => setPhaseFilter(phase)}
                     data-testid={`stage-filter-${phase.toLowerCase().replace(" ", "-")}`}
                   >
@@ -961,7 +961,7 @@ export default function DealPipelinePage() {
             ) : viewMode === "kanban" ? (
               renderKanbanView()
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {filteredDeals.map(renderDealCard)}
               </div>
             )}
@@ -970,7 +970,8 @@ export default function DealPipelinePage() {
       </main>
 
       <Button
-        className="fixed bottom-24 right-4 h-14 w-14 rounded-full shadow-lg z-30"
+        className="fixed right-4 h-14 w-14 rounded-full shadow-lg z-30"
+        style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
         size="icon"
         onClick={() => setShowCreateDealSheet(true)}
         data-testid="add-deal-fab"
@@ -984,7 +985,7 @@ export default function DealPipelinePage() {
           setSelectedDeal(null);
         }
       }}>
-        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0" data-testid="deal-sheet">
+        <SheetContent side="bottom" className="h-[90vh] md:h-[85vh] flex flex-col p-0" data-testid="deal-sheet">
           {selectedDeal && (
             <div className="flex flex-col h-full">
               <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
@@ -1656,7 +1657,7 @@ export default function DealPipelinePage() {
       </Dialog>
 
       <Sheet open={showCreateDealSheet} onOpenChange={setShowCreateDealSheet}>
-        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
+        <SheetContent side="bottom" className="h-[90vh] md:h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
           <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
             <SheetTitle>Create New Deal</SheetTitle>
           </SheetHeader>
@@ -1667,6 +1668,8 @@ export default function DealPipelinePage() {
                 value={newDealForm.businessName}
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, businessName: e.target.value }))}
                 placeholder="Business name"
+                autoComplete="organization"
+                autoCapitalize="words"
                 data-testid="input-business-name"
               />
             </div>
@@ -1677,6 +1680,8 @@ export default function DealPipelinePage() {
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, businessPhone: e.target.value }))}
                 placeholder="555-123-4567"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 data-testid="input-business-phone"
               />
             </div>
@@ -1687,6 +1692,9 @@ export default function DealPipelinePage() {
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, businessEmail: e.target.value }))}
                 placeholder="email@business.com"
                 type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="none"
                 data-testid="input-business-email"
               />
             </div>
@@ -1696,6 +1704,8 @@ export default function DealPipelinePage() {
                 value={newDealForm.businessAddress}
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, businessAddress: e.target.value }))}
                 placeholder="123 Main St"
+                autoComplete="street-address"
+                autoCapitalize="words"
                 data-testid="input-address"
               />
             </div>
@@ -1706,6 +1716,8 @@ export default function DealPipelinePage() {
                   value={newDealForm.businessCity}
                   onChange={(e) => setNewDealForm(prev => ({ ...prev, businessCity: e.target.value }))}
                   placeholder="City"
+                  autoComplete="address-level2"
+                  autoCapitalize="words"
                   data-testid="input-city"
                 />
               </div>
@@ -1713,9 +1725,11 @@ export default function DealPipelinePage() {
                 <Label>State</Label>
                 <Input
                   value={newDealForm.businessState}
-                  onChange={(e) => setNewDealForm(prev => ({ ...prev, businessState: e.target.value }))}
+                  onChange={(e) => setNewDealForm(prev => ({ ...prev, businessState: e.target.value.toUpperCase() }))}
                   placeholder="CA"
                   maxLength={2}
+                  autoComplete="address-level1"
+                  autoCapitalize="characters"
                   data-testid="input-state"
                 />
               </div>
@@ -1725,6 +1739,8 @@ export default function DealPipelinePage() {
                   value={newDealForm.businessZip}
                   onChange={(e) => setNewDealForm(prev => ({ ...prev, businessZip: e.target.value }))}
                   placeholder="90210"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
                   data-testid="input-zip"
                 />
               </div>
@@ -1735,6 +1751,8 @@ export default function DealPipelinePage() {
                 value={newDealForm.contactName}
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, contactName: e.target.value }))}
                 placeholder="John Smith"
+                autoComplete="name"
+                autoCapitalize="words"
                 data-testid="input-contact-name"
               />
             </div>
@@ -1756,12 +1774,13 @@ export default function DealPipelinePage() {
               <Input
                 value={newDealForm.estimatedMonthlyVolume}
                 onChange={(e) => setNewDealForm(prev => ({ ...prev, estimatedMonthlyVolume: e.target.value }))}
-                placeholder="$10,000"
+                placeholder="10000"
+                inputMode="numeric"
                 data-testid="input-volume"
               />
             </div>
           </div>
-          <div className="border-t p-4 flex-shrink-0">
+          <div className="border-t p-4 flex-shrink-0 safe-area-bottom">
             <Button
               className="w-full"
               onClick={() => createDealMutation.mutate(newDealForm)}

@@ -36,8 +36,8 @@ export function BottomNav() {
     : navItems;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 safe-area-inset-bottom bottom-nav-fixed">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {displayItems.map((item) => {
           const isActive = location === item.path || 
             (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
@@ -50,7 +50,7 @@ export function BottomNav() {
                 <Link href={item.path}>
                   <button
                     data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-touch py-2 px-1 rounded-lg transition-colors ${
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[48px] py-2 px-1 rounded-lg transition-colors ${
                       isActive
                         ? "text-primary bg-primary/10"
                         : "text-muted-foreground hover-elevate"
