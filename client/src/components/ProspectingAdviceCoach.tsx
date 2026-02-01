@@ -25,24 +25,17 @@ interface ProspectingAdviceCoachProps {
   className?: string;
 }
 
-// Detect iOS Safari where autoplay is blocked
-const isIOSSafari = () => {
-  const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-};
-
 export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProps) {
   const [input, setInput] = useState("");
   const [advice, setAdvice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Default auto-play OFF on iOS since it's blocked anyway
-  const [autoPlayTTS, setAutoPlayTTS] = useState(() => !isIOSSafari());
+  // Auto-play now works on iOS with the DOM audio element pattern
+  const [autoPlayTTS, setAutoPlayTTS] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTTSLoading, setIsTTSLoading] = useState(false);
   const [ttsError, setTTSError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isMobile = isIOSSafari();
 
   const {
     isListening,
@@ -64,6 +57,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     }
   }, [isListening, startListening, stopListening, input]);
 
+  // Use the same pattern as Sales Coach - update src on existing audio element
   const playTTS = useCallback(async (text: string) => {
     if (!autoPlayTTS) return;
     
@@ -74,27 +68,12 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
       const response = await apiRequest("POST", "/api/tts", { text });
       const data = await response.json();
 
-      if (data.audio) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
-        
-        const audioData = `data:${data.format};base64,${data.audio}`;
-        const audio = new Audio(audioData);
-        audioRef.current = audio;
-        
-        audio.onended = () => {
-          setIsTTSLoading(false);
-        };
-        
-        audio.onerror = () => {
-          setIsTTSLoading(false);
-          setTTSError("Audio playback failed. Tap the speaker icon to listen.");
-        };
+      if (data.audio && audioRef.current) {
+        const audioSrc = `data:${data.format};base64,${data.audio}`;
+        audioRef.current.src = audioSrc;
         
         try {
-          await audio.play();
+          await audioRef.current.play();
         } catch (playError: any) {
           // iOS Safari and some browsers block autoplay
           console.warn("Autoplay blocked:", playError?.message);
@@ -153,7 +132,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      audioRef.current = null;
+      // Don't set to null - we need the ref to point to the DOM element
     }
   };
 
@@ -254,9 +233,6 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
               <Label htmlFor="auto-tts" className="text-sm flex items-center gap-1">
                 <Volume2 className="w-4 h-4" />
                 Read aloud
-                {isMobile && autoPlayTTS && (
-                  <span className="text-xs text-muted-foreground ml-1">(tap speaker icon)</span>
-                )}
               </Label>
             </div>
           </div>
@@ -292,8 +268,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                 <h4 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
-                  {/* Only show auto-TTS spinner on desktop where it works */}
-                  {isTTSLoading && !isMobile && (
+                  {isTTSLoading && (
                     <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
                   )}
                 </h4>
@@ -303,8 +278,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                   data-testid="button-listen-advice"
                 />
               </div>
-              {/* Only show auto-TTS error on desktop - on mobile, they know to tap the speaker */}
-              {ttsError && !isMobile && (
+              {ttsError && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">
                   <Volume2 className="w-3 h-3" />
                   {ttsError}
@@ -317,6 +291,16 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
           )}
         </CardContent>
       )}
+      
+      {/* Hidden audio element - same pattern as Sales Coach for iOS Safari compatibility */}
+      <audio 
+        ref={audioRef} 
+        onEnded={() => setIsTTSLoading(false)} 
+        onError={() => setIsTTSLoading(false)}
+        playsInline 
+        preload="auto" 
+        className="hidden" 
+      />
     </Card>
   );
 }
