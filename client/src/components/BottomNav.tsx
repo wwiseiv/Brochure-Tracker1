@@ -1,5 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3, GraduationCap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -24,9 +26,15 @@ const managerNavItems = [
 
 export function BottomNav() {
   const [location] = useLocation();
+  const [mounted, setMounted] = useState(false);
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
 
@@ -34,16 +42,21 @@ export function BottomNav() {
     ? [...navItems.slice(0, 5), ...managerNavItems, navItems[5]] 
     : navItems;
 
-  return (
+  const navContent = (
     <nav 
-      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-[9999]" 
+      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border"
       style={{ 
+        zIndex: 2147483647,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        transform: 'translateZ(0)',
-        WebkitTransform: 'translateZ(0)',
+        transform: 'translate3d(0, 0, 0)',
+        WebkitTransform: 'translate3d(0, 0, 0)',
         backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden'
+        WebkitBackfaceVisibility: 'hidden',
+        willChange: 'transform',
+        position: 'fixed',
+        contain: 'layout style paint'
       }}
+      data-testid="bottom-nav"
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {displayItems.map((item) => {
@@ -78,6 +91,13 @@ export function BottomNav() {
       </div>
     </nav>
   );
+
+  // Use portal to render directly to body, bypassing any parent transforms
+  if (mounted && typeof document !== 'undefined') {
+    return createPortal(navContent, document.body);
+  }
+
+  return navContent;
 }
 
 export function FloatingHelpButton() {
