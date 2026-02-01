@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BottomNav } from "@/components/BottomNav";
+import { DictationInput } from "@/components/DictationInput";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -835,12 +836,13 @@ ${repEmail}`;
 
             <div className="space-y-2">
               <Label htmlFor="genPrompt">What kind of flyer do you need?</Label>
-              <Textarea
-                id="genPrompt"
+              <DictationInput
                 value={genPrompt}
-                onChange={(e) => setGenPrompt(e.target.value)}
+                onChange={setGenPrompt}
                 placeholder="e.g., Create a flyer for marina and boat repair businesses"
                 className="min-h-[100px]"
+                multiline
+                id="genPrompt"
                 data-testid="input-prompt"
               />
             </div>
