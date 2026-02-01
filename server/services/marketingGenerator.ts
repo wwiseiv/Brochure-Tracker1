@@ -7,7 +7,7 @@ import { marketingApprovedClaims, marketingGenerationJobs } from '@shared/schema
 import { eq } from 'drizzle-orm';
 
 let anthropicClient: Anthropic | null = null;
-let geminiClient: OpenAI | null = null;
+let openaiClient: OpenAI | null = null;
 
 function getAnthropicClient(): Anthropic {
   if (!anthropicClient) {
@@ -21,16 +21,16 @@ function getAnthropicClient(): Anthropic {
   return anthropicClient;
 }
 
-function getGeminiClient(): OpenAI {
-  if (!geminiClient) {
-    const baseURL = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
-    const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     if (!baseURL || !apiKey) {
-      throw new Error('Gemini AI Integration not configured');
+      throw new Error('OpenAI AI Integration not configured');
     }
-    geminiClient = new OpenAI({ baseURL, apiKey });
+    openaiClient = new OpenAI({ baseURL, apiKey });
   }
-  return geminiClient;
+  return openaiClient;
 }
 
 export interface FlyerContent {
@@ -158,22 +158,23 @@ Do NOT include any text, logos, or watermarks in the image.
 Photorealistic, high quality, suitable for a marketing flyer.`;
 
   try {
-    const client = getGeminiClient();
+    const client = getOpenAIClient();
     
     const response = await client.images.generate({
-      model: 'gemini-2.5-flash-image',
+      model: 'gpt-image-1',
       prompt: imagePrompt,
       n: 1,
+      size: '1024x1024',
     });
 
     if (!response.data || response.data.length === 0) {
-      console.error('[MarketingGenerator] No image data in Gemini response');
+      console.error('[MarketingGenerator] No image data in response');
       return null;
     }
     
     const imageData = response.data[0];
     if (!imageData) {
-      console.error('[MarketingGenerator] No image data in Gemini response');
+      console.error('[MarketingGenerator] No image data in response');
       return null;
     }
 
