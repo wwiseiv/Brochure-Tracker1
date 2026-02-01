@@ -15,6 +15,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
 import { 
   LogOut, 
   Package, 
@@ -30,7 +31,11 @@ import {
   Users,
   ChevronRight,
   Sparkles,
-  UserPlus
+  UserPlus,
+  CalendarClock,
+  Send,
+  History,
+  Loader2
 } from "lucide-react";
 import { Link } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -53,6 +58,54 @@ const REMINDER_OPTIONS = [
   { value: "48", label: "48 hours before" },
 ];
 
+const TIMEZONE_OPTIONS = [
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Phoenix", label: "Arizona (AZ)" },
+];
+
+const DAY_OPTIONS = [
+  { value: "monday", label: "Monday" },
+  { value: "tuesday", label: "Tuesday" },
+  { value: "wednesday", label: "Wednesday" },
+  { value: "thursday", label: "Thursday" },
+  { value: "friday", label: "Friday" },
+  { value: "saturday", label: "Saturday" },
+  { value: "sunday", label: "Sunday" },
+];
+
+const TIME_OPTIONS = [
+  { value: "05:00", label: "5:00 AM" },
+  { value: "06:00", label: "6:00 AM" },
+  { value: "07:00", label: "7:00 AM" },
+  { value: "08:00", label: "8:00 AM" },
+  { value: "09:00", label: "9:00 AM" },
+];
+
+interface EmailDigestPreferences {
+  id?: number;
+  dailyDigestEnabled: boolean;
+  weeklyDigestEnabled: boolean;
+  emailAddress: string;
+  timezone: string;
+  dailySendTime: string;
+  weeklySendDay: string;
+  weeklySendTime: string;
+  includeAppointments: boolean;
+  includeFollowups: boolean;
+  includeStaleDeals: boolean;
+  includePipelineSummary: boolean;
+  includeRecentWins: boolean;
+  includeAiTips: boolean;
+  includeQuarterlyCheckins: boolean;
+  includeNewReferrals: boolean;
+  appointmentLookaheadDays: number;
+  staleDealThresholdDays: number;
+  totalEmailsSent?: number;
+}
+
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
   const { toast } = useToast();
@@ -68,6 +121,59 @@ export default function ProfilePage() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+
+  const { data: digestPrefs, isLoading: digestLoading } = useQuery<EmailDigestPreferences>({
+    queryKey: ["/api/email-digest/preferences"],
+  });
+
+  const updateDigestPrefs = useMutation({
+    mutationFn: async (data: Partial<EmailDigestPreferences>) => {
+      const res = await apiRequest("PUT", "/api/email-digest/preferences", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-digest/preferences"] });
+      toast({
+        title: "Email digest settings saved",
+        description: "Your preferences have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendTestEmail = useMutation({
+    mutationFn: async (digestType: 'daily' | 'weekly') => {
+      const res = await apiRequest("POST", "/api/email-digest/test", { digestType });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Test email sent",
+        description: data.message || "Check your inbox!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send test email",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDigestToggle = (field: keyof EmailDigestPreferences, value: boolean) => {
+    updateDigestPrefs.mutate({ ...digestPrefs, [field]: value });
+  };
+
+  const handleDigestChange = (field: keyof EmailDigestPreferences, value: string | number) => {
+    updateDigestPrefs.mutate({ ...digestPrefs, [field]: value });
+  };
 
   const updatePreferences = useMutation({
     mutationFn: async (data: Partial<UserPreferences>) => {
@@ -281,6 +387,208 @@ export default function ProfilePage() {
                 data-testid="switch-push-notifications"
               />
             </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarClock className="w-5 h-5 text-muted-foreground" />
+            <h3 className="font-semibold">Email Digest Settings</h3>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="digest-email" className="text-sm font-medium">
+                Email Address
+              </Label>
+              <Input
+                id="digest-email"
+                type="email"
+                placeholder="your@email.com"
+                value={digestPrefs?.emailAddress || user?.email || ''}
+                onChange={(e) => handleDigestChange('emailAddress', e.target.value)}
+                onBlur={(e) => e.target.value && handleDigestChange('emailAddress', e.target.value)}
+                disabled={digestLoading || updateDigestPrefs.isPending}
+                data-testid="input-digest-email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="digest-timezone" className="text-sm font-medium">
+                Timezone
+              </Label>
+              <Select
+                value={digestPrefs?.timezone || 'America/New_York'}
+                onValueChange={(value) => handleDigestChange('timezone', value)}
+                disabled={digestLoading || updateDigestPrefs.isPending}
+              >
+                <SelectTrigger id="digest-timezone" className="w-full min-h-[48px]" data-testid="select-digest-timezone">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <Mail className="w-5 h-5 text-muted-foreground" />
+                <Label htmlFor="daily-digest" className="text-sm font-medium cursor-pointer">
+                  Daily Sales Digest
+                </Label>
+              </div>
+              <Switch
+                id="daily-digest"
+                checked={digestPrefs?.dailyDigestEnabled ?? false}
+                onCheckedChange={(checked) => handleDigestToggle('dailyDigestEnabled', checked)}
+                disabled={digestLoading || updateDigestPrefs.isPending || !digestPrefs?.emailAddress}
+                data-testid="switch-daily-digest"
+              />
+            </div>
+
+            {digestPrefs?.dailyDigestEnabled && (
+              <div className="space-y-2 pl-8">
+                <Label htmlFor="daily-time" className="text-sm font-medium">
+                  Daily Send Time
+                </Label>
+                <Select
+                  value={digestPrefs?.dailySendTime || '06:00'}
+                  onValueChange={(value) => handleDigestChange('dailySendTime', value)}
+                  disabled={digestLoading || updateDigestPrefs.isPending}
+                >
+                  <SelectTrigger id="daily-time" className="w-full min-h-[48px]" data-testid="select-daily-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_OPTIONS.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-2"
+                  onClick={() => sendTestEmail.mutate('daily')}
+                  disabled={sendTestEmail.isPending}
+                  data-testid="button-test-daily"
+                >
+                  {sendTestEmail.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send Test Daily Digest
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <CalendarClock className="w-5 h-5 text-muted-foreground" />
+                <Label htmlFor="weekly-digest" className="text-sm font-medium cursor-pointer">
+                  Weekly Sales Digest
+                </Label>
+              </div>
+              <Switch
+                id="weekly-digest"
+                checked={digestPrefs?.weeklyDigestEnabled ?? false}
+                onCheckedChange={(checked) => handleDigestToggle('weeklyDigestEnabled', checked)}
+                disabled={digestLoading || updateDigestPrefs.isPending || !digestPrefs?.emailAddress}
+                data-testid="switch-weekly-digest"
+              />
+            </div>
+
+            {digestPrefs?.weeklyDigestEnabled && (
+              <div className="space-y-4 pl-8">
+                <div className="space-y-2">
+                  <Label htmlFor="weekly-day" className="text-sm font-medium">
+                    Send On
+                  </Label>
+                  <Select
+                    value={digestPrefs?.weeklySendDay || 'monday'}
+                    onValueChange={(value) => handleDigestChange('weeklySendDay', value)}
+                    disabled={digestLoading || updateDigestPrefs.isPending}
+                  >
+                    <SelectTrigger id="weekly-day" className="w-full min-h-[48px]" data-testid="select-weekly-day">
+                      <SelectValue placeholder="Select day" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAY_OPTIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weekly-time" className="text-sm font-medium">
+                    Weekly Send Time
+                  </Label>
+                  <Select
+                    value={digestPrefs?.weeklySendTime || '06:00'}
+                    onValueChange={(value) => handleDigestChange('weeklySendTime', value)}
+                    disabled={digestLoading || updateDigestPrefs.isPending}
+                  >
+                    <SelectTrigger id="weekly-time" className="w-full min-h-[48px]" data-testid="select-weekly-time">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_OPTIONS.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-2"
+                  onClick={() => sendTestEmail.mutate('weekly')}
+                  disabled={sendTestEmail.isPending}
+                  data-testid="button-test-weekly"
+                >
+                  {sendTestEmail.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send Test Weekly Digest
+                </Button>
+              </div>
+            )}
+
+            <details className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                <Settings className="w-4 h-4" />
+                Content Options
+                <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+              </summary>
+              <div className="mt-4 space-y-3 pl-6">
+                {[
+                  { key: 'includeAppointments', label: 'Appointments' },
+                  { key: 'includeFollowups', label: 'Follow-ups Due' },
+                  { key: 'includeStaleDeals', label: 'Stale Deals' },
+                  { key: 'includePipelineSummary', label: 'Pipeline Summary' },
+                  { key: 'includeRecentWins', label: 'Recent Wins' },
+                  { key: 'includeAiTips', label: 'AI Sales Tips' },
+                  { key: 'includeQuarterlyCheckins', label: 'Quarterly Check-ins' },
+                  { key: 'includeNewReferrals', label: 'New Referrals' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <Label htmlFor={key} className="text-sm cursor-pointer">{label}</Label>
+                    <Switch
+                      id={key}
+                      checked={(digestPrefs as any)?.[key] ?? true}
+                      onCheckedChange={(checked) => handleDigestToggle(key as keyof EmailDigestPreferences, checked)}
+                      disabled={digestLoading || updateDigestPrefs.isPending}
+                      data-testid={`switch-${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
+
+            {digestPrefs?.totalEmailsSent !== undefined && digestPrefs.totalEmailsSent > 0 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
+                <History className="w-4 h-4" />
+                <span>{digestPrefs.totalEmailsSent} emails sent</span>
+              </div>
+            )}
           </div>
         </Card>
 

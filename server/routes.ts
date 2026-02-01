@@ -9704,7 +9704,24 @@ Generate the following content in JSON format:
   app.put("/api/email-digest/preferences", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const data = req.body;
+      const body = req.body;
+      
+      // Filter to only allowed update fields (exclude read-only fields)
+      const allowedFields = [
+        'dailyDigestEnabled', 'weeklyDigestEnabled', 'emailAddress', 'timezone',
+        'dailySendTime', 'weeklySendDay', 'weeklySendTime',
+        'includeAppointments', 'includeFollowups', 'includeStaleDeals',
+        'includePipelineSummary', 'includeRecentWins', 'includeAiTips',
+        'includeQuarterlyCheckins', 'includeNewReferrals',
+        'appointmentLookaheadDays', 'staleDealThresholdDays', 'organizationId'
+      ];
+      
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (body[key] !== undefined) {
+          data[key] = body[key];
+        }
+      }
       
       let prefs = await storage.getEmailDigestPreferences(userId);
       
@@ -9713,6 +9730,7 @@ Generate the following content in JSON format:
       } else {
         prefs = await storage.createEmailDigestPreferences({
           userId,
+          emailAddress: data.emailAddress || '',
           ...data,
         });
       }
