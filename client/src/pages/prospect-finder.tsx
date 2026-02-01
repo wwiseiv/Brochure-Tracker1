@@ -9,6 +9,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import {
   Sheet,
   SheetContent,
@@ -153,6 +155,9 @@ export default function ProspectFinderPage() {
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
 
   const { toast } = useToast();
+  
+  // Push notifications for background search alerts
+  const { isSubscribed, isSupported } = usePushNotifications();
   const queryClient = useQueryClient();
 
   const { data: mccData, isLoading: loadingMCC } = useQuery<{
@@ -650,6 +655,24 @@ export default function ProspectFinderPage() {
               </Badge>
             )}
           </div>
+
+          {isSupported && !isSubscribed && hasPendingJobs && (
+            <div className="mb-4 p-3 rounded-lg border bg-muted/30">
+              <NotificationPermissionPrompt 
+                context="prospect searches"
+                onClose={() => {}}
+              />
+            </div>
+          )}
+
+          {isSubscribed && hasPendingJobs && (
+            <Alert className="mb-4 border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700 dark:text-green-300 text-sm">
+                You'll receive a notification when searches complete.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {loadingJobs ? (
             <div className="flex justify-center py-8">

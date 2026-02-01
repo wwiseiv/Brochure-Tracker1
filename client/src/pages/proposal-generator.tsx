@@ -16,6 +16,8 @@ import { Progress } from "@/components/ui/progress";
 import { BottomNav } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
 import { useToast } from "@/hooks/use-toast";
+import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { apiRequest } from "@/lib/queryClient";
 import type { ProposalJobStep, ProposalJobStatus, ProposalJobStepStatus, PricingComparison, MerchantScrapedData, SalespersonInfo, Deal } from "@shared/schema";
 import {
@@ -386,6 +388,10 @@ export default function ProposalGeneratorPage() {
   const [activeParseJobId, setActiveParseJobId] = useState<number | null>(null);
   const [showWaitDialog, setShowWaitDialog] = useState(false);
   const [parseJobsOpen, setParseJobsOpen] = useState(false);
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  
+  // Push notifications for background job alerts
+  const { isSubscribed, isSupported, permission } = usePushNotifications();
 
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -3663,7 +3669,7 @@ export default function ProposalGeneratorPage() {
       </main>
 
       <Dialog open={showWaitDialog} onOpenChange={setShowWaitDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -3674,7 +3680,7 @@ export default function ProposalGeneratorPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             {activeJob && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
@@ -3694,6 +3700,24 @@ export default function ProposalGeneratorPage() {
                   </div>
                 )}
               </div>
+            )}
+            
+            {isSupported && !isSubscribed && (
+              <div className="pt-2 border-t">
+                <NotificationPermissionPrompt 
+                  context="document parsing"
+                  onClose={() => {}}
+                />
+              </div>
+            )}
+            
+            {isSubscribed && (
+              <Alert className="border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-300 text-sm">
+                  You'll receive a notification when parsing completes.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
           
