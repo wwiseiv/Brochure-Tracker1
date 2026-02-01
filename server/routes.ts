@@ -10141,5 +10141,78 @@ Generate the following content in JSON format:
     }
   });
 
+  // ============================================================================
+  // MARKETING FLYER GENERATION API
+  // ============================================================================
+
+  app.post("/api/marketing/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { prompt, industry, repName, repPhone, repEmail } = req.body;
+      
+      if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+        return res.status(400).json({ error: 'Prompt is required' });
+      }
+      
+      const { createGenerationJob, executeGenerationJob } = await import('./services/marketingGenerator');
+      
+      const jobId = await createGenerationJob({
+        userId,
+        prompt: prompt.trim(),
+        industry: industry || undefined,
+        repName: repName || undefined,
+        repPhone: repPhone || undefined,
+        repEmail: repEmail || undefined,
+      });
+      
+      executeGenerationJob(jobId).catch(err => {
+        console.error('[MarketingAPI] Background job error:', err);
+      });
+      
+      res.status(201).json({
+        jobId,
+        status: 'pending',
+        message: 'Flyer generation started',
+      });
+    } catch (error) {
+      console.error('Error creating marketing generation job:', error);
+      res.status(500).json({ error: 'Failed to create generation job' });
+    }
+  });
+
+  app.get("/api/marketing/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { getUserGenerationJobs } = await import('./services/marketingGenerator');
+      
+      const jobs = await getUserGenerationJobs(userId);
+      res.json(jobs);
+    } catch (error) {
+      console.error('Error fetching marketing generation jobs:', error);
+      res.status(500).json({ error: 'Failed to fetch jobs' });
+    }
+  });
+
+  app.get("/api/marketing/jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+      
+      const { getGenerationJob } = await import('./services/marketingGenerator');
+      
+      const job = await getGenerationJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      res.json(job);
+    } catch (error) {
+      console.error('Error fetching marketing generation job:', error);
+      res.status(500).json({ error: 'Failed to fetch job' });
+    }
+  });
+
   return httpServer;
 }

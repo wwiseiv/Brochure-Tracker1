@@ -2799,3 +2799,83 @@ export const DEFAULT_MARKETING_TEMPLATES: Omit<InsertMarketingTemplate, 'id'>[] 
   { name: "Merchant Cash Advance", description: "Fast funding for business owners", industry: "merchant_cash_advance", thumbnailUrl: "/marketing/cash-advance.png", isActive: true, sortOrder: 11 },
   { name: "Who is PCBancard?", description: "General company overview flyer", industry: "general", thumbnailUrl: "/marketing/pcbancard-intro.png", isActive: true, sortOrder: 12 },
 ];
+
+// Marketing RAG Content - Store flyer snippets for RAG retrieval
+export const marketingRagContent = pgTable("marketing_rag_content", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  templateId: integer("template_id").references(() => marketingTemplates.id),
+  contentType: varchar("content_type", { length: 50 }).notNull(), // headline, subhead, bullet, cta, disclaimer
+  content: text("content").notNull(),
+  industry: varchar("industry", { length: 50 }),
+  tags: text("tags").array(),
+  metadata: jsonb("metadata"), // additional context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMarketingRagContentSchema = createInsertSchema(marketingRagContent).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMarketingRagContent = z.infer<typeof insertMarketingRagContentSchema>;
+export type MarketingRagContent = typeof marketingRagContent.$inferSelect;
+
+// Marketing Approved Claims - Brand-safe messaging library
+export const marketingApprovedClaims = pgTable("marketing_approved_claims", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  claim: text("claim").notNull(),
+  category: varchar("category", { length: 100 }), // savings, compliance, technology, etc.
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMarketingApprovedClaimSchema = createInsertSchema(marketingApprovedClaims).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMarketingApprovedClaim = z.infer<typeof insertMarketingApprovedClaimSchema>;
+export type MarketingApprovedClaim = typeof marketingApprovedClaims.$inferSelect;
+
+// Marketing Generation Jobs - Track AI flyer generation requests
+export const GENERATION_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+export type GenerationStatus = typeof GENERATION_STATUSES[number];
+
+export const marketingGenerationJobs = pgTable("marketing_generation_jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  prompt: text("prompt").notNull(),
+  industry: varchar("industry", { length: 50 }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  generatedContent: jsonb("generated_content"), // headline, bullets, cta, etc.
+  heroImageUrl: text("hero_image_url"),
+  finalFlyerUrl: text("final_flyer_url"),
+  errorMessage: text("error_message"),
+  repName: varchar("rep_name", { length: 200 }),
+  repPhone: varchar("rep_phone", { length: 30 }),
+  repEmail: varchar("rep_email", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertMarketingGenerationJobSchema = createInsertSchema(marketingGenerationJobs).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+export type InsertMarketingGenerationJob = z.infer<typeof insertMarketingGenerationJobSchema>;
+export type MarketingGenerationJob = typeof marketingGenerationJobs.$inferSelect;
+
+// Default Approved Claims for dual pricing marketing
+export const DEFAULT_APPROVED_CLAIMS = [
+  { claim: "Eliminate up to 100% of your credit card processing fees", category: "savings" },
+  { claim: "Let customers choose how they pay", category: "compliance" },
+  { claim: "Dual pricing is legal and compliant in all 50 states", category: "compliance" },
+  { claim: "No more losing 3-4% on every transaction", category: "savings" },
+  { claim: "Same product, cash or card—you keep more profit", category: "savings" },
+  { claim: "Simple, transparent pricing your customers will love", category: "transparency" },
+  { claim: "Next-day funding on all transactions", category: "technology" },
+  { claim: "Free terminal with approved application", category: "equipment" },
+  { claim: "24/7 US-based customer support", category: "support" },
+  { claim: "No hidden fees, no monthly minimums", category: "transparency" },
+  { claim: "PCI-compliant terminals and systems", category: "security" },
+  { claim: "Accept all major cards: Visa, Mastercard, Amex, Discover", category: "technology" },
+];

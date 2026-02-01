@@ -1,0 +1,221 @@
+What Replit shipped so far is **the “distribution layer”** (library + filters + preview + download + email copy). That’s valuable, but it’s *not* the part that makes this system compound.
+
+What’s missing is the **“generation layer”**: RAG + LLM + Nano Banana Pro image creation + layout-to-PDF/PNG → then saving the new asset back into the library.
+
+## First: one important clarification
+
+**Nano Banana Pro doesn’t “access the RAG.”**
+Nano Banana Pro is an **image generator**. It creates the *visuals* for the new one-pager.
+
+The **RAG** is used by the **text/agent pipeline** to:
+
+* retrieve the most relevant existing flyers (your best examples),
+* learn your structure and messaging patterns,
+* enforce approved wording,
+* and produce a “layout plan + copy” for the new vertical.
+
+Then Nano Banana Pro generates the hero image / icons to match that plan.
+
+So the flow is:
+**RAG retrieval (text) → copy + layout spec (LLM) → visuals (Nano Banana Pro) → assemble/export → store back into library**.
+
+---
+
+## What you’re building (explained to a CSO mindset)
+
+You’re creating a **self-serve vertical marketing factory**:
+
+* Today: “We have 12 flyers.”
+* After generation: “We can create a flyer for ANY vertical in minutes, in-brand, in-message, with rep contact info auto-filled.”
+
+That’s sales leverage because it removes:
+
+* marketing bottlenecks,
+* inconsistent rep-made collateral,
+* and the “we don’t have a flyer for that” gap.
+
+---
+
+## Exactly how we’ll use RAG + Nano Banana Pro to create NEW vertical flyers
+
+### 1) Ingest & index all existing materials (build the RAG)
+
+For every existing flyer (PDF/PNG), the system stores:
+
+**A) Text content**
+
+* Extract headline, subhead, benefit bullets, CTA, disclaimers, proof elements.
+* Also store “component snippets” (e.g., benefit blocks, CTA blocks, contact footer blocks).
+
+**B) Structure metadata**
+
+* Identify the flyer type/format (e.g., “hero photo + 2-column body + footer contact”).
+* Store the “layout recipe” (section names + approximate placement).
+
+**C) Tags**
+
+* Vertical (restaurant, liquor store, etc.), product (dual pricing, POS, MCA), tone.
+
+**D) Vector embeddings**
+
+* Create embeddings for the text and store in a vector DB (pgvector or similar) so retrieval is fast and accurate.
+
+Result: the system can answer, “Show me the closest flyers to *this new vertical* and *this type of offer*.”
+
+---
+
+### 2) Rep requests a new vertical flyer (simple prompt)
+
+Rep types something like:
+
+> “Create a one-page flyer for HVAC companies: stop losing 3–4% to fees, show dual pricing, include a QR CTA for a quick savings check.”
+
+Optional structured fields:
+
+* Vertical
+* Offer components (dual pricing, POS, faster funding, etc.)
+* Tone (punchy / professional)
+* “Must include” / “Must avoid”
+
+---
+
+### 3) RAG retrieval: pull the best examples to imitate
+
+The backend runs retrieval like this:
+
+* Embed the rep’s prompt
+* Retrieve top **K** similar flyers:
+
+  * closest vertical neighbors (service-trades, high-ticket, appointment-based businesses)
+  * closest offer neighbors (dual pricing “pay $0” style)
+  * closest layout neighbors (same design format)
+
+Then it builds a **Context Pack**:
+
+* “Do your headline like these”
+* “Use benefit bullet style like these”
+* “Use disclaimer language like these”
+* “Use footer contact block like these”
+* “Keep color/logo rules like these”
+
+This is what makes outputs consistent with your existing collateral instead of “random AI brochure vibes.”
+
+---
+
+### 4) LLM writes the flyer copy + produces a layout blueprint
+
+Now the LLM uses the retrieved examples to generate:
+
+* Headline + subhead (vertical-specific)
+* 4–7 benefit bullets (in your established tone)
+* 1–2 mini-sections (How it works / Why it matters)
+* CTA copy + QR caption text
+* Any required disclaimer text
+* A **layout spec** (JSON) telling the renderer:
+
+  * where the hero image goes
+  * where bullets go
+  * where CTA goes
+  * where the rep contact footer goes (standardized)
+
+**Guardrails matter here:**
+
+* No made-up stats
+* Only approved product claims
+* If a claim isn’t in the approved library, omit or flag for review
+
+---
+
+### 5) Nano Banana Pro generates the visuals that match the layout + vertical
+
+This is where Nano Banana Pro comes in.
+
+The LLM hands Nano Banana Pro a **very constrained image prompt**, using:
+
+* vertical context (HVAC / dental / marina / etc.)
+* brand style (color palette, “modern clean corporate,” lighting, composition)
+* layout needs (wide hero banner, or small icon tiles)
+* content restrictions (no competitor logos, no “too-good-to-be-true” visuals)
+
+Typical outputs:
+
+* **1 hero image** (top banner)
+* **2–4 icons** (benefit section or CTA section)
+* Optional: a “device / terminal / POS” style mock image if you want consistent equipment visuals
+
+---
+
+### 6) Assemble the one-page flyer using a house template
+
+Instead of “designing from scratch” every time, we use a **house HTML/CSS template** (or a few templates) that mirrors your existing flyers.
+
+* Inject copy into the right sections
+* Place Nano Banana images into the image slots
+* Render to **PDF + PNG** (Playwright is excellent for this)
+
+This ensures every output is:
+
+* one page
+* consistent margins
+* consistent typography
+* consistent logo placement
+
+---
+
+### 7) Auto-fill rep contact info (the field-ready requirement)
+
+The rep’s saved profile fields (Name / Phone / Email / Website) get injected into the footer contact block.
+
+So when the PDF/PNG is generated, it is **immediately sendable**.
+
+---
+
+### 8) Save the new flyer back into the library (the compounding flywheel)
+
+Finally, we store:
+
+* the output flyer (PDF/PNG)
+* its tags (vertical, offer type)
+* the generated copy text as a RAG document
+* embeddings so it’s retrievable next time
+
+This is where the system “gets smarter and smarter.”
+
+---
+
+## Why this is valuable to Jason (in one paragraph)
+
+This turns your library from **12 static flyers** into an **infinite vertical coverage engine**. Sales can walk into any niche business, generate a tailored one-pager in minutes, and follow up immediately—without waiting on marketing and without risking off-brand collateral. Over time, every new flyer becomes another training example, so performance compounds and sales velocity increases.
+
+---
+
+## What Replit needs to build next (the missing pieces)
+
+Here’s the “delta” from what exists today:
+
+1. **RAG Indexing Pipeline**
+
+* Extract text from PDFs/PNGs
+* Tag verticals
+* Store in vector DB (pgvector)
+* Store “component snippets” (headline patterns, bullets, CTAs)
+
+2. **Custom Generate UI**
+
+* “Create New Flyer” button
+* prompt box + optional structured fields
+* preview + “Regenerate / Edit / Approve”
+* save to library
+
+3. **/api/marketing/custom/generate**
+
+* retrieval → copy/layout → Nano Banana images → assemble → export PDF/PNG → save
+
+4. **Brand + Compliance Guardrails**
+
+* approved claims library
+* disclaimer library
+* banned words/claims list
+* optional manager approval toggle for “new flyer goes live”
+
+If you want, paste your Replit repo link or tell me what stack you’re using (Next.js? Prisma? Supabase?), and I’ll give you a **surgical “Replit prompt”** that adds exactly these missing components without rewriting what’s already built.
