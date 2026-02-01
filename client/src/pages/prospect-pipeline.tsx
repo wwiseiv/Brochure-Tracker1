@@ -81,6 +81,10 @@ import {
   Video,
   Users,
   FileQuestion,
+  Sparkles,
+  Loader2,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Deal, DealActivity, DealAttachment } from "@shared/schema";
@@ -173,6 +177,14 @@ export default function DealPipelinePage() {
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
 
   const [showCreateDealSheet, setShowCreateDealSheet] = useState(false);
+  
+  // AI Email Drafting state
+  const [showEmailSheet, setShowEmailSheet] = useState(false);
+  const [emailType, setEmailType] = useState<string>("introduction");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
+  
   const [newDealForm, setNewDealForm] = useState({
     businessName: "",
     businessPhone: "",
@@ -374,6 +386,52 @@ export default function DealPipelinePage() {
     setSelectedDeal(deal);
     setEditingStage(deal.currentStage);
     setEditingNotes(deal.notes || "");
+  };
+
+  const handleGenerateEmail = async (type: string) => {
+    if (!selectedDeal) return;
+    
+    setIsGeneratingEmail(true);
+    setEmailType(type);
+    setEmailSubject("");
+    setEmailBody("");
+    
+    try {
+      const response = await apiRequest("POST", "/api/ai/draft-email", {
+        emailType: type,
+        context: {
+          businessName: selectedDeal.businessName,
+          contactName: selectedDeal.contactName || "",
+          phone: selectedDeal.businessPhone || "",
+          notes: selectedDeal.notes || "",
+        },
+      });
+      
+      const data = await response.json();
+      setEmailSubject(data.subject || "");
+      setEmailBody(data.body || "");
+    } catch (error) {
+      console.error("Failed to generate email:", error);
+      toast({
+        title: "Failed to generate email",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingEmail(false);
+    }
+  };
+
+  const handleOpenEmailSheet = () => {
+    setShowEmailSheet(true);
+    handleGenerateEmail("introduction");
+  };
+
+  const handleSendEmail = () => {
+    if (!selectedDeal?.businessEmail) return;
+    const mailtoLink = `mailto:${selectedDeal.businessEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    window.location.href = mailtoLink;
+    setShowEmailSheet(false);
   };
 
   const handleSaveChanges = () => {
@@ -1050,11 +1108,11 @@ export default function DealPipelinePage() {
                     <Button
                       variant="outline"
                       className="flex-1"
-                      onClick={() => window.open(`mailto:${selectedDeal.businessEmail}`, "_self")}
+                      onClick={handleOpenEmailSheet}
                       data-testid="button-detail-email"
                     >
-                      <Mail className="w-4 h-4 mr-2" />
-                      Email
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      AI Email
                     </Button>
                   )}
                   {selectedDeal.businessAddress && (
@@ -1843,6 +1901,103 @@ export default function DealPipelinePage() {
                 <Plus className="w-4 h-4 mr-2" />
               )}
               Create Deal
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* AI Email Drafting Sheet */}
+      <Sheet open={showEmailSheet} onOpenChange={setShowEmailSheet}>
+        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+          <div className="p-4 border-b flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                AI Email Draft
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowEmailSheet(false)}
+                data-testid="button-close-email"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            {/* Email Type Selector */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "introduction", label: "Introduction" },
+                { value: "follow_up", label: "Follow-up" },
+                { value: "thank_you", label: "Thank You" },
+                { value: "meeting_request", label: "Meeting Request" },
+              ].map((type) => (
+                <Button
+                  key={type.value}
+                  variant={emailType === type.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleGenerateEmail(type.value)}
+                  disabled={isGeneratingEmail}
+                  data-testid={`button-email-type-${type.value}`}
+                >
+                  {type.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {isGeneratingEmail ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-muted-foreground">Generating email for {selectedDeal?.businessName}...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Email subject line"
+                    data-testid="input-email-subject"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Message</Label>
+                  <Textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="Email body content"
+                    className="min-h-[250px] resize-none"
+                    data-testid="input-email-body"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          
+          <div className="border-t p-4 flex-shrink-0 safe-area-bottom flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => handleGenerateEmail(emailType)}
+              disabled={isGeneratingEmail}
+              data-testid="button-regenerate-email"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isGeneratingEmail ? "animate-spin" : ""}`} />
+              Regenerate
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleSendEmail}
+              disabled={isGeneratingEmail || !emailSubject.trim() || !emailBody.trim()}
+              data-testid="button-send-email"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Open in Mail
             </Button>
           </div>
         </SheetContent>
