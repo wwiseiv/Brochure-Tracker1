@@ -1,7 +1,23 @@
 import puppeteer from "puppeteer";
+import { execSync } from "child_process";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, convertInchesToTwip } from "docx";
 import type { GeneratedDocument } from "./claude-document-generator";
 import type { ParsedProposal } from "../proposal-generator";
+
+// Get system chromium path dynamically
+function getChromiumPath(): string {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  try {
+    const path = execSync("which chromium").toString().trim();
+    if (path) return path;
+  } catch (e) {
+    // Ignore error
+  }
+  // Fallback to known Nix path
+  return "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+}
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', { 
@@ -18,9 +34,13 @@ function formatPercent(value: number): string {
 export async function convertHtmlToPdf(html: string): Promise<Buffer> {
   console.log("[DocumentConverter] Starting HTML to PDF conversion with Puppeteer...");
   
+  const chromiumPath = getChromiumPath();
+  console.log("[DocumentConverter] Using Chromium at:", chromiumPath);
+  
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    executablePath: chromiumPath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
 
   try {
