@@ -521,14 +521,16 @@ export default function StatementAnalyzer() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data.job?.id) {
-        setSelectedJobId(data.job.id);
+      // API returns { success, jobId, status, message } not { job: { id } }
+      const jobId = data.jobId || data.job?.id;
+      if (jobId) {
+        setSelectedJobId(jobId);
         setExtractionStep("idle");
         setUploadedFiles([]);
         queryClient.invalidateQueries({ queryKey: ["/api/statement-analysis/jobs"] });
         toast({
           title: "Processing in Background",
-          description: "Your statement is being analyzed. You can navigate away and come back later."
+          description: data.message || "Your statement is being analyzed. You can navigate away and come back later."
         });
       } else {
         toast({
@@ -786,19 +788,26 @@ export default function StatementAnalyzer() {
         // Use proxy upload to avoid browser CORS issues with GCS
         const formData = new FormData();
         formData.append("file", uploadFile.file);
+        
+        console.log("[StatementAnalyzer Job] Uploading file:", uploadFile.file.name, "size:", uploadFile.file.size, "type:", uploadFile.file.type);
 
         const uploadResponse = await fetch("/api/uploads/proxy", {
           method: "POST",
-          body: formData
+          body: formData,
+          credentials: "include"  // Include cookies for authentication on iOS Safari
         });
+
+        console.log("[StatementAnalyzer Job] Upload response status:", uploadResponse.status);
 
         if (!uploadResponse.ok) {
           const errorData = await uploadResponse.json().catch(() => ({}));
-          console.error("Proxy upload failed:", uploadResponse.status, errorData);
-          throw new Error(`Upload failed: ${uploadResponse.status}`);
+          console.error("[StatementAnalyzer Job] Proxy upload failed:", uploadResponse.status, errorData);
+          throw new Error(`Upload failed: ${uploadResponse.status} - ${errorData.error || errorData.details || 'Unknown error'}`);
         }
 
         const { objectPath } = await uploadResponse.json();
+        console.log("[StatementAnalyzer Job] Upload success, objectPath:", objectPath);
+        
         const textContent = await readFileAsText(uploadFile.file);
 
         setUploadedFiles(prev => {
@@ -860,19 +869,25 @@ export default function StatementAnalyzer() {
         // Use proxy upload to avoid browser CORS issues with GCS
         const formData = new FormData();
         formData.append("file", uploadFile.file);
+        
+        console.log("[StatementAnalyzer] Uploading file:", uploadFile.file.name, "size:", uploadFile.file.size, "type:", uploadFile.file.type);
 
         const uploadResponse = await fetch("/api/uploads/proxy", {
           method: "POST",
-          body: formData
+          body: formData,
+          credentials: "include"  // Include cookies for authentication
         });
+
+        console.log("[StatementAnalyzer] Upload response status:", uploadResponse.status);
 
         if (!uploadResponse.ok) {
           const errorData = await uploadResponse.json().catch(() => ({}));
-          console.error("Proxy upload failed:", uploadResponse.status, errorData);
-          throw new Error(`Upload failed: ${uploadResponse.status}`);
+          console.error("[StatementAnalyzer] Proxy upload failed:", uploadResponse.status, errorData);
+          throw new Error(`Upload failed: ${uploadResponse.status} - ${errorData.error || errorData.details || 'Unknown error'}`);
         }
 
         const { objectPath } = await uploadResponse.json();
+        console.log("[StatementAnalyzer] Upload success, objectPath:", objectPath);
 
         setUploadedFiles(prev => {
           const updated = [...prev];

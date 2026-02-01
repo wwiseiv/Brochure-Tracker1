@@ -99,14 +99,24 @@ export function registerObjectStorageRoutes(app: Express): void {
    * Returns the object path for later retrieval.
    */
   app.post("/api/uploads/proxy", upload.single("file"), async (req: Request, res: Response) => {
+    console.log("[Upload Proxy] Request received");
     try {
       if (!req.file) {
+        console.log("[Upload Proxy] Error: No file in request");
         return res.status(400).json({ error: "No file provided" });
       }
 
+      console.log("[Upload Proxy] File received:", req.file.originalname, "size:", req.file.size, "type:", req.file.mimetype);
+
       const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      if (!privateObjectDir) {
+        console.error("[Upload Proxy] Error: Private object directory not configured");
+        return res.status(500).json({ error: "Object storage not configured" });
+      }
+      
       const objectId = randomUUID();
       const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+      console.log("[Upload Proxy] Target path:", fullPath);
 
       // Parse bucket and object name from path
       const pathWithoutLeadingSlash = fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
@@ -117,6 +127,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       const file = bucket.file(objectName);
 
       // Upload the file buffer directly to GCS
+      console.log("[Upload Proxy] Uploading to GCS, bucket:", bucketName, "object:", objectName);
       await file.save(req.file.buffer, {
         contentType: req.file.mimetype || "application/octet-stream",
         metadata: {
@@ -125,6 +136,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       });
 
       const objectPath = `/objects/uploads/${objectId}`;
+      console.log("[Upload Proxy] Success, objectPath:", objectPath);
 
       res.json({
         objectPath,
@@ -134,9 +146,10 @@ export function registerObjectStorageRoutes(app: Express): void {
           contentType: req.file.mimetype
         }
       });
-    } catch (error) {
-      console.error("Error in proxy upload:", error);
-      res.status(500).json({ error: "Failed to upload file" });
+    } catch (error: any) {
+      console.error("[Upload Proxy] Error:", error?.message || error);
+      console.error("[Upload Proxy] Stack:", error?.stack);
+      res.status(500).json({ error: "Failed to upload file", details: error?.message });
     }
   });
 }
