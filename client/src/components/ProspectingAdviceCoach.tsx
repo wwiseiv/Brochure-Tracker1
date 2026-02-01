@@ -32,6 +32,8 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
   const [error, setError] = useState<string | null>(null);
   const [autoPlayTTS, setAutoPlayTTS] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isTTSLoading, setIsTTSLoading] = useState(false);
+  const [ttsError, setTTSError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
@@ -57,6 +59,9 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
   const playTTS = useCallback(async (text: string) => {
     if (!autoPlayTTS) return;
     
+    setIsTTSLoading(true);
+    setTTSError(null);
+    
     try {
       const response = await apiRequest("POST", "/api/tts", { text });
       const data = await response.json();
@@ -70,10 +75,31 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
         const audioData = `data:${data.format};base64,${data.audio}`;
         const audio = new Audio(audioData);
         audioRef.current = audio;
-        await audio.play();
+        
+        audio.onended = () => {
+          setIsTTSLoading(false);
+        };
+        
+        audio.onerror = () => {
+          setIsTTSLoading(false);
+          setTTSError("Audio playback failed. Tap the speaker icon to listen.");
+        };
+        
+        try {
+          await audio.play();
+        } catch (playError: any) {
+          // iOS Safari and some browsers block autoplay
+          console.warn("Autoplay blocked:", playError?.message);
+          setIsTTSLoading(false);
+          setTTSError("Auto-play blocked. Tap the speaker icon to listen.");
+        }
+      } else {
+        throw new Error("No audio data received");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("TTS playback error:", err);
+      setIsTTSLoading(false);
+      setTTSError("Voice playback unavailable. Tap the speaker icon to try again.");
     }
   }, [autoPlayTTS]);
 
@@ -84,6 +110,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     setIsLoading(true);
     setError(null);
     setAdvice("");
+    setTTSError(null);
 
     try {
       const response = await apiRequest("POST", "/api/prospecting-advice", {
@@ -254,6 +281,9 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                 <h4 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
+                  {isTTSLoading && (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                  )}
                 </h4>
                 <ListenButton 
                   text={advice} 
@@ -261,6 +291,12 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                   data-testid="button-listen-advice"
                 />
               </div>
+              {ttsError && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">
+                  <Volume2 className="w-3 h-3" />
+                  {ttsError}
+                </p>
+              )}
               <div className="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {advice}
               </div>

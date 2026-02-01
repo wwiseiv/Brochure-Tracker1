@@ -4932,18 +4932,21 @@ Remember: You're helping them practice real sales conversations. Be challenging 
 
   // Standalone TTS endpoint for listen buttons (ElevenLabs)
   app.post("/api/tts", isAuthenticated, async (req: any, res) => {
+    console.log("[TTS] Request received, text length:", req.body?.text?.length || 0);
     try {
       const { text } = req.body;
 
       if (!text) {
+        console.log("[TTS] Error: No text provided");
         return res.status(400).json({ error: "Text is required" });
       }
 
       const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
       if (!elevenLabsKey) {
-        console.error("ELEVENLABS_API_KEY is not configured");
+        console.error("[TTS] ELEVENLABS_API_KEY is not configured");
         return res.status(500).json({ error: "ElevenLabs not configured" });
       }
+      console.log("[TTS] API key present, calling ElevenLabs...");
 
       // Rachel voice - clear, professional female voice
       const voiceId = "21m00Tcm4TlvDq8ikWAM";
@@ -5000,13 +5003,14 @@ Remember: You're helping them practice real sales conversations. Be challenging 
 
       const audioBuffer = await ttsResponse.arrayBuffer();
       const base64Audio = Buffer.from(audioBuffer).toString("base64");
+      console.log("[TTS] Success, audio size:", base64Audio.length);
 
       res.json({
         audio: base64Audio,
         format: "audio/mpeg",
       });
     } catch (error: any) {
-      console.error("TTS error:", error?.message || error);
+      console.error("[TTS] Error:", error?.message || error);
       res.status(500).json({ error: "Failed to generate speech" });
     }
   });
