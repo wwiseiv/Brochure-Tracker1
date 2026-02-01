@@ -99,7 +99,7 @@ export function HelpChatbot() {
       <button
         onClick={handleOpen}
         data-testid="button-help-chatbot-open"
-        className="fixed bottom-24 right-4 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed top-20 right-4 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
         aria-label="Open AI Help"
       >
         <MessageCircle className="w-5 h-5" />
@@ -112,7 +112,7 @@ export function HelpChatbot() {
       <button
         onClick={() => setIsMinimized(false)}
         data-testid="button-help-chatbot-expand"
-        className="fixed bottom-24 right-4 z-40 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center gap-2 hover:scale-105 transition-transform"
+        className="fixed top-20 right-4 z-40 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center gap-2 hover:scale-105 transition-transform"
         aria-label="Expand chat"
       >
         <Bot className="w-5 h-5" />
@@ -126,7 +126,7 @@ export function HelpChatbot() {
 
   return (
     <Card 
-      className="fixed bottom-24 right-4 left-4 sm:left-auto z-40 sm:w-[380px] h-[60vh] max-h-[450px] flex flex-col shadow-2xl border-primary/20"
+      className="fixed top-20 right-4 left-4 sm:left-auto z-40 sm:w-[380px] h-[60vh] max-h-[450px] flex flex-col shadow-2xl border-primary/20"
       data-testid="help-chatbot-panel"
     >
       <div className="flex items-center justify-between p-3 border-b bg-primary/5 rounded-t-lg">
