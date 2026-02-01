@@ -644,6 +644,12 @@ export default function HelpPage() {
       link: "/prospects/pipeline",
       icon: <Smartphone className="w-5 h-5 text-blue-600" />,
     },
+    {
+      title: "Sales Spark (AI Coach)",
+      description: "Stuck on who to call? Get instant, actionable prospecting ideas tailored to payment processing sales. Use voice dictation and listen to advice read aloud.",
+      link: "/",
+      icon: <Lightbulb className="w-5 h-5 text-amber-600" />,
+    },
   ];
 
   const dealPipelineFeatures: HelpItem[] = [
@@ -1469,6 +1475,12 @@ export default function HelpPage() {
                 <AccordionTrigger className="text-sm">How do I convert a won deal to an active merchant?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
                   When a deal moves to the "Active Merchant" stage, tap "Convert to Merchant" in the deal details. This creates a full merchant profile with all the business info, ready for ongoing relationship management and quarterly check-ins.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-29">
+                <AccordionTrigger className="text-sm">What is Sales Spark and how do I use it?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Sales Spark is your AI prospecting coach on the Dashboard. Tap to expand it, then type or dictate what's on your mind (e.g., "I don't know who to call today"). Tap <strong>Spark My Day</strong> to get specific, actionable prospecting ideas tailored to payment processing sales. Toggle "Read aloud" to hear the advice spoken back to you.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

@@ -91,7 +91,7 @@ export function HelpChatbot() {
     "How do I create a proposal?",
     "What is the Statement Analyzer?",
     "How do I track a brochure drop?",
-    "Tell me about the AI Coach"
+    "Tell me about Sales Spark"
   ];
 
   if (!isOpen) {
