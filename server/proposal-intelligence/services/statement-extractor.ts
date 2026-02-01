@@ -1,12 +1,17 @@
 import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
+import { createRequire } from "module";
 import {
   identifyProcessor,
   findSimilarExtractions,
   storeExtraction,
   buildFewShotPrompt
 } from "./learning-service";
+
+// pdf-parse is a CommonJS module, use createRequire for ESM compatibility
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 interface ExtractedStatementData {
   merchantName?: string;
@@ -130,38 +135,65 @@ export async function extractStatementFromFiles(
 async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
   console.log(`[StatementExtractor] Analyzing PDF with Claude, buffer size: ${buffer.length}`);
   
-  const base64 = buffer.toString("base64");
-  console.log(`[StatementExtractor] PDF base64 length: ${base64.length}`);
-  
+  // Use pdf-parse to extract text from PDF (more compatible with AI Integrations proxy)
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: base64
-              }
-            },
-            {
-              type: "text",
-              text: EXTRACTION_PROMPT
-            }
-          ]
-        }
-      ]
-    });
-
-    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
-    console.log(`[StatementExtractor] Claude response length: ${responseText.length}`);
+    console.log(`[StatementExtractor] Extracting text from PDF using pdf-parse...`);
+    const pdfData = await pdfParse(buffer);
+    const pdfText = pdfData.text;
+    console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText.length}, pages: ${pdfData.numpages}`);
     
-    return parseExtractedData(responseText);
+    if (pdfText && pdfText.trim().length > 100) {
+      // PDF has extractable text, use text-based analysis
+      console.log(`[StatementExtractor] Using text-based PDF analysis`);
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "user",
+            content: `Here is the text content from a merchant processing statement PDF:\n\n${pdfText}\n\n${EXTRACTION_PROMPT}`
+          }
+        ]
+      });
+
+      const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+      console.log(`[StatementExtractor] Claude text analysis response length: ${responseText.length}`);
+      
+      return parseExtractedData(responseText);
+    } else {
+      // PDF is likely scanned/image-based, try native document type as fallback
+      console.log(`[StatementExtractor] PDF appears to be scanned/image-based, using native document type`);
+      const base64 = buffer.toString("base64");
+      
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: base64
+                }
+              },
+              {
+                type: "text",
+                text: EXTRACTION_PROMPT
+              }
+            ]
+          }
+        ]
+      });
+
+      const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+      console.log(`[StatementExtractor] Claude document response length: ${responseText.length}`);
+      
+      return parseExtractedData(responseText);
+    }
   } catch (error: any) {
     console.error("[StatementExtractor] Claude PDF analysis error:", error?.message || error);
     throw new Error(`PDF analysis failed: ${error?.message || "Unknown error"}`);
