@@ -2606,6 +2606,104 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
     }
   });
 
+  // AI Prospecting Advice Coach - generates actionable prospecting ideas
+  app.post("/api/prospecting-advice", isAuthenticated, async (req: any, res) => {
+    try {
+      const { userInput } = req.body;
+      
+      if (!userInput || typeof userInput !== "string") {
+        return res.status(400).json({ error: "User input is required" });
+      }
+      
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        },
+      });
+      
+      const businessContext = `
+You are an expert sales coach for a merchant services/payment processing company called PCBancard.
+
+WHAT WE SELL:
+- Payment processing solutions (credit card processing, POS systems)
+- Cash discount/dual pricing programs that eliminate processing fees for merchants
+- Video brochures as innovative sales tools for pattern interrupt prospecting
+- Full-service merchant accounts with competitive rates and transparent pricing
+
+OUR VALUE PROPOSITIONS:
+1. COST SAVINGS: We can typically save merchants 20-40% on processing fees or eliminate them entirely with dual pricing
+2. NO LONG-TERM CONTRACTS: Month-to-month agreements, no early termination fees
+3. TRANSPARENT PRICING: No hidden fees, no junk fees, clear statements
+4. LOCAL SERVICE: Dedicated local rep vs. 1-800 number support
+5. FAST FUNDING: Next-day or same-day funding available
+6. FREE EQUIPMENT: POS terminals, card readers, etc.
+
+IDEAL PROSPECT TYPES:
+- Restaurants, bars, cafes (high volume, high ticket)
+- Retail stores (clothing, specialty shops, convenience stores)
+- Auto repair shops, mechanics
+- Medical/dental offices
+- Salons, barbershops, spas
+- Professional services (attorneys, accountants)
+- B2B businesses
+- Any business currently paying processing fees
+
+OBJECTION HANDLING BASICS:
+- "I'm in a contract" → We can often help buy out contracts, or set up for future switch
+- "I'm happy with my processor" → Great! Mind if I do a free statement analysis just to make sure you're getting the best deal?
+- "I don't have time" → This takes 5 minutes and could save you thousands per year
+- "I just switched" → Perfect time to make sure you got what you were promised - free analysis
+`;
+
+      const prompt = `${businessContext}
+
+---
+
+A salesperson on our team is reaching out for help. Here's what they said:
+
+"${userInput}"
+
+---
+
+Based on what they're experiencing, provide SPECIFIC, ACTIONABLE prospecting advice for TODAY.
+
+Your response should:
+1. ACKNOWLEDGE their situation briefly (1 sentence)
+2. Provide 3-5 SPECIFIC, ACTIONABLE ideas they can execute TODAY
+3. Each idea should be concrete - include specific places to go, types of businesses to target, and exact words to say
+4. Incorporate real-world, current sales strategies that are working
+5. Frame everything in the context of selling payment processing and video brochure products
+6. End with ONE motivational insight or mindset tip
+
+Keep the tone encouraging but practical. These are experienced salespeople who need actionable advice, not generic platitudes.
+
+Format the response clearly with numbered action items. Be specific - instead of "visit local businesses," say "Walk into 5 restaurants on Main Street during the slow 2-4pm window and ask to speak with the owner about their processing statement."`;
+
+      console.log("Prospecting Advice request received:", { inputLength: userInput.length });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+      });
+
+      const advice = response.text || "";
+      console.log("Prospecting Advice generated:", { adviceLength: advice.length });
+      
+      res.json({ advice });
+    } catch (error) {
+      console.error("Error generating prospecting advice:", error);
+      res.status(500).json({ error: "Failed to generate prospecting advice" });
+    }
+  });
+
   // ============================================
   // MERCHANTS API (Merchant Profiles)
   // ============================================
