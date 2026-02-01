@@ -269,6 +269,16 @@ self.addEventListener('push', (event) => {
         { action: 'dismiss', title: 'Dismiss' }
       ];
     }
+    
+    // Add actions for proposal parse notifications
+    if (data.data?.type === 'proposal-parse-complete') {
+      options.requireInteraction = true;
+      options.tag = data.data?.jobId ? `proposal-parse-${data.data.jobId}` : 'proposal-parse';
+      options.actions = [
+        { action: 'view', title: 'View Results' },
+        { action: 'dismiss', title: 'Dismiss' }
+      ];
+    }
 
     event.waitUntil(
       self.registration.showNotification(title, options)
@@ -290,6 +300,8 @@ self.addEventListener('notificationclick', (event) => {
     urlToOpen = event.notification.data.url;
   } else if (event.notification.data?.type === 'prospect_search_complete') {
     urlToOpen = '/prospect-finder';
+  } else if (event.notification.data?.type === 'proposal-parse-complete') {
+    urlToOpen = '/proposal-generator';
   } else if (event.notification.data?.jobId) {
     urlToOpen = `/prospect-finder`;
   }
