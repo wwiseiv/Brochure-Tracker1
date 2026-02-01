@@ -363,7 +363,7 @@ ${repEmail}`;
           
           <Button 
             size="lg"
-            className="w-full gap-2"
+            className="w-full gap-2 min-h-12"
             onClick={openGenerateSheet}
             data-testid="button-create-with-ai"
           >
@@ -502,7 +502,8 @@ ${repEmail}`;
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          className="flex-1 gap-2"
+                          size="lg"
+                          className="flex-1 gap-2 min-h-12"
                           onClick={() => handleDownloadGeneratedFlyer(job)}
                           data-testid={`button-download-job-${job.jobId}`}
                         >
@@ -511,7 +512,8 @@ ${repEmail}`;
                         </Button>
                         <Button
                           variant={job.savedToLibrary ? "secondary" : "outline"}
-                          className="gap-2"
+                          size="lg"
+                          className="gap-2 min-h-12"
                           onClick={() => saveToLibraryMutation.mutate(job.jobId)}
                           disabled={job.savedToLibrary || savingJobId === job.jobId}
                           data-testid={`button-save-library-${job.jobId}`}
@@ -585,7 +587,8 @@ ${repEmail}`;
                     Download this flyer to share with prospects. Print it or send it digitally.
                   </p>
                   <Button 
-                    className="w-full gap-2" 
+                    size="lg"
+                    className="w-full gap-2 min-h-12" 
                     onClick={handleDownload}
                     data-testid="button-download-flyer"
                   >
@@ -630,7 +633,8 @@ ${repEmail}`;
 
                   <div className="flex flex-col gap-2">
                     <Button 
-                      className="w-full gap-2" 
+                      size="lg"
+                      className="w-full gap-2 min-h-12" 
                       onClick={handleDownload}
                       data-testid="button-download-before-email"
                     >
@@ -639,7 +643,8 @@ ${repEmail}`;
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="w-full gap-2" 
+                      size="lg"
+                      className="w-full gap-2 min-h-12" 
                       onClick={handleEmailCopy}
                       data-testid="button-copy-email"
                     >
@@ -758,7 +763,8 @@ ${repEmail}`;
             </div>
 
             <Button
-              className="w-full gap-2"
+              size="lg"
+              className="w-full gap-2 min-h-12"
               onClick={handleGenerateSubmit}
               disabled={generateMutation.isPending}
               data-testid="button-generate-flyer"
