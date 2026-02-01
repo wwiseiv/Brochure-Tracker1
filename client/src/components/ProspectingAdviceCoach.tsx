@@ -25,16 +25,24 @@ interface ProspectingAdviceCoachProps {
   className?: string;
 }
 
+// Detect iOS Safari where autoplay is blocked
+const isIOSSafari = () => {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
 export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProps) {
   const [input, setInput] = useState("");
   const [advice, setAdvice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoPlayTTS, setAutoPlayTTS] = useState(true);
+  // Default auto-play OFF on iOS since it's blocked anyway
+  const [autoPlayTTS, setAutoPlayTTS] = useState(() => !isIOSSafari());
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTTSLoading, setIsTTSLoading] = useState(false);
   const [ttsError, setTTSError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isMobile = isIOSSafari();
 
   const {
     isListening,
@@ -246,6 +254,9 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
               <Label htmlFor="auto-tts" className="text-sm flex items-center gap-1">
                 <Volume2 className="w-4 h-4" />
                 Read aloud
+                {isMobile && autoPlayTTS && (
+                  <span className="text-xs text-muted-foreground ml-1">(tap speaker icon)</span>
+                )}
               </Label>
             </div>
           </div>
@@ -281,7 +292,8 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                 <h4 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
-                  {isTTSLoading && (
+                  {/* Only show auto-TTS spinner on desktop where it works */}
+                  {isTTSLoading && !isMobile && (
                     <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
                   )}
                 </h4>
@@ -291,7 +303,8 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                   data-testid="button-listen-advice"
                 />
               </div>
-              {ttsError && (
+              {/* Only show auto-TTS error on desktop - on mobile, they know to tap the speaker */}
+              {ttsError && !isMobile && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">
                   <Volume2 className="w-3 h-3" />
                   {ttsError}
