@@ -256,7 +256,7 @@ export default function LandingPage() {
         </section>
 
         <section className="mb-12">
-          <h2 className="text-lg font-semibold text-center mb-2">AI-Powered Marketing</h2>
+          <h2 className="text-lg font-semibold text-center mb-2">AI-Powered Marketing Materials</h2>
           <p className="text-sm text-muted-foreground text-center mb-6">Professional materials to share with your prospects</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
