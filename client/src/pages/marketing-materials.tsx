@@ -67,6 +67,12 @@ const INDUSTRY_LABELS: Record<string, { label: string; icon: React.ReactNode }> 
   traditional: { label: "Traditional Processing", icon: <CreditCard className="w-4 h-4" /> },
   dual_pricing: { label: "Dual Pricing", icon: <CreditCard className="w-4 h-4" /> },
   charity: { label: "Charity & Community", icon: <Heart className="w-4 h-4" /> },
+  garden_centers: { label: "Garden Centers", icon: <Store className="w-4 h-4" /> },
+  retail: { label: "Retail", icon: <Store className="w-4 h-4" /> },
+  attorneys_law: { label: "Attorneys & Law Firms", icon: <Building2 className="w-4 h-4" /> },
+  tattoo_parlors: { label: "Tattoo Parlors", icon: <Scissors className="w-4 h-4" /> },
+  convenience_stores: { label: "Convenience Stores", icon: <Store className="w-4 h-4" /> },
+  promotions: { label: "Promotions & Incentives", icon: <DollarSign className="w-4 h-4" /> },
 };
 
 const MARKETING_INDUSTRIES = Object.keys(INDUSTRY_LABELS);
@@ -117,6 +123,13 @@ const STATIC_TEMPLATES: MarketingTemplateData[] = [
   // Charity & Community
   { id: 19, name: "Charity Giveback Program", description: "How merchants give back to local charities through processing", industry: "charity", thumbnailUrl: "/marketing/charity-program.png" },
   { id: 20, name: "Coastal Bend Community Impact", description: "Over $33,000 given to local charities since 2022", industry: "charity", thumbnailUrl: "/marketing/charity-giveback.jpg" },
+  
+  // Additional Industry-Specific Flyers
+  { id: 21, name: "Garden Centers", description: "Pay $0 to process for garden centers and nurseries", industry: "garden_centers", thumbnailUrl: "/marketing/garden-centers.png" },
+  { id: 22, name: "Retail Stores", description: "Dual pricing solutions for retail and boutique shops", industry: "retail", thumbnailUrl: "/marketing/retail.png" },
+  { id: 23, name: "Attorneys & Law Firms", description: "Professional payment solutions for legal practices", industry: "attorneys_law", thumbnailUrl: "/marketing/attorneys-law.png" },
+  { id: 24, name: "Tattoo Parlors", description: "Eliminate processing fees for tattoo studios", industry: "tattoo_parlors", thumbnailUrl: "/marketing/tattoo-parlors.png" },
+  { id: 25, name: "Convenience Stores", description: "Pay $0 to process for convenience stores", industry: "convenience_stores", thumbnailUrl: "/marketing/convenience-stores.png" },
 ];
 
 export default function MarketingMaterialsPage() {

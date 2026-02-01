@@ -1,0 +1,160 @@
+You are a senior full-stack engineer + QA lead. Your job is to perform an exhaustive production-readiness audit of this entire repo/web app, fix every issue you can fix safely, and produce a clear report of what you fixed vs what still needs human decisions.
+
+CRITICAL CONSTRAINTS
+- Do NOT change what the site “does” (no new product features, no changes to core flows/business logic, no scope creep).
+- You MAY: fix bugs, broken routes, UI glitches, layout issues, error handling, missing wiring, broken UX, missing/misaligned tooltips/help content, missing dictation controls on major inputs, missing ElevenLabs playback on major AI responses (where the pattern already exists).
+- Keep changes minimal, targeted, and consistent with existing patterns/components.
+- Prefer using existing components/utilities rather than inventing new architecture.
+- If you must refactor to fix a bug, keep it narrow and explain why.
+
+PRIMARY GOAL
+Make the app stable, visually consistent, and ready for production:
+1) Everything works end-to-end without “sticking” pages, broken navigation, or console/runtime errors.
+2) UX/UI is functional, polished, responsive, and consistent (especially the bottom menu bar behavior).
+3) Help menu is fully updated (matches the current product) and opens/works everywhere it should.
+4) Hover tooltips/descriptions exist where intended and work consistently.
+5) Any MAJOR text box includes a microphone dictation option.
+6) Any MAJOR response the app generates can be played back with ElevenLabs natural voice (where the existing implementation pattern already exists), and it must be consistent across the site.
+
+DEFINITION: “MAJOR” INPUTS & “MAJOR” RESPONSES
+- “Major text box” = any primary/large input that drives workflow or submission (e.g., prompt inputs, notes fields, proposal inputs, long-form text, forms users complete to generate outputs).
+- “Major response” = any primary output users rely on (generated proposal text, analysis outputs, summaries, next steps, etc.).
+You must discover these by scanning the UI/components and usage patterns (don’t guess—confirm in code).
+
+AUDIT & FIX PLAN (FOLLOW IN ORDER)
+
+PHASE 0 — BASELINE & SAFETY
+1) Identify stack: framework, routing, state management, UI library, build tooling, lint/test setup.
+2) Run the app and capture baseline errors:
+   - Install deps, run typecheck/build, run dev server, run unit tests if present.
+   - Record ALL failures/warnings (typecheck, lint, runtime, console, network).
+3) Create a short “Baseline Findings” section in your final report before you start changing anything.
+
+PHASE 1 — BUILD / RUNTIME / RELIABILITY
+Goal: zero build/typecheck errors, no obvious runtime crashes, no broken pages.
+1) Fix:
+   - TypeScript/typing issues
+   - Lint errors that are real defects (not style debates)
+   - Broken imports, missing env vars references, null/undefined crashes, unhandled promise rejections
+2) Add/repair error boundaries and user-safe fallbacks where pages can crash, but do not alter flows.
+3) Validate routing/navigation:
+   - No dead routes
+   - No blank screens
+   - No infinite loaders
+   - No broken back/forward behavior
+
+PHASE 2 — FULL APP “CRAWL” (FIND EVERYTHING THAT’S BROKEN)
+Goal: systematically visit every page and key state.
+1) Enumerate routes/pages from the router structure.
+2) Manually or programmatically crawl the app:
+   - Use an automated approach if available (e.g., Playwright/Cypress) OR a structured manual checklist.
+   - Check each route for: layout, scroll, responsiveness, errors, missing content, broken components, stuck loading, incorrect z-index layering, nav overlays.
+3) On each page test:
+   - Desktop + mobile viewport
+   - Sidebar/top nav/bottom nav behavior
+   - Modals/toasts/tooltips
+   - Forms validation + submissions
+   - API calls (network errors, retries, error messages)
+
+PHASE 3 — UI/UX POLISH (NO VISUAL REGRESSIONS)
+Goal: “looks good” + consistent and usable.
+Focus areas:
+1) Bottom menu bar:
+   - Must not “float around,” jitter, overlap content, or misplace when scrolling.
+   - Must respect safe-area insets on mobile (iOS notch/home bar).
+   - Must stay consistent across pages (positioning, z-index, height, active state).
+2) Layout consistency:
+   - Headings, spacing, typography, button styles
+   - Forms: labels, error states, disabled states, loading states
+3) Responsiveness:
+   - Check common breakpoints
+   - Ensure no horizontal scroll due to overflow
+   - Ensure long text wraps nicely
+4) Accessibility basics:
+   - Inputs have labels/aria where needed
+   - Focus states visible
+   - Modals trap focus
+   - Tooltips don’t break keyboard navigation
+
+PHASE 4 — HELP MENU + TOOLTIP/HOVER DESCRIPTIONS
+Goal: help content is current and tooltips work everywhere they should.
+1) Help menu:
+   - Verify it opens from every page where it’s expected.
+   - Content must reflect current features/pages (no outdated steps).
+   - Links must work (no dead anchors/routes).
+2) Tooltips / hover descriptions:
+   - Inventory tooltip usage: locate where tooltips are defined and where they are missing.
+   - Ensure consistency: one tooltip component, consistent trigger area, delays, placement.
+   - Confirm tooltips appear on the intended controls and not on random elements.
+   - Fix any broken hover states caused by z-index/overflow containers.
+
+PHASE 5 — DICTATION (MICROPHONE) ON MAJOR TEXT BOXES
+Goal: every major input has mic dictation.
+1) Find the existing dictation implementation and component patterns (mic button, speech-to-text hook, permissions).
+2) Identify all “major text boxes” across the app.
+3) For each missing mic:
+   - Add the mic control using the EXISTING pattern/component.
+   - Ensure it works on desktop + mobile where supported.
+   - Handle permission denied gracefully (clear message, no crash).
+4) Keep UI consistent (icon placement, spacing, tooltips like “Click to диктate” or similar).
+
+PHASE 6 — ELEVENLABS PLAYBACK ON MAJOR RESPONSES
+Goal: every major output supports audio playback.
+1) Find the existing ElevenLabs TTS wiring and UI controls (play/pause, loading, error states).
+2) Identify all “major responses” across the app.
+3) For each missing playback:
+   - Add the playback control using the EXISTING pattern/component.
+   - Ensure API usage is consistent: env var key handling, server-side proxy if required, avoid exposing secrets client-side.
+   - Add graceful error handling (rate limit, missing key, network error).
+4) UX requirements:
+   - Playback button visible and consistent.
+   - Loading state during audio generation.
+   - User can stop/pause.
+   - Doesn’t block the UI or break scrolling.
+
+PHASE 7 — PERFORMANCE & PRODUCTION HARDENING (LIGHT TOUCH)
+Goal: remove obvious production blockers without changing product behavior.
+1) Check:
+   - Console spam
+   - Unnecessary re-renders or runaway intervals/timeouts
+   - Large images or layout thrash causing jank
+2) Security basics:
+   - Ensure no API keys are exposed in client bundles.
+   - Ensure environment variables are used correctly.
+   - Validate any user-provided HTML/markdown rendering is sanitized (if present).
+
+TESTING REQUIREMENTS (MUST DO)
+- Confirm: build passes, typecheck passes, app runs, no critical console errors.
+- For core flows: run through at least one full happy path for each major workflow.
+- Validate dictation + ElevenLabs playback on at least 3 representative pages each, then confirm coverage across all major inputs/outputs.
+
+DELIVERABLES (OUTPUT FORMAT)
+When finished, provide:
+
+1) “Production Readiness Report”
+   - Summary: what you checked, overall status.
+   - Fixed Issues (bullet list): include file paths and what changed.
+   - Remaining Issues (bullet list): ONLY if truly blocked by missing secrets/keys/unknown requirements; include exact reproduction steps.
+   - UX/UI Improvements: what changed and why it was necessary (no opinion-only changes).
+   - Dictation Coverage: list of major inputs and confirmation they have mic controls.
+   - ElevenLabs Coverage: list of major outputs and confirmation they have playback controls.
+   - Help/Tooltip Coverage: what was updated and where.
+
+2) “QA Checklist” (create or update a file like QA_CHECKLIST.md)
+   - A page-by-page checklist anyone can run in 15–30 minutes.
+
+3) “How to Run”
+   - Exact commands to install/run/build/test.
+   - Any required env vars (names only; do not print secrets).
+   - A short troubleshooting section.
+
+CHANGE DISCIPLINE
+- Make commits in logical chunks (or clearly separated diffs if commits aren’t available).
+- Avoid large sweeping rewrites.
+- Prefer fixing root causes rather than hiding errors.
+- If you find something that looks like it “should” work but the intended behavior is ambiguous, do NOT change it—document it in “Remaining Issues” with a recommended fix.
+
+NOW START:
+- First: run baseline checks (build/typecheck/dev).
+- Then proceed phase-by-phase, fixing issues as you go.
+- End with the report + QA checklist + run instructions.
