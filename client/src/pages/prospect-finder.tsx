@@ -554,8 +554,8 @@ export default function ProspectFinderPage() {
       </Sheet>
 
       <Sheet open={showResults} onOpenChange={setShowResults}>
-        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
-          <SheetHeader className="mb-4">
+        <SheetContent side="bottom" className="h-[90vh] flex flex-col p-0">
+          <SheetHeader className="px-4 pt-4 pb-3 border-b flex-shrink-0 sticky top-0 bg-background z-10">
             <div className="flex items-center justify-between">
               <SheetTitle>
                 Search Results ({searchResults?.businesses.length || 0})
@@ -568,6 +568,10 @@ export default function ProspectFinderPage() {
             </div>
           </SheetHeader>
 
+          <div 
+            className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-24" 
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          >
           {searchResults?.businesses.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -577,7 +581,7 @@ export default function ProspectFinderPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3 pb-4">
+            <div className="space-y-3">
               {searchResults?.businesses.map((business) => {
                 const isClaimed = claimedBusinesses.has(business.name);
                 const isClaiming = claimingId === business.name;
@@ -772,6 +776,7 @@ export default function ProspectFinderPage() {
               })}
             </div>
           )}
+          </div>
         </SheetContent>
       </Sheet>
 
