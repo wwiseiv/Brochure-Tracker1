@@ -914,9 +914,9 @@ export default function TeamManagementPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="min-w-[180px]">Email</TableHead>
+                        <TableHead className="w-[100px]">Role</TableHead>
+                        <TableHead className="text-right w-[80px]">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -967,10 +967,10 @@ export default function TeamManagementPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
+                                <div className="flex items-center justify-end gap-1">
                                   <Button
-                                    variant="outline"
-                                    size="sm"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const inviteLink = `${window.location.origin}/accept-invite?token=${invitation.token}`;
@@ -982,8 +982,7 @@ export default function TeamManagementPage() {
                                     }}
                                     data-testid={`button-copy-link-${invitation.id}`}
                                   >
-                                    <Copy className="h-4 w-4 mr-1" />
-                                    Copy Link
+                                    <Copy className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="ghost"
