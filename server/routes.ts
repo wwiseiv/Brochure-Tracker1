@@ -6107,6 +6107,183 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
     }
   });
 
+  // ============================================================================
+  // PROPOSAL PARSE BACKGROUND JOBS API (must be before /api/proposals/:id routes)
+  // ============================================================================
+
+  // POST /api/proposals/parse-jobs - Create a new background parse job
+  app.post("/api/proposals/parse-jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { jobName, files } = req.body;
+
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ error: "files array is required" });
+      }
+
+      const membership = await storage.getUserMembership(userId);
+      const orgId = membership?.organization?.id || null;
+
+      const filePaths = files.map((f: any) => f.path);
+      const fileMimeTypes = files.map((f: any) => f.mimeType || "application/pdf");
+      const fileNames = files.map((f: any) => f.name || "file.pdf");
+
+      const job = await storage.createProposalParseJob({
+        agentId: userId,
+        organizationId: orgId,
+        jobName: jobName || `Proposal Parse ${new Date().toLocaleDateString()}`,
+        filePaths,
+        fileMimeTypes,
+        fileNames,
+        status: "pending",
+        progress: 0,
+        progressMessage: "Queued for processing",
+        retryCount: 0,
+      });
+
+      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      fetch(`${baseUrl}/api/internal/process-proposal-parse-job`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(err => {
+        console.error("[ProposalParse] Failed to trigger background processing:", err);
+      });
+
+      res.status(201).json({
+        success: true,
+        jobId: job.id,
+        status: "pending",
+        message: "Parsing started! We'll notify you when ready.",
+      });
+    } catch (error: any) {
+      console.error("[ProposalParse] Create job error:", error);
+      res.status(500).json({ error: "Failed to create parse job" });
+    }
+  });
+
+  // GET /api/proposals/parse-jobs - List user's parse jobs
+  app.get("/api/proposals/parse-jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const jobs = await storage.getProposalParseJobsByUser(userId);
+      res.json({ jobs });
+    } catch (error: any) {
+      console.error("[ProposalParse] List jobs error:", error);
+      res.status(500).json({ error: "Failed to fetch parse jobs" });
+    }
+  });
+
+  // GET /api/proposals/parse-jobs/:id - Get a single job with results
+  app.get("/api/proposals/parse-jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProposalParseJob(id);
+
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("[ProposalParse] Get job error:", error);
+      res.status(500).json({ error: "Failed to fetch parse job" });
+    }
+  });
+
+  // POST /api/proposals/parse-jobs/:id/retry - Retry a failed job
+  app.post("/api/proposals/parse-jobs/:id/retry", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProposalParseJob(id);
+
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.updateProposalParseJob(id, {
+        status: "pending",
+        errorMessage: null,
+        retryCount: (job.retryCount || 0) + 1,
+        progress: 0,
+        progressMessage: "Queued for retry",
+      });
+
+      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      fetch(`${baseUrl}/api/internal/process-proposal-parse-job`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ jobId: id }),
+      }).catch(err => {
+        console.error("[ProposalParse] Failed to trigger retry processing:", err);
+      });
+
+      res.json({
+        success: true,
+        jobId: id,
+        status: "pending",
+        message: "Retry started!",
+      });
+    } catch (error: any) {
+      console.error("[ProposalParse] Retry job error:", error);
+      res.status(500).json({ error: "Failed to retry parse job" });
+    }
+  });
+
+  // DELETE /api/proposals/parse-jobs/:id - Delete a parse job
+  app.delete("/api/proposals/parse-jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getProposalParseJob(id);
+
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteProposalParseJob(id);
+      res.json({ success: true, message: "Job deleted" });
+    } catch (error: any) {
+      console.error("[ProposalParse] Delete job error:", error);
+      res.status(500).json({ error: "Failed to delete parse job" });
+    }
+  });
+
   // Scrape merchant website for logo and business info
   app.post("/api/proposals/scrape-website", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
@@ -9937,183 +10114,6 @@ Generate the following content in JSON format:
         });
       }
     });
-  });
-
-  // ============================================================================
-  // PROPOSAL PARSE BACKGROUND JOBS API
-  // ============================================================================
-
-  // POST /api/proposals/parse-jobs - Create a new background parse job
-  app.post("/api/proposals/parse-jobs", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { jobName, files } = req.body;
-
-      if (!files || !Array.isArray(files) || files.length === 0) {
-        return res.status(400).json({ error: "files array is required" });
-      }
-
-      const membership = await storage.getUserMembership(userId);
-      const orgId = membership?.organization?.id || null;
-
-      const filePaths = files.map((f: any) => f.path);
-      const fileMimeTypes = files.map((f: any) => f.mimeType || "application/pdf");
-      const fileNames = files.map((f: any) => f.name || "file.pdf");
-
-      const job = await storage.createProposalParseJob({
-        agentId: userId,
-        organizationId: orgId,
-        jobName: jobName || `Proposal Parse ${new Date().toLocaleDateString()}`,
-        filePaths,
-        fileMimeTypes,
-        fileNames,
-        status: "pending",
-        progress: 0,
-        progressMessage: "Queued for processing",
-        retryCount: 0,
-      });
-
-      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
-      fetch(`${baseUrl}/api/internal/process-proposal-parse-job`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Internal-Secret": INTERNAL_SECRET,
-        },
-        body: JSON.stringify({ jobId: job.id }),
-      }).catch(err => {
-        console.error("[ProposalParse] Failed to trigger background processing:", err);
-      });
-
-      res.status(201).json({
-        success: true,
-        jobId: job.id,
-        status: "pending",
-        message: "Parsing started! We'll notify you when ready.",
-      });
-    } catch (error: any) {
-      console.error("[ProposalParse] Create job error:", error);
-      res.status(500).json({ error: "Failed to create parse job" });
-    }
-  });
-
-  // GET /api/proposals/parse-jobs - List user's parse jobs
-  app.get("/api/proposals/parse-jobs", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const jobs = await storage.getProposalParseJobsByUser(userId);
-      res.json({ jobs });
-    } catch (error: any) {
-      console.error("[ProposalParse] List jobs error:", error);
-      res.status(500).json({ error: "Failed to fetch parse jobs" });
-    }
-  });
-
-  // GET /api/proposals/parse-jobs/:id - Get a single job with results
-  app.get("/api/proposals/parse-jobs/:id", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const id = parseInt(req.params.id);
-
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid job ID" });
-      }
-
-      const job = await storage.getProposalParseJob(id);
-
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      if (job.agentId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      res.json(job);
-    } catch (error: any) {
-      console.error("[ProposalParse] Get job error:", error);
-      res.status(500).json({ error: "Failed to fetch parse job" });
-    }
-  });
-
-  // POST /api/proposals/parse-jobs/:id/retry - Retry a failed job
-  app.post("/api/proposals/parse-jobs/:id/retry", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const id = parseInt(req.params.id);
-
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid job ID" });
-      }
-
-      const job = await storage.getProposalParseJob(id);
-
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      if (job.agentId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      await storage.updateProposalParseJob(id, {
-        status: "pending",
-        errorMessage: null,
-        retryCount: (job.retryCount || 0) + 1,
-        progress: 0,
-        progressMessage: "Queued for retry",
-      });
-
-      const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
-      fetch(`${baseUrl}/api/internal/process-proposal-parse-job`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Internal-Secret": INTERNAL_SECRET,
-        },
-        body: JSON.stringify({ jobId: id }),
-      }).catch(err => {
-        console.error("[ProposalParse] Failed to trigger retry processing:", err);
-      });
-
-      res.json({
-        success: true,
-        jobId: id,
-        status: "pending",
-        message: "Retry started!",
-      });
-    } catch (error: any) {
-      console.error("[ProposalParse] Retry job error:", error);
-      res.status(500).json({ error: "Failed to retry parse job" });
-    }
-  });
-
-  // DELETE /api/proposals/parse-jobs/:id - Delete a parse job
-  app.delete("/api/proposals/parse-jobs/:id", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const id = parseInt(req.params.id);
-
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid job ID" });
-      }
-
-      const job = await storage.getProposalParseJob(id);
-
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      if (job.agentId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      await storage.deleteProposalParseJob(id);
-      res.json({ success: true, message: "Job deleted" });
-    } catch (error: any) {
-      console.error("[ProposalParse] Delete job error:", error);
-      res.status(500).json({ error: "Failed to delete parse job" });
-    }
   });
 
   // POST /api/internal/process-proposal-parse-job - Internal endpoint for background processing

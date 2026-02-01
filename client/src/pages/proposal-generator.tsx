@@ -2299,90 +2299,99 @@ export default function ProposalGeneratorPage() {
 
   const renderUploadStep = () => (
     <div className="space-y-6">
-      {parseJobs.length > 0 && (
-        <Card>
-          <Collapsible open={parseJobsOpen} onOpenChange={setParseJobsOpen}>
-            <CardHeader className="pb-3">
-              <CollapsibleTrigger className="flex items-center justify-between w-full" data-testid="toggle-parse-jobs">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  My Parse Jobs
-                  {parseJobs.some(j => j.status === "pending" || j.status === "processing") && (
-                    <Badge variant="secondary" className="ml-2">
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      Processing
-                    </Badge>
-                  )}
-                </CardTitle>
-                <ChevronDown className={`w-5 h-5 transition-transform ${parseJobsOpen ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-              <CardDescription>
-                View and manage your document parsing jobs
-              </CardDescription>
-            </CardHeader>
+      <Card>
+        <Collapsible open={parseJobsOpen} onOpenChange={setParseJobsOpen}>
+          <CardHeader className="pb-3">
+            <CollapsibleTrigger className="flex items-center justify-between w-full" data-testid="toggle-parse-jobs">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                My Parse Jobs
+                {parseJobs.length > 0 && parseJobs.some(j => j.status === "pending" || j.status === "processing") && (
+                  <Badge variant="secondary" className="ml-2">
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    Processing
+                  </Badge>
+                )}
+                {parseJobs.length > 0 && (
+                  <Badge variant="outline" className="ml-2">
+                    {parseJobs.length}
+                  </Badge>
+                )}
+              </CardTitle>
+              <ChevronDown className={`w-5 h-5 transition-transform ${parseJobsOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CardDescription>
+              View and manage your document parsing jobs
+            </CardDescription>
+          </CardHeader>
             <CollapsibleContent>
               <CardContent className="space-y-3">
-                {parseJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                    data-testid={`parse-job-${job.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm truncate">
-                          {job.fileNames.join(", ")}
+                {parseJobs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No parse jobs yet. Upload a PDF and click Parse to create one.
+                  </p>
+                ) : (
+                  parseJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                      data-testid={`parse-job-${job.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm truncate">
+                            {job.fileNames.join(", ")}
+                          </p>
+                          {getParseJobStatusBadge(job.status)}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(job.createdAt).toLocaleString()}
                         </p>
-                        {getParseJobStatusBadge(job.status)}
+                        {job.status === "failed" && job.errorMessage && (
+                          <p className="text-xs text-destructive mt-1">{job.errorMessage}</p>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(job.createdAt).toLocaleString()}
-                      </p>
-                      {job.status === "failed" && job.errorMessage && (
-                        <p className="text-xs text-destructive mt-1">{job.errorMessage}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      {job.status === "completed" && (
+                      <div className="flex items-center gap-1 ml-2">
+                        {job.status === "completed" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => loadParseJobResults(job)}
+                            data-testid={`button-view-results-${job.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        )}
+                        {job.status === "failed" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => retryParseJobMutation.mutate(job.id)}
+                            disabled={retryParseJobMutation.isPending}
+                            data-testid={`button-retry-${job.id}`}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-1" />
+                            Retry
+                          </Button>
+                        )}
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          onClick={() => loadParseJobResults(job)}
-                          data-testid={`button-view-results-${job.id}`}
+                          onClick={() => deleteParseJobMutation.mutate(job.id)}
+                          disabled={deleteParseJobMutation.isPending}
+                          data-testid={`button-delete-job-${job.id}`}
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
+                          <Trash2 className="w-4 h-4 text-muted-foreground" />
                         </Button>
-                      )}
-                      {job.status === "failed" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => retryParseJobMutation.mutate(job.id)}
-                          disabled={retryParseJobMutation.isPending}
-                          data-testid={`button-retry-${job.id}`}
-                        >
-                          <RefreshCw className="w-4 h-4 mr-1" />
-                          Retry
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => deleteParseJobMutation.mutate(job.id)}
-                        disabled={deleteParseJobMutation.isPending}
-                        data-testid={`button-delete-job-${job.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground" />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </CollapsibleContent>
           </Collapsible>
         </Card>
-      )}
 
       <Card>
         <Collapsible open={agentInfoOpen} onOpenChange={setAgentInfoOpen}>
