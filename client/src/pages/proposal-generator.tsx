@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -52,7 +53,10 @@ import {
   Package,
   Cpu,
   FileSpreadsheet,
-  File
+  File,
+  Trash2,
+  RefreshCw,
+  Eye
 } from "lucide-react";
 import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -217,6 +221,19 @@ interface StatementExtractedData {
   extractionNotes: string[];
 }
 
+interface ParseJob {
+  id: number;
+  agentId: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  fileNames: string[];
+  filePaths: string[];
+  parsedData: ServerParsedProposal | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
 const STATEMENT_ACCEPTED_FILE_TYPES = ".pdf,.png,.jpg,.jpeg,.gif,.xlsx,.xls,.csv";
 
 const STEP_LABELS: Record<ProposalJobStep, { label: string; icon: typeof FileText }> = {
@@ -365,9 +382,25 @@ export default function ProposalGeneratorPage() {
   const [interchangePlusIsDragging, setInterchangePlusIsDragging] = useState(false);
   const [selectedDealId, setSelectedDealId] = useState<string>("");
 
+  // Parse jobs state (for background parsing)
+  const [activeParseJobId, setActiveParseJobId] = useState<number | null>(null);
+  const [showWaitDialog, setShowWaitDialog] = useState(false);
+  const [parseJobsOpen, setParseJobsOpen] = useState(false);
+
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
+
+  const { data: parseJobsData, refetch: refetchParseJobs } = useQuery<{ jobs: ParseJob[] }>({
+    queryKey: ["/api/proposals/parse-jobs"],
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs || [];
+      const hasPendingJobs = jobs.some(job => job.status === "pending" || job.status === "processing");
+      return hasPendingJobs ? 5000 : false;
+    },
+  });
+
+  const parseJobs = parseJobsData?.jobs || [];
 
   const validateAgentInfo = () => {
     const errors: Record<string, string> = {};
@@ -453,7 +486,6 @@ export default function ProposalGeneratorPage() {
       const uploadedFileData: Array<{ path: string; mimeType: string; name: string }> = [];
       
       for (const file of files) {
-        // Request presigned upload URL
         const urlResponse = await fetch("/api/uploads/request-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -471,7 +503,6 @@ export default function ProposalGeneratorPage() {
         
         const { uploadURL, objectPath } = await urlResponse.json();
         
-        // Upload file to Object Storage
         const uploadResponse = await fetch(uploadURL, {
           method: "PUT",
           body: file,
@@ -489,8 +520,8 @@ export default function ProposalGeneratorPage() {
         });
       }
       
-      // Step 2: Parse files from Object Storage
-      const res = await fetch("/api/proposals/parse-from-storage", {
+      // Step 2: Create parse job (background parsing)
+      const res = await fetch("/api/proposals/parse-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -498,40 +529,173 @@ export default function ProposalGeneratorPage() {
       });
       
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Failed to parse PDF" }));
-        throw new Error(errorData.error || errorData.message || "Failed to parse files");
+        const errorData = await res.json().catch(() => ({ error: "Failed to create parse job" }));
+        throw new Error(errorData.error || errorData.message || "Failed to create parse job");
       }
       
       const result = await res.json();
-      return [{ data: result.data || result, fileName: files[0]?.name || "document.pdf" }];
+      return result.job as ParseJob;
     },
-    onSuccess: (results) => {
-      if (results.length > 0) {
-        const serverData = results[0].data as ServerParsedProposal;
-        const transformedData = transformParsedData(serverData);
-        setParsedData(transformedData);
-        
-        if (serverData.extractionWarnings && serverData.extractionWarnings.length > 0) {
-          setExtractionWarnings(serverData.extractionWarnings);
-        } else {
-          setExtractionWarnings([]);
-        }
-        
-        setStep("review");
-        toast({
-          title: "PDFs Parsed Successfully",
-          description: `Extracted data from ${results.length} file${results.length > 1 ? 's' : ''}`,
-        });
-      }
+    onSuccess: (job) => {
+      setActiveParseJobId(job.id);
+      setShowWaitDialog(true);
+      setUploadedFiles([]);
+      refetchParseJobs();
+      toast({
+        title: "Parsing Started",
+        description: "Your documents are being parsed in the background",
+      });
     },
     onError: (error) => {
       toast({
-        title: "Error Parsing PDF",
-        description: error instanceof Error ? error.message : "Failed to parse the PDF file",
+        title: "Error Creating Parse Job",
+        description: error instanceof Error ? error.message : "Failed to start parsing",
         variant: "destructive",
       });
     },
   });
+
+  const retryParseJobMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const res = await fetch(`/api/proposals/parse-jobs/${jobId}/retry`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to retry parse job");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      refetchParseJobs();
+      setActiveParseJobId(data.job.id);
+      setShowWaitDialog(true);
+      toast({
+        title: "Retrying Parse",
+        description: "Your documents are being parsed again",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to retry parse job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteParseJobMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const res = await fetch(`/api/proposals/parse-jobs/${jobId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete parse job");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchParseJobs();
+      toast({
+        title: "Job Deleted",
+        description: "Parse job has been deleted",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete parse job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Poll for active parse job status
+  useEffect(() => {
+    if (!activeParseJobId) return;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/proposals/parse-jobs/${activeParseJobId}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        const job = data.job as ParseJob;
+        
+        if (job.status === "completed" && job.parsedData) {
+          clearInterval(pollInterval);
+          const transformedData = transformParsedData(job.parsedData);
+          setParsedData(transformedData);
+          
+          if (job.parsedData.extractionWarnings && job.parsedData.extractionWarnings.length > 0) {
+            setExtractionWarnings(job.parsedData.extractionWarnings);
+          } else {
+            setExtractionWarnings([]);
+          }
+          
+          setActiveParseJobId(null);
+          setShowWaitDialog(false);
+          setStep("review");
+          refetchParseJobs();
+          toast({
+            title: "Parsing Complete",
+            description: "Your documents have been parsed successfully",
+          });
+        } else if (job.status === "failed") {
+          clearInterval(pollInterval);
+          setActiveParseJobId(null);
+          setShowWaitDialog(false);
+          refetchParseJobs();
+          toast({
+            title: "Parsing Failed",
+            description: job.errorMessage || "Failed to parse documents",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error polling parse job:", error);
+      }
+    }, 3000);
+    
+    return () => clearInterval(pollInterval);
+  }, [activeParseJobId, refetchParseJobs]);
+
+  const loadParseJobResults = (job: ParseJob) => {
+    if (job.status !== "completed" || !job.parsedData) return;
+    
+    const transformedData = transformParsedData(job.parsedData);
+    setParsedData(transformedData);
+    
+    if (job.parsedData.extractionWarnings && job.parsedData.extractionWarnings.length > 0) {
+      setExtractionWarnings(job.parsedData.extractionWarnings);
+    } else {
+      setExtractionWarnings([]);
+    }
+    
+    setStep("review");
+    toast({
+      title: "Results Loaded",
+      description: "Parse results have been loaded",
+    });
+  };
+
+  const getParseJobStatusBadge = (status: ParseJob["status"]) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="secondary">Pending</Badge>;
+      case "processing":
+        return <Badge variant="secondary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</Badge>;
+      case "completed":
+        return <Badge variant="default">Completed</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
+    }
+  };
+
+  const activeJob = parseJobs.find(j => j.id === activeParseJobId);
 
   const generateMutation = useMutation({
     mutationFn: async (data: { 
@@ -2135,6 +2299,91 @@ export default function ProposalGeneratorPage() {
 
   const renderUploadStep = () => (
     <div className="space-y-6">
+      {parseJobs.length > 0 && (
+        <Card>
+          <Collapsible open={parseJobsOpen} onOpenChange={setParseJobsOpen}>
+            <CardHeader className="pb-3">
+              <CollapsibleTrigger className="flex items-center justify-between w-full" data-testid="toggle-parse-jobs">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  My Parse Jobs
+                  {parseJobs.some(j => j.status === "pending" || j.status === "processing") && (
+                    <Badge variant="secondary" className="ml-2">
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Processing
+                    </Badge>
+                  )}
+                </CardTitle>
+                <ChevronDown className={`w-5 h-5 transition-transform ${parseJobsOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CardDescription>
+                View and manage your document parsing jobs
+              </CardDescription>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-3">
+                {parseJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    data-testid={`parse-job-${job.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm truncate">
+                          {job.fileNames.join(", ")}
+                        </p>
+                        {getParseJobStatusBadge(job.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(job.createdAt).toLocaleString()}
+                      </p>
+                      {job.status === "failed" && job.errorMessage && (
+                        <p className="text-xs text-destructive mt-1">{job.errorMessage}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      {job.status === "completed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => loadParseJobResults(job)}
+                          data-testid={`button-view-results-${job.id}`}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      )}
+                      {job.status === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => retryParseJobMutation.mutate(job.id)}
+                          disabled={retryParseJobMutation.isPending}
+                          data-testid={`button-retry-${job.id}`}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                          Retry
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteParseJobMutation.mutate(job.id)}
+                        disabled={deleteParseJobMutation.isPending}
+                        data-testid={`button-delete-job-${job.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      )}
+
       <Card>
         <Collapsible open={agentInfoOpen} onOpenChange={setAgentInfoOpen}>
           <CardHeader className="pb-3">
@@ -3403,6 +3652,64 @@ export default function ProposalGeneratorPage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={showWaitDialog} onOpenChange={setShowWaitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              Parsing Documents
+            </DialogTitle>
+            <DialogDescription>
+              Your documents are being parsed in the background. You can wait here or navigate away and come back later.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {activeJob && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{activeJob.fileNames.join(", ")}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Started: {new Date(activeJob.createdAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  {getParseJobStatusBadge(activeJob.status)}
+                </div>
+                
+                {(activeJob.status === "pending" || activeJob.status === "processing") && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {activeJob.status === "pending" ? "Waiting to start..." : "Processing your documents..."}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowWaitDialog(false);
+                setActiveParseJobId(null);
+              }}
+              data-testid="button-navigate-away"
+            >
+              Navigate Away
+            </Button>
+            <Button
+              onClick={() => {}}
+              disabled
+              data-testid="button-wait-here"
+            >
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Waiting...
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BottomNav />
     </div>
