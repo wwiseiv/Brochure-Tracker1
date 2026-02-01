@@ -35,7 +35,10 @@ import {
   Clock,
   CheckCircle2,
   BookmarkPlus,
-  BookmarkCheck
+  BookmarkCheck,
+  Heart,
+  CreditCard,
+  DollarSign
 } from "lucide-react";
 import type { MarketingTemplate, OrganizationMember } from "@shared/schema";
 
@@ -59,8 +62,11 @@ const INDUSTRY_LABELS: Record<string, { label: string; icon: React.ReactNode }> 
   rock_gravel: { label: "Rock & Gravel", icon: <Building2 className="w-4 h-4" /> },
   b2b_level23: { label: "B2B / Level 2&3", icon: <Building2 className="w-4 h-4" /> },
   pos_hotsauce: { label: "HotSauce POS", icon: <FileText className="w-4 h-4" /> },
-  merchant_cash_advance: { label: "Cash Advance", icon: <Building2 className="w-4 h-4" /> },
+  merchant_cash_advance: { label: "Cash Advance", icon: <DollarSign className="w-4 h-4" /> },
   general: { label: "General", icon: <FileText className="w-4 h-4" /> },
+  traditional: { label: "Traditional Processing", icon: <CreditCard className="w-4 h-4" /> },
+  dual_pricing: { label: "Dual Pricing", icon: <CreditCard className="w-4 h-4" /> },
+  charity: { label: "Charity & Community", icon: <Heart className="w-4 h-4" /> },
 };
 
 const MARKETING_INDUSTRIES = Object.keys(INDUSTRY_LABELS);
@@ -82,6 +88,7 @@ interface FlyerGenerationJob {
 }
 
 const STATIC_TEMPLATES: MarketingTemplateData[] = [
+  // Industry-Specific Flyers
   { id: 1, name: "Liquor Stores Dual Pricing", description: "Perfect for liquor stores looking to eliminate processing fees", industry: "liquor_stores", thumbnailUrl: "/marketing/liquor-stores.png", pdfUrl: "/marketing/liquor-stores.pdf" },
   { id: 2, name: "Restaurants & Bars", description: "For restaurants and bars ready to save on credit card fees", industry: "restaurants_bars", thumbnailUrl: "/marketing/restaurants-bars.png" },
   { id: 3, name: "Pizzerias", description: "Tailored messaging for pizzerias and delivery businesses", industry: "pizzerias", thumbnailUrl: "/marketing/pizzerias.png" },
@@ -92,8 +99,24 @@ const STATIC_TEMPLATES: MarketingTemplateData[] = [
   { id: 8, name: "Rock & Gravel Businesses", description: "For construction materials and aggregate suppliers", industry: "rock_gravel", thumbnailUrl: "/marketing/rock-gravel.png" },
   { id: 9, name: "Level 2 & 3 Processing (B2B)", description: "Lower rates for businesses accepting corporate cards", industry: "b2b_level23", thumbnailUrl: "/marketing/b2b-level23.png" },
   { id: 10, name: "HotSauce POS", description: "Restaurant POS system with dual pricing built-in", industry: "pos_hotsauce", thumbnailUrl: "/marketing/hotsauce-pos.png" },
+  
+  // Funding & Cash Advance
   { id: 11, name: "Merchant Cash Advance", description: "Fast funding for business owners", industry: "merchant_cash_advance", thumbnailUrl: "/marketing/cash-advance.png" },
-  { id: 12, name: "Who is PCBancard?", description: "General company overview flyer", industry: "general", thumbnailUrl: "/marketing/pcbancard-intro.png" },
+  { id: 12, name: "Cash Advance - Detailed", description: "Get $50K or more in days - step by step guide", industry: "merchant_cash_advance", thumbnailUrl: "/marketing/cash-advance-detail.png" },
+  
+  // Company Overview & General
+  { id: 13, name: "Who is PCBancard?", description: "General company overview flyer", industry: "general", thumbnailUrl: "/marketing/pcbancard-intro.png" },
+  { id: 14, name: "Services & Programs", description: "Complete list of PCBancard services and programs", industry: "general", thumbnailUrl: "/marketing/services-programs.png" },
+  
+  // Processing Programs
+  { id: 15, name: "Traditional Processing", description: "Benefits of traditional credit card processing", industry: "traditional", thumbnailUrl: "/marketing/traditional-processing.png" },
+  { id: 16, name: "Dual Pricing Overview", description: "6 key benefits of the Dual Pricing Program", industry: "dual_pricing", thumbnailUrl: "/marketing/dual-pricing-overview.png" },
+  { id: 17, name: "Dual Pricing Terminal Demo", description: "How Dual Pricing looks on a $100 transaction", industry: "dual_pricing", thumbnailUrl: "/marketing/dual-pricing-terminal.png" },
+  { id: 18, name: "Dual Pricing Statement", description: "Sample statement showing only $64.95 monthly fee", industry: "dual_pricing", thumbnailUrl: "/marketing/dual-pricing-statement.png" },
+  
+  // Charity & Community
+  { id: 19, name: "Charity Giveback Program", description: "How merchants give back to local charities through processing", industry: "charity", thumbnailUrl: "/marketing/charity-program.png" },
+  { id: 20, name: "Coastal Bend Community Impact", description: "Over $33,000 given to local charities since 2022", industry: "charity", thumbnailUrl: "/marketing/charity-giveback.jpg" },
 ];
 
 export default function MarketingMaterialsPage() {
