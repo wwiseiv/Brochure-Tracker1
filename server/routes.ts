@@ -8455,10 +8455,19 @@ Generate the following content in JSON format:
       const membership = req.orgMembership as OrgMembershipInfo;
       const orgId = membership.organization.id;
 
+      // Sanitize numeric fields - convert empty strings to undefined
+      const sanitizedBody = { ...req.body };
+      const numericFields = ['estimatedMonthlyVolume', 'estimatedCommission', 'dealProbability', 'maxFollowUpAttempts', 'followUpAttemptCount'];
+      for (const field of numericFields) {
+        if (sanitizedBody[field] === '' || sanitizedBody[field] === null) {
+          delete sanitizedBody[field];
+        }
+      }
+
       const parsed = insertDealSchema.safeParse({
-        ...req.body,
+        ...sanitizedBody,
         organizationId: orgId,
-        assignedAgentId: req.body.assignedAgentId || userId,
+        assignedAgentId: sanitizedBody.assignedAgentId || userId,
         createdBy: userId,
         updatedBy: userId,
       });
