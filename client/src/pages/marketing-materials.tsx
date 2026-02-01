@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   ArrowLeft, 
   Sparkles, 
@@ -26,7 +29,11 @@ import {
   Building2,
   Loader2,
   Check,
-  Search
+  Search,
+  Wand2,
+  AlertCircle,
+  Clock,
+  CheckCircle2
 } from "lucide-react";
 import type { MarketingTemplate, OrganizationMember } from "@shared/schema";
 
@@ -53,6 +60,23 @@ const INDUSTRY_LABELS: Record<string, { label: string; icon: React.ReactNode }> 
   merchant_cash_advance: { label: "Cash Advance", icon: <Building2 className="w-4 h-4" /> },
   general: { label: "General", icon: <FileText className="w-4 h-4" /> },
 };
+
+const MARKETING_INDUSTRIES = Object.keys(INDUSTRY_LABELS);
+
+interface FlyerGenerationJob {
+  jobId: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  content?: {
+    headline: string;
+    subhead: string;
+    bullets: string[];
+    ctaText: string;
+    ctaSubtext?: string;
+  };
+  heroImageUrl?: string;
+  finalFlyerUrl?: string;
+  errorMessage?: string;
+}
 
 const STATIC_TEMPLATES: MarketingTemplateData[] = [
   { id: 1, name: "Liquor Stores Dual Pricing", description: "Perfect for liquor stores looking to eliminate processing fees", industry: "liquor_stores", thumbnailUrl: "/marketing/liquor-stores.png", pdfUrl: "/marketing/liquor-stores.pdf" },
@@ -82,9 +106,154 @@ export default function MarketingMaterialsPage() {
   const [repPhone, setRepPhone] = useState("");
   const [repEmail, setRepEmail] = useState("");
 
+  const [generateSheetOpen, setGenerateSheetOpen] = useState(false);
+  const [genIndustry, setGenIndustry] = useState<string>("");
+  const [genPrompt, setGenPrompt] = useState("");
+  const [genRepName, setGenRepName] = useState("");
+  const [genRepPhone, setGenRepPhone] = useState("");
+  const [genRepEmail, setGenRepEmail] = useState("");
+  const [isPolling, setIsPolling] = useState(false);
+  const [lastCompletedJobId, setLastCompletedJobId] = useState<number | null>(null);
+
   const { data: memberInfo } = useQuery<OrganizationMember>({
     queryKey: ["/api/me/member"],
   });
+
+  const { data: generationJobs = [], refetch: refetchJobs } = useQuery<FlyerGenerationJob[]>({
+    queryKey: ["/api/marketing/jobs"],
+    refetchInterval: isPolling ? 3000 : false,
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async (data: { 
+      industry: string; 
+      prompt: string; 
+      repName: string; 
+      repPhone: string; 
+      repEmail: string; 
+    }) => {
+      const response = await apiRequest("POST", "/api/marketing/generate", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Generation started!",
+        description: "Your custom flyer is being created. This may take 30-60 seconds.",
+      });
+      setGenerateSheetOpen(false);
+      setGenPrompt("");
+      setGenIndustry("");
+      setIsPolling(true);
+      refetchJobs();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Generation failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (isPolling && generationJobs.length > 0) {
+      const hasActiveJobs = generationJobs.some(
+        job => job.status === 'pending' || job.status === 'processing'
+      );
+      
+      if (!hasActiveJobs) {
+        setIsPolling(false);
+      }
+
+      const newlyCompletedJob = generationJobs.find(
+        job => job.status === 'completed' && job.jobId !== lastCompletedJobId
+      );
+      if (newlyCompletedJob && lastCompletedJobId !== newlyCompletedJob.jobId) {
+        setLastCompletedJobId(newlyCompletedJob.jobId);
+        toast({
+          title: "Flyer ready!",
+          description: "Your custom flyer has been generated successfully.",
+        });
+      }
+    }
+  }, [generationJobs, isPolling, lastCompletedJobId, toast]);
+
+  const openGenerateSheet = () => {
+    if (memberInfo) {
+      setGenRepName(`${memberInfo.firstName || ""} ${memberInfo.lastName || ""}`.trim());
+      setGenRepPhone(memberInfo.phone || "");
+      setGenRepEmail(memberInfo.email || "");
+    }
+    setGenerateSheetOpen(true);
+  };
+
+  const handleGenerateSubmit = () => {
+    if (!genPrompt.trim()) {
+      toast({
+        title: "Prompt required",
+        description: "Please describe the flyer you want to create.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    generateMutation.mutate({
+      industry: genIndustry,
+      prompt: genPrompt.trim(),
+      repName: genRepName,
+      repPhone: genRepPhone,
+      repEmail: genRepEmail,
+    });
+  };
+
+  const handleDownloadGeneratedFlyer = (job: FlyerGenerationJob) => {
+    if (!job.finalFlyerUrl) return;
+    
+    const link = document.createElement("a");
+    link.href = job.finalFlyerUrl;
+    link.download = `custom-flyer-${job.jobId}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Download Started",
+      description: "Your custom flyer is being downloaded.",
+    });
+  };
+
+  const getJobStatusBadge = (status: FlyerGenerationJob['status']) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <Badge variant="secondary" className="gap-1" data-testid="badge-status-pending">
+            <Clock className="w-3 h-3" />
+            Pending
+          </Badge>
+        );
+      case 'processing':
+        return (
+          <Badge variant="secondary" className="gap-1" data-testid="badge-status-processing">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Processing
+          </Badge>
+        );
+      case 'completed':
+        return (
+          <Badge variant="default" className="gap-1 bg-green-600" data-testid="badge-status-completed">
+            <CheckCircle2 className="w-3 h-3" />
+            Completed
+          </Badge>
+        );
+      case 'failed':
+        return (
+          <Badge variant="destructive" className="gap-1" data-testid="badge-status-failed">
+            <AlertCircle className="w-3 h-3" />
+            Failed
+          </Badge>
+        );
+    }
+  };
 
   const templates = STATIC_TEMPLATES;
 
@@ -159,10 +328,20 @@ ${repEmail}`;
       </header>
 
       <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <section>
+        <section className="space-y-4">
           <p className="text-muted-foreground">
             Select a professional flyer template to share with prospects. Download and personalize with your contact info.
           </p>
+          
+          <Button 
+            size="lg"
+            className="w-full gap-2"
+            onClick={openGenerateSheet}
+            data-testid="button-create-with-ai"
+          >
+            <Wand2 className="w-5 h-5" />
+            Create with AI
+          </Button>
         </section>
 
         <div className="flex flex-col gap-4">
@@ -242,6 +421,80 @@ ${repEmail}`;
               Try adjusting your search or filter.
             </p>
           </div>
+        )}
+
+        {generationJobs.length > 0 && (
+          <section className="space-y-4" data-testid="section-my-generated-flyers">
+            <h2 className="text-lg font-semibold flex items-center gap-2" data-testid="heading-my-generated-flyers">
+              <Wand2 className="w-5 h-5 text-primary" />
+              My Generated Flyers
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {generationJobs.map((job) => (
+                <Card key={job.jobId} className="p-4 space-y-3" data-testid={`job-card-${job.jobId}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate" data-testid={`job-title-${job.jobId}`}>
+                      Flyer #{job.jobId}
+                    </span>
+                    {getJobStatusBadge(job.status)}
+                  </div>
+
+                  {job.status === 'processing' && (
+                    <div className="flex items-center gap-3 py-4" data-testid={`job-processing-${job.jobId}`}>
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      <div className="text-sm text-muted-foreground">
+                        Generating your custom flyer...
+                        <br />
+                        <span className="text-xs">This may take 30-60 seconds</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {job.status === 'pending' && (
+                    <div className="flex items-center gap-3 py-4" data-testid={`job-pending-${job.jobId}`}>
+                      <Clock className="w-6 h-6 text-muted-foreground" />
+                      <div className="text-sm text-muted-foreground">
+                        Waiting to start...
+                      </div>
+                    </div>
+                  )}
+
+                  {job.status === 'completed' && job.finalFlyerUrl && (
+                    <div className="space-y-3">
+                      <div 
+                        className="aspect-[3/4] rounded-md overflow-hidden bg-muted border"
+                        data-testid={`job-thumbnail-container-${job.jobId}`}
+                      >
+                        <img
+                          src={job.finalFlyerUrl}
+                          alt={`Generated Flyer #${job.jobId}`}
+                          className="w-full h-full object-cover"
+                          data-testid={`job-thumbnail-${job.jobId}`}
+                        />
+                      </div>
+                      <Button
+                        className="w-full gap-2"
+                        onClick={() => handleDownloadGeneratedFlyer(job)}
+                        data-testid={`button-download-job-${job.jobId}`}
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                    </div>
+                  )}
+
+                  {job.status === 'failed' && (
+                    <div className="flex items-start gap-3 py-2 text-destructive" data-testid={`job-failed-${job.jobId}`}>
+                      <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        {job.errorMessage || "Generation failed. Please try again."}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </section>
         )}
       </main>
 
@@ -367,6 +620,111 @@ ${repEmail}`;
                 data-testid="fullscreen-preview-image"
               />
             )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={generateSheetOpen} onOpenChange={setGenerateSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle data-testid="generate-sheet-title">
+              <span className="flex items-center gap-2">
+                <Wand2 className="w-5 h-5 text-primary" />
+                Create Custom Flyer
+              </span>
+            </SheetTitle>
+            <SheetDescription data-testid="generate-sheet-description">
+              Use AI to generate a personalized marketing flyer for any industry or business type.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="genIndustry">Industry</Label>
+              <Select value={genIndustry} onValueChange={setGenIndustry}>
+                <SelectTrigger data-testid="select-industry">
+                  <SelectValue placeholder="Select an industry (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MARKETING_INDUSTRIES.map((industry) => (
+                    <SelectItem key={industry} value={industry} data-testid={`select-industry-${industry}`}>
+                      {INDUSTRY_LABELS[industry]?.label || industry}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="genPrompt">What kind of flyer do you need?</Label>
+              <Textarea
+                id="genPrompt"
+                value={genPrompt}
+                onChange={(e) => setGenPrompt(e.target.value)}
+                placeholder="e.g., Create a flyer for marina and boat repair businesses"
+                className="min-h-[100px]"
+                data-testid="input-prompt"
+              />
+            </div>
+
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-medium text-sm">Your Contact Info</h4>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="genRepName">Your Name</Label>
+                  <Input
+                    id="genRepName"
+                    value={genRepName}
+                    onChange={(e) => setGenRepName(e.target.value)}
+                    placeholder="John Smith"
+                    data-testid="input-gen-rep-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="genRepPhone">Your Phone</Label>
+                  <Input
+                    id="genRepPhone"
+                    value={genRepPhone}
+                    onChange={(e) => setGenRepPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    data-testid="input-gen-rep-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="genRepEmail">Your Email</Label>
+                  <Input
+                    id="genRepEmail"
+                    value={genRepEmail}
+                    onChange={(e) => setGenRepEmail(e.target.value)}
+                    placeholder="john@pcbancard.com"
+                    data-testid="input-gen-rep-email"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button
+              className="w-full gap-2"
+              onClick={handleGenerateSubmit}
+              disabled={generateMutation.isPending}
+              data-testid="button-generate-flyer"
+            >
+              {generateMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  Generate Flyer
+                </>
+              )}
+            </Button>
+
+            <p className="text-xs text-muted-foreground text-center">
+              Generation takes 30-60 seconds. You'll be notified when your flyer is ready.
+            </p>
           </div>
         </SheetContent>
       </Sheet>
