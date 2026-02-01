@@ -297,6 +297,7 @@ export interface IStorage {
   getDealsByAgent(agentId: string): Promise<Deal[]>;
   getDealsByOrganization(orgId: number): Promise<Deal[]>;
   getDealsByStage(orgId: number, stage: PipelineStage): Promise<Deal[]>;
+  getDealsByMerchantId(merchantId: number): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: number, data: Partial<Deal>): Promise<Deal | undefined>;
   changeDealStage(id: number, newStage: PipelineStage, agentId: string, reason?: string): Promise<Deal | undefined>;
@@ -2020,6 +2021,15 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(deals.organizationId, orgId),
         eq(deals.currentStage, stage),
+        eq(deals.archived, false)
+      ))
+      .orderBy(desc(deals.updatedAt));
+  }
+
+  async getDealsByMerchantId(merchantId: number): Promise<Deal[]> {
+    return db.select().from(deals)
+      .where(and(
+        eq(deals.merchantId, merchantId),
         eq(deals.archived, false)
       ))
       .orderBy(desc(deals.updatedAt));

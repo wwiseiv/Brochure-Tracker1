@@ -566,6 +566,43 @@ export async function registerRoutes(
             totalDrops: (merchant.totalDrops || 0) + 1,
             lastVisitAt: new Date(),
           });
+          
+          // Auto-create deal in pipeline if not already exists for this merchant
+          const existingDeals = await storage.getDealsByMerchantId(merchant.id);
+          if (existingDeals.length === 0) {
+            // Create a new deal in prospect stage (can be configured via drop.pipelineStage)
+            const initialStage = (drop as any).pipelineStage || "prospect";
+            const deal = await storage.createDeal({
+              organizationId: orgId,
+              businessName: merchant.businessName,
+              businessAddress: merchant.address || undefined,
+              businessPhone: merchant.businessPhone || undefined,
+              contactName: merchant.contactName || undefined,
+              businessType: merchant.businessType || undefined,
+              merchantId: merchant.id,
+              currentStage: initialStage,
+              temperature: "warm",
+              assignedAgentId: userId,
+              sourceType: "brochure_drop",
+              sourceDetails: `Brochure drop ID: ${drop.id}`,
+            });
+            
+            // Create activity for the deal
+            await storage.createDealActivity({
+              dealId: deal.id,
+              activityType: "brochure_drop",
+              description: `Brochure dropped at location. Brochure ID: ${drop.brochureId || 'N/A'}`,
+              performedBy: userId,
+            });
+          } else {
+            // Add brochure drop activity to existing deal
+            await storage.createDealActivity({
+              dealId: existingDeals[0].id,
+              activityType: "brochure_drop",
+              description: `Additional brochure dropped. Brochure ID: ${drop.brochureId || 'N/A'}`,
+              performedBy: userId,
+            });
+          }
         } catch (e) {
           console.error("Error linking drop to merchant:", e);
         }

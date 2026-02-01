@@ -1014,13 +1014,27 @@ export default function DealPipelinePage() {
           {selectedDeal && (
             <div className="flex flex-col h-full">
               <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
-                <SheetTitle className="flex items-center gap-2">
-                  {selectedDeal.businessName}
-                  {renderTemperatureBadge(selectedDeal.temperature)}
-                </SheetTitle>
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setSelectedDeal(null)}
+                    className="flex-shrink-0"
+                    data-testid="button-close-deal-sheet"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  <SheetTitle className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="truncate">{selectedDeal.businessName}</span>
+                    {renderTemperatureBadge(selectedDeal.temperature)}
+                  </SheetTitle>
+                </div>
               </SheetHeader>
 
-              <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div 
+                className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-24 space-y-6" 
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+              >
                 <div className="flex gap-2 flex-wrap">
                   {selectedDeal.businessPhone && (
                     <Button
