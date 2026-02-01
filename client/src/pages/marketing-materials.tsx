@@ -441,10 +441,16 @@ export default function MarketingMaterialsPage() {
 
   const handleSelectTemplate = (template: MarketingTemplateData) => {
     setSelectedTemplate(template);
+    // Auto-populate from member info or user profile as fallback
     if (memberInfo) {
       setRepName(`${memberInfo.firstName || ""} ${memberInfo.lastName || ""}`.trim());
       setRepPhone(memberInfo.phone || "");
       setRepEmail(memberInfo.email || "");
+    } else if (user) {
+      // Fallback to user data if memberInfo isn't available
+      setRepName(`${user.firstName || ""} ${user.lastName || ""}`.trim());
+      setRepPhone("");
+      setRepEmail(user.email || "");
     }
     setSheetOpen(true);
   };
@@ -542,7 +548,7 @@ ${repEmail}`;
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 overflow-y-auto">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
           <Tooltip delayDuration={700}>
@@ -805,7 +811,7 @@ ${repEmail}`;
       </main>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto max-h-[100dvh]">
           <SheetHeader>
             <SheetTitle data-testid="sheet-title">{selectedTemplate?.name}</SheetTitle>
             <SheetDescription data-testid="sheet-description">{selectedTemplate?.description}</SheetDescription>
@@ -954,7 +960,7 @@ ${repEmail}`;
       </Sheet>
 
       <Sheet open={generateSheetOpen} onOpenChange={setGenerateSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto max-h-[100dvh]">
           <SheetHeader>
             <SheetTitle data-testid="generate-sheet-title">
               <span className="flex items-center gap-2">
