@@ -2373,9 +2373,9 @@ export default function ProposalGeneratorPage() {
                           </p>
                           {getParseJobStatusBadge(job.status)}
                         </div>
-                        {job.status === "completed" && job.parsedData?.classifications && (
+                        {job.status === "completed" && (job.parsedData as any)?.classifications && (
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {(job.parsedData.classifications as Array<{name: string; type: string; confidence: number}>)?.map((c, i) => (
+                            {((job.parsedData as any).classifications as Array<{name: string; type: string; confidence: number}>)?.map((c, i) => (
                               <div key={i} className="flex items-center gap-1">
                                 {getDocumentTypeBadge(c.type)}
                               </div>
@@ -2384,8 +2384,8 @@ export default function ProposalGeneratorPage() {
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(job.createdAt).toLocaleString()}
-                          {job.status === "completed" && job.parsedData?.confidence && (
-                            <span className="ml-2">({job.parsedData.confidence}% confidence)</span>
+                          {job.status === "completed" && (job.parsedData as any)?.confidence && (
+                            <span className="ml-2">({(job.parsedData as any).confidence}% confidence)</span>
                           )}
                         </p>
                         {job.status === "failed" && job.errorMessage && (

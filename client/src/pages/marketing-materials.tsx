@@ -747,7 +747,7 @@ ${repEmail}`;
                       className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteTemplateClick(template.id, template.isStatic);
+                        handleDeleteTemplateClick(template.id, template.isStatic ?? false);
                       }}
                       data-testid={`button-delete-template-${template.id}`}
                     >

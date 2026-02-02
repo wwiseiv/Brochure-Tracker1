@@ -1,0 +1,114 @@
+You are an expert senior full-stack engineer + QA lead + debugger.
+
+CONTEXT
+This app used to work, but after recent updates, many links/workflows are randomly broken. I need you to do a comprehensive “system integrity” pass: verify navigation, verify all key flows end-to-end, identify root causes (not guesses), and implement durable fixes. Do NOT redesign or change product behavior; only fix broken routing, UI wiring, API calls, state handling, and regressions. Prefer minimal changes with maximum stability.
+
+PRIMARY SYMPTOMS (MUST FIX)
+1) Navigation is inconsistent/broken:
+   - Hamburger menu links: some routes don’t go where expected / dead clicks / wrong paths
+   - Bottom menu bar links: same issue
+   - Links throughout the app: some now broken due to route/file renames, refactors, or moved pages
+
+2) AI Marketing Image generation:
+   - When I create an AI marketing image it navigates to a blank page
+   - I can’t tell if generation failed or rendering failed; either way it must display results or show actionable error states
+
+3) AI Prospecting List:
+   - Used to work, now does not (determine whether backend call, auth, rate limits, parsing, or UI rendering)
+
+4) Statement Analysis:
+   - Used to work, now does not (determine break point and fix)
+
+5) Proposal:
+   - Used to work, now does not (determine break point and fix)
+
+NON-NEGOTIABLE RULES
+- Don’t change the app’s intended features or user flows.
+- Fix regressions and broken wiring; keep UX consistent.
+- Every fix must be verified by actually running the app and reproducing/fixing the issue.
+- Add guards so failures don’t appear as blank pages (loading, error states, retry).
+- If something fails due to missing env vars / API keys, detect it and show a clear developer-facing message in logs + a user-safe UI message.
+- Prefer robust, typed, explicit route definitions over scattered string routes.
+- All fixes must include logs and/or tests sufficient to prevent recurrence.
+
+DELIVERABLES
+A) A “System Integrity Report” in the repo (e.g., /docs/system-integrity-report.md) containing:
+   1. A route/link inventory (hamburger, bottom nav, in-app links) + their target paths
+   2. Which ones were broken, why, and exactly how you fixed them
+   3. For each broken feature (marketing image, prospect list, statement analysis, proposal):
+      - Repro steps
+      - Root cause
+      - Fix summary
+      - Verification steps & screenshots if possible
+
+B) Fixes implemented:
+   - Navigation must be consistent and correct everywhere
+   - All workflows must complete and show results (or show meaningful errors)
+   - No blank pages: implement a universal “ErrorBoundary / Fallback UI” and route-level loading states
+
+C) Regression prevention:
+   - Add automated checks:
+     1) Route validity test (every nav link points to a real route)
+     2) Smoke tests for key workflows (mock APIs if needed)
+   - Add runtime route validation in development mode
+
+PROCESS YOU MUST FOLLOW (DO NOT SKIP)
+1) Create a new branch: fix/system-integrity-audit
+2) Run the app locally and capture baseline behavior:
+   - Start dev server and confirm current broken states
+   - Open browser console + network tab and collect errors for each symptom
+3) Navigation Audit:
+   - Locate hamburger menu component and bottom nav component
+   - Enumerate every link item and its route/path
+   - Validate each route exists in the router config and that imports match
+   - Fix broken routes (typos, renamed files, missing exports, wrong base path, nested routes, auth guards)
+   - Standardize route constants (e.g., routes.ts) and refactor nav to use them
+4) Core Workflows Audit (end-to-end):
+   - Marketing Image generation:
+     - Trace UI action -> handler -> API call -> response -> state update -> route transition -> rendering component
+     - Fix blank page by ensuring:
+       * route exists
+       * correct params passed
+       * component renders result
+       * error/loading states included
+       * network/API failures surface clearly
+   - Prospecting List, Statement Analysis, Proposal:
+     - For each:
+       * identify entry UI
+       * trace to backend endpoint
+       * confirm request payload shape and auth headers
+       * confirm server returns expected response (or updated schema)
+       * fix any schema mismatches, parsing errors, or state bugs
+       * ensure UI renders results and doesn’t silently fail
+5) Backend/API Verification:
+   - Confirm endpoints exist and are reachable
+   - Confirm env vars are present and referenced correctly
+   - Add defensive validation for missing keys and surface clear errors
+6) Error Handling Hardening:
+   - Add global error boundary
+   - Add route-level suspense/loading
+   - Add standardized toast/alert for failures
+7) Tests:
+   - Add a route/link validation test
+   - Add smoke tests for the 4 workflows (use mocked network if needed)
+8) Final verification:
+   - Re-run the entire manual test plan:
+     * click every menu link in hamburger and bottom bar
+     * click major in-app links
+     * generate marketing image and confirm results render
+     * run prospect list, statement analysis, proposal and confirm output renders
+   - Confirm no console errors
+
+WHAT I EXPECT YOU TO OUTPUT IN THIS CHAT (AS THE AI INSIDE REPLIT)
+- A concise summary of findings
+- A checklist of fixes completed
+- A list of files changed
+- Link to /docs/system-integrity-report.md
+- Notes on any remaining risks or missing keys and how to resolve them
+
+GOAL
+When you’re done, the app should feel “tight” again:
+- every link works
+- every core feature works
+- failures never look like blank pages
+- future updates won’t silently break routing or workflows
