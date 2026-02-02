@@ -2501,14 +2501,16 @@ ${new Date().toLocaleDateString()}
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="opening">
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="opening" data-testid="tab-opening">Opening</TabsTrigger>
-                  <TabsTrigger value="questions" data-testid="tab-questions">Questions</TabsTrigger>
-                  <TabsTrigger value="dual-pricing" data-testid="tab-dual-pricing">Dual Pricing</TabsTrigger>
-                  <TabsTrigger value="ic-plus" data-testid="tab-ic-plus">IC Plus</TabsTrigger>
-                  <TabsTrigger value="objections" data-testid="tab-objections">Objections</TabsTrigger>
-                  <TabsTrigger value="closing" data-testid="tab-closing">Closing</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                  <TabsList className="inline-flex w-max sm:grid sm:w-full sm:grid-cols-6 gap-1">
+                    <TabsTrigger value="opening" data-testid="tab-opening" className="whitespace-nowrap">Opening</TabsTrigger>
+                    <TabsTrigger value="questions" data-testid="tab-questions" className="whitespace-nowrap">Questions</TabsTrigger>
+                    <TabsTrigger value="dual-pricing" data-testid="tab-dual-pricing" className="whitespace-nowrap">Dual Pricing</TabsTrigger>
+                    <TabsTrigger value="ic-plus" data-testid="tab-ic-plus" className="whitespace-nowrap">IC Plus</TabsTrigger>
+                    <TabsTrigger value="objections" data-testid="tab-objections" className="whitespace-nowrap">Objections</TabsTrigger>
+                    <TabsTrigger value="closing" data-testid="tab-closing" className="whitespace-nowrap">Closing</TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <TabsContent value="opening" className="mt-4">
                   <div className="relative">
