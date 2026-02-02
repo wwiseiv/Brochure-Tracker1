@@ -490,7 +490,7 @@ export async function executeGenerationJob(jobId: number): Promise<FlyerGenerati
       status: 'completed',
       content,
       heroImageUrl: heroImageUrl || undefined,
-      finalFlyerUrl: pngUrl || htmlUrl,
+      finalFlyerUrl: pdfUrl || htmlUrl,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

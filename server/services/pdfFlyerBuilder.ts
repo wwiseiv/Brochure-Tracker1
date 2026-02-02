@@ -44,9 +44,12 @@ async function downloadImage(url: string): Promise<Buffer | null> {
       }
 
       if (url.startsWith('/')) {
-        const localPath = path.join(process.cwd(), 'client', 'public', url);
+        const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
+        const localPath = path.join(process.cwd(), 'client', 'public', cleanUrl);
+        console.log('[PDFBuilder] Attempting to load local image from:', localPath);
         if (fs.existsSync(localPath)) {
           resolve(fs.readFileSync(localPath));
+          console.log('[PDFBuilder] Successfully loaded local image');
         } else {
           console.log('[PDFBuilder] Local image not found:', localPath);
           resolve(null);
