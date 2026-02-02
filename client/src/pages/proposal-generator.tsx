@@ -693,11 +693,28 @@ export default function ProposalGeneratorPage() {
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
       case "processing":
-        return <Badge variant="secondary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</Badge>;
+        return <Badge variant="secondary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Analyzing</Badge>;
       case "completed":
         return <Badge variant="default">Completed</Badge>;
       case "failed":
         return <Badge variant="destructive">Failed</Badge>;
+    }
+  };
+
+  const getDocumentTypeBadge = (docType: string) => {
+    switch (docType) {
+      case "processing_statement":
+        return <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">Statement</Badge>;
+      case "pricing_spreadsheet_interchange":
+        return <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">IC+ Sheet</Badge>;
+      case "pricing_spreadsheet_dual_pricing":
+        return <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800">Dual Pricing Sheet</Badge>;
+      case "pricing_spreadsheet_mixed":
+        return <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">Mixed Pricing Sheet</Badge>;
+      case "proposal_pdf":
+        return <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800">Proposal</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs">Document</Badge>;
     }
   };
 
@@ -1172,11 +1189,17 @@ export default function ProposalGeneratorPage() {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/csv",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
   ];
 
   const isValidFile = (file: File) => {
     const validType = supportedMimeTypes.includes(file.type) || 
-      /\.(pdf|doc|docx|xls|xlsx)$/i.test(file.name);
+      file.type.startsWith("image/") ||
+      /\.(pdf|doc|docx|xls|xlsx|csv|png|jpg|jpeg|gif|webp)$/i.test(file.name);
     return validType && file.size > 0;
   };
 
@@ -2350,8 +2373,20 @@ export default function ProposalGeneratorPage() {
                           </p>
                           {getParseJobStatusBadge(job.status)}
                         </div>
+                        {job.status === "completed" && job.parsedData?.classifications && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(job.parsedData.classifications as Array<{name: string; type: string; confidence: number}>)?.map((c, i) => (
+                              <div key={i} className="flex items-center gap-1">
+                                {getDocumentTypeBadge(c.type)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(job.createdAt).toLocaleString()}
+                          {job.status === "completed" && job.parsedData?.confidence && (
+                            <span className="ml-2">({job.parsedData.confidence}% confidence)</span>
+                          )}
                         </p>
                         {job.status === "failed" && job.errorMessage && (
                           <p className="text-xs text-destructive mt-1">{job.errorMessage}</p>
@@ -2652,13 +2687,27 @@ export default function ProposalGeneratorPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" />
-            Upload Pricing PDF
+            Upload Documents
           </CardTitle>
           <CardDescription>
-            Upload a Dual Pricing or Interchange Plus proposal PDF to extract merchant data and generate a professional proposal.
+            Upload statements, pricing spreadsheets, or proposal documents. AI will automatically identify the document type and extract the relevant data.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mb-2">
+            <div className="flex items-center gap-1">
+              <FileText className="w-3 h-3 text-blue-500" />
+              <span>Statements</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FileSpreadsheet className="w-3 h-3 text-green-500" />
+              <span>Pricing Sheets</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FileOutput className="w-3 h-3 text-purple-500" />
+              <span>Proposals</span>
+            </div>
+          </div>
           <div 
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
               isDragging 
@@ -2672,7 +2721,7 @@ export default function ProposalGeneratorPage() {
           >
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,image/*"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
@@ -2689,7 +2738,7 @@ export default function ProposalGeneratorPage() {
                     : "Click to upload or drag files here"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Supports PDF, Word, and Excel files
+                Supports PDF, Excel, CSV, Word, and image files
               </p>
             </label>
           </div>
@@ -2727,12 +2776,12 @@ export default function ProposalGeneratorPage() {
                 {parseMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Parsing {uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''}...
+                    Analyzing {uploadedFiles.length} document{uploadedFiles.length > 1 ? 's' : ''}...
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Parse {uploadedFiles.length} PDF{uploadedFiles.length > 1 ? 's' : ''}
+                    Analyze {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''}
                   </>
                 )}
               </Button>
@@ -2802,12 +2851,12 @@ export default function ProposalGeneratorPage() {
               {parseMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Parsing...
+                  Analyzing...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Parse {uploadedFiles.length} PDF{uploadedFiles.length > 1 ? 's' : ''} and Continue
+                  Analyze {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} and Continue
                 </>
               )}
             </Button>
