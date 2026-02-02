@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startEmailDigestCron } from "./cron";
 import { recoverStuckProspectJobs } from "./services/job-recovery";
+import path from "path";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Serve generated marketing files from client/public/marketing
+  const marketingDir = path.join(process.cwd(), 'client', 'public', 'marketing');
+  app.use('/marketing', express.static(marketingDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.pdf')) {
+        res.set('Content-Type', 'application/pdf');
+      }
+    }
+  }));
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
