@@ -285,9 +285,6 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                 <h4 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
-                  {(speakMutation.isPending || isPlaying) && (
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
-                  )}
                 </h4>
                 <ListenButton 
                   text={advice} 
