@@ -6278,8 +6278,7 @@ ${scriptText ? `Script Reference: ${scriptText}` : ""}
 
       res.status(201).json({
         success: true,
-        jobId: job.id,
-        status: "pending",
+        job: job,
         message: "Parsing started! We'll notify you when ready.",
       });
     } catch (error: any) {
