@@ -145,7 +145,7 @@ export function BottomNav() {
     >
       <div 
         ref={scrollRef}
-        className="flex items-center h-16 overflow-x-auto scrollbar-hide"
+        className="flex items-center justify-center h-16 overflow-x-auto scrollbar-hide"
         style={{
           WebkitOverflowScrolling: 'touch',
           scrollSnapType: 'x mandatory',
@@ -153,7 +153,7 @@ export function BottomNav() {
           scrollbarWidth: 'none',
         }}
       >
-        <div className="flex items-center gap-1 px-2 min-w-max">
+        <div className="flex items-center justify-center gap-1 px-2 min-w-max">
           {displayItems.map((item) => {
             const isActive = location === item.path || 
               (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
