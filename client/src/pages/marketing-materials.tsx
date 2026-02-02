@@ -818,7 +818,7 @@ ${repEmail}`;
                   )}
 
                   {job.status === 'completed' && job.finalFlyerUrl && (
-                    <div className="space-y-3">
+                    <>
                       <div 
                         className="aspect-[3/4] rounded-md overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 border flex flex-col items-center justify-center p-4"
                         data-testid={`job-thumbnail-container-${job.jobId}`}
@@ -836,7 +836,10 @@ ${repEmail}`;
                               variant="outline"
                               size="sm"
                               className="gap-1.5"
-                              onClick={() => window.open(job.finalFlyerUrl, '_blank')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(job.finalFlyerUrl, '_blank');
+                              }}
                               data-testid={`button-preview-pdf-${job.jobId}`}
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -914,7 +917,7 @@ ${repEmail}`;
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                    </div>
+                    </>
                   )}
 
                   {job.status === 'failed' && (
