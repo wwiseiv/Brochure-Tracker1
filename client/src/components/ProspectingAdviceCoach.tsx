@@ -91,15 +91,17 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     },
   });
 
-  // UseEffect to trigger TTS after advice changes - same pattern as Sales Coach
+  // UseEffect as fallback - primary TTS trigger is in getAdvice() for iOS Safari compatibility
+  // Note: Coach pattern doesn't include speakMutation.isPending in dependency array
   useEffect(() => {
-    if (autoPlayTTS && advice && advice !== lastSpokenAdvice && !isPlaying && !speakMutation.isPending) {
-      console.log("[SalesSpark TTS] Triggering auto-play for new advice");
+    // Only run if not already triggered by getAdvice (lastSpokenAdvice would already be set)
+    if (autoPlayTTS && advice && advice !== lastSpokenAdvice && !isPlaying) {
+      console.log("[SalesSpark TTS] Fallback useEffect trigger");
       setLastSpokenAdvice(advice);
       setTTSError(null);
       speakMutation.mutate(advice);
     }
-  }, [advice, autoPlayTTS, isPlaying, lastSpokenAdvice, speakMutation.isPending]);
+  }, [advice, autoPlayTTS, isPlaying, lastSpokenAdvice]);
 
   const getAdvice = async () => {
     const textToSend = transcript || input;
@@ -122,6 +124,13 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
 
       const data = await response.json();
       setAdvice(data.advice);
+      
+      // Trigger TTS directly here to maintain iOS Safari user gesture context
+      if (autoPlayTTS && data.advice) {
+        console.log("[SalesSpark TTS] Triggering TTS directly after advice received");
+        setLastSpokenAdvice(data.advice);
+        speakMutation.mutate(data.advice);
+      }
     } catch (err) {
       console.error("Error getting advice:", err);
       setError("Unable to get advice at this time. Please try again.");
