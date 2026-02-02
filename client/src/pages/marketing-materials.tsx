@@ -371,16 +371,21 @@ export default function MarketingMaterialsPage() {
   const handleDownloadGeneratedFlyer = (job: FlyerGenerationJob) => {
     if (!job.finalFlyerUrl) return;
     
+    const isPdf = job.finalFlyerUrl.endsWith('.pdf');
+    const extension = isPdf ? 'pdf' : 'png';
+    
     const link = document.createElement("a");
     link.href = job.finalFlyerUrl;
-    link.download = `custom-flyer-${job.jobId}.png`;
+    link.download = `custom-flyer-${job.jobId}.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     toast({
       title: "Download Started",
-      description: "Your custom flyer is being downloaded.",
+      description: isPdf 
+        ? "Your professional PDF flyer is being downloaded." 
+        : "Your custom flyer is being downloaded.",
     });
   };
 
@@ -725,15 +730,42 @@ ${repEmail}`;
                   {job.status === 'completed' && job.finalFlyerUrl && (
                     <div className="space-y-3">
                       <div 
-                        className="aspect-[3/4] rounded-md overflow-hidden bg-muted border"
+                        className="aspect-[3/4] rounded-md overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 border flex flex-col items-center justify-center p-4"
                         data-testid={`job-thumbnail-container-${job.jobId}`}
                       >
-                        <img
-                          src={job.finalFlyerUrl}
-                          alt={`Generated Flyer #${job.jobId}`}
-                          className="w-full h-full object-cover"
-                          data-testid={`job-thumbnail-${job.jobId}`}
-                        />
+                        {job.finalFlyerUrl.endsWith('.pdf') ? (
+                          <div className="text-center space-y-3">
+                            <FileText className="w-16 h-16 text-primary/60 mx-auto" />
+                            <div>
+                              <p className="font-semibold text-sm text-foreground">Custom Flyer Ready</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {job.content?.headline || 'Professional PDF Flyer'}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => window.open(job.finalFlyerUrl, '_blank')}
+                              data-testid={`button-preview-pdf-${job.jobId}`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              Preview PDF
+                            </Button>
+                          </div>
+                        ) : job.heroImageUrl ? (
+                          <img
+                            src={job.heroImageUrl}
+                            alt={`Generated Flyer #${job.jobId}`}
+                            className="w-full h-full object-cover"
+                            data-testid={`job-thumbnail-${job.jobId}`}
+                          />
+                        ) : (
+                          <div className="text-center space-y-3">
+                            <FileText className="w-16 h-16 text-primary/60 mx-auto" />
+                            <p className="font-semibold text-sm text-foreground">Flyer Ready</p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button
