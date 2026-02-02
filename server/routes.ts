@@ -8983,6 +8983,40 @@ Generate the following content in JSON format:
     }
   });
 
+  // GET /api/deals/by-merchant/:merchantId - Get deal by merchant ID
+  app.get("/api/deals/by-merchant/:merchantId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+
+      // Get all deals and filter by merchantId
+      let allDeals;
+      if (role === "master_admin" || role === "relationship_manager") {
+        allDeals = await storage.getDealsByOrganization(orgId);
+      } else {
+        allDeals = await storage.getDealsByAgent(userId);
+      }
+
+      const deal = allDeals.find(d => d.merchantId === merchantId);
+      
+      if (!deal) {
+        return res.json(null);
+      }
+
+      res.json(deal);
+    } catch (error: any) {
+      console.error("[Deals] Get by merchant error:", error);
+      res.status(500).json({ error: "Failed to fetch deal" });
+    }
+  });
+
   // GET /api/deals/:id - Get single deal with relations
   app.get("/api/deals/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {

@@ -63,7 +63,47 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
-import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus, MeetingRecording, VoiceNote } from "@shared/schema";
+import type { Merchant, DropWithBrochure, BusinessType, OutcomeType, DropStatus, MeetingRecording, VoiceNote, Deal } from "@shared/schema";
+import {
+  GitBranch,
+  Flame,
+  Thermometer,
+  Snowflake,
+  Presentation,
+  Calculator,
+  Send as SendIcon,
+  Wrench,
+} from "lucide-react";
+
+// Pipeline stage configuration
+const DEAL_STAGE_CONFIG: Record<string, { label: string; color: string; icon: any; phase: string }> = {
+  prospect: { label: "Prospect", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300", icon: Store, phase: "Prospecting" },
+  cold_call: { label: "Cold Call", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", icon: Phone, phase: "Prospecting" },
+  appointment_set: { label: "Appt Set", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300", icon: Calendar, phase: "Prospecting" },
+  presentation_made: { label: "Presented", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", icon: Presentation, phase: "Active Selling" },
+  proposal_sent: { label: "Proposal", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300", icon: FileText, phase: "Active Selling" },
+  statement_analysis: { label: "Analysis", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300", icon: Calculator, phase: "Active Selling" },
+  negotiating: { label: "Negotiating", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", icon: MessageSquare, phase: "Active Selling" },
+  follow_up: { label: "Follow-Up", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", icon: RefreshCw, phase: "Active Selling" },
+  documents_sent: { label: "Docs Sent", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", icon: SendIcon, phase: "Closing" },
+  documents_signed: { label: "Signed", color: "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300", icon: FileSignature, phase: "Closing" },
+  sold: { label: "Won", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300", icon: CheckCircle2, phase: "Closing" },
+  dead: { label: "Lost", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle, phase: "Closing" },
+  installation_scheduled: { label: "Install", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300", icon: Wrench, phase: "Post-Sale" },
+  active_merchant: { label: "Active", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", icon: Store, phase: "Post-Sale" },
+};
+
+const STAGE_ORDER = [
+  "prospect", "cold_call", "appointment_set", "presentation_made",
+  "proposal_sent", "statement_analysis", "negotiating", "follow_up",
+  "documents_sent", "documents_signed", "sold", "dead", "installation_scheduled", "active_merchant"
+];
+
+const TEMPERATURE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+  hot: { label: "Hot", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: Flame },
+  warm: { label: "Warm", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", icon: Thermometer },
+  cold: { label: "Cold", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", icon: Snowflake },
+};
 
 const outcomeIcons: Record<OutcomeType, typeof CheckCircle2> = {
   signed: CheckCircle2,
@@ -183,6 +223,84 @@ export default function MerchantDetailPage() {
     queryKey: ["/api/merchants", merchantId, "work"],
     enabled: !!merchantId,
   });
+
+  // Pipeline/Deal management - fetch deal linked to this merchant
+  const { data: merchantDeal, isLoading: dealLoading } = useQuery<Deal | null>({
+    queryKey: ["/api/deals/by-merchant", merchantId],
+    enabled: !!merchantId,
+  });
+
+  // Pipeline state
+  const [showAddToPipelineDialog, setShowAddToPipelineDialog] = useState(false);
+  const [showChangeStageDialog, setShowChangeStageDialog] = useState(false);
+  const [selectedStage, setSelectedStage] = useState("prospect");
+  const [selectedTemperature, setSelectedTemperature] = useState("warm");
+
+  // Create deal mutation
+  const createDealMutation = useMutation({
+    mutationFn: async (data: { businessName: string; currentStage: string; temperature: string; merchantId: number }) => {
+      const response = await apiRequest("POST", "/api/deals", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/by-merchant", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      setShowAddToPipelineDialog(false);
+      toast({
+        title: "Added to Pipeline",
+        description: `${merchant?.businessName} has been added to your pipeline.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add to pipeline",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Change stage mutation
+  const changeStageMutation = useMutation({
+    mutationFn: async ({ dealId, stage }: { dealId: number; stage: string }) => {
+      const response = await apiRequest("PATCH", `/api/deals/${dealId}/stage`, { stage });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/by-merchant", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      setShowChangeStageDialog(false);
+      toast({
+        title: "Stage Updated",
+        description: "Pipeline stage has been changed.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change stage",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddToPipeline = () => {
+    if (!merchant) return;
+    createDealMutation.mutate({
+      businessName: merchant.businessName,
+      currentStage: selectedStage,
+      temperature: selectedTemperature,
+      merchantId: parseInt(merchantId!),
+    });
+  };
+
+  const handleChangeStage = () => {
+    if (!merchantDeal) return;
+    changeStageMutation.mutate({
+      dealId: merchantDeal.id,
+      stage: selectedStage,
+    });
+  };
 
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
   
@@ -752,6 +870,96 @@ export default function MerchantDetailPage() {
             </p>
           </Card>
         )}
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Sales Pipeline</h2>
+            </div>
+            {merchantDeal && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/pipeline`)}
+                data-testid="button-view-pipeline"
+              >
+                View Pipeline
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
+          </div>
+          
+          {dealLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : merchantDeal ? (
+            <Card className="p-4" data-testid="card-pipeline-status">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    {(() => {
+                      const stageConfig = DEAL_STAGE_CONFIG[merchantDeal.currentStage] || DEAL_STAGE_CONFIG.prospect;
+                      const StageIcon = stageConfig.icon;
+                      return (
+                        <Badge className={`${stageConfig.color} gap-1`}>
+                          <StageIcon className="w-3 h-3" />
+                          {stageConfig.label}
+                        </Badge>
+                      );
+                    })()}
+                    {(() => {
+                      const tempConfig = TEMPERATURE_CONFIG[merchantDeal.temperature] || TEMPERATURE_CONFIG.warm;
+                      const TempIcon = tempConfig.icon;
+                      return (
+                        <Badge variant="outline" className="gap-1">
+                          <TempIcon className="w-3 h-3" />
+                          {tempConfig.label}
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Stage: {DEAL_STAGE_CONFIG[merchantDeal.currentStage]?.phase || "Prospecting"}
+                  </p>
+                  {merchantDeal.nextFollowUpAt && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Follow-up: {format(new Date(merchantDeal.nextFollowUpAt), "MMM d, yyyy")}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedStage(merchantDeal.currentStage);
+                    setShowChangeStageDialog(true);
+                  }}
+                  data-testid="button-change-stage"
+                >
+                  <Edit2 className="w-4 h-4 mr-1" />
+                  Change Stage
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 text-center" data-testid="card-add-to-pipeline">
+              <p className="text-muted-foreground mb-3">
+                This contact isn't in your sales pipeline yet.
+              </p>
+              <Button
+                onClick={() => {
+                  setSelectedStage("prospect");
+                  setSelectedTemperature("warm");
+                  setShowAddToPipelineDialog(true);
+                }}
+                data-testid="button-add-to-pipeline"
+              >
+                <GitBranch className="w-4 h-4 mr-2" />
+                Add to Pipeline
+              </Button>
+            </Card>
+          )}
+        </section>
 
         <section>
           <h2 className="text-lg font-semibold mb-3">Contact Info</h2>
@@ -1837,6 +2045,146 @@ export default function MerchantDetailPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddToPipelineDialog} onOpenChange={setShowAddToPipelineDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add to Sales Pipeline</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Add "{merchant.businessName}" to your sales pipeline. Select the initial stage and temperature.
+            </p>
+            
+            <div className="space-y-2">
+              <Label>Pipeline Stage</Label>
+              <Select value={selectedStage} onValueChange={setSelectedStage}>
+                <SelectTrigger data-testid="select-stage">
+                  <SelectValue placeholder="Select stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGE_ORDER.map((stage) => {
+                    const config = DEAL_STAGE_CONFIG[stage];
+                    const StageIcon = config.icon;
+                    return (
+                      <SelectItem key={stage} value={stage}>
+                        <div className="flex items-center gap-2">
+                          <StageIcon className="w-4 h-4" />
+                          <span>{config.label}</span>
+                          <span className="text-muted-foreground text-xs">({config.phase})</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Deal Temperature</Label>
+              <Select value={selectedTemperature} onValueChange={setSelectedTemperature}>
+                <SelectTrigger data-testid="select-temperature">
+                  <SelectValue placeholder="Select temperature" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TEMPERATURE_CONFIG).map(([key, config]) => {
+                    const TempIcon = config.icon;
+                    return (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <TempIcon className="w-4 h-4" />
+                          <span>{config.label}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddToPipelineDialog(false)}
+              data-testid="button-cancel-add-pipeline"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddToPipeline}
+              disabled={createDealMutation.isPending}
+              className="gap-2"
+              data-testid="button-confirm-add-pipeline"
+            >
+              {createDealMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Add to Pipeline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showChangeStageDialog} onOpenChange={setShowChangeStageDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Pipeline Stage</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Move "{merchant.businessName}" to a different stage in your pipeline.
+            </p>
+            
+            <div className="space-y-2">
+              <Label>New Stage</Label>
+              <Select value={selectedStage} onValueChange={setSelectedStage}>
+                <SelectTrigger data-testid="select-new-stage">
+                  <SelectValue placeholder="Select stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGE_ORDER.map((stage) => {
+                    const config = DEAL_STAGE_CONFIG[stage];
+                    const StageIcon = config.icon;
+                    const isCurrent = merchantDeal?.currentStage === stage;
+                    return (
+                      <SelectItem key={stage} value={stage}>
+                        <div className="flex items-center gap-2">
+                          <StageIcon className="w-4 h-4" />
+                          <span>{config.label}</span>
+                          <span className="text-muted-foreground text-xs">({config.phase})</span>
+                          {isCurrent && (
+                            <Badge variant="secondary" className="text-xs ml-1">Current</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowChangeStageDialog(false)}
+              data-testid="button-cancel-change-stage"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangeStage}
+              disabled={changeStageMutation.isPending || selectedStage === merchantDeal?.currentStage}
+              className="gap-2"
+              data-testid="button-confirm-change-stage"
+            >
+              {changeStageMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Update Stage
             </Button>
           </DialogFooter>
         </DialogContent>
