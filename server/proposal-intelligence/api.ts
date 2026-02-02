@@ -555,7 +555,7 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
       right: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
     };
 
-    const createTableCell = (text: string, options?: { bold?: boolean; color?: string; width?: number }) => {
+    const createTableCell = (text: string, options?: { bold?: boolean; color?: string; widthTwips?: number }) => {
       return new TableCell({
         children: [new Paragraph({ 
           children: [new TextRun({ 
@@ -565,7 +565,7 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
             size: 22
           })] 
         })],
-        width: options?.width ? { size: options.width, type: WidthType.PERCENTAGE } : { size: 50, type: WidthType.PERCENTAGE },
+        width: { size: options?.widthTwips || 4500, type: WidthType.DXA },
         borders: tableBorders,
         margins: { top: 50, bottom: 50, left: 100, right: 100 }
       });
@@ -598,15 +598,15 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
     );
 
     const summaryTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: 9000, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [5000, 4000],
       rows: [
-        new TableRow({ children: [createTableCell("Monthly Volume", { width: 55 }), createTableCell(formatCurrency(analysis.summary.monthlyVolume), { bold: true, width: 45 })] }),
-        new TableRow({ children: [createTableCell("Monthly Transactions", { width: 55 }), createTableCell(analysis.summary.monthlyTransactions.toLocaleString(), { bold: true, width: 45 })] }),
-        new TableRow({ children: [createTableCell("Average Ticket", { width: 55 }), createTableCell(formatCurrency(analysis.summary.averageTicket), { bold: true, width: 45 })] }),
-        new TableRow({ children: [createTableCell("Current Total Fees", { width: 55 }), createTableCell(formatCurrency(analysis.summary.currentTotalFees), { bold: true, color: "DC2626", width: 45 })] }),
-        new TableRow({ children: [createTableCell("Current Effective Rate", { width: 55 }), createTableCell(`${analysis.summary.currentEffectiveRate}%`, { bold: true, color: "DC2626", width: 45 })] })
+        new TableRow({ children: [createTableCell("Monthly Volume", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.summary.monthlyVolume), { bold: true, widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Monthly Transactions", { widthTwips: 5000 }), createTableCell(analysis.summary.monthlyTransactions.toLocaleString(), { bold: true, widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Average Ticket", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.summary.averageTicket), { bold: true, widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Current Total Fees", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.summary.currentTotalFees), { bold: true, color: "DC2626", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Current Effective Rate", { widthTwips: 5000 }), createTableCell(`${analysis.summary.currentEffectiveRate}%`, { bold: true, color: "DC2626", widthTwips: 4000 })] })
       ]
     });
     children.push(summaryTable);
@@ -620,14 +620,14 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
     );
 
     const costTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: 9000, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [5000, 4000],
       rows: [
-        new TableRow({ children: [createTableCell("True Interchange", { width: 55 }), createTableCell(formatCurrency(analysis.costAnalysis.trueInterchange), { width: 45 })] }),
-        new TableRow({ children: [createTableCell("Card Brand Assessments", { width: 55 }), createTableCell(formatCurrency(analysis.costAnalysis.trueAssessments), { width: 45 })] }),
-        new TableRow({ children: [createTableCell("True Wholesale Cost", { width: 55 }), createTableCell(formatCurrency(analysis.costAnalysis.trueWholesale), { color: "16A34A", width: 45 })] }),
-        new TableRow({ children: [createTableCell("Processor Markup", { width: 55 }), createTableCell(`${formatCurrency(analysis.costAnalysis.processorMarkup)} (${analysis.costAnalysis.processorMarkupRate}%)`, { color: "DC2626", width: 45 })] })
+        new TableRow({ children: [createTableCell("True Interchange", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.costAnalysis.trueInterchange), { widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Card Brand Assessments", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.costAnalysis.trueAssessments), { widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("True Wholesale Cost", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.costAnalysis.trueWholesale), { color: "16A34A", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Processor Markup", { widthTwips: 5000 }), createTableCell(`${formatCurrency(analysis.costAnalysis.processorMarkup)} (${analysis.costAnalysis.processorMarkupRate}%)`, { color: "DC2626", widthTwips: 4000 })] })
       ]
     });
     children.push(costTable);
@@ -645,14 +645,14 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
     );
 
     const dpTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: 9000, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [5000, 4000],
       rows: [
-        new TableRow({ children: [createTableCell("New Monthly Cost", { width: 55 }), createTableCell(formatCurrency(analysis.savings.dualPricing.monthlyCost), { width: 45 })] }),
-        new TableRow({ children: [createTableCell("Monthly Savings", { width: 55 }), createTableCell(formatCurrency(analysis.savings.dualPricing.monthlySavings), { bold: true, color: "16A34A", width: 45 })] }),
-        new TableRow({ children: [createTableCell("Annual Savings", { width: 55 }), createTableCell(formatCurrency(analysis.savings.dualPricing.annualSavings), { bold: true, color: "16A34A", width: 45 })] }),
-        new TableRow({ children: [createTableCell("New Effective Rate", { width: 55 }), createTableCell(`${analysis.savings.dualPricing.effectiveRate}%`, { width: 45 })] })
+        new TableRow({ children: [createTableCell("New Monthly Cost", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.dualPricing.monthlyCost), { widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Monthly Savings", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.dualPricing.monthlySavings), { bold: true, color: "16A34A", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Annual Savings", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.dualPricing.annualSavings), { bold: true, color: "16A34A", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("New Effective Rate", { widthTwips: 5000 }), createTableCell(`${analysis.savings.dualPricing.effectiveRate}%`, { widthTwips: 4000 })] })
       ]
     });
     children.push(dpTable);
@@ -665,14 +665,14 @@ router.post("/statement-docx", isAuthenticated, ensureOrgMembership(), async (re
     );
 
     const icpTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: 9000, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [5000, 4000],
       rows: [
-        new TableRow({ children: [createTableCell("New Monthly Cost", { width: 55 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.monthlyCost), { width: 45 })] }),
-        new TableRow({ children: [createTableCell("Monthly Savings", { width: 55 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.monthlySavings), { bold: true, color: "16A34A", width: 45 })] }),
-        new TableRow({ children: [createTableCell("Annual Savings", { width: 55 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.annualSavings), { bold: true, color: "16A34A", width: 45 })] }),
-        new TableRow({ children: [createTableCell("New Effective Rate", { width: 55 }), createTableCell(`${analysis.savings.interchangePlus.effectiveRate}%`, { width: 45 })] })
+        new TableRow({ children: [createTableCell("New Monthly Cost", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.monthlyCost), { widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Monthly Savings", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.monthlySavings), { bold: true, color: "16A34A", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("Annual Savings", { widthTwips: 5000 }), createTableCell(formatCurrency(analysis.savings.interchangePlus.annualSavings), { bold: true, color: "16A34A", widthTwips: 4000 })] }),
+        new TableRow({ children: [createTableCell("New Effective Rate", { widthTwips: 5000 }), createTableCell(`${analysis.savings.interchangePlus.effectiveRate}%`, { widthTwips: 4000 })] })
       ]
     });
     children.push(icpTable);
