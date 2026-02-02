@@ -2609,6 +2609,74 @@ ${notes ? `Notes/Context: ${notes}` : ""}`;
     }
   });
 
+  // AI Analyze Deal - generates summary and key takeaways for a deal
+  app.post("/api/ai/analyze-deal", isAuthenticated, async (req: any, res) => {
+    try {
+      const { businessName, notes, stage, temperature, followUpCount } = req.body;
+      
+      if (!businessName) {
+        return res.status(400).json({ error: "Business name is required" });
+      }
+      
+      const client = getAIIntegrationsClient();
+      
+      const systemPrompt = `You are an expert sales analyst. Analyze the provided deal information and generate insights.
+
+You MUST respond with valid JSON in this exact format:
+{
+  "sentiment": "positive" | "neutral" | "negative",
+  "summary": "A brief 2-3 sentence summary of the deal status and prospects",
+  "keyTakeaways": ["Takeaway 1", "Takeaway 2", "Takeaway 3"]
+}
+
+Consider:
+- The deal stage and what it indicates about progress
+- The temperature (hot/warm/cold) and engagement level
+- Any notes provided about the business
+- The number of follow-up attempts made`;
+
+      const userMessage = `Analyze this deal:
+Business: ${businessName}
+Stage: ${stage || "prospect"}
+Temperature: ${temperature || "warm"}
+Follow-up attempts: ${followUpCount || 0}
+Notes: ${notes || "No notes provided"}`;
+
+      const response = await client.chat.completions.create({
+        model: "claude-sonnet-4-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage }
+        ],
+        max_tokens: 1000,
+      });
+      
+      const responseContent = response.choices[0]?.message?.content || "";
+      
+      let parsedResponse;
+      try {
+        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedResponse = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON found in response");
+        }
+      } catch (parseError) {
+        console.error("Failed to parse AI response as JSON:", parseError);
+        parsedResponse = {
+          sentiment: "neutral",
+          summary: "Unable to generate summary at this time.",
+          keyTakeaways: []
+        };
+      }
+      
+      res.json(parsedResponse);
+    } catch (error) {
+      console.error("Error analyzing deal:", error);
+      res.status(500).json({ error: "Failed to analyze deal" });
+    }
+  });
+
   // AI Prospecting Advice Coach - generates actionable prospecting ideas
   // Uses training materials from Google Drive for RAG-enhanced responses
   app.post("/api/prospecting-advice", isAuthenticated, async (req: any, res) => {

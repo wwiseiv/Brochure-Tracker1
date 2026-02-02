@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DictationInput } from "@/components/DictationInput";
 import { BottomNav } from "@/components/BottomNav";
+import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RoleplayCoach } from "@/components/RoleplayCoach";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -85,6 +88,12 @@ import {
   Sparkles,
   RefreshCw,
   X,
+  Target,
+  Lightbulb,
+  AlertTriangle,
+  ListChecks,
+  Wand2,
+  GraduationCap,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Deal, DealActivity, DealAttachment } from "@shared/schema";
@@ -178,6 +187,14 @@ export default function DealPipelinePage() {
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
 
   const [showCreateDealSheet, setShowCreateDealSheet] = useState(false);
+  
+  // AI Summary and Lead Score state
+  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
+  const [isScoreOpen, setIsScoreOpen] = useState(true);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isCalculatingScore, setIsCalculatingScore] = useState(false);
+  const [dealSummary, setDealSummary] = useState<{ sentiment: string; summary: string; keyTakeaways: string[] } | null>(null);
+  const [dealScore, setDealScore] = useState<{ score: number; factors: { name: string; impact: string }[] } | null>(null);
   
   // AI Email Drafting state
   const [showEmailSheet, setShowEmailSheet] = useState(false);
@@ -369,6 +386,87 @@ export default function DealPipelinePage() {
 
   const [checkInNotes, setCheckInNotes] = useState("");
 
+  // Generate AI summary for deal
+  const handleGenerateSummary = async () => {
+    if (!selectedDeal) return;
+    setIsGeneratingSummary(true);
+    
+    try {
+      const response = await apiRequest("POST", "/api/ai/analyze-deal", {
+        businessName: selectedDeal.businessName,
+        notes: selectedDeal.notes || editingNotes,
+        stage: selectedDeal.currentStage,
+        temperature: selectedDeal.temperature,
+        followUpCount: selectedDeal.followUpAttemptCount,
+      });
+      const data = await response.json();
+      setDealSummary({
+        sentiment: data.sentiment || "neutral",
+        summary: data.summary || "No summary available.",
+        keyTakeaways: data.keyTakeaways || [],
+      });
+    } catch (error) {
+      toast({ title: "Failed to generate summary", variant: "destructive" });
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  // Calculate lead score for deal
+  const handleCalculateScore = async () => {
+    if (!selectedDeal) return;
+    setIsCalculatingScore(true);
+    
+    try {
+      // Calculate score based on deal attributes
+      let score = 50; // Base score
+      const factors: { name: string; impact: string }[] = [];
+      
+      // Temperature impact
+      if (selectedDeal.temperature === "hot") {
+        score += 20;
+        factors.push({ name: "Hot temperature", impact: "+20" });
+      } else if (selectedDeal.temperature === "warm") {
+        score += 10;
+        factors.push({ name: "Warm temperature", impact: "+10" });
+      } else {
+        factors.push({ name: "Cold temperature", impact: "+0" });
+      }
+      
+      // Stage impact
+      const advancedStages = ["presentation_made", "proposal_sent", "negotiating", "documents_sent", "documents_signed"];
+      if (advancedStages.includes(selectedDeal.currentStage)) {
+        score += 15;
+        factors.push({ name: "Advanced stage", impact: "+15" });
+      }
+      
+      // Follow-up engagement
+      if (selectedDeal.followUpAttemptCount > 0 && selectedDeal.followUpAttemptCount < 5) {
+        score += 10;
+        factors.push({ name: "Active follow-ups", impact: "+10" });
+      }
+      
+      // Has contact info
+      if (selectedDeal.businessPhone || selectedDeal.businessEmail) {
+        score += 5;
+        factors.push({ name: "Contact info available", impact: "+5" });
+      }
+      
+      // Has estimated volume
+      if (selectedDeal.estimatedMonthlyVolume) {
+        score += 5;
+        factors.push({ name: "Volume estimated", impact: "+5" });
+      }
+      
+      score = Math.min(100, Math.max(0, score));
+      setDealScore({ score, factors });
+    } catch (error) {
+      toast({ title: "Failed to calculate score", variant: "destructive" });
+    } finally {
+      setIsCalculatingScore(false);
+    }
+  };
+
   const handleRecordFollowUp = () => {
     if (!selectedDeal || !followUpMethod || !followUpOutcome) {
       toast({ title: "Please select method and outcome", variant: "destructive" });
@@ -393,6 +491,9 @@ export default function DealPipelinePage() {
     setSelectedDeal(deal);
     setEditingStage(deal.currentStage);
     setEditingNotes(deal.notes || "");
+    // Reset AI analysis state for new deal
+    setDealSummary(null);
+    setDealScore(null);
   };
 
   const handleGenerateEmail = async (type: string) => {
@@ -1251,6 +1352,193 @@ export default function DealPipelinePage() {
                     </div>
                   </div>
                 </div>
+
+                {/* AI Summary Section */}
+                <Card className="p-4">
+                  <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium text-sm">AI Summary</h4>
+                          {dealSummary && (
+                            <Badge variant="outline" className="text-xs">
+                              {dealSummary.sentiment === "positive" ? "Positive" : 
+                               dealSummary.sentiment === "negative" ? "Negative" : "Neutral"}
+                            </Badge>
+                          )}
+                        </div>
+                        {isSummaryOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      {dealSummary ? (
+                        <div className="space-y-3">
+                          <p className="text-sm text-muted-foreground">{dealSummary.summary}</p>
+                          {dealSummary.keyTakeaways.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-primary font-medium flex items-center gap-1">
+                                <Lightbulb className="w-3 h-3" /> Key Takeaways
+                              </p>
+                              <ul className="text-sm space-y-1">
+                                {dealSummary.keyTakeaways.map((point, idx) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="text-primary mt-0.5">•</span>
+                                    <span className="text-muted-foreground">{point}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={handleGenerateSummary}
+                            disabled={isGeneratingSummary}
+                          >
+                            <RefreshCw className={`w-3 h-3 mr-1 ${isGeneratingSummary ? "animate-spin" : ""}`} />
+                            Refresh
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={handleGenerateSummary}
+                          disabled={isGeneratingSummary}
+                          data-testid="button-generate-summary"
+                        >
+                          {isGeneratingSummary ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Wand2 className="w-4 h-4 mr-2" />
+                          )}
+                          Generate AI Summary
+                        </Button>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+
+                {/* Lead Score Section */}
+                <Card className="p-4">
+                  <Collapsible open={isScoreOpen} onOpenChange={setIsScoreOpen}>
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-primary" />
+                          <h4 className="font-medium text-sm">Lead Score</h4>
+                          {dealScore && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                dealScore.score >= 70 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                                dealScore.score >= 50 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
+                                "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              }`}
+                            >
+                              {dealScore.score >= 70 ? "Hot" : dealScore.score >= 50 ? "Warm" : "Cold"}
+                            </Badge>
+                          )}
+                        </div>
+                        {isScoreOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      {dealScore ? (
+                        <div className="space-y-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">Score: {dealScore.score}/100</span>
+                            </div>
+                            <Progress value={dealScore.score} className="h-2" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Scoring Factors</p>
+                            <div className="space-y-1">
+                              {dealScore.factors.map((factor, idx) => (
+                                <div key={idx} className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">{factor.name}</span>
+                                  <span className="font-medium text-primary">{factor.impact}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={handleCalculateScore}
+                            disabled={isCalculatingScore}
+                          >
+                            <RefreshCw className={`w-3 h-3 mr-1 ${isCalculatingScore ? "animate-spin" : ""}`} />
+                            Recalculate
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={handleCalculateScore}
+                          disabled={isCalculatingScore}
+                          data-testid="button-calculate-score"
+                        >
+                          {isCalculatingScore ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Target className="w-4 h-4 mr-2" />
+                          )}
+                          Calculate Lead Score
+                        </Button>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+
+                {/* Meeting Recording Section */}
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Mic className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Record Meeting</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Record your conversation during meetings. The recording will be analyzed by AI and sent to the office for coaching review.
+                  </p>
+                  {selectedDeal.merchantId ? (
+                    <Button 
+                      variant="default"
+                      className="w-full"
+                      onClick={() => {
+                        navigate(`/merchants/${selectedDeal.merchantId}`);
+                      }}
+                      data-testid="button-go-to-merchant-for-recording"
+                    >
+                      <Video className="w-4 h-4 mr-2" />
+                      Record Pickup Meeting
+                    </Button>
+                  ) : (
+                    <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
+                      <p className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-500 flex-shrink-0" />
+                        <span>Meeting recording is available after the deal is won and converted to an active merchant. Win this deal first to unlock recording features!</span>
+                      </p>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Prep for Visit - Role Play Section */}
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Prep for Visit</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Practice your pitch with our AI role-play coach before visiting this business.
+                  </p>
+                  <RoleplayCoach
+                    businessName={selectedDeal.businessName}
+                    businessType="general"
+                  />
+                </Card>
 
                 {selectedDeal.currentStage === "sold" && !selectedDeal.merchantId && (
                   <Card className="p-4 border-green-200 dark:border-green-900/50 bg-green-50/50 dark:bg-green-900/10" data-testid="convert-merchant-section">
