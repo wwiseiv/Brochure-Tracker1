@@ -166,6 +166,7 @@ export default function MarketingMaterialsPage() {
   const [generateSheetOpen, setGenerateSheetOpen] = useState(false);
   const [genIndustry, setGenIndustry] = useState<string>("");
   const [genPrompt, setGenPrompt] = useState("");
+  const [genBusinessWebsite, setGenBusinessWebsite] = useState("");
   const [genRepName, setGenRepName] = useState("");
   const [genRepPhone, setGenRepPhone] = useState("");
   const [genRepEmail, setGenRepEmail] = useState("");
@@ -196,7 +197,8 @@ export default function MarketingMaterialsPage() {
       prompt: string; 
       repName: string; 
       repPhone: string; 
-      repEmail: string; 
+      repEmail: string;
+      businessWebsite?: string;
     }) => {
       const response = await apiRequest("POST", "/api/marketing/generate", data);
       return response.json();
@@ -207,6 +209,7 @@ export default function MarketingMaterialsPage() {
         description: "Your custom flyer is being created. This may take 30-60 seconds.",
       });
       setGenerateSheetOpen(false);
+      setGenBusinessWebsite("");
       setGenPrompt("");
       setGenIndustry("");
       setIsPolling(true);
@@ -365,6 +368,7 @@ export default function MarketingMaterialsPage() {
       repName: genRepName,
       repPhone: genRepPhone,
       repEmail: genRepEmail,
+      businessWebsite: genBusinessWebsite.trim() || undefined,
     });
   };
 
@@ -1033,6 +1037,21 @@ ${repEmail}`;
                 id="genPrompt"
                 data-testid="input-prompt"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="genBusinessWebsite">Business Website (Optional)</Label>
+              <Input
+                id="genBusinessWebsite"
+                value={genBusinessWebsite}
+                onChange={(e) => setGenBusinessWebsite(e.target.value)}
+                placeholder="https://www.businessname.com"
+                type="url"
+                data-testid="input-business-website"
+              />
+              <p className="text-xs text-muted-foreground">
+                If provided, we'll analyze the website to customize the flyer for that specific business.
+              </p>
             </div>
 
             <div className="space-y-4 border-t pt-4">

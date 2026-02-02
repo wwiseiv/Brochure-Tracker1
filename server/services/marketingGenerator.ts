@@ -6,6 +6,7 @@ import { db } from '../db';
 import { marketingApprovedClaims, marketingGenerationJobs } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { buildFlyerPDF, FlyerContent as PDFFlyerContent, RepInfo } from './pdfFlyerBuilder';
+import { analyzeBusinessWebsite, BusinessInfo } from './websiteAnalyzer';
 
 let anthropicClient: Anthropic | null = null;
 let openaiClient: OpenAI | null = null;
@@ -49,6 +50,7 @@ export interface FlyerGenerationInput {
   repName?: string;
   repPhone?: string;
   repEmail?: string;
+  businessWebsite?: string;
 }
 
 export interface FlyerGenerationResult {
@@ -445,6 +447,7 @@ export async function createGenerationJob(input: FlyerGenerationInput): Promise<
     repName: input.repName || null,
     repPhone: input.repPhone || null,
     repEmail: input.repEmail || null,
+    businessWebsite: input.businessWebsite || null,
   }).returning();
   
   return job.id;
@@ -462,9 +465,27 @@ export async function executeGenerationJob(jobId: number): Promise<FlyerGenerati
       throw new Error('Job not found');
     }
 
-    const content = await generateFlyerContent(job.prompt, job.industry || undefined);
+    let businessInfo: BusinessInfo | null = null;
+    if (job.businessWebsite) {
+      console.log('[MarketingGenerator] Analyzing business website:', job.businessWebsite);
+      businessInfo = await analyzeBusinessWebsite(job.businessWebsite);
+      
+      if (businessInfo) {
+        await db.update(marketingGenerationJobs)
+          .set({ businessInfo: businessInfo as any })
+          .where(eq(marketingGenerationJobs.id, jobId));
+      }
+    }
+
+    const enhancedPrompt = businessInfo 
+      ? `${job.prompt}\n\nBusiness Details:\n- Business Name: ${businessInfo.businessName}\n- Description: ${businessInfo.description}\n- Industry: ${businessInfo.industry || job.industry || 'General'}\n- Services: ${businessInfo.services?.join(', ') || 'N/A'}\n- Unique Selling Points: ${businessInfo.uniqueSellingPoints?.join(', ') || 'N/A'}\n- Tagline: ${businessInfo.tagline || 'N/A'}`
+      : job.prompt;
+
+    const effectiveIndustry = businessInfo?.industry || job.industry || undefined;
+
+    const content = await generateFlyerContent(enhancedPrompt, effectiveIndustry);
     
-    const heroImageUrl = await generateHeroImage(job.prompt, job.industry || undefined);
+    const heroImageUrl = await generateHeroImage(enhancedPrompt, effectiveIndustry);
     
     const repInfo = {
       name: job.repName || undefined,

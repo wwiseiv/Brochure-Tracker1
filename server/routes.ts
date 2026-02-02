@@ -10556,7 +10556,7 @@ Generate the following content in JSON format:
   app.post("/api/marketing/generate", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { prompt, industry, repName, repPhone, repEmail } = req.body;
+      const { prompt, industry, repName, repPhone, repEmail, businessWebsite } = req.body;
       
       if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
         return res.status(400).json({ error: 'Prompt is required' });
@@ -10571,6 +10571,7 @@ Generate the following content in JSON format:
         repName: repName || undefined,
         repPhone: repPhone || undefined,
         repEmail: repEmail || undefined,
+        businessWebsite: businessWebsite?.trim() || undefined,
       });
       
       executeGenerationJob(jobId).catch(err => {
