@@ -24,7 +24,7 @@ const navItems = [
   { path: "/", icon: Home, label: "Home", tooltip: "Go to home screen" },
   { path: "/today", icon: CalendarCheck, label: "Today", tooltip: "Today's tasks and actions" },
   { path: "/merchants", icon: Building2, label: "CRM", tooltip: "Merchant accounts & CRM" },
-  { path: "/pipeline", icon: Target, label: "Pipeline", tooltip: "Deal pipeline" },
+  { path: "/prospects/pipeline", icon: Target, label: "Pipeline", tooltip: "Prospect & deal pipeline" },
   { path: "/scan", icon: QrCode, label: "Scan", tooltip: "Scan & drop a brochure" },
   { path: "/esign", icon: FileSignature, label: "E-Sign", tooltip: "Electronic signature documents" },
   { path: "/coach", icon: GraduationCap, label: "Coach", tooltip: "AI coaching & training tools" },
@@ -43,15 +43,14 @@ const menuCategories = [
       { path: "/", icon: Home, label: "Home" },
       { path: "/today", icon: CalendarCheck, label: "Today" },
       { path: "/merchants", icon: Building2, label: "CRM / Merchants" },
-      { path: "/pipeline", icon: Target, label: "Deal Pipeline" },
+      { path: "/prospects/pipeline", icon: Target, label: "Pipeline" },
     ]
   },
   {
     title: "Prospecting",
     items: [
-      { path: "/prospect-finder", icon: Sparkles, label: "AI Prospect Finder" },
-      { path: "/prospect-pipeline", icon: Target, label: "Prospect Pipeline" },
-      { path: "/route-planner", icon: MapPin, label: "Route Planner" },
+      { path: "/prospects/search", icon: Sparkles, label: "AI Prospect Finder" },
+      { path: "/route", icon: MapPin, label: "Route Planner" },
     ]
   },
   {
@@ -159,7 +158,7 @@ export function BottomNav() {
             const isActive = location === item.path || 
               (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
               (item.path === "/pipeline-analytics" && location === "/team-pipeline") ||
-              (item.path === "/pipeline" && location.startsWith("/pipeline"));
+              (item.path === "/prospects/pipeline" && location.startsWith("/prospects/pipeline"));
             const Icon = item.icon;
             
             return (
