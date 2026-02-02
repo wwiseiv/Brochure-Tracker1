@@ -89,7 +89,17 @@ Preferred communication style: Simple, everyday language.
 - **Offline Mode**: Enhanced offline capabilities with IndexedDB for drops and recordings, syncing when online.
 - **Data Export**: Export drops, merchants, and referrals to CSV/Excel.
 - **Admin & RM Dashboards**: Org-wide stats and member management.
-- **Individual User Permissions**: Per-user feature toggles.
+- **Comprehensive RBAC Permission System**: Feature-level access control with three-tier architecture:
+    - **Roles**: `admin` (full access), `manager` (team oversight), `agent` (sales rep)
+    - **Agent Stages**: `trainee` (limited features), `active` (standard features), `senior` (advanced features)
+    - **Feature Registry**: 30+ features organized by categories (core_crm, sales_training, ai_tools, analytics, team_management) in `shared/permissions.ts`
+    - **Permission Resolution**: Admin role → Critical features → Explicit overrides → Agent stage defaults → Role defaults → Deny by default
+    - **Feature Overrides**: Individual user feature toggles for granular access control
+    - **Organization Features**: Org-level feature disables
+    - **Audit Logging**: Full change history for compliance
+    - **React Integration**: PermissionContext with hooks (`usePermissions`, `useFeatureAccess`, `useRole`, `useStage`) and guard components (`RequireFeature`, `RequireRole`, `RequireStage`)
+    - **Permission-aware Navigation**: Bottom nav and hamburger menu filter items based on user's effective permissions
+    - **API Endpoints**: `/api/permissions/me` (user permissions), `/api/permissions/features` (registry), `/api/permissions/users` (list users), role/stage/override management endpoints
 - **Data Isolation**: Role-based data access.
 - **My Work History**: Centralized view of user's proposals and statement analyses.
 - **Team Leaderboard**: Optional leaderboard for top agents.

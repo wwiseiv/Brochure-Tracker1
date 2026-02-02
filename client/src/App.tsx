@@ -44,6 +44,7 @@ import MarketingMaterialsPage from "@/pages/marketing-materials";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
+import { PermissionProvider } from "@/contexts/PermissionContext";
 
 import { useLocation } from "wouter";
 
@@ -226,9 +227,11 @@ function AppContent() {
   }
 
   return (
-    <ProfileCompletionGuard>
-      <AuthenticatedRouter />
-    </ProfileCompletionGuard>
+    <PermissionProvider>
+      <ProfileCompletionGuard>
+        <AuthenticatedRouter />
+      </ProfileCompletionGuard>
+    </PermissionProvider>
   );
 }
 

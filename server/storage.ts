@@ -113,6 +113,13 @@ import {
   type InsertEquipmentQuizResult,
   userPermissions,
   type UserPermissions,
+  type InsertUserPermissions,
+  organizationFeatures,
+  type OrganizationFeatures,
+  type InsertOrganizationFeatures,
+  permissionAuditLog,
+  type PermissionAuditLog,
+  type InsertPermissionAuditLog,
   presentationModules,
   presentationLessons,
   presentationProgress,
@@ -294,11 +301,19 @@ export interface IStorage {
   getDailyEdgeStreak(userId: string): Promise<DailyEdgeStreak | undefined>;
   markChallengeCompleted(userId: string, contentId: number): Promise<UserDailyEdge | undefined>;
   
-  // User Permissions
+  // User Permissions (RBAC)
   getUserPermissions(userId: string): Promise<UserPermissions | undefined>;
-  createUserPermissions(userId: string): Promise<UserPermissions>;
+  createUserPermissions(data: Partial<InsertUserPermissions> & { userId: string }): Promise<UserPermissions>;
   updateUserPermissions(userId: string, data: Partial<UserPermissions>): Promise<UserPermissions | undefined>;
   getAllUserPermissions(): Promise<UserPermissions[]>;
+  getUserPermissionsByOrg(orgId: number): Promise<UserPermissions[]>;
+  
+  // Organization Features
+  getOrganizationFeatures(orgId: number): Promise<OrganizationFeatures[]>;
+  setOrganizationFeature(data: InsertOrganizationFeatures): Promise<OrganizationFeatures>;
+  
+  // Permission Audit Log
+  createPermissionAuditLog(data: InsertPermissionAuditLog): Promise<PermissionAuditLog>;
   
   // Email Digest Methods
   getEmailDigestPreferences(userId: string): Promise<EmailDigestPreferences | undefined>;
@@ -1865,14 +1880,14 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(equipmentProducts.category, category), eq(equipmentProducts.isActive, true)));
   }
 
-  // User Permissions
+  // User Permissions (RBAC)
   async getUserPermissions(userId: string): Promise<UserPermissions | undefined> {
     const [perms] = await db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
     return perms;
   }
 
-  async createUserPermissions(userId: string): Promise<UserPermissions> {
-    const [perms] = await db.insert(userPermissions).values({ userId }).returning();
+  async createUserPermissions(data: Partial<InsertUserPermissions> & { userId: string }): Promise<UserPermissions> {
+    const [perms] = await db.insert(userPermissions).values(data as any).returning();
     return perms;
   }
 
@@ -1888,6 +1903,33 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUserPermissions(): Promise<UserPermissions[]> {
     return db.select().from(userPermissions);
+  }
+
+  async getUserPermissionsByOrg(orgId: number): Promise<UserPermissions[]> {
+    return db.select().from(userPermissions).where(eq(userPermissions.orgId, orgId));
+  }
+
+  // Organization Features
+  async getOrganizationFeatures(orgId: number): Promise<OrganizationFeatures[]> {
+    return db.select().from(organizationFeatures).where(eq(organizationFeatures.orgId, orgId));
+  }
+
+  async setOrganizationFeature(data: InsertOrganizationFeatures): Promise<OrganizationFeatures> {
+    const [feature] = await db
+      .insert(organizationFeatures)
+      .values(data as any)
+      .onConflictDoUpdate({
+        target: [organizationFeatures.orgId, organizationFeatures.featureId],
+        set: { enabled: data.enabled, updatedAt: new Date() }
+      })
+      .returning();
+    return feature;
+  }
+
+  // Permission Audit Log
+  async createPermissionAuditLog(data: InsertPermissionAuditLog): Promise<PermissionAuditLog> {
+    const [log] = await db.insert(permissionAuditLog).values(data as any).returning();
+    return log;
   }
 
   // Email Digest Methods

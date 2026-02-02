@@ -113,12 +113,29 @@ export const insertOrganizationMemberSchema = z.object({
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
 
-// User permissions table - individual feature toggles per user
+// RBAC Role and Stage types
+export const USER_ROLES = ['admin', 'manager', 'agent'] as const;
+export type UserRoleType = typeof USER_ROLES[number];
+
+export const AGENT_STAGES = ['trainee', 'active', 'senior'] as const;
+export type AgentStageType = typeof AGENT_STAGES[number];
+
+// User permissions table - RBAC with roles, stages, and feature overrides
 export const userPermissions = pgTable("user_permissions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("user_id").notNull().unique(),
+  orgId: integer("org_id").references(() => organizations.id),
   
-  // Feature toggles (default off unless specified)
+  // RBAC role: admin (full access), manager (team oversight), agent (controlled by stage)
+  role: varchar("role", { length: 20 }).default("agent").notNull(),
+  
+  // Agent stage: trainee (training only), active (CRM/drops), senior (all features)
+  agentStage: varchar("agent_stage", { length: 20 }).default("trainee"),
+  
+  // Per-user feature overrides: { "feature_id": true/false }
+  featureOverrides: jsonb("feature_overrides").default({}).notNull(),
+  
+  // Legacy feature toggles (deprecated - use featureOverrides instead)
   canViewLeaderboard: boolean("can_view_leaderboard").default(false).notNull(),
   canAccessCoach: boolean("can_access_coach").default(true).notNull(),
   canAccessEquipIQ: boolean("can_access_equip_iq").default(true).notNull(),
@@ -128,6 +145,10 @@ export const userPermissions = pgTable("user_permissions", {
   canViewDailyEdge: boolean("can_view_daily_edge").default(true).notNull(),
   canAccessSequences: boolean("can_access_sequences").default(true).notNull(),
   canAccessProposals: boolean("can_access_proposals").default(true).notNull(),
+  
+  // Metadata
+  setBy: varchar("set_by"),
+  notes: text("notes"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -140,6 +161,53 @@ export const insertUserPermissionsSchema = createInsertSchema(userPermissions).o
 });
 export type InsertUserPermissions = z.infer<typeof insertUserPermissionsSchema>;
 export type UserPermissions = typeof userPermissions.$inferSelect;
+
+// Permission audit log - track all permission changes
+export const permissionAuditLog = pgTable("permission_audit_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").references(() => organizations.id),
+  changedByUserId: varchar("changed_by_user_id"),
+  targetUserId: varchar("target_user_id"),
+  changeType: varchar("change_type", { length: 50 }).notNull(),
+  oldRole: varchar("old_role", { length: 20 }),
+  newRole: varchar("new_role", { length: 20 }),
+  oldStage: varchar("old_stage", { length: 20 }),
+  newStage: varchar("new_stage", { length: 20 }),
+  featureId: varchar("feature_id", { length: 100 }),
+  oldOverride: boolean("old_override"),
+  newOverride: boolean("new_override"),
+  presetId: varchar("preset_id", { length: 100 }),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPermissionAuditLogSchema = createInsertSchema(permissionAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPermissionAuditLog = z.infer<typeof insertPermissionAuditLogSchema>;
+export type PermissionAuditLog = typeof permissionAuditLog.$inferSelect;
+
+// Organization-level feature toggles (master switch for org)
+export const organizationFeatures = pgTable("organization_features", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  orgId: integer("org_id").notNull().references(() => organizations.id),
+  featureId: varchar("feature_id", { length: 100 }).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  disabledReason: text("disabled_reason"),
+  disabledBy: varchar("disabled_by"),
+  disabledAt: timestamp("disabled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrganizationFeaturesSchema = createInsertSchema(organizationFeatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOrganizationFeatures = z.infer<typeof insertOrganizationFeaturesSchema>;
+export type OrganizationFeatures = typeof organizationFeatures.$inferSelect;
 
 // Brochures table
 export const brochures = pgTable("brochures", {

@@ -1675,10 +1675,434 @@ Format your response as JSON:
   });
 
   // ============================================
-  // USER PERMISSIONS API
+  // USER PERMISSIONS API (RBAC)
   // ============================================
 
-  // Get current user's permissions
+  // Import permission utilities
+  const { 
+    FEATURES, 
+    PERMISSION_PRESETS,
+    getEffectivePermissions, 
+    mapOrgRoleToUserRole,
+    getFeaturesByStageUnlock,
+    getFeatureById
+  } = await import("@shared/permissions");
+  type UserRole = 'admin' | 'manager' | 'agent';
+  type AgentStage = 'trainee' | 'active' | 'senior';
+
+  // Get current user's permissions with effective features
+  app.get("/api/permissions/me", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      let perms = await storage.getUserPermissions(userId);
+      
+      // Create default permissions if they don't exist
+      if (!perms) {
+        const role = mapOrgRoleToUserRole(membership.role);
+        perms = await storage.createUserPermissions({
+          userId,
+          orgId: membership.orgId,
+          role,
+          agentStage: role === 'agent' ? 'trainee' : null,
+          featureOverrides: {}
+        });
+      }
+      
+      // Get org-level feature disables
+      const orgFeatures = await storage.getOrganizationFeatures(membership.orgId);
+      const overrides = { ...((perms.featureOverrides as Record<string, boolean>) || {}) };
+      for (const feature of orgFeatures) {
+        if (!feature.enabled) {
+          overrides[feature.featureId] = false;
+        }
+      }
+      
+      const permData = {
+        userId: perms.userId,
+        organizationId: membership.orgId,
+        role: (perms.role as UserRole) || mapOrgRoleToUserRole(membership.role),
+        agentStage: (perms.agentStage as AgentStage) || 'trainee',
+        overrides
+      };
+      
+      const effective = getEffectivePermissions(permData);
+      
+      res.json({
+        userId: perms.userId,
+        organizationId: membership.orgId,
+        role: permData.role,
+        agentStage: permData.agentStage,
+        overrides: permData.overrides,
+        effectiveFeatures: effective.features,
+        canManagePermissions: effective.canManagePermissions,
+        canViewTeam: effective.canViewTeam
+      });
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch permissions" });
+    }
+  });
+
+  // Get feature registry
+  app.get("/api/permissions/features", isAuthenticated, async (req: any, res) => {
+    try {
+      const byStage = getFeaturesByStageUnlock();
+      
+      res.json({
+        features: FEATURES,
+        presets: PERMISSION_PRESETS,
+        byStageUnlock: {
+          trainee: byStage.trainee.map(f => f.id),
+          active: byStage.active.map(f => f.id),
+          senior: byStage.senior.map(f => f.id),
+          managerOnly: byStage.managerOnly.map(f => f.id),
+          adminOnly: byStage.adminOnly.map(f => f.id)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching feature registry:", error);
+      res.status(500).json({ error: "Failed to fetch features" });
+    }
+  });
+
+  // Get all users with permissions (manager+ only)
+  app.get("/api/permissions/users", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only managers and admins can view users
+      if (currentRole !== 'admin' && currentRole !== 'manager') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Manager role or higher required" });
+      }
+      
+      // Get all org members
+      const members = await storage.getOrganizationMembers(membership.organization.id);
+      
+      // Get permissions for each user
+      const usersWithPerms = await Promise.all(
+        members.map(async (member) => {
+          let perms = await storage.getUserPermissions(member.userId);
+          return {
+            id: member.id,
+            userId: member.userId,
+            name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Unknown',
+            email: member.email,
+            orgRole: member.role,
+            role: (perms?.role as UserRole) || mapOrgRoleToUserRole(member.role),
+            agentStage: (perms?.agentStage as AgentStage) || 'trainee',
+            overrides: (perms?.featureOverrides as Record<string, boolean>) || {},
+            updatedAt: perms?.updatedAt || member.createdAt
+          };
+        })
+      );
+      
+      // Filter: managers can only see agents
+      const filteredUsers = currentRole === 'admin' 
+        ? usersWithPerms
+        : usersWithPerms.filter(u => u.role === 'agent');
+      
+      res.json({ users: filteredUsers });
+    } catch (error) {
+      console.error("Error fetching users with permissions:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Update user role (admin only)
+  app.patch("/api/permissions/users/:targetUserId/role", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { targetUserId } = req.params;
+      const { role, reason } = req.body;
+      const changedBy = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only admins can change roles
+      if (currentRole !== 'admin') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Admin role required" });
+      }
+      
+      // Validate role
+      if (!['admin', 'manager', 'agent'].includes(role)) {
+        return res.status(400).json({ error: "INVALID_ROLE" });
+      }
+      
+      // Can't change own role
+      if (targetUserId === changedBy) {
+        return res.status(400).json({ error: "CANNOT_CHANGE_OWN_ROLE" });
+      }
+      
+      // CRITICAL: Verify target user is in the same organization
+      const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+      const targetInOrg = orgMembers.some(m => m.userId === targetUserId);
+      if (!targetInOrg) {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "User not in your organization" });
+      }
+      
+      // Get current permissions
+      let perms = await storage.getUserPermissions(targetUserId);
+      const oldRole = perms?.role || 'agent';
+      
+      if (!perms) {
+        perms = await storage.createUserPermissions({
+          userId: targetUserId,
+          orgId: membership.orgId,
+          role,
+          agentStage: role === 'agent' ? 'trainee' : null
+        });
+      } else {
+        await storage.updateUserPermissions(targetUserId, { 
+          role, 
+          setBy: changedBy,
+          agentStage: role === 'agent' ? (perms.agentStage || 'trainee') : null
+        });
+      }
+      
+      // Audit log
+      await storage.createPermissionAuditLog({
+        orgId: membership.orgId,
+        changedByUserId: changedBy,
+        targetUserId,
+        changeType: 'role_change',
+        oldRole,
+        newRole: role,
+        reason
+      });
+      
+      res.json({ success: true, role });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // Update agent stage (manager+ only)
+  app.patch("/api/permissions/users/:targetUserId/stage", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { targetUserId } = req.params;
+      const { stage, reason } = req.body;
+      const changedBy = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only managers and admins can change stages
+      if (currentRole !== 'admin' && currentRole !== 'manager') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Manager role or higher required" });
+      }
+      
+      // Validate stage
+      if (!['trainee', 'active', 'senior'].includes(stage)) {
+        return res.status(400).json({ error: "INVALID_STAGE" });
+      }
+      
+      // CRITICAL: Verify target user is in the same organization
+      const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+      const targetInOrg = orgMembers.some(m => m.userId === targetUserId);
+      if (!targetInOrg) {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "User not in your organization" });
+      }
+      
+      // Get current permissions
+      let perms = await storage.getUserPermissions(targetUserId);
+      const oldStage = perms?.agentStage || 'trainee';
+      
+      // Managers can only modify agents
+      if (perms?.role && perms.role !== 'agent' && currentRole !== 'admin') {
+        return res.status(403).json({ error: "CAN_ONLY_MODIFY_AGENTS" });
+      }
+      
+      if (!perms) {
+        perms = await storage.createUserPermissions({
+          userId: targetUserId,
+          orgId: membership.orgId,
+          role: 'agent',
+          agentStage: stage
+        });
+      } else {
+        await storage.updateUserPermissions(targetUserId, { 
+          agentStage: stage,
+          setBy: changedBy 
+        });
+      }
+      
+      // Audit log
+      await storage.createPermissionAuditLog({
+        orgId: membership.orgId,
+        changedByUserId: changedBy,
+        targetUserId,
+        changeType: 'stage_change',
+        oldStage,
+        newStage: stage,
+        reason
+      });
+      
+      res.json({ success: true, stage });
+    } catch (error) {
+      console.error("Error updating agent stage:", error);
+      res.status(500).json({ error: "Failed to update stage" });
+    }
+  });
+
+  // Add/update feature override (manager+ only)
+  app.post("/api/permissions/users/:targetUserId/override", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { targetUserId } = req.params;
+      const { featureId, enabled, reason } = req.body;
+      const changedBy = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only managers and admins can add overrides
+      if (currentRole !== 'admin' && currentRole !== 'manager') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Manager role or higher required" });
+      }
+      
+      // Validate feature exists
+      const feature = getFeatureById(featureId);
+      if (!feature) {
+        return res.status(400).json({ error: "INVALID_FEATURE" });
+      }
+      
+      // Can't override critical features
+      if (feature.isCritical) {
+        return res.status(400).json({ error: "CANNOT_OVERRIDE_CRITICAL" });
+      }
+      
+      // CRITICAL: Verify target user is in the same organization
+      const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+      const targetInOrg = orgMembers.some(m => m.userId === targetUserId);
+      if (!targetInOrg) {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "User not in your organization" });
+      }
+      
+      // Get current permissions
+      let perms = await storage.getUserPermissions(targetUserId);
+      
+      // Managers can only modify agents
+      if (perms?.role && perms.role !== 'agent' && currentRole !== 'admin') {
+        return res.status(403).json({ error: "CAN_ONLY_MODIFY_AGENTS" });
+      }
+      
+      const currentOverrides = (perms?.featureOverrides as Record<string, boolean>) || {};
+      const oldOverride = currentOverrides[featureId];
+      
+      // Update overrides
+      const newOverrides = { ...currentOverrides };
+      if (enabled === null || enabled === undefined) {
+        delete newOverrides[featureId]; // Remove override
+      } else {
+        newOverrides[featureId] = enabled;
+      }
+      
+      if (!perms) {
+        perms = await storage.createUserPermissions({
+          userId: targetUserId,
+          orgId: membership.orgId,
+          role: 'agent',
+          agentStage: 'trainee',
+          featureOverrides: newOverrides
+        });
+      } else {
+        await storage.updateUserPermissions(targetUserId, { 
+          featureOverrides: newOverrides,
+          setBy: changedBy 
+        });
+      }
+      
+      // Audit log
+      await storage.createPermissionAuditLog({
+        orgId: membership.orgId,
+        changedByUserId: changedBy,
+        targetUserId,
+        changeType: enabled === null ? 'override_removed' : (oldOverride === undefined ? 'override_added' : 'override_changed'),
+        featureId,
+        oldOverride,
+        newOverride: enabled,
+        reason
+      });
+      
+      res.json({ success: true, featureId, enabled });
+    } catch (error) {
+      console.error("Error updating feature override:", error);
+      res.status(500).json({ error: "Failed to update override" });
+    }
+  });
+
+  // Apply preset (manager+ only)
+  app.post("/api/permissions/users/:targetUserId/preset", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { targetUserId } = req.params;
+      const { presetId, reason } = req.body;
+      const changedBy = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only managers and admins can apply presets
+      if (currentRole !== 'admin' && currentRole !== 'manager') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Manager role or higher required" });
+      }
+      
+      // Find preset
+      const preset = PERMISSION_PRESETS.find(p => p.id === presetId);
+      if (!preset) {
+        return res.status(400).json({ error: "INVALID_PRESET" });
+      }
+      
+      // Managers can only apply agent presets
+      if (preset.role !== 'agent' && currentRole !== 'admin') {
+        return res.status(403).json({ error: "CAN_ONLY_APPLY_AGENT_PRESETS" });
+      }
+      
+      // CRITICAL: Verify target user is in the same organization
+      const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+      const targetInOrg = orgMembers.some(m => m.userId === targetUserId);
+      if (!targetInOrg) {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "User not in your organization" });
+      }
+      
+      // Get current permissions
+      let perms = await storage.getUserPermissions(targetUserId);
+      
+      if (!perms) {
+        perms = await storage.createUserPermissions({
+          userId: targetUserId,
+          orgId: membership.orgId,
+          role: preset.role,
+          agentStage: preset.agentStage || null,
+          featureOverrides: {}
+        });
+      } else {
+        await storage.updateUserPermissions(targetUserId, { 
+          role: preset.role,
+          agentStage: preset.agentStage || null,
+          featureOverrides: {},
+          setBy: changedBy 
+        });
+      }
+      
+      // Audit log
+      await storage.createPermissionAuditLog({
+        orgId: membership.orgId,
+        changedByUserId: changedBy,
+        targetUserId,
+        changeType: 'preset_applied',
+        presetId,
+        newRole: preset.role,
+        newStage: preset.agentStage,
+        reason
+      });
+      
+      res.json({ success: true, preset });
+    } catch (error) {
+      console.error("Error applying preset:", error);
+      res.status(500).json({ error: "Failed to apply preset" });
+    }
+  });
+
+  // Legacy: Get current user's permissions (old endpoint for backwards compatibility)
   app.get("/api/me/permissions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -1686,7 +2110,7 @@ Format your response as JSON:
       
       // Create default permissions if they don't exist
       if (!perms) {
-        perms = await storage.createUserPermissions(userId);
+        perms = await storage.createUserPermissions({ userId });
       }
       
       res.json(perms);
@@ -1696,7 +2120,7 @@ Format your response as JSON:
     }
   });
 
-  // Get permissions for a specific user (admin only)
+  // Legacy: Get permissions for a specific user (admin only)
   app.get("/api/permissions/:userId", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
     try {
       const { userId } = req.params;

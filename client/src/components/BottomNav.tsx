@@ -12,12 +12,40 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 interface UserRole {
   role: string;
   memberId: number;
   organization: { id: number; name: string };
 }
+
+const pathToFeatureMap: Record<string, string> = {
+  "/": "dashboard",
+  "/today": "today_dashboard",
+  "/merchants": "merchant_profiles",
+  "/prospects/pipeline": "deal_pipeline",
+  "/scan": "drop_management",
+  "/esign": "esign_integration",
+  "/coach": "sales_spark",
+  "/profile": "user_profile",
+  "/team-pipeline": "team_reports",
+  "/pipeline-analytics": "pipeline_analytics",
+  "/admin": "admin_dashboard",
+  "/admin/team": "team_management",
+  "/prospects/search": "ai_prospect_finder",
+  "/route": "route_planner",
+  "/proposal-generator": "proposal_generator",
+  "/statement-analyzer": "statement_analyzer",
+  "/marketing": "marketing_materials",
+  "/email": "email_drafter",
+  "/equipiq": "equipiq",
+  "/history": "drop_management",
+  "/referrals": "referral_tracking",
+  "/my-work": "my_analytics",
+  "/activity": "activity_feed",
+  "/help": "help_center",
+};
 
 // Bottom nav items - most used features
 const navItems = [
@@ -116,6 +144,7 @@ export function BottomNav() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+  const { hasFeature, hasRole, isLoading: permLoading } = usePermissions();
 
   useEffect(() => {
     setMounted(true);
@@ -123,10 +152,19 @@ export function BottomNav() {
   }, []);
 
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
+  
+  const canAccessPath = (path: string): boolean => {
+    if (permLoading) return true;
+    const featureId = pathToFeatureMap[path];
+    if (!featureId) return true;
+    return hasFeature(featureId);
+  };
 
-  const displayItems = isManager 
+  const allItems = isManager 
     ? [...navItems.slice(0, 6), ...managerNavItems, ...navItems.slice(6)] 
     : navItems;
+  
+  const displayItems = allItems.filter(item => canAccessPath(item.path));
 
   const navContent = (
     <nav 
@@ -204,11 +242,19 @@ export function HamburgerMenu() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+  const { hasFeature, isLoading: permLoading } = usePermissions();
 
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
   const isAdmin = userRole?.role === "master_admin";
+  
+  const canAccessPath = (path: string): boolean => {
+    if (permLoading) return true;
+    const featureId = pathToFeatureMap[path];
+    if (!featureId) return true;
+    return hasFeature(featureId);
+  };
 
-  // Combine all menu categories
+  // Combine all menu categories and filter by permissions
   let allCategories = [...menuCategories];
   if (isManager) {
     allCategories = [...allCategories.slice(0, 1), ...managerMenuItems, ...allCategories.slice(1)];
@@ -216,6 +262,11 @@ export function HamburgerMenu() {
   if (isAdmin) {
     allCategories = [...allCategories, ...adminMenuItems];
   }
+  
+  const filteredCategories = allCategories.map(category => ({
+    ...category,
+    items: category.items.filter(item => canAccessPath(item.path))
+  })).filter(category => category.items.length > 0);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -235,7 +286,7 @@ export function HamburgerMenu() {
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-60px)]">
           <div className="py-2">
-            {allCategories.map((category) => (
+            {filteredCategories.map((category) => (
               <div key={category.title} className="mb-2">
                 <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {category.title}
