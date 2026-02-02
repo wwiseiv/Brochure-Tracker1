@@ -238,8 +238,17 @@ async function extractAndMergePricingData(
     }
   }
 
+  // If pricing extraction failed but we have statement data, use that as fallback
+  if (!pricingData && !statementData) {
+    throw new Error("Could not extract data from any uploaded documents");
+  }
+
   if (!pricingData) {
-    throw new Error("Could not extract pricing data from uploaded documents");
+    // Fall back to statement-only extraction
+    warnings.push("Pricing spreadsheet extraction failed. Using statement data only.");
+    return await extractStatementOnly(
+      statementClassifications.map(c => allFiles.find(f => f.path === c.path)!).filter(Boolean)
+    );
   }
 
   let proposalType: "dual_pricing" | "interchange_plus" | "both" = "interchange_plus";
