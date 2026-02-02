@@ -58,16 +58,16 @@ const menuCategories = [
     items: [
       { path: "/scan", icon: QrCode, label: "Scan Brochure" },
       { path: "/esign", icon: FileSignature, label: "E-Sign" },
-      { path: "/proposal", icon: FileText, label: "Proposal Generator" },
+      { path: "/proposal-generator", icon: FileText, label: "Proposal Generator" },
       { path: "/statement-analyzer", icon: BarChart3, label: "Statement Analyzer" },
-      { path: "/marketing-materials", icon: Megaphone, label: "Marketing Materials" },
+      { path: "/marketing", icon: Megaphone, label: "Marketing Materials" },
     ]
   },
   {
     title: "AI Tools",
     items: [
       { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
-      { path: "/email-drafter", icon: MessageSquare, label: "Email Drafter" },
+      { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
     ]
   },
@@ -77,7 +77,7 @@ const menuCategories = [
       { path: "/history", icon: History, label: "Drop History" },
       { path: "/referrals", icon: Users2, label: "Referrals" },
       { path: "/my-work", icon: Briefcase, label: "My Work" },
-      { path: "/activity-feed", icon: PenTool, label: "Activity Feed" },
+      { path: "/activity", icon: PenTool, label: "Activity Feed" },
     ]
   },
   {
@@ -95,7 +95,7 @@ const managerMenuItems = [
     items: [
       { path: "/team-pipeline", icon: Users, label: "Team Pipeline" },
       { path: "/pipeline-analytics", icon: BarChart3, label: "Pipeline Analytics" },
-      { path: "/team-management", icon: Users2, label: "Team Management" },
+      { path: "/admin/team", icon: Users2, label: "Team Management" },
     ]
   },
 ];
