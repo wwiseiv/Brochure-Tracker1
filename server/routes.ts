@@ -565,6 +565,7 @@ export async function registerRoutes(
               latitude: drop.latitude || undefined,
               longitude: drop.longitude || undefined,
               status: "prospect",
+              createdBy: userId,
             });
           }
           
@@ -919,6 +920,7 @@ export async function registerRoutes(
               notes: updated.textNotes || existingDrop.textNotes || null,
               status: "converted",
               lastVisitAt: new Date(),
+              createdBy: userId,
             });
           }
         } catch (merchantError) {
@@ -2831,12 +2833,17 @@ Format the response clearly with numbered action items. Be specific - instead of
           allowedAgentIds = [userId];
         }
         
-        // Check if merchant has drops from allowed agents
-        const allowedMerchants = await storage.getMerchantsByAgentIds(orgId, allowedAgentIds);
-        const hasAccess = allowedMerchants.some(m => m.id === merchantId);
+        // First check if merchant was created by an allowed agent
+        const isCreatedByAllowed = merchant.createdBy && allowedAgentIds.includes(merchant.createdBy);
         
-        if (!hasAccess) {
-          return res.status(403).json({ error: "Access denied" });
+        if (!isCreatedByAllowed) {
+          // Also check if merchant has drops from allowed agents (legacy support)
+          const allowedMerchants = await storage.getMerchantsByAgentIds(orgId, allowedAgentIds);
+          const hasAccess = allowedMerchants.some(m => m.id === merchantId);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ error: "Access denied" });
+          }
         }
       }
       
@@ -2850,7 +2857,12 @@ Format the response clearly with numbered action items. Be specific - instead of
   app.post("/api/merchants", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
-      const data = { ...req.body, orgId: membership.organization.id };
+      const userId = req.user.claims.sub;
+      const data = { 
+        ...req.body, 
+        orgId: membership.organization.id,
+        createdBy: userId,
+      };
       
       const parsed = insertMerchantSchema.safeParse(data);
       if (!parsed.success) {
@@ -8580,19 +8592,15 @@ Generate the following content in JSON format:
 
       // Create merchant from prospect
       const merchant = await storage.createMerchant({
-        organizationId: membership.orgId,
+        orgId: membership.organization.id,
         businessName: prospect.businessName,
-        dbaName: prospect.dbaName || undefined,
         status: "prospect",
         address: prospect.addressLine1 || undefined,
-        city: prospect.city || undefined,
-        state: prospect.state || undefined,
-        zip: prospect.zipCode,
-        phone: prospect.phone || undefined,
+        businessPhone: prospect.phone || undefined,
         email: prospect.email || undefined,
-        website: prospect.website || undefined,
         businessType: prospect.businessType || undefined,
         notes: prospect.notes || undefined,
+        createdBy: agentId,
       });
 
       // Update prospect
@@ -8953,8 +8961,30 @@ Generate the following content in JSON format:
         }
       }
 
+      // Auto-create merchant if no merchantId provided
+      let merchantId = sanitizedBody.merchantId;
+      if (!merchantId) {
+        // Create a merchant from deal data for unified CRM experience
+        const merchantData = {
+          businessName: sanitizedBody.businessName,
+          businessPhone: sanitizedBody.businessPhone || null,
+          email: sanitizedBody.businessEmail || null,
+          address: sanitizedBody.businessAddress 
+            ? `${sanitizedBody.businessAddress}${sanitizedBody.businessCity ? `, ${sanitizedBody.businessCity}` : ''}${sanitizedBody.businessState ? `, ${sanitizedBody.businessState}` : ''}${sanitizedBody.businessZip ? ` ${sanitizedBody.businessZip}` : ''}`
+            : null,
+          contactName: sanitizedBody.contactName || null,
+          orgId: orgId,
+          createdBy: userId,
+          status: 'prospect',
+        };
+        
+        const newMerchant = await storage.createMerchant(merchantData);
+        merchantId = newMerchant.id;
+      }
+
       const parsed = insertDealSchema.safeParse({
         ...sanitizedBody,
+        merchantId,
         organizationId: orgId,
         assignedAgentId: sanitizedBody.assignedAgentId || userId,
         createdBy: userId,
@@ -9454,6 +9484,7 @@ Generate the following content in JSON format:
         longitude: existingDeal.longitude || undefined,
         status: "converted",
         notes: existingDeal.notes || undefined,
+        createdBy: userId,
       });
 
       const now = new Date();

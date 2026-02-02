@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSwipeable } from "react-swipeable";
 import { Button } from "@/components/ui/button";
@@ -150,6 +150,7 @@ interface PipelineCounts {
 }
 
 export default function DealPipelinePage() {
+  const [, navigate] = useLocation();
   const [phaseFilter, setPhaseFilter] = useState<string>("All");
   const [temperatureFilter, setTemperatureFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -383,6 +384,12 @@ export default function DealPipelinePage() {
   };
 
   const handleOpenDeal = (deal: Deal) => {
+    // If deal has a linked merchant, navigate to merchant page for full feature access
+    if (deal.merchantId) {
+      navigate(`/merchants/${deal.merchantId}`);
+      return;
+    }
+    // Fallback to sheet for deals without linked merchants (legacy deals)
     setSelectedDeal(deal);
     setEditingStage(deal.currentStage);
     setEditingNotes(deal.notes || "");

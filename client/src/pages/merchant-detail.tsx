@@ -73,6 +73,9 @@ import {
   Calculator,
   Send as SendIcon,
   Wrench,
+  PhoneOutgoing,
+  Clock,
+  CalendarCheck,
 } from "lucide-react";
 
 // Pipeline stage configuration
@@ -233,8 +236,13 @@ export default function MerchantDetailPage() {
   // Pipeline state
   const [showAddToPipelineDialog, setShowAddToPipelineDialog] = useState(false);
   const [showChangeStageDialog, setShowChangeStageDialog] = useState(false);
+  const [showRecordFollowUpDialog, setShowRecordFollowUpDialog] = useState(false);
   const [selectedStage, setSelectedStage] = useState("prospect");
   const [selectedTemperature, setSelectedTemperature] = useState("warm");
+  const [followUpMethod, setFollowUpMethod] = useState("");
+  const [followUpOutcome, setFollowUpOutcome] = useState("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [nextFollowUpDate, setNextFollowUpDate] = useState("");
 
   // Create deal mutation
   const createDealMutation = useMutation({
@@ -283,6 +291,45 @@ export default function MerchantDetailPage() {
       });
     },
   });
+
+  // Record follow-up mutation
+  const recordFollowUpMutation = useMutation({
+    mutationFn: async (data: { id: number; method: string; outcome: string; notes: string; nextFollowUpAt?: string }) => {
+      const response = await apiRequest("POST", `/api/deals/${data.id}/follow-up`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/by-merchant", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      setShowRecordFollowUpDialog(false);
+      setFollowUpMethod("");
+      setFollowUpOutcome("");
+      setFollowUpNotes("");
+      setNextFollowUpDate("");
+      toast({
+        title: "Follow-up Recorded",
+        description: "Your follow-up has been logged.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record follow-up",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRecordFollowUp = () => {
+    if (!merchantDeal) return;
+    recordFollowUpMutation.mutate({
+      id: merchantDeal.id,
+      method: followUpMethod,
+      outcome: followUpOutcome,
+      notes: followUpNotes,
+      nextFollowUpAt: nextFollowUpDate || undefined,
+    });
+  };
 
   const handleAddToPipeline = () => {
     if (!merchant) return;
@@ -893,7 +940,7 @@ export default function MerchantDetailPage() {
           {dealLoading ? (
             <Skeleton className="h-24 w-full" />
           ) : merchantDeal ? (
-            <Card className="p-4" data-testid="card-pipeline-status">
+            <Card className="p-4 space-y-4" data-testid="card-pipeline-status">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -919,13 +966,8 @@ export default function MerchantDetailPage() {
                     })()}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Stage: {DEAL_STAGE_CONFIG[merchantDeal.currentStage]?.phase || "Prospecting"}
+                    Phase: {DEAL_STAGE_CONFIG[merchantDeal.currentStage]?.phase || "Prospecting"}
                   </p>
-                  {merchantDeal.nextFollowUpAt && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Follow-up: {format(new Date(merchantDeal.nextFollowUpAt), "MMM d, yyyy")}
-                    </p>
-                  )}
                 </div>
                 <Button
                   variant="outline"
@@ -937,7 +979,43 @@ export default function MerchantDetailPage() {
                   data-testid="button-change-stage"
                 >
                   <Edit2 className="w-4 h-4 mr-1" />
-                  Change Stage
+                  Change
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                {merchantDeal.estimatedMonthlyVolume && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Est. Monthly Volume</p>
+                    <p className="font-medium">${parseFloat(merchantDeal.estimatedMonthlyVolume).toLocaleString()}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground">Follow-ups</p>
+                  <p className="font-medium">{merchantDeal.followUpAttemptCount || 0} / {merchantDeal.maxFollowUpAttempts || 5}</p>
+                </div>
+                {merchantDeal.nextFollowUpAt && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Next Follow-up</p>
+                    <p className={`font-medium ${new Date(merchantDeal.nextFollowUpAt) <= new Date() ? 'text-red-600' : ''}`}>
+                      {format(new Date(merchantDeal.nextFollowUpAt), "MMM d, yyyy")}
+                      {new Date(merchantDeal.nextFollowUpAt) <= new Date() && (
+                        <Badge variant="destructive" className="ml-2 text-xs">Due</Badge>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="pt-2 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowRecordFollowUpDialog(true)}
+                  data-testid="button-record-followup"
+                >
+                  <PhoneOutgoing className="w-4 h-4 mr-2" />
+                  Record Follow-Up
                 </Button>
               </div>
             </Card>
@@ -2185,6 +2263,91 @@ export default function MerchantDetailPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               Update Stage
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRecordFollowUpDialog} onOpenChange={setShowRecordFollowUpDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Follow-Up</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Method</Label>
+              <Select value={followUpMethod} onValueChange={setFollowUpMethod}>
+                <SelectTrigger data-testid="select-followup-method">
+                  <SelectValue placeholder="How did you contact them?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone Call</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="text">Text Message</SelectItem>
+                  <SelectItem value="visit">In-Person Visit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Outcome</Label>
+              <Select value={followUpOutcome} onValueChange={setFollowUpOutcome}>
+                <SelectTrigger data-testid="select-followup-outcome">
+                  <SelectValue placeholder="What was the result?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no_answer">No Answer</SelectItem>
+                  <SelectItem value="left_voicemail">Left Voicemail</SelectItem>
+                  <SelectItem value="spoke_interested">Spoke - Interested</SelectItem>
+                  <SelectItem value="spoke_needs_time">Spoke - Needs Time</SelectItem>
+                  <SelectItem value="spoke_objection">Spoke - Objection</SelectItem>
+                  <SelectItem value="spoke_ready">Spoke - Ready</SelectItem>
+                  <SelectItem value="not_interested">Not Interested</SelectItem>
+                  <SelectItem value="callback_scheduled">Callback Scheduled</SelectItem>
+                  <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={followUpNotes}
+                onChange={(e) => setFollowUpNotes(e.target.value)}
+                placeholder="Add notes about this follow-up..."
+                rows={3}
+                data-testid="textarea-followup-notes"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Schedule Next Follow-up</Label>
+              <Input
+                type="date"
+                value={nextFollowUpDate}
+                onChange={(e) => setNextFollowUpDate(e.target.value)}
+                data-testid="input-next-followup-date"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowRecordFollowUpDialog(false)}
+              data-testid="button-cancel-followup"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRecordFollowUp}
+              disabled={recordFollowUpMutation.isPending || !followUpMethod || !followUpOutcome}
+              className="gap-2"
+              data-testid="button-confirm-followup"
+            >
+              {recordFollowUpMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Record Follow-Up
             </Button>
           </DialogFooter>
         </DialogContent>
