@@ -177,6 +177,7 @@ export default function MarketingMaterialsPage() {
   const [deletingJobId, setDeletingJobId] = useState<number | null>(null);
   const [deleteTemplateDialogOpen, setDeleteTemplateDialogOpen] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
+  const [deletingTemplateIsStatic, setDeletingTemplateIsStatic] = useState(false);
 
   const { data: memberInfo } = useQuery<OrganizationMember>({
     queryKey: ["/api/me/member"],
@@ -184,6 +185,10 @@ export default function MarketingMaterialsPage() {
 
   const { data: savedTemplates = [] } = useQuery<MarketingTemplate[]>({
     queryKey: ["/api/marketing/templates"],
+  });
+
+  const { data: hiddenTemplateIds = [] } = useQuery<number[]>({
+    queryKey: ["/api/marketing/hidden-templates"],
   });
 
   const { data: generationJobs = [], refetch: refetchJobs } = useQuery<FlyerGenerationJob[]>({
@@ -298,6 +303,7 @@ export default function MarketingMaterialsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/marketing/templates"] });
       setDeleteTemplateDialogOpen(false);
       setDeletingTemplateId(null);
+      setDeletingTemplateIsStatic(false);
     },
     onError: (error: Error) => {
       toast({
@@ -306,17 +312,49 @@ export default function MarketingMaterialsPage() {
         variant: "destructive",
       });
       setDeletingTemplateId(null);
+      setDeletingTemplateIsStatic(false);
     },
   });
 
-  const handleDeleteTemplateClick = (templateId: number) => {
+  const hideStaticTemplateMutation = useMutation({
+    mutationFn: async (templateId: number) => {
+      const response = await apiRequest("POST", `/api/marketing/hide-template/${templateId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Template Hidden",
+        description: "Template has been hidden from the library.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/hidden-templates"] });
+      setDeleteTemplateDialogOpen(false);
+      setDeletingTemplateId(null);
+      setDeletingTemplateIsStatic(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Hide failed",
+        description: error.message || "Failed to hide template.",
+        variant: "destructive",
+      });
+      setDeletingTemplateId(null);
+      setDeletingTemplateIsStatic(false);
+    },
+  });
+
+  const handleDeleteTemplateClick = (templateId: number, isStatic: boolean) => {
     setDeletingTemplateId(templateId);
+    setDeletingTemplateIsStatic(isStatic);
     setDeleteTemplateDialogOpen(true);
   };
 
   const confirmDeleteTemplate = () => {
     if (deletingTemplateId) {
-      deleteTemplateMutation.mutate(deletingTemplateId);
+      if (deletingTemplateIsStatic) {
+        hideStaticTemplateMutation.mutate(deletingTemplateId);
+      } else {
+        deleteTemplateMutation.mutate(deletingTemplateId);
+      }
     }
   };
 
@@ -451,7 +489,9 @@ export default function MarketingMaterialsPage() {
     }
   };
 
-  const staticTemplatesWithFlag = STATIC_TEMPLATES.map(t => ({ ...t, isStatic: true }));
+  // Filter out hidden static templates
+  const visibleStaticTemplates = STATIC_TEMPLATES.filter(t => !hiddenTemplateIds.includes(t.id));
+  const staticTemplatesWithFlag = visibleStaticTemplates.map(t => ({ ...t, isStatic: true }));
   
   const savedTemplatesFormatted: MarketingTemplateData[] = savedTemplates.map(t => ({
     id: t.id,
@@ -684,7 +724,7 @@ ${repEmail}`;
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredTemplates.map((template) => {
             const industryConfig = INDUSTRY_LABELS[template.industry];
-            const canDeleteTemplate = canDelete && !template.isStatic;
+            const canDeleteThisTemplate = canDelete;
             return (
               <Card
                 key={`${template.isStatic ? 'static' : 'saved'}-${template.id}`}
@@ -700,14 +740,14 @@ ${repEmail}`;
                     loading="lazy"
                     data-testid={`template-image-${template.id}`}
                   />
-                  {canDeleteTemplate && (
+                  {canDeleteThisTemplate && (
                     <Button
                       variant="destructive"
                       size="icon"
                       className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteTemplateClick(template.id);
+                        handleDeleteTemplateClick(template.id, template.isStatic);
                       }}
                       data-testid={`button-delete-template-${template.id}`}
                     >
@@ -1203,9 +1243,14 @@ ${repEmail}`;
       <AlertDialog open={deleteTemplateDialogOpen} onOpenChange={setDeleteTemplateDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle data-testid="delete-template-dialog-title">Delete Template?</AlertDialogTitle>
+            <AlertDialogTitle data-testid="delete-template-dialog-title">
+              {deletingTemplateIsStatic ? "Hide Template?" : "Delete Template?"}
+            </AlertDialogTitle>
             <AlertDialogDescription data-testid="delete-template-dialog-description">
-              This action cannot be undone. This will permanently delete this template from the library.
+              {deletingTemplateIsStatic 
+                ? "This will hide the template from the library. It can be restored later if needed."
+                : "This action cannot be undone. This will permanently delete this template from the library."
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1214,6 +1259,7 @@ ${repEmail}`;
               onClick={() => {
                 setDeleteTemplateDialogOpen(false);
                 setDeletingTemplateId(null);
+                setDeletingTemplateIsStatic(false);
               }}
             >
               Cancel
@@ -1221,16 +1267,16 @@ ${repEmail}`;
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={confirmDeleteTemplate}
-              disabled={deleteTemplateMutation.isPending}
+              disabled={deleteTemplateMutation.isPending || hideStaticTemplateMutation.isPending}
               data-testid="button-confirm-delete-template"
             >
-              {deleteTemplateMutation.isPending ? (
+              {(deleteTemplateMutation.isPending || hideStaticTemplateMutation.isPending) ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
+                  {deletingTemplateIsStatic ? "Hiding..." : "Deleting..."}
                 </>
               ) : (
-                "Delete"
+                deletingTemplateIsStatic ? "Hide" : "Delete"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
