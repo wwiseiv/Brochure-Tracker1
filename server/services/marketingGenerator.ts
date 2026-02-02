@@ -5,6 +5,7 @@ import path from 'path';
 import { db } from '../db';
 import { marketingApprovedClaims, marketingGenerationJobs } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { buildFlyerPDF, FlyerContent as PDFFlyerContent, RepInfo } from './pdfFlyerBuilder';
 
 let anthropicClient: Anthropic | null = null;
 let openaiClient: OpenAI | null = null;
@@ -403,7 +404,7 @@ export async function assembleFlyer(
   content: FlyerContent,
   heroImageUrl: string | null,
   repInfo?: { name?: string; phone?: string; email?: string }
-): Promise<{ htmlUrl: string; pngUrl?: string }> {
+): Promise<{ htmlUrl: string; pdfUrl?: string }> {
   const html = generateFlyerHtml(content, heroImageUrl, repInfo);
   
   const timestamp = Date.now();
@@ -418,31 +419,21 @@ export async function assembleFlyer(
   fs.writeFileSync(htmlPath, html);
   
   const htmlUrl = `/marketing/generated/${htmlFilename}`;
-  let pngUrl: string | undefined;
+  let pdfUrl: string | undefined;
 
   try {
-    const { chromium } = await import('playwright');
-    
-    const browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    
-    await page.setViewportSize({ width: 816, height: 1056 });
-    await page.setContent(html, { waitUntil: 'networkidle' });
-    
-    const pngFilename = `flyer_${timestamp}.png`;
-    const pngPath = path.join(publicDir, pngFilename);
-    
-    await page.screenshot({ path: pngPath, fullPage: true });
-    await browser.close();
-    
-    pngUrl = `/marketing/generated/${pngFilename}`;
-    console.log('[MarketingGenerator] Generated PNG flyer:', pngFilename);
+    pdfUrl = await buildFlyerPDF({
+      content,
+      heroImageUrl: heroImageUrl || undefined,
+      repInfo: repInfo as RepInfo,
+    });
+    console.log('[MarketingGenerator] Generated PDF flyer:', pdfUrl);
   } catch (error) {
-    console.log('[MarketingGenerator] Playwright not available, skipping PNG generation:', error);
+    console.log('[MarketingGenerator] PDF generation failed:', error);
   }
   
   console.log('[MarketingGenerator] Assembled flyer HTML:', htmlFilename);
-  return { htmlUrl, pngUrl };
+  return { htmlUrl, pdfUrl };
 }
 
 export async function createGenerationJob(input: FlyerGenerationInput): Promise<number> {
@@ -480,14 +471,14 @@ export async function executeGenerationJob(jobId: number): Promise<FlyerGenerati
       phone: job.repPhone || undefined,
       email: job.repEmail || undefined,
     };
-    const { htmlUrl, pngUrl } = await assembleFlyer(content, heroImageUrl, repInfo);
+    const { htmlUrl, pdfUrl } = await assembleFlyer(content, heroImageUrl, repInfo);
     
     await db.update(marketingGenerationJobs)
       .set({
         status: 'completed',
         generatedContent: content as any,
         heroImageUrl: heroImageUrl,
-        finalFlyerUrl: pngUrl || htmlUrl,
+        finalFlyerUrl: pdfUrl || htmlUrl,
         completedAt: new Date(),
       })
       .where(eq(marketingGenerationJobs.id, jobId));
