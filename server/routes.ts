@@ -10899,6 +10899,91 @@ Generate the following content in JSON format:
     }
   });
 
+  // Get hidden static templates (for filtering)
+  app.get("/api/marketing/hidden-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const { hiddenMarketingTemplates } = await import('@shared/schema');
+      const hidden = await db.select().from(hiddenMarketingTemplates);
+      res.json(hidden.map(h => h.staticTemplateId));
+    } catch (error) {
+      console.error('Error fetching hidden templates:', error);
+      res.status(500).json({ error: 'Failed to fetch hidden templates' });
+    }
+  });
+
+  // Hide a static template (admin only)
+  app.post("/api/marketing/hide-template/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const staticTemplateId = parseInt(req.params.id);
+      if (isNaN(staticTemplateId)) {
+        return res.status(400).json({ error: 'Invalid template ID' });
+      }
+
+      const userId = req.user.claims.sub;
+      
+      // Only master_admin can hide templates
+      const membership = await storage.getUserMembership(userId);
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Only administrators can hide templates' });
+      }
+
+      const { hiddenMarketingTemplates } = await import('@shared/schema');
+      
+      // Check if already hidden
+      const [existing] = await db.select()
+        .from(hiddenMarketingTemplates)
+        .where(eq(hiddenMarketingTemplates.staticTemplateId, staticTemplateId));
+      
+      if (existing) {
+        return res.json({ success: true, message: 'Template already hidden' });
+      }
+
+      await db.insert(hiddenMarketingTemplates).values({
+        staticTemplateId,
+        hiddenBy: userId,
+      });
+
+      res.json({
+        success: true,
+        message: 'Template hidden successfully',
+      });
+    } catch (error) {
+      console.error('Error hiding template:', error);
+      res.status(500).json({ error: 'Failed to hide template' });
+    }
+  });
+
+  // Unhide a static template (admin only)
+  app.delete("/api/marketing/hide-template/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const staticTemplateId = parseInt(req.params.id);
+      if (isNaN(staticTemplateId)) {
+        return res.status(400).json({ error: 'Invalid template ID' });
+      }
+
+      const userId = req.user.claims.sub;
+      
+      // Only master_admin can unhide templates
+      const membership = await storage.getUserMembership(userId);
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Only administrators can manage templates' });
+      }
+
+      const { hiddenMarketingTemplates } = await import('@shared/schema');
+      
+      await db.delete(hiddenMarketingTemplates)
+        .where(eq(hiddenMarketingTemplates.staticTemplateId, staticTemplateId));
+
+      res.json({
+        success: true,
+        message: 'Template restored successfully',
+      });
+    } catch (error) {
+      console.error('Error unhiding template:', error);
+      res.status(500).json({ error: 'Failed to restore template' });
+    }
+  });
+
   // Delete marketing generation job (admin or owner only)
   app.delete("/api/marketing/jobs/:id", isAuthenticated, async (req: any, res) => {
     try {

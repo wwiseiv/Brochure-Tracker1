@@ -2930,6 +2930,21 @@ export const insertMarketingGenerationJobSchema = createInsertSchema(marketingGe
 export type InsertMarketingGenerationJob = z.infer<typeof insertMarketingGenerationJobSchema>;
 export type MarketingGenerationJob = typeof marketingGenerationJobs.$inferSelect;
 
+// Hidden Static Marketing Templates - Track which static templates are hidden by admins
+export const hiddenMarketingTemplates = pgTable("hidden_marketing_templates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  staticTemplateId: integer("static_template_id").notNull(), // ID from STATIC_TEMPLATES array
+  hiddenBy: varchar("hidden_by").notNull(), // User ID who hid it
+  hiddenAt: timestamp("hidden_at").defaultNow().notNull(),
+});
+
+export const insertHiddenMarketingTemplateSchema = createInsertSchema(hiddenMarketingTemplates).omit({
+  id: true,
+  hiddenAt: true,
+});
+export type InsertHiddenMarketingTemplate = z.infer<typeof insertHiddenMarketingTemplateSchema>;
+export type HiddenMarketingTemplate = typeof hiddenMarketingTemplates.$inferSelect;
+
 // Default Approved Claims for dual pricing marketing
 export const DEFAULT_APPROVED_CLAIMS = [
   { claim: "Eliminate up to 100% of your credit card processing fees", category: "savings" },
