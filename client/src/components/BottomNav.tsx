@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3, GraduationCap } from "lucide-react";
+import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3, GraduationCap, Building2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UserRole {
@@ -14,6 +14,7 @@ interface UserRole {
 const navItems = [
   { path: "/", icon: Home, label: "Home", tooltip: "Go to home screen" },
   { path: "/today", icon: CalendarCheck, label: "Today", tooltip: "Today's tasks and actions" },
+  { path: "/merchants", icon: Building2, label: "CRM", tooltip: "Merchant accounts & CRM" },
   { path: "/scan", icon: QrCode, label: "Scan", tooltip: "Scan & drop a brochure" },
   { path: "/esign", icon: FileSignature, label: "E-Sign", tooltip: "Electronic signature documents" },
   { path: "/coach", icon: GraduationCap, label: "Coach", tooltip: "AI coaching & training tools" },

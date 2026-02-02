@@ -168,7 +168,12 @@ export default function ProfilePage() {
   });
 
   const handleDigestToggle = (field: keyof EmailDigestPreferences, value: boolean) => {
-    updateDigestPrefs.mutate({ ...digestPrefs, [field]: value });
+    const updateData: Partial<EmailDigestPreferences> = { ...digestPrefs, [field]: value };
+    // When enabling a digest, make sure email is populated from user profile
+    if (value && !digestPrefs?.emailAddress && user?.email) {
+      updateData.emailAddress = user.email;
+    }
+    updateDigestPrefs.mutate(updateData);
   };
 
   const handleDigestChange = (field: keyof EmailDigestPreferences, value: string | number) => {
@@ -444,7 +449,7 @@ export default function ProfilePage() {
                 id="daily-digest"
                 checked={digestPrefs?.dailyDigestEnabled ?? false}
                 onCheckedChange={(checked) => handleDigestToggle('dailyDigestEnabled', checked)}
-                disabled={digestLoading || updateDigestPrefs.isPending || !digestPrefs?.emailAddress}
+                disabled={digestLoading || updateDigestPrefs.isPending}
                 data-testid="switch-daily-digest"
               />
             </div>
@@ -493,7 +498,7 @@ export default function ProfilePage() {
                 id="weekly-digest"
                 checked={digestPrefs?.weeklyDigestEnabled ?? false}
                 onCheckedChange={(checked) => handleDigestToggle('weeklyDigestEnabled', checked)}
-                disabled={digestLoading || updateDigestPrefs.isPending || !digestPrefs?.emailAddress}
+                disabled={digestLoading || updateDigestPrefs.isPending}
                 data-testid="switch-weekly-digest"
               />
             </div>
