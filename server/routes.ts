@@ -86,6 +86,7 @@ import proposalIntelligenceRouter from "./proposal-intelligence/api";
 import { searchLocalBusinesses } from "./services/prospect-search";
 import { analyzeStatement, type StatementData } from "./proposal-intelligence/services/statement-analysis";
 import { generateTalkingPoints } from "./proposal-intelligence/services/talking-points";
+import { extractStatementFromFiles } from "./proposal-intelligence/services/statement-extractor";
 import webpush from "web-push";
 import fs from "fs";
 import path from "path";
@@ -10087,8 +10088,11 @@ Generate the following content in JSON format:
 
         // Parse extracted text data to get statement information
         const extractedTexts = job.extractedTexts || [];
-        if (extractedTexts.length === 0) {
-          throw new Error("No extracted text data available");
+        const fileUrls = job.fileUrls || [];
+        const fileNames = job.fileNames || [];
+        
+        if (extractedTexts.length === 0 && fileUrls.length === 0) {
+          throw new Error("No extracted text data or files available");
         }
 
         await storage.updateStatementAnalysisJob(jobId, {
@@ -10098,54 +10102,91 @@ Generate the following content in JSON format:
 
         // Try to parse the extracted text as JSON (from statement extractor)
         let statementData: StatementData;
-        try {
-          // Assume the first extracted text contains JSON data from the extractor
-          const extractedData = JSON.parse(extractedTexts[0]);
-          
-          statementData = {
-            processorName: extractedData.processorName,
-            merchantName: extractedData.merchantName,
-            merchantId: extractedData.merchantId,
-            statementPeriod: extractedData.statementPeriod,
-            totalVolume: extractedData.totalVolume || 0,
-            totalTransactions: extractedData.totalTransactions || 0,
-            averageTicket: extractedData.averageTicket,
-            cardMix: extractedData.cardMix,
-            fees: {
-              interchange: extractedData.fees?.interchange,
-              assessments: extractedData.fees?.assessments,
-              processorMarkup: extractedData.fees?.processorMarkup,
-              monthlyFees: extractedData.fees?.monthlyFees,
-              pciFees: extractedData.fees?.pciFees,
-              equipmentFees: extractedData.fees?.equipmentFees,
-              otherFees: extractedData.fees?.otherFees,
-              totalFees: extractedData.fees?.totalFees || 0,
-              annual: extractedData.fees?.annual,
-            },
-            qualificationBreakdown: extractedData.qualificationBreakdown,
-            merchantType: extractedData.merchantType || merchantType,
-          };
-        } catch (parseError) {
-          // If parsing fails, try to extract basic numbers from text
-          console.log("[StatementJobs] Falling back to text parsing for job:", jobId);
-          const rawText = extractedTexts.join("\n");
-          
-          // Simple regex patterns to extract basic data
-          const volumeMatch = rawText.match(/(?:total|gross|net)\s*(?:volume|sales|processing)[\s:$]*([0-9,]+(?:\.[0-9]{2})?)/i);
-          const txnMatch = rawText.match(/(?:total|number of)\s*(?:transactions?|items?)[\s:]*([0-9,]+)/i);
-          const feesMatch = rawText.match(/(?:total|processing)\s*(?:fees?|charges?)[\s:$]*([0-9,]+(?:\.[0-9]{2})?)/i);
-          
-          const totalVolume = volumeMatch ? parseFloat(volumeMatch[1].replace(/,/g, "")) : 10000;
-          const totalTransactions = txnMatch ? parseInt(txnMatch[1].replace(/,/g, "")) : 100;
-          const totalFees = feesMatch ? parseFloat(feesMatch[1].replace(/,/g, "")) : totalVolume * 0.03;
-          
-          statementData = {
-            totalVolume,
-            totalTransactions,
-            merchantType: merchantType as any,
-            fees: { totalFees },
-          };
+        let extractedData: any = null;
+        
+        // First try: Check if extractedTexts contains valid JSON with statement data
+        if (extractedTexts.length > 0) {
+          try {
+            // Remove BOM and trim whitespace
+            const firstText = extractedTexts[0].replace(/^\uFEFF/, "").trim();
+            // Try to parse as JSON - if it's base64 data URL it will fail
+            if (firstText.startsWith("{") || firstText.startsWith("[")) {
+              const parsed = JSON.parse(firstText);
+              // Handle both direct object and array format
+              const candidate = Array.isArray(parsed) ? parsed[0] : parsed;
+              // Verify it has meaningful statement data (not just random JSON)
+              if (candidate && (candidate.totalVolume || candidate.totalTransactions || candidate.processorName || candidate.merchantName || candidate.fees)) {
+                extractedData = candidate;
+                console.log("[StatementJobs] Parsed JSON from extractedTexts for job:", jobId);
+              }
+            }
+          } catch (parseError) {
+            // Not valid JSON - likely base64 data URL from frontend, will try file extraction
+            console.log("[StatementJobs] extractedTexts is not valid JSON for job:", jobId);
+          }
         }
+        
+        // Second try: If no valid JSON, use file URLs to extract from Object Storage
+        if (!extractedData && fileUrls.length > 0) {
+          console.log("[StatementJobs] Extracting from files in Object Storage for job:", jobId);
+          
+          await storage.updateStatementAnalysisJob(jobId, {
+            progress: 40,
+            progressMessage: "Extracting data from PDF...",
+          });
+          
+          try {
+            // Build file info from job data with correct MIME types
+            const files = fileUrls.map((url: string, index: number) => {
+              const name = fileNames[index] || `file_${index}`;
+              const lowerName = name.toLowerCase();
+              let mimeType = "application/octet-stream";
+              if (lowerName.endsWith(".pdf")) mimeType = "application/pdf";
+              else if (lowerName.endsWith(".xlsx")) mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+              else if (lowerName.endsWith(".xls")) mimeType = "application/vnd.ms-excel";
+              else if (lowerName.endsWith(".csv")) mimeType = "text/csv";
+              else if (lowerName.match(/\.(jpg|jpeg)$/)) mimeType = "image/jpeg";
+              else if (lowerName.endsWith(".png")) mimeType = "image/png";
+              else if (lowerName.endsWith(".gif")) mimeType = "image/gif";
+              return { path: url, mimeType, name };
+            });
+            
+            extractedData = await extractStatementFromFiles(files);
+            console.log("[StatementJobs] Successfully extracted data from files for job:", jobId, "confidence:", extractedData.confidence);
+          } catch (extractError: any) {
+            console.error("[StatementJobs] File extraction failed for job:", jobId, extractError?.message);
+            throw new Error(`Failed to extract data from statement files: ${extractError?.message}`);
+          }
+        }
+        
+        // If we still don't have data, throw an error instead of using defaults
+        if (!extractedData || (!extractedData.totalVolume && !extractedData.fees?.totalFees)) {
+          throw new Error("Could not extract meaningful data from the statement. Please try a different file or enter data manually.");
+        }
+        
+        statementData = {
+          processorName: extractedData.processorName,
+          merchantName: extractedData.merchantName,
+          merchantId: extractedData.merchantId,
+          statementPeriod: extractedData.statementPeriod,
+          totalVolume: extractedData.totalVolume || 0,
+          totalTransactions: extractedData.totalTransactions || 0,
+          averageTicket: extractedData.averageTicket,
+          cardMix: extractedData.cardMix,
+          fees: {
+            interchange: extractedData.fees?.interchange,
+            assessments: extractedData.fees?.assessments,
+            processorMarkup: extractedData.fees?.processorMarkup,
+            monthlyFees: extractedData.fees?.monthlyFees,
+            pciFees: extractedData.fees?.pciFees,
+            equipmentFees: extractedData.fees?.equipmentFees,
+            otherFees: extractedData.fees?.otherFees,
+            totalFees: extractedData.totalFees || extractedData.fees?.totalFees || 0,
+            annual: extractedData.fees?.annual,
+          },
+          qualificationBreakdown: extractedData.qualificationBreakdown,
+          merchantType: extractedData.merchantType || merchantType,
+        };
 
         await storage.updateStatementAnalysisJob(jobId, {
           progress: 60,
