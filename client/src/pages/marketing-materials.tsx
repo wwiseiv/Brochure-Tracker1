@@ -843,14 +843,14 @@ ${repEmail}`;
       </main>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto max-h-[100dvh]">
-          <SheetHeader>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col h-full max-h-[100dvh]">
+          <SheetHeader className="flex-shrink-0">
             <SheetTitle data-testid="sheet-title">{selectedTemplate?.name}</SheetTitle>
             <SheetDescription data-testid="sheet-description">{selectedTemplate?.description}</SheetDescription>
           </SheetHeader>
 
           {selectedTemplate && (
-            <div className="mt-6 space-y-6">
+            <div className="flex-1 overflow-y-auto overscroll-contain mt-6 space-y-6 pb-8" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div 
                 className="aspect-[3/4] rounded-lg overflow-hidden border cursor-pointer"
                 onClick={() => setPreviewOpen(true)}
@@ -992,8 +992,8 @@ ${repEmail}`;
       </Sheet>
 
       <Sheet open={generateSheetOpen} onOpenChange={setGenerateSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto max-h-[100dvh]">
-          <SheetHeader>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col h-full max-h-[100dvh]">
+          <SheetHeader className="flex-shrink-0">
             <SheetTitle data-testid="generate-sheet-title">
               <span className="flex items-center gap-2">
                 <Wand2 className="w-5 h-5 text-primary" />
@@ -1005,7 +1005,7 @@ ${repEmail}`;
             </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-6 space-y-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain mt-6 space-y-6 pb-8" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="space-y-2">
               <Label htmlFor="genIndustry">Industry</Label>
               <Select value={genIndustry} onValueChange={setGenIndustry}>
@@ -1091,7 +1091,7 @@ ${repEmail}`;
               )}
             </Button>
 
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center pb-4">
               Generation takes 30-60 seconds. You'll be notified when your flyer is ready.
             </p>
           </div>
