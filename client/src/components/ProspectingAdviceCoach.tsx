@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,11 +31,11 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
   const [advice, setAdvice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Auto-play now works on iOS with the DOM audio element pattern
   const [autoPlayTTS, setAutoPlayTTS] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isTTSLoading, setIsTTSLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [ttsError, setTTSError] = useState<string | null>(null);
+  const [lastSpokenAdvice, setLastSpokenAdvice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
@@ -57,38 +58,48 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     }
   }, [isListening, startListening, stopListening, input]);
 
-  // Use the same pattern as Sales Coach - update src on existing audio element
-  const playTTS = useCallback(async (text: string) => {
-    if (!autoPlayTTS) return;
-    
-    setIsTTSLoading(true);
-    setTTSError(null);
-    
-    try {
-      const response = await apiRequest("POST", "/api/tts", { text });
-      const data = await response.json();
-
+  // TTS mutation - same pattern as Sales Coach for iOS Safari compatibility
+  const speakMutation = useMutation({
+    mutationFn: async (text: string) => {
+      console.log("[SalesSpark TTS] Starting TTS request, text length:", text.length);
+      const res = await apiRequest("POST", "/api/tts", { text });
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      console.log("[SalesSpark TTS] Got response, audio present:", !!data.audio);
       if (data.audio && audioRef.current) {
-        const audioSrc = `data:${data.format};base64,${data.audio}`;
-        audioRef.current.src = audioSrc;
-        
         try {
+          const audioSrc = `data:${data.format};base64,${data.audio}`;
+          audioRef.current.src = audioSrc;
+          setIsPlaying(true);
+          console.log("[SalesSpark TTS] Playing audio...");
           await audioRef.current.play();
+          console.log("[SalesSpark TTS] Audio playing successfully");
         } catch (playError: any) {
-          // iOS Safari and some browsers block autoplay
-          console.warn("Autoplay blocked:", playError?.message);
-          setIsTTSLoading(false);
-          setTTSError("Auto-play blocked. Tap the speaker icon to listen.");
+          console.error("[SalesSpark TTS] Audio play failed:", playError?.message);
+          setIsPlaying(false);
+          setTTSError("Tap the speaker icon to listen");
         }
       } else {
-        throw new Error("No audio data received");
+        console.error("[SalesSpark TTS] No audio data or audioRef not available");
+        setTTSError("Voice unavailable. Tap speaker to retry.");
       }
-    } catch (err: any) {
-      console.error("TTS playback error:", err);
-      setIsTTSLoading(false);
-      setTTSError("Voice playback unavailable. Tap the speaker icon to try again.");
+    },
+    onError: (error: Error) => {
+      console.error("[SalesSpark TTS] Mutation error:", error);
+      setTTSError("Voice unavailable. Tap speaker to retry.");
+    },
+  });
+
+  // UseEffect to trigger TTS after advice changes - same pattern as Sales Coach
+  useEffect(() => {
+    if (autoPlayTTS && advice && advice !== lastSpokenAdvice && !isPlaying && !speakMutation.isPending) {
+      console.log("[SalesSpark TTS] Triggering auto-play for new advice");
+      setLastSpokenAdvice(advice);
+      setTTSError(null);
+      speakMutation.mutate(advice);
     }
-  }, [autoPlayTTS]);
+  }, [advice, autoPlayTTS, isPlaying, lastSpokenAdvice, speakMutation.isPending]);
 
   const getAdvice = async () => {
     const textToSend = transcript || input;
@@ -98,6 +109,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     setError(null);
     setAdvice("");
     setTTSError(null);
+    setLastSpokenAdvice(null);
 
     try {
       const response = await apiRequest("POST", "/api/prospecting-advice", {
@@ -110,10 +122,6 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
 
       const data = await response.json();
       setAdvice(data.advice);
-      
-      if (autoPlayTTS && data.advice) {
-        playTTS(data.advice);
-      }
     } catch (err) {
       console.error("Error getting advice:", err);
       setError("Unable to get advice at this time. Please try again.");
@@ -132,8 +140,8 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      // Don't set to null - we need the ref to point to the DOM element
     }
+    setIsPlaying(false);
   };
 
   const placeholders = [
@@ -268,7 +276,7 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                 <h4 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
-                  {isTTSLoading && (
+                  {(speakMutation.isPending || isPlaying) && (
                     <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
                   )}
                 </h4>
@@ -295,8 +303,8 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
       {/* Hidden audio element - same pattern as Sales Coach for iOS Safari compatibility */}
       <audio 
         ref={audioRef} 
-        onEnded={() => setIsTTSLoading(false)} 
-        onError={() => setIsTTSLoading(false)}
+        onEnded={() => setIsPlaying(false)} 
+        onError={() => setIsPlaying(false)}
         playsInline 
         preload="auto" 
         className="hidden" 
