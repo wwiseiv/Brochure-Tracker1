@@ -372,25 +372,50 @@ export default function MarketingMaterialsPage() {
     });
   };
 
-  const handleDownloadGeneratedFlyer = (job: FlyerGenerationJob) => {
+  const handleDownloadGeneratedFlyer = async (job: FlyerGenerationJob) => {
     if (!job.finalFlyerUrl) return;
     
     const isPdf = job.finalFlyerUrl.endsWith('.pdf');
     const extension = isPdf ? 'pdf' : 'png';
-    
-    const link = document.createElement("a");
-    link.href = job.finalFlyerUrl;
-    link.download = `custom-flyer-${job.jobId}.${extension}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `custom-flyer-${job.jobId}.${extension}`;
     
     toast({
-      title: "Download Started",
-      description: isPdf 
-        ? "Your professional PDF flyer is being downloaded." 
-        : "Your custom flyer is being downloaded.",
+      title: "Downloading...",
+      description: "Preparing your file for download.",
     });
+    
+    try {
+      const response = await fetch(job.finalFlyerUrl);
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(blobUrl);
+      
+      toast({
+        title: "Download Complete",
+        description: isPdf 
+          ? "Your professional PDF flyer has been downloaded." 
+          : "Your custom flyer has been downloaded.",
+      });
+    } catch (error) {
+      console.error('[Marketing] Download failed:', error);
+      toast({
+        title: "Download Failed",
+        description: "Could not download the file. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getJobStatusBadge = (status: FlyerGenerationJob['status']) => {
@@ -466,10 +491,34 @@ export default function MarketingMaterialsPage() {
 
   const [isPersonalizing, setIsPersonalizing] = useState(false);
 
+  const downloadFileAsBlob = async (url: string, filename: string): Promise<boolean> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(blobUrl);
+      return true;
+    } catch (error) {
+      console.error('[Marketing] Blob download failed:', error);
+      return false;
+    }
+  };
+
   const handleDownload = async () => {
     if (!selectedTemplate) return;
     
-    // Check if contact info is filled in
     if (!repName.trim() || !repPhone.trim() || !repEmail.trim()) {
       toast({
         title: "Contact Info Required",
@@ -479,7 +528,6 @@ export default function MarketingMaterialsPage() {
       return;
     }
 
-    // For static templates, personalize with contact info
     if (selectedTemplate.isStatic) {
       setIsPersonalizing(true);
       try {
@@ -493,17 +541,17 @@ export default function MarketingMaterialsPage() {
         const data = await response.json();
         
         if (data.personalizedUrl) {
-          const link = document.createElement("a");
-          link.href = data.personalizedUrl;
-          link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-personalized.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          const filename = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-personalized.png`;
+          const success = await downloadFileAsBlob(data.personalizedUrl, filename);
           
-          toast({
-            title: "Download Started",
-            description: "Your personalized flyer with contact info is being downloaded.",
-          });
+          if (success) {
+            toast({
+              title: "Download Complete",
+              description: "Your personalized flyer with contact info has been downloaded.",
+            });
+          } else {
+            throw new Error('Download failed');
+          }
         }
       } catch (error) {
         toast({
@@ -511,29 +559,27 @@ export default function MarketingMaterialsPage() {
           description: "Could not add your contact info to the flyer. Downloading original instead.",
           variant: "destructive",
         });
-        // Fallback to original download
-        const link = document.createElement("a");
-        link.href = selectedTemplate.thumbnailUrl;
-        link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const filename = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
+        await downloadFileAsBlob(selectedTemplate.thumbnailUrl, filename);
       } finally {
         setIsPersonalizing(false);
       }
     } else {
-      // For custom/saved templates, download as-is
-      const link = document.createElement("a");
-      link.href = selectedTemplate.thumbnailUrl;
-      link.download = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const filename = `${selectedTemplate.name.replace(/\s+/g, "-").toLowerCase()}-flyer.png`;
+      const success = await downloadFileAsBlob(selectedTemplate.thumbnailUrl, filename);
       
-      toast({
-        title: "Download Started",
-        description: "Your marketing flyer is being downloaded.",
-      });
+      if (success) {
+        toast({
+          title: "Download Complete",
+          description: "Your marketing flyer has been downloaded.",
+        });
+      } else {
+        toast({
+          title: "Download Failed",
+          description: "Could not download the file. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
