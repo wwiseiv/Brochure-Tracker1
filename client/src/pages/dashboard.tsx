@@ -8,7 +8,7 @@ import { DropCard } from "@/components/DropCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ProspectingAdviceCoach } from "@/components/ProspectingAdviceCoach";
 import { DashboardSkeleton } from "@/components/LoadingState";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
@@ -142,8 +142,11 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
-          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
+          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <HamburgerMenu />
+              <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
+            </div>
             <div className="w-8 h-8 rounded-full bg-muted" />
           </div>
         </header>
@@ -159,7 +162,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-          <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
+          <div className="flex items-center gap-2">
+            <HamburgerMenu />
+            <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
+          </div>
           <div className="flex items-center gap-2">
             <Tooltip delayDuration={700}>
               <TooltipTrigger asChild>

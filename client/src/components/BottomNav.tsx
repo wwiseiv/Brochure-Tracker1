@@ -1,9 +1,17 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Home, QrCode, User, Store, FileSignature, HelpCircle, CalendarCheck, Users, BarChart3, GraduationCap, Building2 } from "lucide-react";
+import { 
+  Home, QrCode, User, FileSignature, HelpCircle, CalendarCheck, Users, 
+  GraduationCap, Building2, Menu, X, Briefcase, MapPin, FileText, 
+  BarChart3, MessageSquare, Settings, Users2, Sparkles, Package,
+  Target, Megaphone, History, PenTool, Shield, ChevronRight
+} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface UserRole {
   role: string;
@@ -11,10 +19,12 @@ interface UserRole {
   organization: { id: number; name: string };
 }
 
+// Bottom nav items - most used features
 const navItems = [
   { path: "/", icon: Home, label: "Home", tooltip: "Go to home screen" },
   { path: "/today", icon: CalendarCheck, label: "Today", tooltip: "Today's tasks and actions" },
   { path: "/merchants", icon: Building2, label: "CRM", tooltip: "Merchant accounts & CRM" },
+  { path: "/pipeline", icon: Target, label: "Pipeline", tooltip: "Deal pipeline" },
   { path: "/scan", icon: QrCode, label: "Scan", tooltip: "Scan & drop a brochure" },
   { path: "/esign", icon: FileSignature, label: "E-Sign", tooltip: "Electronic signature documents" },
   { path: "/coach", icon: GraduationCap, label: "Coach", tooltip: "AI coaching & training tools" },
@@ -25,9 +35,85 @@ const managerNavItems = [
   { path: "/team-pipeline", icon: Users, label: "Team", tooltip: "Team pipeline & analytics" },
 ];
 
+// Full menu items organized by category
+const menuCategories = [
+  {
+    title: "Main",
+    items: [
+      { path: "/", icon: Home, label: "Home" },
+      { path: "/today", icon: CalendarCheck, label: "Today" },
+      { path: "/merchants", icon: Building2, label: "CRM / Merchants" },
+      { path: "/pipeline", icon: Target, label: "Deal Pipeline" },
+    ]
+  },
+  {
+    title: "Prospecting",
+    items: [
+      { path: "/prospect-finder", icon: Sparkles, label: "AI Prospect Finder" },
+      { path: "/prospect-pipeline", icon: Target, label: "Prospect Pipeline" },
+      { path: "/route-planner", icon: MapPin, label: "Route Planner" },
+    ]
+  },
+  {
+    title: "Documents",
+    items: [
+      { path: "/scan", icon: QrCode, label: "Scan Brochure" },
+      { path: "/esign", icon: FileSignature, label: "E-Sign" },
+      { path: "/proposal", icon: FileText, label: "Proposal Generator" },
+      { path: "/statement-analyzer", icon: BarChart3, label: "Statement Analyzer" },
+      { path: "/marketing-materials", icon: Megaphone, label: "Marketing Materials" },
+    ]
+  },
+  {
+    title: "AI Tools",
+    items: [
+      { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
+      { path: "/email-drafter", icon: MessageSquare, label: "Email Drafter" },
+      { path: "/equipiq", icon: Package, label: "EquipIQ" },
+    ]
+  },
+  {
+    title: "Activity",
+    items: [
+      { path: "/history", icon: History, label: "Drop History" },
+      { path: "/referrals", icon: Users2, label: "Referrals" },
+      { path: "/my-work", icon: Briefcase, label: "My Work" },
+      { path: "/activity-feed", icon: PenTool, label: "Activity Feed" },
+    ]
+  },
+  {
+    title: "Settings",
+    items: [
+      { path: "/profile", icon: User, label: "Profile & Settings" },
+      { path: "/help", icon: HelpCircle, label: "Help & Support" },
+    ]
+  },
+];
+
+const managerMenuItems = [
+  {
+    title: "Team Management",
+    items: [
+      { path: "/team-pipeline", icon: Users, label: "Team Pipeline" },
+      { path: "/pipeline-analytics", icon: BarChart3, label: "Pipeline Analytics" },
+      { path: "/team-management", icon: Users2, label: "Team Management" },
+    ]
+  },
+];
+
+const adminMenuItems = [
+  {
+    title: "Admin",
+    items: [
+      { path: "/admin", icon: Shield, label: "Admin Dashboard" },
+    ]
+  },
+];
+
 export function BottomNav() {
   const [location] = useLocation();
   const [mounted, setMounted] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
@@ -40,7 +126,7 @@ export function BottomNav() {
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
 
   const displayItems = isManager 
-    ? [...navItems.slice(0, 5), ...managerNavItems, navItems[5]] 
+    ? [...navItems.slice(0, 6), ...managerNavItems, ...navItems.slice(6)] 
     : navItems;
 
   const navContent = (
@@ -58,36 +144,49 @@ export function BottomNav() {
       }}
       data-testid="bottom-nav"
     >
-      <div className="flex items-center justify-around flex-wrap gap-1 h-16 max-w-lg mx-auto px-2">
-        {displayItems.map((item) => {
-          const isActive = location === item.path || 
-            (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
-            (item.path === "/pipeline-analytics" && location === "/team-pipeline");
-          const Icon = item.icon;
-          
-          return (
-            <Tooltip key={item.path} delayDuration={700}>
-              <TooltipTrigger asChild>
-                <Link href={item.path}>
-                  <button
-                    data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[48px] py-2 px-1 rounded-lg transition-colors ${
-                      isActive
-                        ? "text-primary bg-primary/10"
-                        : "text-muted-foreground hover-elevate"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-[10px] font-medium">{item.label}</span>
-                  </button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>{item.tooltip}</p>
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+      <div 
+        ref={scrollRef}
+        className="flex items-center h-16 overflow-x-auto scrollbar-hide"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          scrollSnapType: 'x mandatory',
+          msOverflowStyle: 'none',
+          scrollbarWidth: 'none',
+        }}
+      >
+        <div className="flex items-center gap-1 px-2 min-w-max">
+          {displayItems.map((item) => {
+            const isActive = location === item.path || 
+              (item.path === "/team-pipeline" && location === "/pipeline-analytics") ||
+              (item.path === "/pipeline-analytics" && location === "/team-pipeline") ||
+              (item.path === "/pipeline" && location.startsWith("/pipeline"));
+            const Icon = item.icon;
+            
+            return (
+              <Tooltip key={item.path} delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href={item.path}>
+                    <button
+                      data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                      className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] py-2 px-2 rounded-lg transition-colors scroll-snap-align-center ${
+                        isActive
+                          ? "text-primary bg-primary/10"
+                          : "text-muted-foreground hover-elevate"
+                      }`}
+                      style={{ scrollSnapAlign: 'center' }}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-[10px] font-medium whitespace-nowrap">{item.label}</span>
+                    </button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>{item.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
@@ -98,6 +197,78 @@ export function BottomNav() {
   }
 
   return navContent;
+}
+
+export function HamburgerMenu() {
+  const [location] = useLocation();
+  const [open, setOpen] = useState(false);
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
+
+  const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
+  const isAdmin = userRole?.role === "master_admin";
+
+  // Combine all menu categories
+  let allCategories = [...menuCategories];
+  if (isManager) {
+    allCategories = [...allCategories.slice(0, 1), ...managerMenuItems, ...allCategories.slice(1)];
+  }
+  if (isAdmin) {
+    allCategories = [...allCategories, ...adminMenuItems];
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="min-h-[44px] min-w-[44px]"
+          data-testid="button-hamburger-menu"
+        >
+          <Menu className="w-5 h-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-[280px] p-0">
+        <SheetHeader className="p-4 border-b">
+          <SheetTitle className="text-left">Menu</SheetTitle>
+        </SheetHeader>
+        <ScrollArea className="h-[calc(100vh-60px)]">
+          <div className="py-2">
+            {allCategories.map((category) => (
+              <div key={category.title} className="mb-2">
+                <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {category.title}
+                </div>
+                {category.items.map((item) => {
+                  const isActive = location === item.path;
+                  const Icon = item.icon;
+                  return (
+                    <Link key={item.path} href={item.path}>
+                      <button
+                        onClick={() => setOpen(false)}
+                        data-testid={`menu-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                          isActive
+                            ? "bg-primary/10 text-primary border-l-2 border-primary"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5 flex-shrink-0" />
+                        <span className="text-sm font-medium">{item.label}</span>
+                        <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground" />
+                      </button>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 export function FloatingHelpButton() {
