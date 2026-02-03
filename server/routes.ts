@@ -28,7 +28,9 @@ import {
   PIPELINE_STAGES,
   deals,
   dealActivities,
+  organizations,
 } from "@shared/schema";
+import { db } from "./db";
 import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail, sendRoleplaySessionEmail } from "./email";
 import { insertMeetingRecordingSchema } from "@shared/schema";
 import { exportReferrals, exportDrops, exportMerchants, ExportFormat } from "./export";
@@ -2974,6 +2976,123 @@ Format your response as JSON:
     } catch (error) {
       console.error("Error deleting demo deals:", error);
       res.status(500).json({ error: "Failed to delete demo deals" });
+    }
+  });
+
+  // User API - Check if demo deals exist for user's organization
+  app.get("/api/user/demo-deals/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      if (!membership) {
+        return res.status(403).json({ error: "No organization membership" });
+      }
+      const orgId = membership.organization.id;
+      
+      const exists = await checkDemoDealsExist(orgId);
+      
+      res.json({
+        exists,
+        message: exists ? "Demo deals exist in this organization" : "No demo deals found",
+      });
+    } catch (error) {
+      console.error("Error checking demo deals status:", error);
+      res.status(500).json({ error: "Failed to check demo deals status" });
+    }
+  });
+
+  // User API - Seed demo deals for user's organization (any logged in user can trigger)
+  app.post("/api/user/demo-deals/seed", isAuthenticated, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      if (!membership) {
+        return res.status(403).json({ error: "No organization membership" });
+      }
+      const userId = req.user.claims.sub;
+      const orgId = membership.organization.id;
+      
+      const result = await seedDemoDeals(orgId, userId);
+      
+      if (result.skipped) {
+        return res.status(200).json({
+          success: true,
+          message: "Demo deals already exist for this organization",
+          created: 0,
+          skipped: true,
+        });
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: `Successfully created ${result.created} demo deals across all pipeline stages`,
+        created: result.created,
+        skipped: false,
+      });
+    } catch (error) {
+      console.error("Error seeding demo deals:", error);
+      res.status(500).json({ error: "Failed to seed demo deals" });
+    }
+  });
+
+  // User API - Delete demo deals for user's organization (any logged in user can delete)
+  app.delete("/api/user/demo-deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      if (!membership) {
+        return res.status(403).json({ error: "No organization membership" });
+      }
+      const orgId = membership.organization.id;
+      
+      const deleted = await deleteDemoDeals(orgId);
+      
+      res.json({
+        success: true,
+        message: deleted > 0 ? `Successfully deleted ${deleted} demo deals` : "No demo deals found to delete",
+        deleted,
+      });
+    } catch (error) {
+      console.error("Error deleting demo deals:", error);
+      res.status(500).json({ error: "Failed to delete demo deals" });
+    }
+  });
+
+  // Bulk API - Seed demo deals for all active organizations (internal/admin only)
+  app.post("/api/internal/seed-all-demo-deals", async (req, res) => {
+    const internalSecret = req.headers["x-internal-secret"];
+    if (internalSecret !== process.env.INTERNAL_SECRET && process.env.NODE_ENV !== "development") {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const orgs = await db.select({ id: organizations.id }).from(organizations);
+      
+      let totalCreated = 0;
+      let orgsSeeded = 0;
+      let orgsSkipped = 0;
+      
+      for (const org of orgs) {
+        const members = await storage.getOrganizationMembers(org.id);
+        const firstMember = members[0];
+        if (firstMember && firstMember.userId) {
+          const result = await seedDemoDeals(org.id, firstMember.userId);
+          if (result.skipped) {
+            orgsSkipped++;
+          } else {
+            totalCreated += result.created;
+            orgsSeeded++;
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: `Seeded ${totalCreated} demo deals across ${orgsSeeded} organizations (${orgsSkipped} already had demo data)`,
+        totalCreated,
+        orgsSeeded,
+        orgsSkipped,
+      });
+    } catch (error) {
+      console.error("Error bulk seeding demo deals:", error);
+      res.status(500).json({ error: "Failed to bulk seed demo deals" });
     }
   });
 
