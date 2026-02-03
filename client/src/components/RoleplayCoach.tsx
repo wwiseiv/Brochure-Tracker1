@@ -42,6 +42,8 @@ import type { RoleplayScenario } from "@shared/schema";
 
 interface RoleplayCoachProps {
   dropId?: number;
+  dealId?: number;
+  merchantId?: number;
   businessName?: string;
   businessType?: string;
   onClose?: () => void;
@@ -94,7 +96,7 @@ const scenarioOptions: { value: RoleplayScenario; label: string; description: st
 
 type SessionMode = "roleplay" | "coaching";
 
-export function RoleplayCoach({ dropId, businessName, businessType, onClose }: RoleplayCoachProps) {
+export function RoleplayCoach({ dropId, dealId, merchantId, businessName, businessType, onClose }: RoleplayCoachProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<SessionMode>("coaching");
@@ -116,6 +118,10 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  
+  // Merchant intelligence state
+  const [isGeneratingIntelligence, setIsGeneratingIntelligence] = useState(false);
+  const [hasIntelligence, setHasIntelligence] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -125,10 +131,33 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
     scrollToBottom();
   }, [messages]);
 
+  // Generate merchant intelligence before starting session
+  const generateIntelligenceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/merchant-intelligence/generate", {
+        dealId,
+        merchantId,
+        dropId,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.status === 'cached' || data.status === 'processing') {
+        setHasIntelligence(true);
+      }
+    },
+    onError: () => {
+      // Continue without intelligence - it's optional
+      console.log('Intelligence generation failed, continuing without context');
+    },
+  });
+
   const startSessionMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/roleplay/sessions", {
         dropId,
+        dealId,
+        merchantId,
         scenario,
         mode,
         customObjections: customObjections.trim() || undefined,
@@ -138,11 +167,14 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
     onSuccess: (data) => {
       setSessionId(data.sessionId);
       setMessages([]);
+      setHasIntelligence(data.hasIntelligence || false);
       toast({
         title: mode === "coaching" ? "Coaching session started" : "Role-play started",
         description: mode === "coaching" 
           ? "Ask me anything about sales techniques or what to say!"
-          : "Begin your approach! The prospect is waiting...",
+          : data.hasIntelligence 
+            ? "Begin your approach! Using merchant intelligence for realistic practice..."
+            : "Begin your approach! The prospect is waiting...",
       });
     },
     onError: (error: Error) => {
@@ -398,8 +430,27 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
       setMessages([]);
       setFeedback(null);
       setShowFeedback(false);
+      setIsGeneratingIntelligence(false);
+      setHasIntelligence(false);
       onClose?.();
     }
+  };
+  
+  // Start session with intelligence generation
+  const handleStartSession = async () => {
+    // Only generate intelligence if we have a deal, merchant, or drop
+    if (dealId || merchantId || dropId) {
+      setIsGeneratingIntelligence(true);
+      try {
+        await generateIntelligenceMutation.mutateAsync();
+      } catch (error) {
+        // Continue without intelligence
+      }
+      setIsGeneratingIntelligence(false);
+    }
+    
+    // Start the actual session
+    startSessionMutation.mutate();
   };
 
   const handleNewSession = () => {
@@ -429,9 +480,20 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
                 <DialogTitle className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5" />
                   Sales Role-Play Coach
+                  {hasIntelligence && sessionId && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      <Target className="w-3 h-3 mr-1" />
+                      Context-Aware
+                    </Badge>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {businessName ? `Practice for: ${businessName}` : "Practice your sales skills with AI"}
+                  {hasIntelligence && sessionId && (
+                    <span className="block text-xs text-green-600 dark:text-green-400 mt-0.5">
+                      Using merchant website and transcript intelligence
+                    </span>
+                  )}
                 </DialogDescription>
               </div>
               {sessionId && !showFeedback && (
@@ -548,11 +610,16 @@ export function RoleplayCoach({ dropId, businessName, businessType, onClose }: R
 
                 <Button
                   className="w-full"
-                  onClick={() => startSessionMutation.mutate()}
-                  disabled={startSessionMutation.isPending}
+                  onClick={handleStartSession}
+                  disabled={startSessionMutation.isPending || isGeneratingIntelligence}
                   data-testid="button-start-roleplay"
                 >
-                  {startSessionMutation.isPending ? (
+                  {isGeneratingIntelligence ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Gathering merchant intelligence...
+                    </>
+                  ) : startSessionMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Starting...
