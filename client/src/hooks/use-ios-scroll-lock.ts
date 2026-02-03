@@ -6,7 +6,7 @@
  * Prevents background scrolling when modals/sheets are open.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, type RefObject } from 'react';
 
 // ============================================
 // DEVICE DETECTION
@@ -213,7 +213,7 @@ interface UseBottomSheetScrollOptions {
 }
 
 interface UseBottomSheetScrollReturn<T extends HTMLElement> {
-  scrollRef: React.RefObject<T>;
+  scrollRef: RefObject<T>;
   isAtTop: boolean;
   isAtBottom: boolean;
   scrollProgress: number;
