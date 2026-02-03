@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useAudioRecorder, createAudioFilename } from "@/hooks/use-audio-recorder";
+import { AudioCompatibilityBanner } from "@/components/AudioCompatibility";
 import { apiRequest } from "@/lib/queryClient";
 import {
   MessageSquare,
@@ -112,16 +114,42 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Voice recording state
-  const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [autoPlayVoice, setAutoPlayVoice] = useState(true);
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<number | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   
   // Merchant intelligence state
   const [isGeneratingIntelligence, setIsGeneratingIntelligence] = useState(false);
   const [hasIntelligence, setHasIntelligence] = useState(false);
+
+  // Transcribe audio and send to session (defined before hook to use in callback)
+  const transcribeAudioRef = useRef<((blob: Blob) => Promise<void>) | null>(null);
+
+  // Audio recording with browser compatibility using the new hook
+  const handleRecordingComplete = useCallback(async (blob: Blob) => {
+    if (transcribeAudioRef.current) {
+      await transcribeAudioRef.current(blob);
+    }
+  }, []);
+
+  const handleRecordingError = useCallback((error: Error) => {
+    toast({
+      title: "Recording failed",
+      description: error.message,
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const {
+    isRecording,
+    start: startAudioRecorder,
+    stop: stopAudioRecorder,
+    browserSupport,
+    error: recorderError,
+  } = useAudioRecorder({
+    onStop: handleRecordingComplete,
+    onError: handleRecordingError,
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -284,80 +312,30 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
       return;
     }
     
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Determine the best supported audio format
-      // Priority: webm (Chrome/Firefox) > mp4 (Safari) > default (let browser decide)
-      let options: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        options.mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        options.mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        options.mimeType = "audio/mp4";
-      } else if (MediaRecorder.isTypeSupported("audio/aac")) {
-        options.mimeType = "audio/aac";
-      }
-      // If no mimeType set, MediaRecorder will use browser default
-      
-      const mediaRecorder = new MediaRecorder(stream, options);
-      
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-      
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(track => track.stop());
-        
-        if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
-          await transcribeAudio(audioBlob);
-        }
-      };
-      
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
+    if (!browserSupport.isFullySupported) {
       toast({
-        title: "Microphone access denied",
-        description: "Please allow microphone access to use voice input",
+        title: "Recording not supported",
+        description: `Your browser (${browserSupport.browserName}) has limited audio recording support. ${browserSupport.limitations.join(", ")}`,
         variant: "destructive",
       });
+      return;
     }
+    
+    await startAudioRecorder();
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    if (isRecording) {
+      stopAudioRecorder();
     }
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const transcribeAudio = useCallback(async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
       const formData = new FormData();
-      // Determine extension based on blob MIME type
-      let ext = "m4a"; // Default to m4a which works well with Whisper
-      const blobType = audioBlob.type.toLowerCase();
-      if (blobType.includes("webm")) {
-        ext = "webm";
-      } else if (blobType.includes("mp4") || blobType.includes("aac") || blobType.includes("m4a")) {
-        ext = "m4a";
-      } else if (blobType.includes("mpeg") || blobType.includes("mp3")) {
-        ext = "mp3";
-      } else if (blobType.includes("wav")) {
-        ext = "wav";
-      } else if (blobType.includes("ogg")) {
-        ext = "ogg";
-      }
-      formData.append("audio", audioBlob, `recording.${ext}`);
+      const filename = createAudioFilename("roleplay_recording", audioBlob.type);
+      formData.append("audio", audioBlob, filename);
       
       const response = await fetch("/api/transcribe", {
         method: "POST",
@@ -373,7 +351,6 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
       
       const data = await response.json();
       if (data.text && data.text.trim()) {
-        // Auto-send the transcribed message
         const userMessage: Message = {
           id: Date.now(),
           role: "user",
@@ -397,7 +374,12 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
     } finally {
       setIsTranscribing(false);
     }
-  };
+  }, [toast, sendMessageMutation]);
+
+  // Update the ref with the latest transcribeAudio function
+  useEffect(() => {
+    transcribeAudioRef.current = transcribeAudio;
+  }, [transcribeAudio]);
 
   const handleSend = () => {
     if (!inputMessage.trim() || !sessionId) return;
@@ -607,6 +589,12 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                     </p>
                   </Card>
                 )}
+
+                <AudioCompatibilityBanner 
+                  support={browserSupport} 
+                  showOnlyIfIssues={true}
+                  compact={true}
+                />
 
                 <Button
                   className="w-full"

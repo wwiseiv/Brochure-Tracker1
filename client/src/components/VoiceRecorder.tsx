@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Square, Play, Pause, Trash2, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mic, Square, Play, Pause, Trash2, AlertTriangle } from "lucide-react";
+import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 
 interface VoiceRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -9,72 +11,45 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete }: VoiceRecorderProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(existingAudioUrl || null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(existingAudioUrl || null);
+  const [displayDuration, setDisplayDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<number | null>(null);
+
+  const {
+    isRecording,
+    duration,
+    audioBlob,
+    audioUrl,
+    error,
+    browserSupport,
+    start,
+    stop,
+    reset,
+  } = useAudioRecorder({
+    onStop: (blob, url, finalDuration) => {
+      setDisplayUrl(url);
+      setDisplayDuration(finalDuration);
+      onRecordingComplete(blob, finalDuration);
+    },
+    onError: (err) => {
+      console.error("Recording error:", err);
+    },
+  });
 
   useEffect(() => {
     if (existingAudioUrl) {
-      setAudioUrl(existingAudioUrl);
+      setDisplayUrl(existingAudioUrl);
     }
   }, [existingAudioUrl]);
 
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
-      });
-      
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-      
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
-        setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        onRecordingComplete(blob, recordingTime);
-        
-        stream.getTracks().forEach((track) => track.stop());
-      };
-      
-      mediaRecorder.start(100);
-      setIsRecording(true);
-      setRecordingTime(0);
-      
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-    } catch (err) {
-      console.error("Failed to start recording:", err);
-    }
-  }, [onRecordingComplete, recordingTime]);
+  const handleStartRecording = useCallback(async () => {
+    await start();
+  }, [start]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  }, [isRecording]);
+  const handleStopRecording = useCallback(async () => {
+    await stop();
+  }, [stop]);
 
   const togglePlayback = useCallback(() => {
     if (!audioRef.current) return;
@@ -88,38 +63,72 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
   }, [isPlaying]);
 
   const handleDelete = useCallback(() => {
-    setAudioBlob(null);
-    if (audioUrl && !existingAudioUrl) {
-      URL.revokeObjectURL(audioUrl);
+    reset();
+    if (displayUrl && displayUrl !== existingAudioUrl) {
+      URL.revokeObjectURL(displayUrl);
     }
-    setAudioUrl(null);
-    setRecordingTime(0);
+    setDisplayUrl(null);
+    setDisplayDuration(0);
     onDelete?.();
-  }, [audioUrl, existingAudioUrl, onDelete]);
+  }, [reset, displayUrl, existingAudioUrl, onDelete]);
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const totalSeconds = Math.floor(seconds);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (audioUrl && !existingAudioUrl) {
-        URL.revokeObjectURL(audioUrl);
+      if (displayUrl && displayUrl !== existingAudioUrl) {
+        URL.revokeObjectURL(displayUrl);
       }
     };
-  }, [audioUrl, existingAudioUrl]);
+  }, [displayUrl, existingAudioUrl]);
 
-  if (audioUrl) {
+  if (!browserSupport.isFullySupported) {
+    return (
+      <Alert variant="destructive" className="flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5" />
+        <AlertDescription>
+          <p className="font-medium">Recording not supported on {browserSupport.browserName}</p>
+          <p className="text-sm mt-1">
+            {browserSupport.limitations.join(". ")}
+          </p>
+          <p className="text-sm mt-1">
+            For best results, use Chrome, Firefox, or Edge.
+          </p>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => reset()}
+          data-testid="button-retry-recording"
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  if (displayUrl) {
     return (
       <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
         <audio
           ref={audioRef}
-          src={audioUrl}
+          src={displayUrl}
           onEnded={() => setIsPlaying(false)}
           onPause={() => setIsPlaying(false)}
           onPlay={() => setIsPlaying(true)}
@@ -145,7 +154,7 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
             <div className="h-full w-full bg-primary rounded-full" />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatTime(recordingTime || 0)}
+            {formatTime(displayDuration || 0)}
           </p>
         </div>
         
@@ -169,7 +178,7 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
         type="button"
         variant={isRecording ? "destructive" : "secondary"}
         size="lg"
-        onClick={isRecording ? stopRecording : startRecording}
+        onClick={isRecording ? handleStopRecording : handleStartRecording}
         className={`min-h-touch gap-2 ${isRecording ? "animate-pulse" : ""}`}
         data-testid={isRecording ? "button-stop-recording" : "button-start-recording"}
       >
@@ -190,7 +199,7 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 bg-destructive rounded-full animate-pulse" />
           <span className="font-mono text-lg font-semibold">
-            {formatTime(recordingTime)}
+            {formatTime(duration)}
           </span>
         </div>
       )}

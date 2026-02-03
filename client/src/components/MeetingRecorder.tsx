@@ -6,6 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
+import { useAudioRecorder, createAudioFilename } from "@/hooks/use-audio-recorder";
+import { AudioCompatibilityBanner } from "@/components/AudioCompatibility";
 import {
   savePendingRecording,
   getPendingRecordingForMerchant,
@@ -24,6 +26,8 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  Pause,
+  Play,
 } from "lucide-react";
 import type { Merchant, MeetingRecording } from "@shared/schema";
 
@@ -39,7 +43,6 @@ const MAX_RECORDING_SECONDS = 90 * 60; // 90 minutes
 export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) {
   const { toast } = useToast();
   const [state, setState] = useState<RecordingState>("idle");
-  const [recordingTime, setRecordingTime] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [analysisResult, setAnalysisResult] = useState<{
     summary?: string;
@@ -48,15 +51,46 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
   } | null>(null);
   const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [finalDuration, setFinalDuration] = useState(0);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const recordingIdRef = useRef<number | null>(null);
-  const audioBlobRef = useRef<Blob | null>(null);
 
   const { uploadFile } = useUpload();
+
+  const handleRecordingStop = useCallback(async (blob: Blob, _url: string, durationSecs: number) => {
+    setFinalDuration(Math.round(durationSecs));
+    await processRecording(blob, blob.type, Math.round(durationSecs));
+  }, []);
+
+  const handleRecordingError = useCallback((err: Error) => {
+    console.error("Recording error:", err);
+    setState("error");
+    setErrorMessage(err.message || "An error occurred during recording");
+    recordingIdRef.current = null;
+    toast({
+      title: "Recording error",
+      description: err.message || "Could not access your microphone. Please check browser permissions.",
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const audioRecorder = useAudioRecorder({
+    maxDuration: MAX_RECORDING_SECONDS,
+    onStop: handleRecordingStop,
+    onError: handleRecordingError,
+  });
+
+  const {
+    isRecording: hookIsRecording,
+    isPaused,
+    duration: hookDuration,
+    browserSupport,
+    start: startAudioRecording,
+    stop: stopAudioRecording,
+    pause: pauseRecording,
+    resume: resumeRecording,
+    reset: resetAudioRecorder,
+  } = audioRecorder;
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -75,7 +109,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
       if (pending) {
         setPendingRecording(pending);
         recordingIdRef.current = pending.recordingId;
-        setRecordingTime(pending.durationSeconds);
+        setFinalDuration(pending.durationSeconds);
         setState("pending_upload");
       }
     }
@@ -112,7 +146,6 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
         await removePendingRecording(pendingRecording.id);
         setPendingRecording(null);
       }
-      audioBlobRef.current = null;
       setState("completed");
       setAnalysisResult({
         summary: data.aiSummary,
@@ -141,75 +174,42 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const startRecording = useCallback(async () => {
+    if (!browserSupport.isFullySupported) {
+      setErrorMessage(`Recording not supported: ${browserSupport.limitations.join(', ')}`);
+      toast({
+        title: "Browser not supported",
+        description: "Your browser doesn't fully support audio recording. Try Chrome, Firefox, or Edge.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setErrorMessage("");
       setState("recording");
-      setRecordingTime(0);
-      audioChunksRef.current = [];
-      audioBlobRef.current = null;
+      setFinalDuration(0);
 
       const recording = await createRecordingMutation.mutateAsync();
       recordingIdRef.current = recording.id;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      let options: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        options.mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        options.mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        options.mimeType = "audio/mp4";
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        audioBlobRef.current = audioBlob;
-        await processRecording(audioBlob, mimeType);
-      };
-
-      mediaRecorder.start(1000);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (prev >= MAX_RECORDING_SECONDS - 1) {
-            stopRecording();
-            toast({
-              title: "Maximum length reached",
-              description: "Recording automatically stopped at 90 minutes.",
-            });
-            return MAX_RECORDING_SECONDS;
-          }
-          return prev + 1;
+      const success = await startAudioRecording();
+      if (!success) {
+        setState("idle");
+        recordingIdRef.current = null;
+        setErrorMessage("Could not start recording. Please check microphone permissions.");
+        toast({
+          title: "Recording failed",
+          description: "Could not start recording. Please check microphone permissions.",
+          variant: "destructive",
         });
-      }, 1000);
-
+      }
     } catch (error: any) {
       console.error("Error starting recording:", error);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
       setState("idle");
       recordingIdRef.current = null;
       
@@ -226,25 +226,13 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
         variant: "destructive",
       });
     }
-  }, [createRecordingMutation, toast]);
+  }, [createRecordingMutation, toast, browserSupport, startAudioRecording]);
 
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+  const stopRecording = useCallback(async () => {
+    await stopAudioRecording();
+  }, [stopAudioRecording]);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const processRecording = async (audioBlob: Blob, mimeType?: string) => {
+  const processRecording = async (audioBlob: Blob, mimeType: string, durationSeconds: number) => {
     setState("processing");
 
     if (!recordingIdRef.current) {
@@ -254,10 +242,8 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
     }
 
     try {
-      const ext = audioBlob.type.includes("webm") ? "webm" : "m4a";
-      const file = new File([audioBlob], `meeting-${Date.now()}.${ext}`, {
-        type: audioBlob.type,
-      });
+      const filename = createAudioFilename("meeting", mimeType);
+      const file = new File([audioBlob], filename, { type: mimeType });
 
       const uploadResult = await uploadFile(file);
 
@@ -270,20 +256,11 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
       await completeRecordingMutation.mutateAsync({
         recordingId: recordingIdRef.current,
         recordingUrl,
-        durationSeconds: recordingTime,
+        durationSeconds,
       });
 
     } catch (error) {
       console.error("Error processing recording:", error);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
 
       try {
         const saved = await savePendingRecording({
@@ -295,7 +272,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
           businessPhone: merchant.businessPhone || undefined,
           audioBlob: audioBlob,
           mimeType: mimeType || audioBlob.type,
-          durationSeconds: recordingTime,
+          durationSeconds,
         });
         setPendingRecording(saved);
         setState("pending_upload");
@@ -325,8 +302,8 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
     setPendingRecording(prev => prev ? { ...prev, retryCount: prev.retryCount + 1 } : null);
 
     try {
-      const ext = pendingRecording.mimeType.includes("webm") ? "webm" : "m4a";
-      const file = new File([pendingRecording.audioBlob], `meeting-${Date.now()}.${ext}`, {
+      const filename = createAudioFilename("meeting", pendingRecording.mimeType);
+      const file = new File([pendingRecording.audioBlob], filename, {
         type: pendingRecording.mimeType,
       });
 
@@ -360,20 +337,20 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
       await removePendingRecording(pendingRecording.id);
       setPendingRecording(null);
     }
-    audioBlobRef.current = null;
     recordingIdRef.current = null;
     setState("idle");
-    setRecordingTime(0);
+    setFinalDuration(0);
     setErrorMessage("");
+    resetAudioRecorder();
   };
 
   const resetRecorder = () => {
     setState("idle");
-    setRecordingTime(0);
+    setFinalDuration(0);
     setErrorMessage("");
     setAnalysisResult(null);
     recordingIdRef.current = null;
-    audioBlobRef.current = null;
+    resetAudioRecorder();
   };
 
   if (state === "pending_upload" && pendingRecording) {
@@ -431,46 +408,79 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
 
   if (state === "idle") {
     return (
-      <Button
-        onClick={startRecording}
-        disabled={createRecordingMutation.isPending}
-        className="w-full h-14 bg-purple-600 hover:bg-purple-700"
-        data-testid="button-start-meeting-recording"
-      >
-        {createRecordingMutation.isPending ? (
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-        ) : (
-          <Mic className="w-5 h-5 mr-2" />
-        )}
-        Record Meeting
-      </Button>
+      <div className="space-y-3">
+        <AudioCompatibilityBanner support={browserSupport} compact className="mb-2" />
+        <Button
+          onClick={startRecording}
+          disabled={createRecordingMutation.isPending || !browserSupport.isFullySupported}
+          className="w-full h-14 bg-purple-600 hover:bg-purple-700"
+          data-testid="button-start-meeting-recording"
+        >
+          {createRecordingMutation.isPending ? (
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          ) : (
+            <Mic className="w-5 h-5 mr-2" />
+          )}
+          Record Meeting
+        </Button>
+      </div>
     );
   }
 
   if (state === "recording") {
+    const displayDuration = Math.round(hookDuration);
     return (
       <Card className="p-4 border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-            <span className="font-medium text-purple-700 dark:text-purple-300">Recording...</span>
+            {isPaused ? (
+              <div className="w-3 h-3 rounded-full bg-yellow-500" />
+            ) : (
+              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+            )}
+            <span className="font-medium text-purple-700 dark:text-purple-300">
+              {isPaused ? "Paused" : "Recording..."}
+            </span>
           </div>
           <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
             <Clock className="w-4 h-4" />
-            <span className="font-mono">{formatTime(recordingTime)}</span>
+            <span className="font-mono">{formatTime(displayDuration)}</span>
             <span className="text-xs text-muted-foreground">/ 90:00</span>
           </div>
         </div>
-        <Button
-          onClick={stopRecording}
-          variant="destructive"
-          className="w-full h-12"
-          data-testid="button-stop-meeting-recording"
-        >
-          <Square className="w-5 h-5 mr-2" />
-          Stop & Send to Office
-        </Button>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <div className="flex gap-2 mb-2">
+          {isPaused ? (
+            <Button
+              onClick={resumeRecording}
+              variant="outline"
+              className="flex-1 h-12"
+              data-testid="button-resume-meeting-recording"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              onClick={pauseRecording}
+              variant="outline"
+              className="flex-1 h-12"
+              data-testid="button-pause-meeting-recording"
+            >
+              <Pause className="w-5 h-5 mr-2" />
+              Pause
+            </Button>
+          )}
+          <Button
+            onClick={stopRecording}
+            variant="destructive"
+            className="flex-1 h-12"
+            data-testid="button-stop-meeting-recording"
+          >
+            <Square className="w-5 h-5 mr-2" />
+            Stop & Send
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground text-center">
           Recording will be analyzed and emailed to office when stopped
         </p>
       </Card>
@@ -511,7 +521,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
           </div>
         </div>
         <div className="flex items-center justify-between text-sm mb-3">
-          <span className="text-muted-foreground">Duration: {formatTime(recordingTime)}</span>
+          <span className="text-muted-foreground">Duration: {formatTime(finalDuration)}</span>
           {analysisResult.sentiment && (
             <span className={`font-medium ${
               analysisResult.sentiment === "positive" ? "text-green-600" :
@@ -554,6 +564,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
             </p>
           </div>
         </div>
+        <AudioCompatibilityBanner support={browserSupport} showOnlyIfIssues={false} className="mb-3" />
         <Button
           onClick={resetRecorder}
           variant="outline"

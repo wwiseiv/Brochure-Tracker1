@@ -1,0 +1,348 @@
+/**
+ * iOS Safari Scroll Fix CSS
+ * =========================
+ * 
+ * Add these styles to your global CSS file (e.g., globals.css or index.css)
+ * These handle iOS Safari scroll quirks for bottom sheets and modals.
+ * 
+ * INSTALLATION:
+ *   Add contents to: client/src/index.css (or globals.css)
+ */
+
+/* ============================================
+   iOS SAFE AREA VARIABLES
+   ============================================ */
+
+:root {
+  /* Safe area insets as CSS variables for JS access */
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  
+  /* iOS viewport height fix */
+  --vh: 1vh;
+}
+
+/* ============================================
+   iOS VIEWPORT HEIGHT FIX
+   ============================================ */
+
+/*
+ * iOS Safari has issues with 100vh not accounting for the toolbar.
+ * This provides a fallback using -webkit-fill-available.
+ */
+
+@supports (-webkit-touch-callout: none) {
+  /* iOS only */
+  .h-screen {
+    height: -webkit-fill-available;
+  }
+  
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+  
+  .max-h-screen {
+    max-height: -webkit-fill-available;
+  }
+}
+
+/* ============================================
+   iOS BOTTOM SHEET STYLES
+   ============================================ */
+
+.ios-bottom-sheet {
+  /* Prevent rubber-band effect from propagating */
+  overscroll-behavior: contain;
+  
+  /* Smooth momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Prevent text selection during drag */
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* GPU acceleration for smooth animations */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  
+  /* Prevent tap highlight */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Re-enable text selection for content */
+.ios-bottom-sheet [data-selectable="true"] {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* ============================================
+   iOS SCROLL CONTAINER STYLES
+   ============================================ */
+
+.ios-scroll-container {
+  /* Critical: contain scroll within this element */
+  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  
+  /* Enable momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Prevent scroll chaining */
+  overflow-anchor: none;
+  
+  /* Touch action for vertical scrolling only */
+  touch-action: pan-y;
+  
+  /* GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* Fix for nested scroll containers */
+.ios-scroll-container .ios-scroll-container {
+  /* Nested containers should also be contained */
+  overscroll-behavior: contain;
+}
+
+/* ============================================
+   BODY SCROLL LOCK STYLES
+   ============================================ */
+
+/*
+ * These classes are applied by the useBodyScrollLock hook
+ * but we define fallbacks here for CSS-only usage.
+ */
+
+body.scroll-locked {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* iOS-specific body lock */
+@supports (-webkit-touch-callout: none) {
+  body.scroll-locked {
+    /* Prevent iOS rubber-banding */
+    overscroll-behavior: none;
+  }
+  
+  html.scroll-locked {
+    overflow: hidden !important;
+    height: 100% !important;
+  }
+}
+
+/* ============================================
+   OVERSCROLL BEHAVIOR UTILITIES
+   ============================================ */
+
+/* Utility classes matching Tailwind naming */
+.overscroll-none {
+  overscroll-behavior: none;
+}
+
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+.overscroll-auto {
+  overscroll-behavior: auto;
+}
+
+.overscroll-y-none {
+  overscroll-behavior-y: none;
+}
+
+.overscroll-y-contain {
+  overscroll-behavior-y: contain;
+}
+
+.overscroll-x-none {
+  overscroll-behavior-x: none;
+}
+
+.overscroll-x-contain {
+  overscroll-behavior-x: contain;
+}
+
+/* ============================================
+   TOUCH ACTION UTILITIES
+   ============================================ */
+
+.touch-none {
+  touch-action: none;
+}
+
+.touch-pan-x {
+  touch-action: pan-x;
+}
+
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+.touch-pan-left {
+  touch-action: pan-left;
+}
+
+.touch-pan-right {
+  touch-action: pan-right;
+}
+
+.touch-pan-up {
+  touch-action: pan-up;
+}
+
+.touch-pan-down {
+  touch-action: pan-down;
+}
+
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* ============================================
+   iOS MOMENTUM SCROLLING
+   ============================================ */
+
+.-webkit-overflow-scrolling-touch {
+  -webkit-overflow-scrolling: touch;
+}
+
+.-webkit-overflow-scrolling-auto {
+  -webkit-overflow-scrolling: auto;
+}
+
+/* ============================================
+   SAFE AREA PADDING UTILITIES
+   ============================================ */
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+
+.p-safe {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Min padding with safe area */
+.pb-safe-min-4 {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pb-safe-min-6 {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* ============================================
+   ANIMATION FIXES FOR iOS
+   ============================================ */
+
+/* Prevent flickering during animations */
+.ios-animate {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+}
+
+/* Smooth sheet slide animations */
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutToBottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.animate-slide-in-from-bottom {
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.animate-slide-out-to-bottom {
+  animation: slideOutToBottom 0.2s ease-in forwards;
+}
+
+/* ============================================
+   SCROLL SNAP (OPTIONAL)
+   ============================================ */
+
+.snap-y {
+  scroll-snap-type: y mandatory;
+}
+
+.snap-y-proximity {
+  scroll-snap-type: y proximity;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+.snap-center {
+  scroll-snap-align: center;
+}
+
+.snap-end {
+  scroll-snap-align: end;
+}
+
+/* ============================================
+   PULL TO REFRESH PREVENTION
+   ============================================ */
+
+/* Prevent pull-to-refresh on specific containers */
+.no-pull-refresh {
+  overscroll-behavior-y: contain;
+}
+
+/* Allow pull-to-refresh (default browser behavior) */
+.allow-pull-refresh {
+  overscroll-behavior-y: auto;
+}
+
+/* ============================================
+   DEBUG UTILITIES (remove in production)
+   ============================================ */
+
+.debug-scroll {
+  outline: 2px solid red;
+}
+
+.debug-scroll::before {
+  content: 'scroll container';
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: red;
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  z-index: 9999;
+}

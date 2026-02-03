@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
+import { useAudioRecorder, createAudioFilename } from "@/hooks/use-audio-recorder";
+import { AudioCompatibilityBanner } from "@/components/AudioCompatibility";
 import {
   Mic,
   Square,
@@ -13,6 +15,8 @@ import {
   AlertCircle,
   Send,
   Clock,
+  Pause,
+  Play,
 } from "lucide-react";
 import type { Deal, MeetingRecording } from "@shared/schema";
 
@@ -28,7 +32,6 @@ const MAX_RECORDING_SECONDS = 90 * 60; // 90 minutes
 export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderProps) {
   const { toast } = useToast();
   const [state, setState] = useState<RecordingState>("idle");
-  const [recordingTime, setRecordingTime] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [analysisResult, setAnalysisResult] = useState<{
     summary?: string;
@@ -36,14 +39,79 @@ export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderPro
     emailSent?: boolean;
   } | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const recordingIdRef = useRef<number | null>(null);
-  const audioBlobRef = useRef<Blob | null>(null);
+  const finalDurationRef = useRef<number>(0);
 
   const { uploadFile } = useUpload();
+
+  const processRecording = useCallback(async (audioBlob: Blob, mimeType: string, durationSeconds: number) => {
+    if (!recordingIdRef.current) {
+      setState("error");
+      setErrorMessage("Recording ID not found");
+      return;
+    }
+
+    setState("processing");
+
+    try {
+      const filename = createAudioFilename(`meeting-${deal.id}`, mimeType);
+      const file = new File([audioBlob], filename, { type: mimeType });
+      const uploadedUrl = await uploadFile(file);
+      
+      await completeRecordingMutation.mutateAsync({
+        recordingId: recordingIdRef.current,
+        recordingUrl: uploadedUrl,
+        durationSeconds: Math.floor(durationSeconds),
+      });
+    } catch (error) {
+      console.error("Error processing recording:", error);
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to upload recording");
+    }
+  }, [deal.id, uploadFile]);
+
+  const handleRecordingStop = useCallback((blob: Blob, _url: string, durationSeconds: number) => {
+    finalDurationRef.current = durationSeconds;
+    processRecording(blob, blob.type, durationSeconds);
+  }, [processRecording]);
+
+  const handleRecordingError = useCallback((error: Error) => {
+    console.error("Recording error:", error);
+    setState("idle");
+    recordingIdRef.current = null;
+
+    if (error.message.includes("denied") || error.message.includes("NotAllowedError")) {
+      setErrorMessage("Microphone permission denied. Please allow microphone access in your browser settings.");
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access in your browser settings.",
+        variant: "destructive",
+      });
+    } else {
+      setErrorMessage(error.message || "Failed to start recording");
+      toast({
+        title: "Recording failed",
+        description: error.message || "Failed to start recording. Check microphone permissions.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const {
+    isRecording,
+    isPaused,
+    duration,
+    browserSupport,
+    start: startHookRecording,
+    stop: stopHookRecording,
+    pause: pauseRecording,
+    resume: resumeRecording,
+    reset: resetHookRecording,
+  } = useAudioRecorder({
+    onStop: handleRecordingStop,
+    onError: handleRecordingError,
+    maxDuration: MAX_RECORDING_SECONDS,
+  });
 
   const createRecordingMutation = useMutation({
     mutationFn: async () => {
@@ -71,7 +139,6 @@ export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderPro
       return response.json();
     },
     onSuccess: async (data) => {
-      audioBlobRef.current = null;
       setState("completed");
       setAnalysisResult({
         summary: data.aiSummary,
@@ -101,171 +168,87 @@ export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderPro
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const processRecording = useCallback(async (audioBlob: Blob, mimeType: string) => {
-    if (!recordingIdRef.current) {
-      setState("error");
-      setErrorMessage("Recording ID not found");
-      return;
-    }
-
-    setState("processing");
-
-    try {
-      const extension = mimeType.includes("mp4") ? "m4a" : "webm";
-      const file = new File([audioBlob], `meeting-${deal.id}-${Date.now()}.${extension}`, { type: mimeType });
-      const uploadedUrl = await uploadFile(file);
-      
-      await completeRecordingMutation.mutateAsync({
-        recordingId: recordingIdRef.current,
-        recordingUrl: uploadedUrl,
-        durationSeconds: recordingTime,
-      });
-    } catch (error) {
-      console.error("Error processing recording:", error);
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to upload recording");
-    }
-  }, [deal.id, recordingTime, uploadFile, completeRecordingMutation]);
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
 
   const startRecording = useCallback(async () => {
     try {
       setErrorMessage("");
-      setState("recording");
-      setRecordingTime(0);
-      audioChunksRef.current = [];
-      audioBlobRef.current = null;
-
+      
       const recording = await createRecordingMutation.mutateAsync();
       recordingIdRef.current = recording.id;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      let options: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        options.mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        options.mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        options.mimeType = "audio/mp4";
+      const success = await startHookRecording();
+      if (success) {
+        setState("recording");
+      } else {
+        recordingIdRef.current = null;
+        setState("idle");
       }
-
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        audioBlobRef.current = audioBlob;
-        await processRecording(audioBlob, mimeType);
-      };
-
-      mediaRecorder.start(1000);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (prev >= MAX_RECORDING_SECONDS - 1) {
-            stopRecording();
-            toast({
-              title: "Maximum length reached",
-              description: "Recording automatically stopped at 90 minutes.",
-            });
-            return MAX_RECORDING_SECONDS;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-
     } catch (error: any) {
       console.error("Error starting recording:", error);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-      setState("idle");
       recordingIdRef.current = null;
-
-      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-        setErrorMessage("Microphone permission denied. Please allow microphone access in your browser settings.");
-        toast({
-          title: "Microphone access denied",
-          description: "Please allow microphone access in your browser settings.",
-          variant: "destructive",
-        });
-      } else {
-        setErrorMessage(error.message || "Failed to start recording");
-        toast({
-          title: "Recording failed",
-          description: error.message || "Failed to start recording. Check microphone permissions.",
-          variant: "destructive",
-        });
-      }
+      setState("idle");
+      setErrorMessage(error.message || "Failed to start recording");
+      toast({
+        title: "Recording failed",
+        description: error.message || "Failed to start recording.",
+        variant: "destructive",
+      });
     }
-  }, [createRecordingMutation, stopRecording, processRecording, toast]);
+  }, [createRecordingMutation, startHookRecording, toast]);
+
+  const stopRecording = useCallback(async () => {
+    await stopHookRecording();
+  }, [stopHookRecording]);
 
   const resetRecorder = useCallback(() => {
     setState("idle");
-    setRecordingTime(0);
     setErrorMessage("");
     setAnalysisResult(null);
     recordingIdRef.current = null;
-    audioBlobRef.current = null;
-  }, []);
+    finalDurationRef.current = 0;
+    resetHookRecording();
+  }, [resetHookRecording]);
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
+    if (isRecording && duration >= MAX_RECORDING_SECONDS) {
+      toast({
+        title: "Maximum length reached",
+        description: "Recording automatically stopped at 90 minutes.",
+      });
+      stopRecording();
+    }
+  }, [isRecording, duration, stopRecording, toast]);
 
   if (state === "idle") {
     return (
-      <Button
-        onClick={startRecording}
-        disabled={createRecordingMutation.isPending}
-        className="w-full h-14 bg-purple-600 hover:bg-purple-700"
-        data-testid="button-start-deal-recording"
-      >
-        {createRecordingMutation.isPending ? (
-          <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        ) : (
-          <Mic className="w-5 h-5 mr-2" />
+      <div className="space-y-3">
+        <AudioCompatibilityBanner 
+          support={browserSupport} 
+          showOnlyIfIssues={true}
+          compact={true}
+        />
+        <Button
+          onClick={startRecording}
+          disabled={createRecordingMutation.isPending || !browserSupport.isFullySupported}
+          className="w-full h-14 bg-purple-600 hover:bg-purple-700"
+          data-testid="button-start-deal-recording"
+        >
+          {createRecordingMutation.isPending ? (
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          ) : (
+            <Mic className="w-5 h-5 mr-2" />
+          )}
+          Start Recording Sales Call
+        </Button>
+        {!browserSupport.isFullySupported && (
+          <p className="text-xs text-muted-foreground text-center">
+            Audio recording is not fully supported in your browser.
+          </p>
         )}
-        Start Recording Sales Call
-      </Button>
+      </div>
     );
   }
 
@@ -274,25 +257,54 @@ export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderPro
       <Card className="p-4 border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-            <span className="font-medium text-purple-700 dark:text-purple-300">Recording...</span>
+            {isPaused ? (
+              <>
+                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                <span className="font-medium text-yellow-700 dark:text-yellow-300">Paused</span>
+              </>
+            ) : (
+              <>
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-medium text-purple-700 dark:text-purple-300">Recording...</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
             <Clock className="w-4 h-4" />
-            <span className="font-mono">{formatTime(recordingTime)}</span>
+            <span className="font-mono">{formatTime(duration)}</span>
             <span className="text-xs text-muted-foreground">/ 90:00</span>
           </div>
         </div>
-        <Button
-          onClick={stopRecording}
-          variant="destructive"
-          className="w-full h-12"
-          data-testid="button-stop-deal-recording"
-        >
-          <Square className="w-5 h-5 mr-2" />
-          Stop & Send to Office
-        </Button>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <div className="flex gap-2 mb-2">
+          <Button
+            onClick={isPaused ? resumeRecording : pauseRecording}
+            variant="outline"
+            className="flex-1 h-12"
+            data-testid={isPaused ? "button-resume-deal-recording" : "button-pause-deal-recording"}
+          >
+            {isPaused ? (
+              <>
+                <Play className="w-5 h-5 mr-2" />
+                Resume
+              </>
+            ) : (
+              <>
+                <Pause className="w-5 h-5 mr-2" />
+                Pause
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={stopRecording}
+            variant="destructive"
+            className="flex-1 h-12"
+            data-testid="button-stop-deal-recording"
+          >
+            <Square className="w-5 h-5 mr-2" />
+            Stop & Send
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground text-center">
           Recording will be analyzed and emailed to office when stopped
         </p>
       </Card>

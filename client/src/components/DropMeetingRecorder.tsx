@@ -6,6 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
+import { useAudioRecorder, createAudioFilename } from "@/hooks/use-audio-recorder";
+import { AudioCompatibilityBanner } from "@/components/AudioCompatibility";
 import {
   savePendingRecording,
   getPendingRecordingForDrop,
@@ -49,14 +51,47 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
   const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const recordingIdRef = useRef<number | null>(null);
   const audioBlobRef = useRef<Blob | null>(null);
 
   const { uploadFile } = useUpload();
+
+  const handleRecordingStop = useCallback(async (blob: Blob, _url: string, duration: number) => {
+    audioBlobRef.current = blob;
+    setRecordingTime(Math.floor(duration));
+    await processRecording(blob);
+  }, []);
+
+  const handleRecordingError = useCallback((error: Error) => {
+    console.error("Recording error:", error);
+    setState("idle");
+    recordingIdRef.current = null;
+    setErrorMessage(error.message);
+    toast({
+      title: "Microphone error",
+      description: error.message,
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const {
+    isRecording: hookIsRecording,
+    duration: hookDuration,
+    start: hookStart,
+    stop: hookStop,
+    reset: hookReset,
+    browserSupport,
+  } = useAudioRecorder({
+    onStop: handleRecordingStop,
+    onError: handleRecordingError,
+    maxDuration: MAX_RECORDING_SECONDS,
+  });
+
+  useEffect(() => {
+    if (hookIsRecording) {
+      setRecordingTime(Math.floor(hookDuration));
+    }
+  }, [hookDuration, hookIsRecording]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -147,70 +182,35 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
   };
 
   const startRecording = useCallback(async () => {
+    if (!browserSupport.isFullySupported) {
+      setErrorMessage(browserSupport.limitations.join(". "));
+      toast({
+        title: "Browser not supported",
+        description: "Please use Chrome, Firefox, or Edge for audio recording.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setErrorMessage("");
       setState("recording");
       setRecordingTime(0);
-      audioChunksRef.current = [];
       audioBlobRef.current = null;
 
       const recording = await createRecordingMutation.mutateAsync();
       recordingIdRef.current = recording.id;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      let options: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        options.mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        options.mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        options.mimeType = "audio/mp4";
+      const started = await hookStart();
+      if (!started) {
+        setState("idle");
+        recordingIdRef.current = null;
+        return;
       }
-
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        audioBlobRef.current = audioBlob;
-        await processRecording(audioBlob, mimeType);
-      };
-
-      mediaRecorder.start(1000);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (prev >= MAX_RECORDING_SECONDS - 1) {
-            stopRecording();
-            toast({
-              title: "Maximum length reached",
-              description: "Recording automatically stopped at 90 minutes.",
-            });
-            return MAX_RECORDING_SECONDS;
-          }
-          return prev + 1;
-        });
-      }, 1000);
 
     } catch (error: any) {
       console.error("Error starting recording:", error);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
+      hookReset();
       setState("idle");
       recordingIdRef.current = null;
       
@@ -227,25 +227,13 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
         variant: "destructive",
       });
     }
-  }, [createRecordingMutation, toast]);
+  }, [createRecordingMutation, toast, hookStart, hookReset, browserSupport]);
 
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+  const stopRecording = useCallback(async () => {
+    await hookStop();
+  }, [hookStop]);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const processRecording = async (audioBlob: Blob, mimeType?: string) => {
+  const processRecording = async (audioBlob: Blob) => {
     setState("processing");
 
     if (!recordingIdRef.current) {
@@ -255,8 +243,8 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     }
 
     try {
-      const ext = audioBlob.type.includes("webm") ? "webm" : "m4a";
-      const file = new File([audioBlob], `meeting-${Date.now()}.${ext}`, {
+      const filename = createAudioFilename("meeting", audioBlob.type);
+      const file = new File([audioBlob], filename, {
         type: audioBlob.type,
       });
 
@@ -276,15 +264,6 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
 
     } catch (error) {
       console.error("Error processing recording:", error);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
 
       try {
         const saved = await savePendingRecording({
@@ -295,7 +274,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
           contactName: drop.contactName || undefined,
           businessPhone: drop.businessPhone || undefined,
           audioBlob: audioBlob,
-          mimeType: mimeType || audioBlob.type,
+          mimeType: audioBlob.type,
           durationSeconds: recordingTime,
         });
         setPendingRecording(saved);
@@ -326,8 +305,8 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     setPendingRecording(prev => prev ? { ...prev, retryCount: prev.retryCount + 1 } : null);
 
     try {
-      const ext = pendingRecording.mimeType.includes("webm") ? "webm" : "m4a";
-      const file = new File([pendingRecording.audioBlob], `meeting-${Date.now()}.${ext}`, {
+      const filename = createAudioFilename("meeting", pendingRecording.mimeType);
+      const file = new File([pendingRecording.audioBlob], filename, {
         type: pendingRecording.mimeType,
       });
 
@@ -363,6 +342,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     }
     audioBlobRef.current = null;
     recordingIdRef.current = null;
+    hookReset();
     setState("idle");
     setRecordingTime(0);
     setErrorMessage("");
@@ -375,6 +355,7 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
     setAnalysisResult(null);
     recordingIdRef.current = null;
     audioBlobRef.current = null;
+    hookReset();
   };
 
   if (state === "pending_upload" && pendingRecording) {
@@ -432,19 +413,22 @@ export function DropMeetingRecorder({ drop, onComplete }: DropMeetingRecorderPro
 
   if (state === "idle") {
     return (
-      <Button
-        onClick={startRecording}
-        disabled={createRecordingMutation.isPending}
-        className="w-full h-14 bg-purple-600 hover:bg-purple-700"
-        data-testid="button-start-drop-meeting-recording"
-      >
-        {createRecordingMutation.isPending ? (
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-        ) : (
-          <Mic className="w-5 h-5 mr-2" />
-        )}
-        Record Pickup Meeting
-      </Button>
+      <div className="space-y-3">
+        <AudioCompatibilityBanner support={browserSupport} compact />
+        <Button
+          onClick={startRecording}
+          disabled={createRecordingMutation.isPending || !browserSupport.isFullySupported}
+          className="w-full h-14 bg-purple-600 hover:bg-purple-700"
+          data-testid="button-start-drop-meeting-recording"
+        >
+          {createRecordingMutation.isPending ? (
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          ) : (
+            <Mic className="w-5 h-5 mr-2" />
+          )}
+          Record Pickup Meeting
+        </Button>
+      </div>
     );
   }
 
