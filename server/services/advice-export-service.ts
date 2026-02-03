@@ -94,6 +94,10 @@ Return ONLY the JSON, no other text.`,
 export async function generateAdvicePdf(options: AdviceExportOptions): Promise<Buffer> {
   const { content, title, subtitle, agentName } = options;
   
+  if (!content || content.trim().length === 0) {
+    throw new Error("Content is required for PDF generation");
+  }
+  
   console.log("[AdviceExport] Generating PDF for:", title);
   
   const { sections } = await formatContentWithClaude(content, title);
@@ -199,6 +203,10 @@ export async function generateAdvicePdf(options: AdviceExportOptions): Promise<B
 
 export async function generateAdviceWord(options: AdviceExportOptions): Promise<Buffer> {
   const { content, title, subtitle, agentName } = options;
+  
+  if (!content || content.trim().length === 0) {
+    throw new Error("Content is required for Word document generation");
+  }
   
   console.log("[AdviceExport] Generating Word document for:", title);
   
@@ -376,6 +384,14 @@ export async function generateAdviceWord(options: AdviceExportOptions): Promise<
 
 export async function emailAdvice(options: EmailAdviceOptions): Promise<void> {
   const { email, content, title, subtitle, agentName } = options;
+  
+  if (!email || !email.includes("@")) {
+    throw new Error("Valid email address is required");
+  }
+  
+  if (!content || content.trim().length === 0) {
+    throw new Error("Content is required for email");
+  }
   
   console.log("[AdviceExport] Sending email to:", email);
 

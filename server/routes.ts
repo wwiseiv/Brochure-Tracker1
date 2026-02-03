@@ -6697,17 +6697,34 @@ Remember: You're helping them practice real sales conversations. Be challenging 
   });
 
   // Advice Export Endpoints
+  const MAX_EXPORT_CONTENT_LENGTH = 50000; // 50KB limit for content
+  
   app.post("/api/export/advice-document", isAuthenticated, async (req: any, res) => {
     try {
       const { content, title, subtitle, format } = req.body;
       
-      if (!content || !title || !format) {
-        return res.status(400).json({ error: "Content, title, and format are required" });
+      // Validate required fields
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Content is required and must be a non-empty string" });
+      }
+      
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required and must be a non-empty string" });
       }
       
       if (format !== "pdf" && format !== "docx") {
         return res.status(400).json({ error: "Format must be 'pdf' or 'docx'" });
       }
+      
+      // Limit content length to prevent abuse
+      if (content.length > MAX_EXPORT_CONTENT_LENGTH) {
+        return res.status(400).json({ error: `Content exceeds maximum length of ${MAX_EXPORT_CONTENT_LENGTH} characters` });
+      }
+      
+      // Sanitize inputs
+      const sanitizedTitle = title.trim().substring(0, 200);
+      const sanitizedSubtitle = subtitle ? String(subtitle).trim().substring(0, 500) : undefined;
+      const sanitizedContent = content.trim();
 
       const userId = req.user?.id;
       const member = await storage.getOrganizationMemberByUserId(userId, null);
@@ -6716,14 +6733,14 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       const { generateAdvicePdf, generateAdviceWord } = await import("./services/advice-export-service");
       
       if (format === "pdf") {
-        const pdfBuffer = await generateAdvicePdf({ content, title, subtitle, format: "pdf", agentName });
+        const pdfBuffer = await generateAdvicePdf({ content: sanitizedContent, title: sanitizedTitle, subtitle: sanitizedSubtitle, format: "pdf", agentName });
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-z0-9]/gi, "_")}.pdf"`);
+        res.setHeader("Content-Disposition", `attachment; filename="${sanitizedTitle.replace(/[^a-z0-9]/gi, "_")}.pdf"`);
         res.send(pdfBuffer);
       } else {
-        const docxBuffer = await generateAdviceWord({ content, title, subtitle, format: "docx", agentName });
+        const docxBuffer = await generateAdviceWord({ content: sanitizedContent, title: sanitizedTitle, subtitle: sanitizedSubtitle, format: "docx", agentName });
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-z0-9]/gi, "_")}.docx"`);
+        res.setHeader("Content-Disposition", `attachment; filename="${sanitizedTitle.replace(/[^a-z0-9]/gi, "_")}.docx"`);
         res.send(docxBuffer);
       }
     } catch (error: any) {
@@ -6736,9 +6753,29 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     try {
       const { email, content, title, subtitle } = req.body;
       
-      if (!email || !content || !title) {
-        return res.status(400).json({ error: "Email, content, and title are required" });
+      // Validate required fields
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ error: "Valid email address is required" });
       }
+      
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Content is required and must be a non-empty string" });
+      }
+      
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required and must be a non-empty string" });
+      }
+      
+      // Limit content length to prevent abuse
+      if (content.length > MAX_EXPORT_CONTENT_LENGTH) {
+        return res.status(400).json({ error: `Content exceeds maximum length of ${MAX_EXPORT_CONTENT_LENGTH} characters` });
+      }
+      
+      // Sanitize inputs
+      const sanitizedEmail = email.trim().toLowerCase().substring(0, 254);
+      const sanitizedTitle = title.trim().substring(0, 200);
+      const sanitizedSubtitle = subtitle ? String(subtitle).trim().substring(0, 500) : undefined;
+      const sanitizedContent = content.trim();
 
       const userId = req.user?.id;
       const member = await storage.getOrganizationMemberByUserId(userId, null);
@@ -6746,7 +6783,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       
       const { emailAdvice } = await import("./services/advice-export-service");
       
-      await emailAdvice({ email, content, title, subtitle, agentName });
+      await emailAdvice({ email: sanitizedEmail, content: sanitizedContent, title: sanitizedTitle, subtitle: sanitizedSubtitle, agentName });
       
       res.json({ success: true, message: "Email sent successfully" });
     } catch (error: any) {
