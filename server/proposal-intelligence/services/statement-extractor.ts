@@ -134,13 +134,22 @@ export async function extractStatementFromFiles(
 async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
   console.log(`[StatementExtractor] Analyzing PDF with Claude, buffer size: ${buffer.length}`);
   
-  // Use pdf-parse to extract text from PDF (more compatible with AI Integrations proxy)
+  // Try pdf-parse first, but fallback to Claude's native PDF support if it fails
+  let pdfText: string | null = null;
+  
   try {
     console.log(`[StatementExtractor] Extracting text from PDF using pdf-parse...`);
     const pdfData = await pdfParse(buffer);
-    const pdfText = pdfData.text;
-    console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText.length}, pages: ${pdfData.numpages}`);
-    
+    pdfText = pdfData.text;
+    console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText?.length || 0}, pages: ${pdfData.numpages}`);
+  } catch (parseError: any) {
+    // pdf-parse failed (common issue with "P4e/d4e is not a function" errors)
+    // This happens with certain PDF structures - fallback to Claude's native PDF support
+    console.warn(`[StatementExtractor] pdf-parse failed: ${parseError?.message}. Falling back to Claude native PDF analysis.`);
+    pdfText = null;
+  }
+  
+  try {
     if (pdfText && pdfText.trim().length > 100) {
       // PDF has extractable text, use text-based analysis
       console.log(`[StatementExtractor] Using text-based PDF analysis`);
@@ -160,8 +169,8 @@ async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promi
       
       return parseExtractedData(responseText);
     } else {
-      // PDF is likely scanned/image-based, try native document type as fallback
-      console.log(`[StatementExtractor] PDF appears to be scanned/image-based, using native document type`);
+      // PDF text extraction failed or PDF is scanned/image-based, use native document type
+      console.log(`[StatementExtractor] Using Claude native PDF document analysis (pdf-parse failed or PDF is scanned)`);
       const base64 = buffer.toString("base64");
       
       const response = await anthropic.messages.create({
