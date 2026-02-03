@@ -230,6 +230,56 @@ export default function DealPipelinePage() {
     queryKey: ["/api/deals"],
   });
 
+  const { data: demoDataStatus, refetch: refetchDemoStatus } = useQuery<{ exists: boolean }>({
+    queryKey: ["/api/user/demo-deals/status"],
+  });
+
+  const deleteDemoDataMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/user/demo-deals");
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Demo data removed",
+        description: data.message || "Successfully deleted demo deals",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/demo-deals/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/pipeline-counts"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete demo data",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const seedDemoDataMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/user/demo-deals/seed");
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Demo data created",
+        description: data.message || "Sample deals have been added to your pipeline",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/demo-deals/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals/pipeline-counts"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to create demo data",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: activitiesData, isLoading: loadingActivities, refetch: refetchActivities } = useQuery<DealActivity[]>({
     queryKey: ["/api/deals", selectedDeal?.id, "activities"],
     queryFn: async () => {
@@ -1184,6 +1234,62 @@ export default function DealPipelinePage() {
           </div>
         </div>
       </header>
+
+      {demoDataStatus?.exists && (
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 py-2">
+          <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-md px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <span className="text-sm text-amber-800 dark:text-amber-200 truncate">
+                You have sample deals for training. Delete when you're ready for real data.
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 bg-white dark:bg-background hover:bg-amber-50 dark:hover:bg-amber-900/50 border-amber-400 text-amber-700 dark:text-amber-300"
+              onClick={() => deleteDemoDataMutation.mutate()}
+              disabled={deleteDemoDataMutation.isPending}
+              data-testid="button-delete-demo-data"
+            >
+              {deleteDemoDataMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <X className="w-4 h-4 mr-1" />
+              )}
+              Remove
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!demoDataStatus?.exists && (!dealsData || dealsData.length === 0) && !isLoading && (
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 py-2">
+          <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-md px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-sm text-blue-800 dark:text-blue-200 truncate">
+                Want to see the pipeline in action? Load sample deals for training.
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 bg-white dark:bg-background hover:bg-blue-50 dark:hover:bg-blue-900/50 border-blue-400 text-blue-700 dark:text-blue-300"
+              onClick={() => seedDemoDataMutation.mutate()}
+              disabled={seedDemoDataMutation.isPending}
+              data-testid="button-seed-demo-data"
+            >
+              {seedDemoDataMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <Plus className="w-4 h-4 mr-1" />
+              )}
+              Load Samples
+            </Button>
+          </div>
+        </div>
+      )}
 
       <main className={`${viewMode === 'kanban' ? 'w-full px-4' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
         {isLoading ? (
