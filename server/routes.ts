@@ -3454,7 +3454,7 @@ Follow-up attempts: ${followUpCount || 0}
 Notes: ${notes || "No notes provided"}`;
 
       const response = await client.chat.completions.create({
-        model: "claude-sonnet-4-5",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage }
