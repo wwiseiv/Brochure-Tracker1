@@ -832,6 +832,14 @@ function SessionHistoryCard({
                   <span className="text-xs font-medium text-muted-foreground">Session Feedback:</span>
                   <AdviceExportToolbar
                     content={[
+                      // Conversation Transcript
+                      sessionMessages.length > 0 ? `CONVERSATION TRANSCRIPT\n${"=".repeat(50)}\n${sessionMessages.map(msg => 
+                        msg.role === "user" 
+                          ? `Agent: ${msg.content}` 
+                          : `Prospect: ${msg.content}`
+                      ).join("\n\n")}\n\n` : "",
+                      // Feedback Section
+                      `${"=".repeat(50)}\nPERFORMANCE FEEDBACK\n${"=".repeat(50)}\n`,
                       `Overall Score: ${sessionFeedback.overallScore}/100`,
                       sessionFeedback.strengths?.length ? `\nStrengths:\n${sessionFeedback.strengths.map(s => `• ${s}`).join("\n")}` : "",
                       sessionFeedback.areasToImprove?.length ? `\nAreas to Improve:\n${sessionFeedback.areasToImprove.map(a => `• ${a}`).join("\n")}` : "",
@@ -1778,6 +1786,14 @@ export default function CoachPage() {
                 <Progress value={feedback.overallScore} className="h-3 mb-4" />
                 <AdviceExportToolbar
                   content={[
+                    // Conversation Transcript
+                    messages.length > 0 ? `CONVERSATION TRANSCRIPT\n${"=".repeat(50)}\n${messages.map(msg => 
+                      msg.role === "user" 
+                        ? `Agent: ${msg.content}` 
+                        : `Prospect: ${msg.content}`
+                    ).join("\n\n")}\n\n` : "",
+                    // Feedback Section
+                    `${"=".repeat(50)}\nPERFORMANCE FEEDBACK\n${"=".repeat(50)}\n`,
                     `Overall Score: ${feedback.overallScore}/100`,
                     feedback.strengths?.length ? `\nStrengths:\n${feedback.strengths.map(s => `• ${s}`).join("\n")}` : "",
                     feedback.areasToImprove?.length ? `\nAreas to Improve:\n${feedback.areasToImprove.map(a => `• ${a}`).join("\n")}` : "",
