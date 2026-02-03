@@ -284,7 +284,7 @@ export function HamburgerMenu() {
           <SheetTitle className="text-left">Menu</SheetTitle>
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-60px)]">
-          <div className="py-2">
+          <div className="py-2 pb-24">
             {filteredCategories.map((category) => (
               <div key={category.title} className="mb-2">
                 <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
