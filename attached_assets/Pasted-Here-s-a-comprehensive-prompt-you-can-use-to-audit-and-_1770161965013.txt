@@ -1,0 +1,239 @@
+Here's a comprehensive prompt you can use to audit and enhance the training module:
+
+---
+
+## PCBancard Sales Training Module - Quality Assurance & Enhancement Prompt
+
+### CONTEXT
+You are reviewing the PCBancard Sales Training 2026 HTML module for the Field Sales Intelligence Suite. This is a standalone, shareable training resource for merchant services sales agents. The module contains 4 sales phases, a quiz system, and a resources section.
+
+### PRIMARY OBJECTIVES
+Conduct a thorough audit and enhancement of the following areas:
+
+---
+
+### 1. CODE & FUNCTIONALITY ERRORS
+
+**Check and fix:**
+- [ ] All JavaScript functions work correctly (phase switching, quiz logic, answer selection, score calculation, reset functionality)
+- [ ] CSS styling renders consistently across Chrome, Firefox, Safari, Edge
+- [ ] Mobile responsiveness - test at 320px, 768px, 1024px, 1440px breakpoints
+- [ ] All interactive elements have proper hover/focus/active states
+- [ ] No console errors or warnings
+- [ ] Smooth scroll behavior and transitions
+- [ ] Print stylesheet functionality
+- [ ] LocalStorage conflicts (if any quiz progress saving is added)
+
+**Validate:**
+- [ ] All external links open in new tabs (`target="_blank"`)
+- [ ] All links include `rel="noopener noreferrer"` for security
+- [ ] Test every PDF link for 404 errors
+- [ ] Test every video link (Vimeo) for accessibility
+- [ ] Test every form/portal link for functionality
+- [ ] Verify email addresses are correct and clickable (`mailto:`)
+- [ ] Verify phone numbers are clickable (`tel:`)
+
+---
+
+### 2. CONTENT ACCURACY AUDIT
+
+**Verify against source documents:**
+- [ ] All dollar amounts match PCBancard official pricing ($64.95 program fee, $10 portal fee, $99 PCI fee, etc.)
+- [ ] All contact information is current (names, emails, phone numbers, roles)
+- [ ] Office hours are accurate (8:30 AM - 5:00 PM EST)
+- [ ] All scripts match the official PCBancard 2026 Sales Process document verbatim
+- [ ] All questionnaire questions are complete and in correct order
+- [ ] Savings chart calculations are mathematically accurate
+- [ ] Target industries list is complete per P Series Industry Guide
+- [ ] Onboarding steps and timelines are accurate (2-day FedEx, 30-day PCI, etc.)
+- [ ] Email automation series names and enrollment links are correct
+
+**Flag for review:**
+- Any content that may have changed since document creation
+- Any pricing or policy information that needs verification
+- Any broken or redirected URLs
+
+---
+
+### 3. NAVIGATION & UX IMPROVEMENTS
+
+**Enhance navigation:**
+- [ ] Add breadcrumb trail showing current location (Training > Phase 2: Discovery)
+- [ ] Add "Back to Top" floating button for long sections
+- [ ] Add keyboard navigation support (arrow keys for phases, Enter for selection)
+- [ ] Add progress indicator for training completion
+- [ ] Add "Mark as Complete" checkboxes for each phase
+- [ ] Implement smooth scroll to sections when switching phases
+- [ ] Add search/filter functionality for Resources section
+- [ ] Add collapsible/expandable cards for dense content sections
+
+**Menu enhancements:**
+- [ ] Add dropdown submenu for quick-jump to specific content within phases
+- [ ] Add "Quick Actions" menu (Start Quiz, View Resources, Contact Support)
+- [ ] Add phase completion status indicators (checkmarks, progress bars)
+- [ ] Consider adding a sidebar navigation for desktop view
+
+**Mobile improvements:**
+- [ ] Hamburger menu for header navigation on mobile
+- [ ] Swipe gestures for phase navigation
+- [ ] Bottom navigation bar for primary actions
+- [ ] Touch-friendly button sizes (minimum 44px tap targets)
+
+---
+
+### 4. TOOLTIPS & CONTEXTUAL HELP
+
+**Add tooltips to:**
+- [ ] Industry terms (Interchange, PCI Compliance, Dual Pricing, Surcharging, etc.)
+- [ ] Acronyms (POS, ACH, ISO, etc.)
+- [ ] Fee breakdowns (explain what each fee covers)
+- [ ] Contact roles (explain when to contact each person)
+- [ ] Document names (explain purpose of each questionnaire/form)
+- [ ] Formula numbers (explain what each metric means in 5-9-4-2-25)
+
+**Tooltip implementation:**
+```html
+<span class="tooltip" data-tip="Payment Card Industry Data Security Standard - Required compliance for accepting credit cards">PCI Compliance</span>
+```
+
+**Add contextual help icons (?) next to:**
+- Complex concepts in scripts
+- Technical requirements in onboarding
+- Calculation methods in savings chart
+- Quiz questions (hint system)
+
+---
+
+### 5. AI HELP SYSTEM INTEGRATION
+
+**Implement AI Assistant features:**
+
+**A. Floating Help Button**
+- Position: Bottom-right corner
+- Icon: Chat bubble or "?" icon
+- Expands to chat interface on click
+
+**B. Contextual AI Suggestions**
+- Detect current phase/section
+- Offer relevant tips based on context
+- Examples:
+  - Phase 1: "Need help customizing the drop-in script for a specific industry?"
+  - Phase 2: "Want me to explain any of these discovery questions in more detail?"
+  - Phase 3: "Would you like help calculating savings for a specific merchant volume?"
+  - Quiz: "Stuck on a question? I can provide a hint without giving the answer."
+
+**C. AI-Powered Features to Add:**
+```javascript
+// AI Help System Functions
+const aiHelpSystem = {
+  // Script customization
+  customizeScript: (industry, area, repName) => {},
+  
+  // Savings calculator
+  calculateSavings: (monthlyVolume, currentRate) => {},
+  
+  // Objection handler
+  getObjectionResponse: (objection) => {},
+  
+  // Quiz hints
+  getQuizHint: (questionIndex) => {},
+  
+  // Role-play practice
+  startRolePlay: (scenario) => {},
+  
+  // Document explainer
+  explainDocument: (docName) => {},
+  
+  // Process navigator
+  getNextStep: (currentPhase, completedActions) => {}
+};
+```
+
+**D. Pre-built AI Prompts/Quick Actions:**
+- "Customize this script for [industry]"
+- "What should I say if merchant says [objection]?"
+- "Explain [term] in simple terms"
+- "Generate a follow-up email for [situation]"
+- "Quiz me on Phase [X] content"
+- "What documents do I need for [scenario]?"
+- "Calculate savings for $[X] monthly volume"
+
+**E. Smart Search:**
+- Natural language search across all content
+- "How do I handle PCI compliance?" → Jumps to relevant section
+- "What's Jason's number?" → Shows contact info
+- "Show me the closing script" → Highlights closing script card
+
+---
+
+### 6. ACCESSIBILITY COMPLIANCE (WCAG 2.1 AA)
+
+**Check and fix:**
+- [ ] All images have alt text (add any missing)
+- [ ] Color contrast ratios meet 4.5:1 minimum
+- [ ] Focus indicators are visible for all interactive elements
+- [ ] Screen reader compatibility (proper heading hierarchy, ARIA labels)
+- [ ] Form labels properly associated with inputs
+- [ ] Skip navigation link for keyboard users
+- [ ] Reduced motion option for animations
+- [ ] Text resizable to 200% without horizontal scroll
+
+---
+
+### 7. PERFORMANCE OPTIMIZATION
+
+**Optimize:**
+- [ ] Minimize inline CSS (consider external stylesheet)
+- [ ] Lazy load any images if added
+- [ ] Optimize JavaScript (debounce scroll events, etc.)
+- [ ] Add loading states for any async operations
+- [ ] Consider code splitting if file grows large
+
+---
+
+### 8. ADDITIONAL FEATURES TO CONSIDER
+
+**Tracking & Analytics:**
+- [ ] Track phase completion
+- [ ] Track quiz attempts and scores
+- [ ] Track resource link clicks
+- [ ] Track time spent per section
+
+**Gamification:**
+- [ ] Completion badges for each phase
+- [ ] Quiz leaderboard (if multi-user)
+- [ ] Progress achievements
+- [ ] Certification upon 100% completion
+
+**Offline Support:**
+- [ ] Service worker for offline access
+- [ ] Cache critical resources
+- [ ] Offline indicator
+
+---
+
+### OUTPUT FORMAT
+
+Please provide:
+1. **Error Report** - List of all issues found with severity (Critical/High/Medium/Low)
+2. **Fixed Code** - Complete corrected HTML file
+3. **Enhancement Summary** - List of all improvements made
+4. **Recommendations** - Prioritized list of additional enhancements for future iterations
+
+---
+
+### TESTING CHECKLIST
+
+Before finalizing, verify:
+- [ ] Fresh browser test (clear cache)
+- [ ] Mobile device test (actual device, not just emulator)
+- [ ] All 4 phases load and display correctly
+- [ ] Quiz completes full cycle (answer all → submit → review → reset)
+- [ ] All 20+ external links work
+- [ ] Print preview looks acceptable
+- [ ] File size is reasonable (<500KB)
+- [ ] No JavaScript errors in console
+
+---
+
+**START AUDIT NOW**

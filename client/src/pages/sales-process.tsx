@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +10,24 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { HamburgerMenu } from "@/components/BottomNav";
 import { AdviceExportToolbar } from "@/components/AdviceExportToolbar";
 import {
   ArrowLeft,
+  ArrowUp,
   Target,
   Search,
   Handshake,
   Rocket,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Copy,
   ExternalLink,
   Phone,
@@ -32,8 +40,44 @@ import {
   Lightbulb,
   Building2,
   Users,
+  HelpCircle,
+  Bot,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const glossary: Record<string, string> = {
+  "Dual Pricing": "Display cash and card prices separately, eliminating processing fees for the merchant",
+  "Interchange": "Base cost card networks (Visa, Mastercard) charge to process transactions",
+  "PCI Compliance": "Payment Card Industry Data Security Standard - security requirements for handling card data",
+  "Surcharging": "Adding a fee to credit card transactions only to offset processing costs",
+  "Processing Statement": "Monthly statement showing all card transaction fees and volume",
+  "ETF": "Early Termination Fee - penalty for canceling before contract end (PCBancard has none!)",
+};
+
+function GlossaryTerm({ term, children }: { term: string; children: React.ReactNode }) {
+  const definition = glossary[term];
+  if (!definition) return <>{children}</>;
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span 
+          className="underline decoration-dotted decoration-primary/50 cursor-help"
+          tabIndex={0}
+          role="button"
+          aria-label={`${term}: ${definition}`}
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p className="font-semibold text-sm">{term}</p>
+        <p className="text-xs text-muted-foreground">{definition}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 const phaseIcons = {
   Prospecting: Target,
@@ -289,11 +333,163 @@ Thank you. I will see you on ___ at ___.`,
   ]
 };
 
+function PhaseProgressIndicator({ activePhase, onPhaseClick }: { activePhase: number; onPhaseClick: (id: number) => void }) {
+  return (
+    <nav aria-label="Sales process phases" className="flex items-center justify-between mb-4 px-2">
+      {salesProcessData.phases.map((phase, index) => {
+        const Icon = phaseIcons[phase.name as keyof typeof phaseIcons] || Target;
+        const isActive = phase.id === activePhase;
+        const isCompleted = phase.id < activePhase;
+        
+        return (
+          <div key={phase.id} className="flex items-center flex-1">
+            <button
+              onClick={() => onPhaseClick(phase.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPhaseClick(phase.id);
+                }
+              }}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                isActive ? 'scale-105' : 'hover:scale-102'
+              }`}
+              aria-label={`Phase ${phase.id}: ${phase.name}${isCompleted ? ' (completed)' : isActive ? ' (current)' : ''}`}
+              aria-current={isActive ? 'step' : undefined}
+              role="button"
+              tabIndex={0}
+              data-testid={`progress-phase-${phase.id}`}
+            >
+              <div className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                isActive 
+                  ? phaseColors[phase.name as keyof typeof phaseColors] + ' text-white shadow-lg' 
+                  : isCompleted 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-muted text-muted-foreground'
+              }`}>
+                {isCompleted ? (
+                  <Check className="w-5 h-5" aria-hidden="true" />
+                ) : (
+                  <Icon className="w-5 h-5" aria-hidden="true" />
+                )}
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-background border text-[10px] font-bold flex items-center justify-center">
+                  {phase.id}
+                </span>
+              </div>
+              <span className={`text-[10px] font-medium text-center ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                {phase.name}
+              </span>
+            </button>
+            {index < salesProcessData.phases.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-1 ${isCompleted ? 'bg-green-500' : 'bg-border'}`} aria-hidden="true" />
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Breadcrumb({ currentPhase }: { currentPhase?: SalesPhase }) {
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
+      <Link href="/coach">
+        <span className="hover:text-foreground cursor-pointer transition-colors" tabIndex={0}>Training</span>
+      </Link>
+      <ChevronRight className="w-3 h-3" aria-hidden="true" />
+      <span className="hover:text-foreground cursor-pointer transition-colors">Phases</span>
+      {currentPhase && (
+        <>
+          <ChevronRight className="w-3 h-3" aria-hidden="true" />
+          <span className="text-foreground font-medium">{currentPhase.name}</span>
+        </>
+      )}
+    </nav>
+  );
+}
+
+function AIHelpButton({ context, className = "" }: { context?: string; className?: string }) {
+  const handleOpenAIHelp = useCallback(() => {
+    const chatButton = document.querySelector('[data-testid="button-help-chatbot-open"]') as HTMLButtonElement;
+    if (chatButton) {
+      chatButton.click();
+    }
+  }, []);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleOpenAIHelp}
+      className={`gap-1.5 ${className}`}
+      aria-label={context ? `Get AI help with ${context}` : "Get AI help"}
+      data-testid="button-contextual-ai-help"
+    >
+      <Bot className="w-3 h-3" aria-hidden="true" />
+      <span className="text-xs">AI Help</span>
+    </Button>
+  );
+}
+
+function FloatingAIButton() {
+  const handleOpenAIHelp = useCallback(() => {
+    const chatButton = document.querySelector('[data-testid="button-help-chatbot-open"]') as HTMLButtonElement;
+    if (chatButton) {
+      chatButton.click();
+    }
+  }, []);
+
+  return (
+    <Button
+      onClick={handleOpenAIHelp}
+      size="icon"
+      className="fixed bottom-20 left-4 z-40 shadow-lg rounded-full w-12 h-12"
+      aria-label="Ask AI for help"
+      data-testid="button-floating-ai-help"
+    >
+      <HelpCircle className="w-5 h-5" aria-hidden="true" />
+    </Button>
+  );
+}
+
+function BackToTopButton() {
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  if (!showBackToTop) return null;
+
+  return (
+    <Button
+      onClick={scrollToTop}
+      size="icon"
+      variant="secondary"
+      className="fixed bottom-20 right-4 z-40 shadow-lg rounded-full w-10 h-10"
+      aria-label="Scroll back to top"
+      data-testid="button-back-to-top"
+    >
+      <ArrowUp className="w-4 h-4" aria-hidden="true" />
+    </Button>
+  );
+}
+
 export default function SalesProcessPage() {
   const { toast } = useToast();
   const [activePhase, setActivePhase] = useState<number>(1);
   const [expandedScripts, setExpandedScripts] = useState<Record<string, boolean>>({});
   const [expandedObjections, setExpandedObjections] = useState<Record<number, boolean>>({});
+  const [activeTab, setActiveTab] = useState("phases");
 
   const toggleScript = (scriptName: string) => {
     setExpandedScripts(prev => ({ ...prev, [scriptName]: !prev[scriptName] }));
@@ -308,349 +504,489 @@ export default function SalesProcessPage() {
     toast({ title: "Copied to clipboard" });
   };
 
+  const handlePhaseClick = useCallback((id: number) => {
+    setActivePhase(id);
+    setActiveTab("phases");
+  }, []);
+
   const currentPhase = salesProcessData.phases.find(p => p.id === activePhase);
   const PhaseIcon = currentPhase ? phaseIcons[currentPhase.name as keyof typeof phaseIcons] || Target : Target;
   const phaseColor = currentPhase ? phaseColors[currentPhase.name as keyof typeof phaseColors] || "bg-primary" : "bg-primary";
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="flex items-center justify-between p-3">
-          <div className="flex items-center gap-2">
-            <HamburgerMenu />
-            <Link href="/coach">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+    <TooltipProvider>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+          <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-green-600" />
-              <span className="font-semibold">2026 Sales Process</span>
+              <HamburgerMenu />
+              <Link href="/coach">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  data-testid="button-back"
+                  aria-label="Go back to coaching page"
+                >
+                  <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                </Button>
+              </Link>
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-green-600" aria-hidden="true" />
+                <h1 className="font-semibold">2026 Sales Process</h1>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="p-4 pb-24 max-w-4xl mx-auto space-y-6">
-        <Tabs defaultValue="phases" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
-            <TabsTrigger value="phases" data-testid="tab-phases">Phases</TabsTrigger>
-            <TabsTrigger value="objections" data-testid="tab-objections">Objections</TabsTrigger>
-            <TabsTrigger value="industries" data-testid="tab-industries">Industries</TabsTrigger>
-            <TabsTrigger value="contacts" data-testid="tab-contacts">Contacts</TabsTrigger>
-          </TabsList>
+        <main className="p-4 pb-24 max-w-4xl mx-auto space-y-6" role="main">
+          <Breadcrumb currentPhase={activeTab === "phases" ? currentPhase : undefined} />
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4" role="tablist">
+              <TabsTrigger value="phases" data-testid="tab-phases" role="tab" aria-selected={activeTab === "phases"}>Phases</TabsTrigger>
+              <TabsTrigger value="objections" data-testid="tab-objections" role="tab" aria-selected={activeTab === "objections"}>Objections</TabsTrigger>
+              <TabsTrigger value="industries" data-testid="tab-industries" role="tab" aria-selected={activeTab === "industries"}>Industries</TabsTrigger>
+              <TabsTrigger value="contacts" data-testid="tab-contacts" role="tab" aria-selected={activeTab === "contacts"}>Contacts</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="phases" className="space-y-4">
-            <div className="grid grid-cols-4 gap-2">
-              {salesProcessData.phases.map((phase) => {
-                const Icon = phaseIcons[phase.name as keyof typeof phaseIcons] || Target;
-                const color = phaseColors[phase.name as keyof typeof phaseColors] || "bg-primary";
-                return (
-                  <button
-                    key={phase.id}
-                    onClick={() => setActivePhase(phase.id)}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      activePhase === phase.id
-                        ? `border-current ${color.replace('bg-', 'text-')} bg-opacity-10`
-                        : "border-border hover:border-primary/50"
-                    }`}
-                    data-testid={`phase-button-${phase.id}`}
-                  >
-                    <Icon className={`w-5 h-5 mx-auto mb-1 ${activePhase === phase.id ? color.replace('bg-', 'text-') : 'text-muted-foreground'}`} />
-                    <div className="text-xs font-medium truncate">{phase.name}</div>
-                  </button>
-                );
-              })}
-            </div>
+            <TabsContent value="phases" className="space-y-4" role="tabpanel">
+              <PhaseProgressIndicator activePhase={activePhase} onPhaseClick={handlePhaseClick} />
+              
+              <div className="grid grid-cols-4 gap-2">
+                {salesProcessData.phases.map((phase) => {
+                  const Icon = phaseIcons[phase.name as keyof typeof phaseIcons] || Target;
+                  const color = phaseColors[phase.name as keyof typeof phaseColors] || "bg-primary";
+                  return (
+                    <button
+                      key={phase.id}
+                      onClick={() => setActivePhase(phase.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setActivePhase(phase.id);
+                        }
+                      }}
+                      className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                        activePhase === phase.id
+                          ? `border-current ${color.replace('bg-', 'text-')} bg-opacity-10`
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      data-testid={`phase-button-${phase.id}`}
+                      aria-label={`Select phase ${phase.id}: ${phase.name}`}
+                      aria-pressed={activePhase === phase.id}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <Icon className={`w-5 h-5 mx-auto mb-1 ${activePhase === phase.id ? color.replace('bg-', 'text-') : 'text-muted-foreground'}`} aria-hidden="true" />
+                      <div className="text-xs font-medium truncate">{phase.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
 
-            {currentPhase && (
-              <Card className="p-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className={`w-12 h-12 rounded-lg ${phaseColor} flex items-center justify-center flex-shrink-0`}>
-                    <PhaseIcon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="font-bold text-lg">{currentPhase.title}</h2>
-                    <p className="text-sm text-muted-foreground">{currentPhase.objective}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    Key Activities
-                  </h3>
-                  <ul className="space-y-1">
-                    {currentPhase.keyActivities.map((activity, i) => (
-                      <li key={i} className="text-sm flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>{activity}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {currentPhase.scripts.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-blue-600" />
-                      Scripts
-                    </h3>
-                    <div className="space-y-2">
-                      {currentPhase.scripts.map((script, i) => (
-                        <Collapsible
-                          key={i}
-                          open={expandedScripts[script.name]}
-                          onOpenChange={() => toggleScript(script.name)}
-                        >
-                          <Card className="p-3 border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
-                            <CollapsibleTrigger className="w-full flex items-center justify-between">
-                              <span className="font-medium text-sm">{script.name}</span>
-                              {expandedScripts[script.name] ? (
-                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              )}
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="mt-3 space-y-3">
-                              <div className="relative">
-                                <div className="bg-background p-3 rounded-lg border text-sm whitespace-pre-wrap">
-                                  "{script.content}"
-                                </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => copyToClipboard(script.content)}
-                                    data-testid={`copy-script-${i}`}
-                                  >
-                                    <Copy className="w-3 h-3 mr-1" />
-                                    Copy
-                                  </Button>
-                                  <AdviceExportToolbar
-                                    content={`${script.name}\n\n"${script.content}"\n\nTips:\n${script.tips.map(t => `• ${t}`).join('\n')}`}
-                                    title={script.name}
-                                    subtitle="PCBancard Sales Script"
-                                    variant="inline"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-xs font-medium text-muted-foreground mb-1">Tips:</div>
-                                <ul className="text-xs space-y-1">
-                                  {script.tips.map((tip, j) => (
-                                    <li key={j} className="flex items-start gap-1">
-                                      <Lightbulb className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                                      <span>{tip}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </CollapsibleContent>
-                          </Card>
-                        </Collapsible>
-                      ))}
+              {currentPhase && (
+                <Card className="p-4 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-12 h-12 rounded-lg ${phaseColor} flex items-center justify-center flex-shrink-0`}>
+                      <PhaseIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="font-bold text-lg">{currentPhase.title}</h2>
+                      <p className="text-sm text-muted-foreground">{currentPhase.objective}</p>
                     </div>
                   </div>
-                )}
 
-                {currentPhase.tips.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-amber-500" />
-                      Pro Tips
+                      <CheckCircle className="w-4 h-4 text-green-600" aria-hidden="true" />
+                      Key Activities
                     </h3>
-                    <ul className="space-y-1">
-                      {currentPhase.tips.map((tip, i) => (
+                    <ul className="space-y-1" role="list">
+                      {currentPhase.keyActivities.map((activity, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
-                          <span className="text-amber-500">•</span>
-                          <span>{tip}</span>
+                          <span className="text-primary" aria-hidden="true">•</span>
+                          <span>
+                            {activity.includes("Dual Pricing") ? (
+                              <>
+                                {activity.split("Dual Pricing")[0]}
+                                <GlossaryTerm term="Dual Pricing">Dual Pricing</GlossaryTerm>
+                                {activity.split("Dual Pricing")[1]}
+                              </>
+                            ) : activity.includes("processing statement") ? (
+                              <>
+                                {activity.split("processing statement")[0]}
+                                <GlossaryTerm term="Processing Statement">processing statement</GlossaryTerm>
+                                {activity.split("processing statement")[1]}
+                              </>
+                            ) : activity.includes("PCI compliance") ? (
+                              <>
+                                {activity.split("PCI compliance")[0]}
+                                <GlossaryTerm term="PCI Compliance">PCI compliance</GlossaryTerm>
+                                {activity.split("PCI compliance")[1]}
+                              </>
+                            ) : (
+                              activity
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>
                   </div>
-                )}
 
-                {currentPhase.resources.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-primary" />
-                      Resources
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {currentPhase.resources.map((resource, i) => (
-                        <a
-                          key={i}
-                          href={resource.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent/50 transition-colors"
-                        >
-                          {resource.type === "video" ? (
-                            <Video className="w-4 h-4 text-red-500" />
-                          ) : (
-                            <FileText className="w-4 h-4 text-blue-500" />
-                          )}
-                          <span className="text-xs font-medium truncate">{resource.name}</span>
-                          <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto flex-shrink-0" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="objections" className="space-y-4">
-            <Card className="p-4">
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-orange-500" />
-                Common Objections & Responses
-              </h2>
-              <div className="space-y-3">
-                {salesProcessData.objectionHandling.map((obj, i) => (
-                  <Collapsible
-                    key={i}
-                    open={expandedObjections[i]}
-                    onOpenChange={() => toggleObjection(i)}
-                  >
-                    <Card className="p-3 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
-                      <CollapsibleTrigger className="w-full flex items-start justify-between gap-2">
-                        <span className="font-medium text-sm text-left">"{obj.objection}"</span>
-                        {expandedObjections[i] ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        )}
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-3 space-y-3">
-                        <div className="space-y-2">
-                          <div className="text-xs font-medium text-green-600">Responses:</div>
-                          {obj.responses.map((response, j) => (
-                            <div key={j} className="bg-background p-3 rounded-lg border text-sm">
-                              "{response}"
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="mt-2"
-                                onClick={() => copyToClipboard(response)}
+                  {currentPhase.scripts.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                        Scripts
+                      </h3>
+                      <div className="space-y-2">
+                        {currentPhase.scripts.map((script, i) => (
+                          <Collapsible
+                            key={i}
+                            open={expandedScripts[script.name]}
+                            onOpenChange={() => toggleScript(script.name)}
+                          >
+                            <Card className="p-3 border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+                              <CollapsibleTrigger 
+                                className="w-full flex items-center justify-between"
+                                aria-expanded={expandedScripts[script.name]}
+                                aria-label={`${expandedScripts[script.name] ? 'Collapse' : 'Expand'} ${script.name} script`}
                               >
-                                <Copy className="w-3 h-3 mr-1" />
-                                Copy
-                              </Button>
+                                <span className="font-medium text-sm">{script.name}</span>
+                                {expandedScripts[script.name] ? (
+                                  <ChevronUp className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                                )}
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-3 space-y-3">
+                                <div className="relative">
+                                  <div className="bg-background p-3 rounded-lg border text-sm whitespace-pre-wrap">
+                                    "{script.content.includes("Dual Pricing") ? (
+                                      <>
+                                        {script.content.split("Dual Pricing")[0]}
+                                        <GlossaryTerm term="Dual Pricing">Dual Pricing</GlossaryTerm>
+                                        {script.content.split("Dual Pricing").slice(1).join("Dual Pricing")}
+                                      </>
+                                    ) : script.content.includes("Surcharging") ? (
+                                      <>
+                                        {script.content.split("Surcharging")[0]}
+                                        <GlossaryTerm term="Surcharging">Surcharging</GlossaryTerm>
+                                        {script.content.split("Surcharging").slice(1).join("Surcharging")}
+                                      </>
+                                    ) : (
+                                      script.content
+                                    )}"
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => copyToClipboard(script.content)}
+                                      data-testid={`copy-script-${i}`}
+                                      aria-label={`Copy ${script.name} to clipboard`}
+                                    >
+                                      <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
+                                      Copy
+                                    </Button>
+                                    <AdviceExportToolbar
+                                      content={`${script.name}\n\n"${script.content}"\n\nTips:\n${script.tips.map(t => `• ${t}`).join('\n')}`}
+                                      title={script.name}
+                                      subtitle="PCBancard Sales Script"
+                                      variant="inline"
+                                    />
+                                    <AIHelpButton context={`the ${script.name}`} />
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground mb-1">Tips:</div>
+                                  <ul className="text-xs space-y-1" role="list">
+                                    {script.tips.map((tip, j) => (
+                                      <li key={j} className="flex items-start gap-1">
+                                        <Lightbulb className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                                        <span>{tip}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </CollapsibleContent>
+                            </Card>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentPhase.tips.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-amber-500" aria-hidden="true" />
+                        Pro Tips
+                      </h3>
+                      <ul className="space-y-1" role="list">
+                        {currentPhase.tips.map((tip, i) => (
+                          <li key={i} className="text-sm flex items-start gap-2">
+                            <span className="text-amber-500" aria-hidden="true">•</span>
+                            <span>
+                              {tip.includes("ETF") ? (
+                                <>
+                                  {tip.split("ETF")[0]}
+                                  <GlossaryTerm term="ETF">ETF</GlossaryTerm>
+                                  {tip.split("ETF")[1]}
+                                </>
+                              ) : tip.includes("PCI") ? (
+                                <>
+                                  {tip.split("PCI")[0]}
+                                  <GlossaryTerm term="PCI Compliance">PCI</GlossaryTerm>
+                                  {tip.split("PCI")[1]}
+                                </>
+                              ) : tip.includes("Dual Pricing") ? (
+                                <>
+                                  {tip.split("Dual Pricing")[0]}
+                                  <GlossaryTerm term="Dual Pricing">Dual Pricing</GlossaryTerm>
+                                  {tip.split("Dual Pricing")[1]}
+                                </>
+                              ) : (
+                                tip
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {currentPhase.resources.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-primary" aria-hidden="true" />
+                        Resources
+                      </h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {currentPhase.resources.map((resource, i) => (
+                          <a
+                            key={i}
+                            href={resource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                            aria-label={`Open ${resource.name} (opens in new tab)`}
+                          >
+                            {resource.type === "video" ? (
+                              <Video className="w-4 h-4 text-red-500" aria-hidden="true" />
+                            ) : (
+                              <FileText className="w-4 h-4 text-blue-500" aria-hidden="true" />
+                            )}
+                            <span className="text-xs font-medium truncate">{resource.name}</span>
+                            <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto flex-shrink-0" aria-hidden="true" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="objections" className="space-y-4" role="tabpanel">
+              <Card className="p-4">
+                <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" aria-hidden="true" />
+                  Common Objections & Responses
+                </h2>
+                <div className="space-y-3">
+                  {salesProcessData.objectionHandling.map((obj, i) => (
+                    <Collapsible
+                      key={i}
+                      open={expandedObjections[i]}
+                      onOpenChange={() => toggleObjection(i)}
+                    >
+                      <Card className="p-3 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+                        <CollapsibleTrigger 
+                          className="w-full flex items-start justify-between gap-2"
+                          aria-expanded={expandedObjections[i]}
+                          aria-label={`${expandedObjections[i] ? 'Collapse' : 'Expand'} objection: ${obj.objection}`}
+                        >
+                          <span className="font-medium text-sm text-left">"{obj.objection}"</span>
+                          {expandedObjections[i] ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
+                          )}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-3 space-y-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs font-medium text-green-600">Responses:</div>
+                              <AIHelpButton context={`handling the objection: "${obj.objection}"`} />
                             </div>
-                          ))}
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-muted-foreground mb-1">Tips:</div>
-                          <ul className="text-xs space-y-1">
-                            {obj.tips.map((tip, j) => (
-                              <li key={j} className="flex items-start gap-1">
-                                <Lightbulb className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                                <span>{tip}</span>
-                              </li>
+                            {obj.responses.map((response, j) => (
+                              <div key={j} className="bg-background p-3 rounded-lg border text-sm">
+                                "{response.includes("Dual Pricing") ? (
+                                  <>
+                                    {response.split("Dual Pricing")[0]}
+                                    <GlossaryTerm term="Dual Pricing">Dual Pricing</GlossaryTerm>
+                                    {response.split("Dual Pricing").slice(1).join("Dual Pricing")}
+                                  </>
+                                ) : (
+                                  response
+                                )}"
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() => copyToClipboard(response)}
+                                  aria-label={`Copy response ${j + 1} to clipboard`}
+                                >
+                                  <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
+                                  Copy
+                                </Button>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Tips:</div>
+                            <ul className="text-xs space-y-1" role="list">
+                              {obj.tips.map((tip, j) => (
+                                <li key={j} className="flex items-start gap-1">
+                                  <Lightbulb className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                                  <span>
+                                    {tip.includes("ETF") ? (
+                                      <>
+                                        {tip.split("ETF")[0]}
+                                        <GlossaryTerm term="ETF">ETF</GlossaryTerm>
+                                        {tip.split("ETF")[1]}
+                                      </>
+                                    ) : (
+                                      tip
+                                    )}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-amber-500" aria-hidden="true" />
+                  Top Closing Tips
+                </h3>
+                <ul className="space-y-2" role="list">
+                  {salesProcessData.closingTips.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                      <span>
+                        {tip.includes("ETF") ? (
+                          <>
+                            {tip.split("ETF")[0]}
+                            <GlossaryTerm term="ETF">ETF</GlossaryTerm>
+                            {tip.split("ETF")[1]}
+                          </>
+                        ) : (
+                          tip
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="industries" className="space-y-4" role="tabpanel">
+              <Card className="p-4">
+                <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-primary" aria-hidden="true" />
+                  Target Industries for P Series Terminal
+                </h2>
+                <div className="space-y-4">
+                  {salesProcessData.targetIndustries.map((category, i) => (
+                    <div key={i}>
+                      <h3 className="font-semibold text-sm mb-2">{category.category}</h3>
+                      <div className="flex flex-wrap gap-1">
+                        {category.industries.map((industry, j) => (
+                          <Badge key={j} variant="secondary" className="text-xs">
+                            {industry}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="contacts" className="space-y-4" role="tabpanel">
+              <Card className="p-4">
+                <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" aria-hidden="true" />
+                  Key Contacts
+                </h2>
+                <div className="space-y-3">
+                  {Object.entries(salesProcessData.contacts).map(([key, contact]) => (
+                    <Card key={key} className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-medium">
+                            {'name' in contact ? contact.name : 'names' in contact ? contact.names.join(' & ') : ''}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{'role' in contact ? contact.role : ''}</div>
                         </div>
-                      </CollapsibleContent>
+                        <div className="flex gap-2">
+                          {'phone' in contact && contact.phone && (
+                            <a href={`tel:${contact.phone}`}>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                aria-label={`Call ${'name' in contact ? contact.name : 'names' in contact ? contact.names.join(' and ') : 'contact'}`}
+                              >
+                                <Phone className="w-4 h-4" aria-hidden="true" />
+                              </Button>
+                            </a>
+                          )}
+                          {'email' in contact && (
+                            <a href={`mailto:${contact.email}`}>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                aria-label={`Email ${'name' in contact ? contact.name : 'names' in contact ? contact.names.join(' and ') : 'contact'}`}
+                              >
+                                <Mail className="w-4 h-4" aria-hidden="true" />
+                              </Button>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      {'email' in contact && (
+                        <div className="text-xs text-muted-foreground mt-1">{contact.email}</div>
+                      )}
+                      {'phone' in contact && contact.phone && (
+                        <div className="text-xs text-muted-foreground">{contact.phone}</div>
+                      )}
+                      {'turnaround' in contact && (
+                        <Badge variant="outline" className="mt-2 text-xs">{contact.turnaround} turnaround</Badge>
+                      )}
+                      {'hours' in contact && (
+                        <div className="text-xs text-muted-foreground mt-1">Hours: {contact.hours}</div>
+                      )}
                     </Card>
-                  </Collapsible>
-                ))}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </main>
 
-            <Card className="p-4">
-              <h3 className="font-bold mb-3 flex items-center gap-2">
-                <Lightbulb className="w-5 h-5 text-amber-500" />
-                Top Closing Tips
-              </h3>
-              <ul className="space-y-2">
-                {salesProcessData.closingTips.map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="industries" className="space-y-4">
-            <Card className="p-4">
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" />
-                Target Industries for P Series Terminal
-              </h2>
-              <div className="space-y-4">
-                {salesProcessData.targetIndustries.map((category, i) => (
-                  <div key={i}>
-                    <h3 className="font-semibold text-sm mb-2">{category.category}</h3>
-                    <div className="flex flex-wrap gap-1">
-                      {category.industries.map((industry, j) => (
-                        <Badge key={j} variant="secondary" className="text-xs">
-                          {industry}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="contacts" className="space-y-4">
-            <Card className="p-4">
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                Key Contacts
-              </h2>
-              <div className="space-y-3">
-                {Object.entries(salesProcessData.contacts).map(([key, contact]) => (
-                  <Card key={key} className="p-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="font-medium">
-                          {'name' in contact ? contact.name : 'names' in contact ? contact.names.join(' & ') : ''}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{'role' in contact ? contact.role : ''}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        {'phone' in contact && contact.phone && (
-                          <a href={`tel:${contact.phone}`}>
-                            <Button variant="outline" size="icon" className="h-8 w-8">
-                              <Phone className="w-4 h-4" />
-                            </Button>
-                          </a>
-                        )}
-                        {'email' in contact && (
-                          <a href={`mailto:${contact.email}`}>
-                            <Button variant="outline" size="icon" className="h-8 w-8">
-                              <Mail className="w-4 h-4" />
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    {'email' in contact && (
-                      <div className="text-xs text-muted-foreground mt-1">{contact.email}</div>
-                    )}
-                    {'phone' in contact && contact.phone && (
-                      <div className="text-xs text-muted-foreground">{contact.phone}</div>
-                    )}
-                    {'turnaround' in contact && (
-                      <Badge variant="outline" className="mt-2 text-xs">{contact.turnaround} turnaround</Badge>
-                    )}
-                    {'hours' in contact && (
-                      <div className="text-xs text-muted-foreground mt-1">Hours: {contact.hours}</div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+        <FloatingAIButton />
+        <BackToTopButton />
+      </div>
+    </TooltipProvider>
   );
 }
