@@ -66,7 +66,7 @@ import {
   prospectActivities,
   prospectSearches,
 } from "@shared/schema";
-import { eq, and, desc, ilike, or, asc, lte } from "drizzle-orm";
+import { eq, and, desc, ilike, or, asc, lte, gte, count, sql } from "drizzle-orm";
 import { 
   listCoachingDocuments, 
   getAllCoachingContent, 
@@ -78,6 +78,7 @@ import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
 import { getMerchantCache, formatDuration, CacheCategory } from "./services/cache-service";
+import { paginate, paginateByStage, normalizeDealParams, decodeCursor, DealPaginationParams, KanbanPaginationParams } from "./services/pagination";
 import { getDuplicateDetector, type Prospect as DuplicateProspect, type DuplicateCheckResult } from "./services/duplicate-detection";
 import { seedDemoDeals, deleteDemoDeals, checkDemoDealsExist } from "./seed-demo-data";
 import { researchBusiness } from "./business-research";
@@ -10409,6 +10410,376 @@ Generate the following content in JSON format:
   // ==========================================
   // DEAL PIPELINE ROUTES
   // ==========================================
+
+  // GET /api/deals/paginated - Paginated deal list with cursor-based pagination
+  app.get("/api/deals/paginated", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      
+      const params: DealPaginationParams = normalizeDealParams({
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+        cursor: req.query.cursor as string,
+        sortBy: (req.query.sortBy as string) || 'createdAt',
+        sortOrder: (req.query.sortOrder as 'asc' | 'desc') || 'desc',
+        stage: req.query.stage as string,
+        status: req.query.status as string,
+        search: req.query.search as string,
+        dateFrom: req.query.dateFrom as string,
+        dateTo: req.query.dateTo as string,
+        minValue: req.query.minValue ? parseFloat(req.query.minValue as string) : undefined,
+        maxValue: req.query.maxValue ? parseFloat(req.query.maxValue as string) : undefined,
+        temperature: req.query.temperature as string,
+        priority: req.query.priority as string,
+      });
+      
+      // Build filter conditions
+      const conditions: any[] = [
+        eq(deals.organizationId, orgId),
+        eq(deals.archived, false)
+      ];
+      
+      // Non-admin users only see their own deals
+      if (role !== "master_admin" && role !== "relationship_manager") {
+        conditions.push(eq(deals.assignedAgentId, userId));
+      }
+      
+      if (params.stage) {
+        conditions.push(eq(deals.currentStage, params.stage));
+      }
+      
+      if (params.temperature) {
+        conditions.push(eq(deals.temperature, params.temperature));
+      }
+      
+      if (params.search) {
+        conditions.push(
+          or(
+            ilike(deals.businessName, `%${params.search}%`),
+            ilike(deals.contactName, `%${params.search}%`)
+          )
+        );
+      }
+      
+      if (params.dateFrom) {
+        conditions.push(gte(deals.createdAt, new Date(params.dateFrom)));
+      }
+      
+      if (params.dateTo) {
+        conditions.push(lte(deals.createdAt, new Date(params.dateTo)));
+      }
+      
+      if (params.minValue !== undefined) {
+        conditions.push(sql`CAST(${deals.estimatedMonthlyVolume} AS NUMERIC) >= ${params.minValue}`);
+      }
+      
+      if (params.maxValue !== undefined) {
+        conditions.push(sql`CAST(${deals.estimatedMonthlyVolume} AS NUMERIC) <= ${params.maxValue}`);
+      }
+      
+      // Determine sort column
+      const sortColumnMap: Record<string, any> = {
+        createdAt: deals.createdAt,
+        updatedAt: deals.updatedAt,
+        estimatedMonthlyVolume: deals.estimatedMonthlyVolume,
+        businessName: deals.businessName,
+        stage: deals.currentStage,
+        dealProbability: deals.dealProbability,
+      };
+      
+      const sortColumn = sortColumnMap[params.sortBy || 'createdAt'] || deals.createdAt;
+      
+      // Build base query
+      const baseQuery = db.select().from(deals).where(and(...conditions));
+      
+      // Get sort value function - maps sortBy param to actual schema field
+      const getSortValue = (deal: any) => {
+        const fieldMap: Record<string, string> = {
+          createdAt: 'createdAt',
+          updatedAt: 'updatedAt',
+          estimatedMonthlyVolume: 'estimatedMonthlyVolume',
+          businessName: 'businessName',
+          stage: 'currentStage',
+          dealProbability: 'dealProbability',
+        };
+        const field = fieldMap[params.sortBy || 'createdAt'] || 'createdAt';
+        return deal[field];
+      };
+      
+      // Execute paginated query
+      const result = await paginate({
+        query: baseQuery,
+        params,
+        sortColumn,
+        idColumn: deals.id,
+        getSortValue,
+        includeTotalCount: req.query.includeCount === 'true',
+        countQuery: req.query.includeCount === 'true'
+          ? db.select({ count: count() }).from(deals).where(and(...conditions))
+          : undefined,
+      });
+      
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("[Deals] Paginated list error:", error);
+      res.status(500).json({ error: "Failed to fetch deals", message: error.message });
+    }
+  });
+
+  // GET /api/deals/kanban - Paginated deals grouped by stage (for Kanban view)
+  app.get("/api/deals/kanban", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      
+      const limitPerStage = req.query.limitPerStage 
+        ? parseInt(req.query.limitPerStage as string) 
+        : 10;
+      const sortBy = (req.query.sortBy as string) || 'updatedAt';
+      const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+      const cursors = req.query.cursors 
+        ? JSON.parse(req.query.cursors as string) 
+        : {};
+      
+      const stages = PIPELINE_STAGES;
+      
+      // Build query for each stage
+      const queryBuilder = (stage: string) => {
+        const conditions: any[] = [
+          eq(deals.organizationId, orgId),
+          eq(deals.archived, false),
+          eq(deals.currentStage, stage)
+        ];
+        
+        if (role !== "master_admin" && role !== "relationship_manager") {
+          conditions.push(eq(deals.assignedAgentId, userId));
+        }
+        
+        return db.select().from(deals).where(and(...conditions));
+      };
+      
+      const sortColumn = sortBy === 'updatedAt' ? deals.updatedAt : deals.createdAt;
+      
+      // Map sortBy param to actual schema field for getSortValue
+      const sortFieldMap: Record<string, string> = {
+        createdAt: 'createdAt',
+        updatedAt: 'updatedAt',
+        stage: 'currentStage',
+      };
+      const actualSortField = sortFieldMap[sortBy] || 'createdAt';
+      
+      const result = await paginateByStage(
+        queryBuilder,
+        stages,
+        { limitPerStage, cursors, sortBy, sortOrder },
+        sortColumn,
+        deals.id,
+        (deal: any) => deal[actualSortField] || deal.createdAt
+      );
+      
+      // Get total counts per stage
+      const stageCounts = await Promise.all(
+        stages.map(async (stage) => {
+          const conditions: any[] = [
+            eq(deals.organizationId, orgId),
+            eq(deals.archived, false),
+            eq(deals.currentStage, stage)
+          ];
+          
+          if (role !== "master_admin" && role !== "relationship_manager") {
+            conditions.push(eq(deals.assignedAgentId, userId));
+          }
+          
+          const [{ count: stageCount }] = await db
+            .select({ count: count() })
+            .from(deals)
+            .where(and(...conditions));
+          return { stage, count: Number(stageCount) };
+        })
+      );
+      
+      res.json({
+        ...result,
+        stageCounts: Object.fromEntries(
+          stageCounts.map(s => [s.stage, s.count])
+        ),
+      });
+      
+    } catch (error: any) {
+      console.error("[Deals] Kanban error:", error);
+      res.status(500).json({ error: "Failed to fetch kanban deals", message: error.message });
+    }
+  });
+
+  // GET /api/deals/stage/:stage - Paginated deals for a single stage
+  app.get("/api/deals/stage/:stage", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      const { stage } = req.params;
+      
+      const params = normalizeDealParams({
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+        cursor: req.query.cursor as string,
+        sortBy: (req.query.sortBy as string) || 'updatedAt',
+        sortOrder: (req.query.sortOrder as 'asc' | 'desc') || 'desc',
+      });
+      
+      const conditions: any[] = [
+        eq(deals.organizationId, orgId),
+        eq(deals.archived, false),
+        eq(deals.currentStage, stage)
+      ];
+      
+      if (role !== "master_admin" && role !== "relationship_manager") {
+        conditions.push(eq(deals.assignedAgentId, userId));
+      }
+      
+      const baseQuery = db.select().from(deals).where(and(...conditions));
+      
+      const sortColumn = params.sortBy === 'updatedAt' ? deals.updatedAt : deals.createdAt;
+      
+      // Map sortBy param to actual schema field
+      const sortFieldMap: Record<string, string> = {
+        createdAt: 'createdAt',
+        updatedAt: 'updatedAt',
+        stage: 'currentStage',
+      };
+      const actualSortField = sortFieldMap[params.sortBy || 'updatedAt'] || 'updatedAt';
+      
+      const result = await paginate({
+        query: baseQuery,
+        params,
+        sortColumn,
+        idColumn: deals.id,
+        getSortValue: (deal: any) => deal[actualSortField],
+      });
+      
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("[Deals] Stage deals error:", error);
+      res.status(500).json({ error: "Failed to fetch stage deals", message: error.message });
+    }
+  });
+
+  // GET /api/deals/search - Search deals with pagination
+  app.get("/api/deals/search", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      const query = req.query.q as string;
+      
+      if (!query || query.length < 2) {
+        return res.status(400).json({ error: "Search query must be at least 2 characters" });
+      }
+      
+      const params = normalizeDealParams({
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+        cursor: req.query.cursor as string,
+        sortBy: 'businessName',
+        sortOrder: 'asc',
+      });
+      
+      const conditions: any[] = [
+        eq(deals.organizationId, orgId),
+        eq(deals.archived, false),
+        or(
+          ilike(deals.businessName, `%${query}%`),
+          ilike(deals.contactName, `%${query}%`),
+          ilike(deals.notes, `%${query}%`)
+        )
+      ];
+      
+      if (role !== "master_admin" && role !== "relationship_manager") {
+        conditions.push(eq(deals.assignedAgentId, userId));
+      }
+      
+      const baseQuery = db.select().from(deals).where(and(...conditions));
+      
+      const result = await paginate({
+        query: baseQuery,
+        params,
+        sortColumn: deals.businessName,
+        idColumn: deals.id,
+        getSortValue: (deal: any) => deal.businessName,
+      });
+      
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("[Deals] Search error:", error);
+      res.status(500).json({ error: "Failed to search deals", message: error.message });
+    }
+  });
+
+  // GET /api/deals/stats - Get deal statistics
+  app.get("/api/deals/stats", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      
+      const baseConditions: any[] = [
+        eq(deals.organizationId, orgId),
+        eq(deals.archived, false)
+      ];
+      
+      if (role !== "master_admin" && role !== "relationship_manager") {
+        baseConditions.push(eq(deals.assignedAgentId, userId));
+      }
+      
+      // Get counts by stage
+      const stageCounts = await db
+        .select({
+          stage: deals.currentStage,
+          count: count(),
+        })
+        .from(deals)
+        .where(and(...baseConditions))
+        .groupBy(deals.currentStage);
+      
+      // Get total value by stage
+      const stageValues = await db
+        .select({
+          stage: deals.currentStage,
+          totalValue: sql<number>`SUM(CAST(${deals.estimatedMonthlyVolume} AS NUMERIC))`,
+        })
+        .from(deals)
+        .where(and(...baseConditions))
+        .groupBy(deals.currentStage);
+      
+      // Get total count
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(deals)
+        .where(and(...baseConditions));
+      
+      res.json({
+        totalDeals: total,
+        byStage: Object.fromEntries(
+          stageCounts.map(s => [s.stage, {
+            count: Number(s.count),
+            value: Number(stageValues.find(v => v.stage === s.stage)?.totalValue || 0),
+          }])
+        ),
+      });
+      
+    } catch (error: any) {
+      console.error("[Deals] Stats error:", error);
+      res.status(500).json({ error: "Failed to fetch deal stats", message: error.message });
+    }
+  });
 
   // GET /api/deals/today - Get today's action items (must be before /:id route)
   app.get("/api/deals/today", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {

@@ -16,10 +16,10 @@ import { apiRequest } from '@/lib/queryClient';
 export interface Deal {
   id: number;
   businessName: string;
-  stage: string;
+  currentStage: string;
   status?: string;
-  estimatedMonthlyVolume?: number;
-  estimatedCommission?: number;
+  estimatedMonthlyVolume?: string | number;
+  estimatedCommission?: string | number;
   contactName?: string;
   contactPhone?: string;
   businessPhone?: string;
@@ -27,10 +27,12 @@ export interface Deal {
   notes?: string;
   createdAt: string;
   updatedAt?: string;
-  agentId?: string;
+  assignedAgentId?: string;
   temperature?: string;
   dealProbability?: number;
-  nextFollowUpDate?: string;
+  nextFollowUpAt?: string;
+  organizationId: number;
+  archived: boolean;
   [key: string]: any;
 }
 
@@ -343,7 +345,7 @@ export function useUpdateDealStage() {
           for (const [stage, stageData] of Object.entries(newStages)) {
             const dealIndex = stageData.items.findIndex(d => d.id === dealId);
             if (dealIndex !== -1) {
-              movedDeal = { ...stageData.items[dealIndex], stage: newStage };
+              movedDeal = { ...stageData.items[dealIndex], currentStage: newStage };
               newStages[stage] = {
                 ...stageData,
                 items: stageData.items.filter(d => d.id !== dealId),
