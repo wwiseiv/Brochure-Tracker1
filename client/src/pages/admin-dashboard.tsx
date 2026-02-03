@@ -48,6 +48,7 @@ import {
   Loader2,
   FolderSync,
   CheckCircle,
+  Trash2,
   Pencil,
 } from "lucide-react";
 import { isToday, isPast, parseISO, startOfDay } from "date-fns";
@@ -216,6 +217,35 @@ export default function AdminDashboardPage() {
       refetchDrive();
     }
   }, [syncStatusData, isSyncing, refetchDrive, toast]);
+
+  // Delete drop state and mutation
+  const [dropToDelete, setDropToDelete] = useState<{ id: number; name: string } | null>(null);
+  
+  const deleteDropMutation = useMutation({
+    mutationFn: async (dropId: number) => {
+      const res = await apiRequest("DELETE", `/api/drops/${dropId}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to delete drop");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Drop deleted",
+        description: "The drop record has been removed",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/drops"] });
+      setDropToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -794,11 +824,22 @@ export default function AdminDashboardPage() {
                           {formatDistanceToNow(new Date(drop.droppedAt), { addSuffix: true })}
                         </p>
                       </div>
-                      <Link href={`/drops/${drop.id}`}>
-                        <Button variant="ghost" size="sm" data-testid={`button-view-drop-${drop.id}`}>
-                          View
+                      <div className="flex items-center gap-1">
+                        <Link href={`/drops/${drop.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-view-drop-${drop.id}`}>
+                            View
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDropToDelete({ id: drop.id, name: drop.businessName || "Unnamed Business" })}
+                          data-testid={`button-delete-drop-${drop.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </Link>
+                      </div>
                     </div>
                   ))
                 )}
@@ -857,6 +898,44 @@ export default function AdminDashboardPage() {
                 </>
               ) : (
                 "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Drop Confirmation Dialog */}
+      <Dialog open={!!dropToDelete} onOpenChange={(open) => !open && setDropToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Drop Record</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-muted-foreground">
+              Are you sure you want to delete the drop for <strong>{dropToDelete?.name}</strong>? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDropToDelete(null)}
+              data-testid="button-cancel-delete-drop"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => dropToDelete && deleteDropMutation.mutate(dropToDelete.id)}
+              disabled={deleteDropMutation.isPending}
+              data-testid="button-confirm-delete-drop"
+            >
+              {deleteDropMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
               )}
             </Button>
           </DialogFooter>
