@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -40,6 +40,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,12 +68,14 @@ import {
   Copy,
   Check,
   Settings,
+  Lock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import type { OrganizationMember, OrgMemberRole, UserPermissions } from "@shared/schema";
+import { FEATURES, type FeatureDefinition, type FeatureCategory, type UserRole as PermissionUserRole, type AgentStage } from "@shared/permissions";
 
-interface UserRole {
+interface CurrentUserRole {
   role: string;
   memberId: number;
   organization: {
@@ -180,7 +190,7 @@ export default function TeamManagementPage() {
   const [inviteRole, setInviteRole] = useState<OrgMemberRole>("agent");
   const [inviteManagerId, setInviteManagerId] = useState<string>("");
 
-  const { data: userRole, isLoading: userRoleLoading } = useQuery<UserRole>({
+  const { data: userRole, isLoading: userRoleLoading } = useQuery<CurrentUserRole>({
     queryKey: ["/api/me/role"],
   });
 
@@ -331,57 +341,135 @@ export default function TeamManagementPage() {
     },
   });
 
-  // User Permissions State
-  const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+  // User Permissions State - Feature-based
+  const [isPermissionsSheetOpen, setIsPermissionsSheetOpen] = useState(false);
   const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<OrganizationMember | null>(null);
-  const [memberPermissions, setMemberPermissions] = useState<UserPermissions | null>(null);
+  const [featureOverrides, setFeatureOverrides] = useState<Record<string, boolean>>({});
+  const [memberRole, setMemberRole] = useState<PermissionUserRole>("agent");
+  const [memberStage, setMemberStage] = useState<AgentStage>("trainee");
+  const [loadingOverrides, setLoadingOverrides] = useState(false);
 
-  const { refetch: refetchPermissions } = useQuery<UserPermissions>({
-    queryKey: ["/api/permissions", selectedMemberForPermissions?.userId],
-    enabled: false,
-  });
+  const CATEGORY_LABELS: Record<FeatureCategory, string> = {
+    core_crm: "Core CRM",
+    brochure_management: "Brochure Management",
+    ai_tools: "AI Tools",
+    sales_training: "Sales Training",
+    documents: "Documents",
+    communication: "Communication",
+    team_management: "Team Management",
+    analytics: "Analytics",
+    system: "System",
+  };
 
-  const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, data }: { userId: string; data: Partial<UserPermissions> }) => {
-      const res = await apiRequest("PATCH", `/api/permissions/${encodeURIComponent(userId)}`, data);
+  const featuresByCategory = useMemo(() => {
+    const grouped: Record<FeatureCategory, FeatureDefinition[]> = {
+      core_crm: [],
+      brochure_management: [],
+      ai_tools: [],
+      sales_training: [],
+      documents: [],
+      communication: [],
+      team_management: [],
+      analytics: [],
+      system: [],
+    };
+    FEATURES.forEach((feature) => {
+      if (!feature.isCritical) {
+        grouped[feature.category].push(feature);
+      }
+    });
+    return grouped;
+  }, []);
+
+  const getFeatureDefaultEnabled = (feature: FeatureDefinition): boolean => {
+    const normalizedRole: PermissionUserRole = 
+      memberRole === "admin" ? "admin" : 
+      memberRole === "manager" ? "manager" : "agent";
+    
+    if (feature.roleDefaults[normalizedRole]) {
+      if (normalizedRole === "agent" && memberStage) {
+        return feature.stageDefaults[memberStage] ?? false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const getFeatureCurrentState = (feature: FeatureDefinition): { enabled: boolean; isDefault: boolean; isOverride: boolean } => {
+    const defaultEnabled = getFeatureDefaultEnabled(feature);
+    const hasOverride = feature.id in featureOverrides;
+    
+    if (hasOverride) {
+      return { enabled: featureOverrides[feature.id], isDefault: false, isOverride: true };
+    }
+    return { enabled: defaultEnabled, isDefault: true, isOverride: false };
+  };
+
+  const toggleFeatureOverrideMutation = useMutation({
+    mutationFn: async ({ userId, featureId, enabled }: { userId: string; featureId: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", `/api/permissions/users/${encodeURIComponent(userId)}/override`, {
+        featureId,
+        enabled,
+        reason: "Admin override via team management",
+      });
       return res.json();
     },
-    onSuccess: (data) => {
-      setMemberPermissions(data);
+    onSuccess: (data, variables) => {
+      setFeatureOverrides((prev) => ({
+        ...prev,
+        [variables.featureId]: variables.enabled,
+      }));
       toast({
-        title: "Permissions updated",
-        description: "User permissions have been updated.",
+        title: "Permission updated",
+        description: `Feature access has been ${variables.enabled ? "enabled" : "disabled"}.`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to update permissions",
+        title: "Failed to update permission",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const openPermissionsDialog = async (member: OrganizationMember) => {
+  const openPermissionsSheet = async (member: OrganizationMember) => {
     setSelectedMemberForPermissions(member);
+    setLoadingOverrides(true);
+    setFeatureOverrides({});
+    
+    const role = member.role === "master_admin" ? "admin" : 
+                 member.role === "relationship_manager" ? "manager" : "agent";
+    setMemberRole(role as PermissionUserRole);
+    setMemberStage((member as any).agentStage || "active");
+    
     try {
-      const res = await fetch(`/api/permissions/${encodeURIComponent(member.userId)}`, { credentials: "include" });
+      const res = await fetch(`/api/permissions/users/${encodeURIComponent(member.userId)}`, { credentials: "include" });
       if (res.ok) {
-        const perms = await res.json();
-        setMemberPermissions(perms);
+        const data = await res.json();
+        if (data.overrides) {
+          setFeatureOverrides(data.overrides);
+        }
+        if (data.agentStage) {
+          setMemberStage(data.agentStage);
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch permissions:", error);
+      console.error("Failed to fetch user permissions:", error);
     }
-    setIsPermissionsDialogOpen(true);
+    setLoadingOverrides(false);
+    setIsPermissionsSheetOpen(true);
   };
 
-  const togglePermission = (key: keyof UserPermissions) => {
-    if (!selectedMemberForPermissions || !memberPermissions) return;
-    const newValue = !memberPermissions[key];
-    updatePermissionsMutation.mutate({
+  const handleToggleFeature = (feature: FeatureDefinition) => {
+    if (!selectedMemberForPermissions) return;
+    const currentState = getFeatureCurrentState(feature);
+    const newEnabled = !currentState.enabled;
+    
+    toggleFeatureOverrideMutation.mutate({
       userId: selectedMemberForPermissions.userId,
-      data: { [key]: newValue },
+      featureId: feature.id,
+      enabled: newEnabled,
     });
   };
 
@@ -866,7 +954,7 @@ export default function TeamManagementPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => openPermissionsDialog(member)}
+                                  onClick={() => openPermissionsSheet(member)}
                                   title="Manage Permissions"
                                   data-testid={`button-permissions-member-${member.id}`}
                                 >
@@ -1203,161 +1291,134 @@ export default function TeamManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* User Permissions Dialog */}
-      <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              User Permissions
-            </DialogTitle>
-            <DialogDescription>
+      {/* User Permissions Sheet */}
+      <Sheet open={isPermissionsSheetOpen} onOpenChange={setIsPermissionsSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-hidden flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Feature Permissions
+            </SheetTitle>
+            <SheetDescription>
               {selectedMemberForPermissions && (
-                <span>Manage feature access for {selectedMemberForPermissions.userId.slice(0, 16)}...</span>
+                <span>Manage feature access for {selectedMemberForPermissions.userId.slice(0, 20)}...</span>
               )}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           
-          {memberPermissions ? (
-            <div className="space-y-4 py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">View Leaderboard</Label>
-                  <p className="text-xs text-muted-foreground">Can see team leaderboard rankings</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canViewLeaderboard}
-                  onCheckedChange={() => togglePermission("canViewLeaderboard")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-view-leaderboard"
-                />
+          {selectedMemberForPermissions && (
+            <div className="flex items-center gap-3 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={getRoleBadgeClassName(selectedMemberForPermissions.role)}
+                  data-testid="badge-permissions-role"
+                >
+                  {getRoleLabel(selectedMemberForPermissions.role)}
+                </Badge>
+                {memberRole === "agent" && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs"
+                    data-testid="badge-permissions-stage"
+                  >
+                    {memberStage.charAt(0).toUpperCase() + memberStage.slice(1)}
+                  </Badge>
+                )}
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">AI Coach</Label>
-                  <p className="text-xs text-muted-foreground">Access AI role-play coaching</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canAccessCoach}
-                  onCheckedChange={() => togglePermission("canAccessCoach")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-access-coach"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">EquipIQ</Label>
-                  <p className="text-xs text-muted-foreground">Access equipment advisor</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canAccessEquipIQ}
-                  onCheckedChange={() => togglePermission("canAccessEquipIQ")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-access-equipiq"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Daily Edge</Label>
-                  <p className="text-xs text-muted-foreground">Access motivation system</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canViewDailyEdge}
-                  onCheckedChange={() => togglePermission("canViewDailyEdge")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-view-daily-edge"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Export Data</Label>
-                  <p className="text-xs text-muted-foreground">Can export data to CSV/Excel</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canExportData}
-                  onCheckedChange={() => togglePermission("canExportData")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-export-data"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Record Meetings</Label>
-                  <p className="text-xs text-muted-foreground">Can record and analyze meetings</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canRecordMeetings}
-                  onCheckedChange={() => togglePermission("canRecordMeetings")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-record-meetings"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Manage Referrals</Label>
-                  <p className="text-xs text-muted-foreground">Can create and manage referrals</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canManageReferrals}
-                  onCheckedChange={() => togglePermission("canManageReferrals")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-manage-referrals"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Follow-up Sequences</Label>
-                  <p className="text-xs text-muted-foreground">Access automated sequences</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canAccessSequences}
-                  onCheckedChange={() => togglePermission("canAccessSequences")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-access-sequences"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Proposal Generator</Label>
-                  <p className="text-xs text-muted-foreground">Generate professional proposals</p>
-                </div>
-                <Switch
-                  checked={memberPermissions.canAccessProposals}
-                  onCheckedChange={() => togglePermission("canAccessProposals")}
-                  disabled={updatePermissionsMutation.isPending}
-                  data-testid="switch-can-access-proposals"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center text-muted-foreground">
-              Loading permissions...
             </div>
           )}
           
-          <DialogFooter>
+          {loadingOverrides ? (
+            <div className="flex-1 flex items-center justify-center py-8">
+              <div className="text-center text-muted-foreground">
+                <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                Loading permissions...
+              </div>
+            </div>
+          ) : (
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-6 py-4">
+                {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
+                  const features = featuresByCategory[category];
+                  if (features.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="space-y-3">
+                      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                        {CATEGORY_LABELS[category]}
+                      </h3>
+                      <div className="space-y-2">
+                        {features.map((feature) => {
+                          const state = getFeatureCurrentState(feature);
+                          const isTogglingThisFeature = toggleFeatureOverrideMutation.isPending && 
+                            toggleFeatureOverrideMutation.variables?.featureId === feature.id;
+                          
+                          return (
+                            <div
+                              key={feature.id}
+                              className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30"
+                              data-testid={`feature-row-${feature.id}`}
+                            >
+                              <div className="flex-1 min-w-0 pr-3">
+                                <div className="flex items-center gap-2">
+                                  <Label className="font-medium text-sm">{feature.name}</Label>
+                                  {state.isDefault && state.enabled && (
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-[10px] px-1.5 py-0 h-4"
+                                      data-testid={`badge-default-${feature.id}`}
+                                    >
+                                      Default
+                                    </Badge>
+                                  )}
+                                  {state.isOverride && (
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-[10px] px-1.5 py-0 h-4 border-primary/50"
+                                      data-testid={`badge-override-${feature.id}`}
+                                    >
+                                      Override
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {feature.description}
+                                </p>
+                              </div>
+                              <Switch
+                                checked={state.enabled}
+                                onCheckedChange={() => handleToggleFeature(feature)}
+                                disabled={isTogglingThisFeature}
+                                data-testid={`switch-feature-${feature.id}`}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+          
+          <div className="pt-4 border-t border-border">
             <Button
               variant="outline"
+              className="w-full"
               onClick={() => {
-                setIsPermissionsDialogOpen(false);
+                setIsPermissionsSheetOpen(false);
                 setSelectedMemberForPermissions(null);
-                setMemberPermissions(null);
+                setFeatureOverrides({});
               }}
               data-testid="button-close-permissions"
             >
               Close
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

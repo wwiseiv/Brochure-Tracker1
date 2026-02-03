@@ -1947,6 +1947,41 @@ Format your response as JSON:
     }
   });
 
+  // Get single user's permissions (manager+ only, must be same org)
+  app.get("/api/permissions/users/:targetUserId", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const { targetUserId } = req.params;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const currentRole = mapOrgRoleToUserRole(membership.role);
+      
+      // Only managers and admins can view user permissions
+      if (currentRole !== 'admin' && currentRole !== 'manager') {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "Manager role or higher required" });
+      }
+      
+      // CRITICAL: Verify target user is in the same organization
+      const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+      const targetMember = orgMembers.find(m => m.userId === targetUserId);
+      if (!targetMember) {
+        return res.status(403).json({ error: "ACCESS_DENIED", message: "User not in your organization" });
+      }
+      
+      // Get user permissions
+      let perms = await storage.getUserPermissions(targetUserId);
+      
+      // Return with member info for role/stage display
+      res.json({
+        userId: targetUserId,
+        role: perms?.role || mapOrgRoleToUserRole(targetMember.role),
+        agentStage: perms?.agentStage || 'trainee',
+        overrides: (perms?.featureOverrides as Record<string, boolean>) || {}
+      });
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch permissions" });
+    }
+  });
+
   // Add/update feature override (manager+ only)
   app.post("/api/permissions/users/:targetUserId/override", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
