@@ -869,13 +869,13 @@ export default function StatementAnalyzer() {
       });
 
       try {
-        // Use proxy upload to avoid browser CORS issues with GCS
+        // Use document upload endpoint for PDFs, Excel, CSV files
         const formData = new FormData();
         formData.append("file", uploadFile.file);
         
         console.log("[StatementAnalyzer Job] Uploading file:", uploadFile.file.name, "size:", uploadFile.file.size, "type:", uploadFile.file.type);
 
-        const uploadResponse = await fetch("/api/uploads/proxy", {
+        const uploadResponse = await fetch("/api/uploads/documents", {
           method: "POST",
           body: formData,
           credentials: "include"  // Include cookies for authentication on iOS Safari
@@ -950,13 +950,13 @@ export default function StatementAnalyzer() {
       });
 
       try {
-        // Use proxy upload to avoid browser CORS issues with GCS
+        // Use document upload endpoint for PDFs, Excel, CSV files
         const formData = new FormData();
         formData.append("file", uploadFile.file);
         
         console.log("[StatementAnalyzer] Uploading file:", uploadFile.file.name, "size:", uploadFile.file.size, "type:", uploadFile.file.type);
 
-        const uploadResponse = await fetch("/api/uploads/proxy", {
+        const uploadResponse = await fetch("/api/uploads/documents", {
           method: "POST",
           body: formData,
           credentials: "include"  // Include cookies for authentication
@@ -1987,12 +1987,12 @@ ${new Date().toLocaleDateString()}
 
                     <FormItem>
                       <FormLabel>Link to Deal (Optional)</FormLabel>
-                      <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+                      <Select value={selectedDealId} onValueChange={(val) => setSelectedDealId(val === "none" ? "" : val)}>
                         <SelectTrigger data-testid="select-link-deal">
                           <SelectValue placeholder="Select a deal to link..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No deal selected</SelectItem>
+                          <SelectItem value="none">No deal selected</SelectItem>
                           {deals?.map((deal) => (
                             <SelectItem key={deal.id} value={String(deal.id)}>
                               {deal.businessName}

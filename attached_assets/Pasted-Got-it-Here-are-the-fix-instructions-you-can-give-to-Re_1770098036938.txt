@@ -1,0 +1,166 @@
+Got it! Here are the fix instructions you can give to Replit:
+
+---
+
+## Fix Request 1: Navigation Inconsistency
+
+**Problem:** Users get stuck on pages that lack the HamburgerMenu button. Only EquipIQ and E-Sign Document Library have been fixed.
+
+**Task:** Audit all page components and add HamburgerMenu to any page missing it.
+
+```
+Search all files in client/src/pages/ for page headers that don't include <HamburgerMenu />.
+
+For each main page missing it, update the header to follow this pattern:
+
+import { HamburgerMenu } from "@/components/BottomNav";
+
+// In the component's header section:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <h1>Page Title</h1>
+</div>
+
+Pages to check:
+- dashboard.tsx
+- prospect-pipeline.tsx
+- prospect-finder.tsx
+- statement-analyzer.tsx
+- proposal-generator.tsx
+- marketing-materials.tsx
+- coach.tsx
+- merchants.tsx
+- today.tsx
+- profile.tsx
+- Any other main pages
+
+Also check sub-pages that use back buttons - ensure they have a fallback navigation option if the back button fails.
+```
+
+---
+
+## Fix Request 2: Statement Analyzer - Permanent Fix for Undefined Values
+
+**Problem:** The ErrorBoundary is a workaround, not a fix. The root cause is that the AI extraction can return incomplete data, and the UI tries to render undefined values.
+
+**Task:** Add comprehensive null-safe handling throughout the statement analyzer.
+
+```
+In client/src/pages/statement-analyzer.tsx:
+
+1. Update the StatementAnalysisResult type to make all nested fields optional:
+
+interface StatementAnalysisResult {
+  savings?: {
+    interchangePlus?: {
+      monthlyCost?: number;
+      monthlySavings?: number;
+      annualSavings?: number;
+      effectiveRate?: number;
+    };
+    dualPricing?: {
+      monthlyCost?: number;
+      monthlySavings?: number;
+      annualSavings?: number;
+      effectiveRate?: number;
+    };
+  };
+  // ... same for other nested objects
+}
+
+2. Create a normalization function that runs when data is received:
+
+function normalizeAnalysisResult(raw: any): StatementAnalysisResult {
+  return {
+    savings: {
+      interchangePlus: {
+        monthlyCost: raw?.savings?.interchangePlus?.monthlyCost ?? 0,
+        monthlySavings: raw?.savings?.interchangePlus?.monthlySavings ?? 0,
+        annualSavings: raw?.savings?.interchangePlus?.annualSavings ?? 0,
+        effectiveRate: raw?.savings?.interchangePlus?.effectiveRate ?? 0,
+      },
+      dualPricing: {
+        monthlyCost: raw?.savings?.dualPricing?.monthlyCost ?? 0,
+        monthlySavings: raw?.savings?.dualPricing?.monthlySavings ?? 0,
+        annualSavings: raw?.savings?.dualPricing?.annualSavings ?? 0,
+        effectiveRate: raw?.savings?.dualPricing?.effectiveRate ?? 0,
+      },
+    },
+    // normalize other fields similarly
+  };
+}
+
+3. Call normalizeAnalysisResult() immediately when the API response is received, before setting state.
+
+4. Add validation on the server side in the AI extraction to ensure all required fields have default values before returning.
+```
+
+---
+
+## Fix Request 3: Voice Recording Browser Compatibility
+
+**Problem:** MediaRecorder produces different audio formats across browsers, and some browsers don't support certain formats.
+
+**Task:** Implement robust format detection and fallback handling.
+
+```
+Create a shared utility at client/src/lib/audioUtils.ts:
+
+export function getSupportedMimeType(): string {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+    'audio/wav',
+  ];
+  
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  
+  return ''; // Let browser choose default
+}
+
+export function getFileExtension(mimeType: string): string {
+  if (mimeType.includes('webm')) return 'webm';
+  if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'm4a';
+  if (mimeType.includes('ogg')) return 'ogg';
+  if (mimeType.includes('wav')) return 'wav';
+  return 'webm'; // Default fallback
+}
+
+export function createMediaRecorder(stream: MediaStream): MediaRecorder {
+  const mimeType = getSupportedMimeType();
+  const options = mimeType ? { mimeType } : undefined;
+  return new MediaRecorder(stream, options);
+}
+
+Then update these files to use the shared utility:
+- client/src/components/RoleplayCoach.tsx
+- client/src/pages/new-drop.tsx  
+- client/src/components/DealMeetingRecorder.tsx
+
+Replace direct MediaRecorder instantiation with:
+
+import { createMediaRecorder, getFileExtension } from '@/lib/audioUtils';
+
+// When creating recorder:
+const recorder = createMediaRecorder(stream);
+
+// When saving file:
+const ext = getFileExtension(audioBlob.type);
+
+Also add a check before recording starts:
+
+if (!navigator.mediaDevices?.getUserMedia) {
+  toast.error('Audio recording is not supported in this browser');
+  return;
+}
+```
+
+---
+
+Want me to expand on any of these or add more detail for specific files?

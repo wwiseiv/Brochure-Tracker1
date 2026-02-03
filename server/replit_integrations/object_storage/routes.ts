@@ -13,6 +13,18 @@ const ALLOWED_IMAGE_TYPES = [
   "image/svg+xml"
 ];
 
+// Allowed document MIME types for statement/document uploads
+const ALLOWED_DOCUMENT_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // xlsx
+  "application/vnd.ms-excel", // xls
+  "text/csv",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp"
+];
+
 /**
  * Register object storage routes for file uploads.
  *
@@ -34,6 +46,19 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error("Only image files are allowed (JPEG, PNG, GIF, WebP, SVG)"));
+    }
+  }
+});
+
+// Configure multer for document uploads (PDFs, Excel, CSV, images)
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for documents
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_DOCUMENT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF, Excel, CSV, or image files are allowed"));
     }
   }
 });
@@ -169,6 +194,70 @@ export function registerObjectStorageRoutes(app: Express): void {
       console.error("[Upload Proxy] Error:", error?.message || error);
       console.error("[Upload Proxy] Stack:", error?.stack);
       res.status(500).json({ error: "Failed to upload file", details: error?.message });
+    }
+  });
+
+  /**
+   * Document upload proxy endpoint - for PDFs, Excel, CSV files.
+   * POST /api/uploads/documents
+   * 
+   * Uses multipart/form-data for file upload.
+   * Returns the object path for later retrieval.
+   * 
+   * NOTE: Requires authentication. Accepts PDFs, Excel, CSV, and images up to 50MB.
+   */
+  app.post("/api/uploads/documents", isAuthenticated, documentUpload.single("file"), async (req: Request, res: Response) => {
+    console.log("[Document Upload] Request received");
+    try {
+      if (!req.file) {
+        console.log("[Document Upload] Error: No file in request");
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      console.log("[Document Upload] File received:", req.file.originalname, "size:", req.file.size, "type:", req.file.mimetype);
+
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      if (!privateObjectDir) {
+        console.error("[Document Upload] Error: Private object directory not configured");
+        return res.status(500).json({ error: "Object storage not configured" });
+      }
+      
+      const objectId = randomUUID();
+      const fullPath = `${privateObjectDir}/documents/${objectId}`;
+      console.log("[Document Upload] Target path:", fullPath);
+
+      // Parse bucket and object name from path
+      const pathWithoutLeadingSlash = fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
+      const [bucketName, ...rest] = pathWithoutLeadingSlash.split("/");
+      const objectName = rest.join("/");
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      // Upload the file buffer directly to GCS
+      console.log("[Document Upload] Uploading to GCS, bucket:", bucketName, "object:", objectName);
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype || "application/octet-stream",
+        metadata: {
+          originalName: req.file.originalname
+        }
+      });
+
+      const objectPath = `/objects/documents/${objectId}`;
+      console.log("[Document Upload] Success, objectPath:", objectPath);
+
+      res.json({
+        objectPath,
+        metadata: {
+          name: req.file.originalname,
+          size: req.file.size,
+          contentType: req.file.mimetype
+        }
+      });
+    } catch (error: any) {
+      console.error("[Document Upload] Error:", error?.message || error);
+      console.error("[Document Upload] Stack:", error?.stack);
+      res.status(500).json({ error: "Failed to upload document", details: error?.message });
     }
   });
 }
