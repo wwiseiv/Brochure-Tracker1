@@ -813,17 +813,18 @@ export default function ProspectFinderPage() {
       </main>
 
       <Sheet open={showMCCSheet} onOpenChange={setShowMCCSheet}>
-        <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
-          <SheetHeader className="mb-4">
+        <SheetContent side="bottom" className="h-[85dvh] max-h-[85dvh] flex flex-col p-0">
+          <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
             <SheetTitle>Select Business Types</SheetTitle>
           </SheetHeader>
           
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
           {loadingMCC ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="space-y-6 pb-20">
+            <div className="space-y-6 px-4 py-4 pb-32">
               {mccData?.categories.map((category) => {
                 const IconComponent = getCategoryIcon(category.id);
                 const codes = groupedMCCCodes[category.id] || [];
@@ -870,8 +871,9 @@ export default function ProspectFinderPage() {
               })}
             </div>
           )}
+          </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
+          <div className="flex-shrink-0 p-4 bg-background border-t">
             <Button
               className="w-full"
               onClick={() => setShowMCCSheet(false)}
@@ -889,7 +891,7 @@ export default function ProspectFinderPage() {
           setActiveJobId(null);
         }
       }}>
-        <SheetContent side="bottom" className="h-[90vh] flex flex-col p-0">
+        <SheetContent side="bottom" className="h-[90dvh] max-h-[90dvh] flex flex-col p-0">
           <SheetHeader className="px-4 pt-4 pb-3 border-b flex-shrink-0 sticky top-0 bg-background z-10">
             <div className="flex items-center justify-between">
               <SheetTitle>
@@ -904,7 +906,7 @@ export default function ProspectFinderPage() {
           </SheetHeader>
 
           <div 
-            className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-24" 
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-32" 
             style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
           >
           {searchResults?.businesses.length === 0 ? (

@@ -1178,9 +1178,9 @@ export default function DealPipelinePage() {
           setSelectedDeal(null);
         }
       }}>
-        <SheetContent side="bottom" className="h-[90vh] md:h-[85vh] flex flex-col p-0" data-testid="deal-sheet">
+        <SheetContent side="bottom" className="h-[90dvh] md:h-[85dvh] max-h-[90dvh] flex flex-col p-0" data-testid="deal-sheet">
           {selectedDeal && (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full min-h-0">
               <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <Button 
@@ -1200,7 +1200,7 @@ export default function DealPipelinePage() {
               </SheetHeader>
 
               <div 
-                className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-24 space-y-6" 
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-32 space-y-6" 
                 style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
               >
                 <div className="flex gap-2 flex-wrap">
@@ -2038,12 +2038,12 @@ export default function DealPipelinePage() {
       </Dialog>
 
       <Sheet open={showCreateDealSheet} onOpenChange={setShowCreateDealSheet}>
-        <SheetContent side="bottom" className="h-[85vh] md:h-[85vh] flex flex-col p-0" data-testid="create-deal-sheet">
+        <SheetContent side="bottom" className="h-[85dvh] md:h-[85dvh] max-h-[85dvh] flex flex-col p-0" data-testid="create-deal-sheet">
           <SheetHeader className="px-4 pt-4 pb-2 border-b flex-shrink-0">
             <SheetTitle>Create New Deal</SheetTitle>
           </SheetHeader>
           <div 
-            className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 pb-40" 
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 pb-40" 
             style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
           >
             <div className="space-y-2">
@@ -2192,7 +2192,7 @@ export default function DealPipelinePage() {
 
       {/* AI Email Drafting Sheet */}
       <Sheet open={showEmailSheet} onOpenChange={setShowEmailSheet}>
-        <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+        <SheetContent side="bottom" className="h-[85dvh] max-h-[85dvh] flex flex-col p-0">
           <div className="p-4 border-b flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
