@@ -77,6 +77,7 @@ import {
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
+import { seedDemoDeals, deleteDemoDeals, checkDemoDealsExist } from "./seed-demo-data";
 import { researchBusiness } from "./business-research";
 import { extractBusinessCardData } from "./services/business-card-scanner";
 import { generateProposalImages, type ProposalImages } from "./proposal-images";
@@ -2583,6 +2584,73 @@ Format your response as JSON:
     } catch (error) {
       console.error("Error fetching admin drops:", error);
       res.status(500).json({ error: "Failed to fetch admin drops" });
+    }
+  });
+
+  // Admin Dashboard API - Seed demo deals for testing/training (master_admin only)
+  app.post("/api/admin/seed-demo-deals", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const userId = req.user.claims.sub;
+      const orgId = membership.organization.id;
+      
+      const result = await seedDemoDeals(orgId, userId);
+      
+      if (result.skipped) {
+        return res.status(200).json({
+          success: true,
+          message: "Demo deals already exist for this organization",
+          created: 0,
+          skipped: true,
+        });
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: `Successfully created ${result.created} demo deals across all pipeline stages`,
+        created: result.created,
+        skipped: false,
+      });
+    } catch (error) {
+      console.error("Error seeding demo deals:", error);
+      res.status(500).json({ error: "Failed to seed demo deals" });
+    }
+  });
+
+  // Admin Dashboard API - Check if demo deals exist (master_admin only)
+  app.get("/api/admin/demo-deals/status", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const orgId = membership.organization.id;
+      
+      const exists = await checkDemoDealsExist(orgId);
+      
+      res.json({
+        exists,
+        message: exists ? "Demo deals exist in this organization" : "No demo deals found",
+      });
+    } catch (error) {
+      console.error("Error checking demo deals status:", error);
+      res.status(500).json({ error: "Failed to check demo deals status" });
+    }
+  });
+
+  // Admin Dashboard API - Delete all demo deals (master_admin only)
+  app.delete("/api/admin/demo-deals", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const orgId = membership.organization.id;
+      
+      const deleted = await deleteDemoDeals(orgId);
+      
+      res.json({
+        success: true,
+        message: deleted > 0 ? `Successfully deleted ${deleted} demo deals` : "No demo deals found to delete",
+        deleted,
+      });
+    } catch (error) {
+      console.error("Error deleting demo deals:", error);
+      res.status(500).json({ error: "Failed to delete demo deals" });
     }
   });
 

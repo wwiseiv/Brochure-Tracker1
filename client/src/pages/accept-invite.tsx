@@ -49,11 +49,11 @@ export default function AcceptInvitePage() {
       setAccepted(true);
       toast({
         title: "Welcome to the team!",
-        description: `You've successfully joined ${invitation?.organizationName}.`,
+        description: `You've successfully joined ${invitation?.organizationName}. Next, complete your profile.`,
       });
       setTimeout(() => {
-        setLocation("/");
-      }, 2000);
+        setLocation("/complete-profile");
+      }, 1500);
     },
     onError: (err: Error) => {
       toast({
