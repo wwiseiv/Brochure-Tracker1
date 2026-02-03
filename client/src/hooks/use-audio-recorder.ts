@@ -122,12 +122,7 @@ export function checkBrowserSupport(): BrowserSupport {
     limitations.push('MediaRecorder API not supported');
   }
   
-  const hasGetUserMedia = !!(
-    navigator.mediaDevices?.getUserMedia ||
-    (navigator as any).getUserMedia ||
-    (navigator as any).webkitGetUserMedia ||
-    (navigator as any).mozGetUserMedia
-  );
+  const hasGetUserMedia = !!(navigator.mediaDevices?.getUserMedia);
   if (!hasGetUserMedia) {
     limitations.push('getUserMedia not supported');
   }

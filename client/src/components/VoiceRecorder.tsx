@@ -87,23 +87,6 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
     };
   }, [displayUrl, existingAudioUrl]);
 
-  if (!browserSupport.isFullySupported) {
-    return (
-      <Alert variant="destructive" className="flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 mt-0.5" />
-        <AlertDescription>
-          <p className="font-medium">Recording not supported on {browserSupport.browserName}</p>
-          <p className="text-sm mt-1">
-            {browserSupport.limitations.join(". ")}
-          </p>
-          <p className="text-sm mt-1">
-            For best results, use Chrome, Firefox, or Edge.
-          </p>
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
   if (error) {
     return (
       <div className="space-y-3">
@@ -173,36 +156,51 @@ export function VoiceRecorder({ onRecordingComplete, existingAudioUrl, onDelete 
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <Button
-        type="button"
-        variant={isRecording ? "destructive" : "secondary"}
-        size="lg"
-        onClick={isRecording ? handleStopRecording : handleStartRecording}
-        className={`min-h-touch gap-2 ${isRecording ? "animate-pulse" : ""}`}
-        data-testid={isRecording ? "button-stop-recording" : "button-start-recording"}
-      >
-        {isRecording ? (
-          <>
-            <Square className="w-5 h-5" />
-            Stop Recording
-          </>
-        ) : (
-          <>
-            <Mic className="w-5 h-5" />
-            Record Voice Note
-          </>
-        )}
-      </Button>
-      
-      {isRecording && (
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 bg-destructive rounded-full animate-pulse" />
-          <span className="font-mono text-lg font-semibold">
-            {formatTime(duration)}
-          </span>
-        </div>
+    <div className="space-y-3">
+      {!browserSupport.isFullySupported && (
+        <Alert className="flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-500" />
+          <AlertDescription>
+            <p className="text-sm">
+              Recording not available on {browserSupport.browserName}. 
+              Use Chrome, Firefox, or Edge for recording.
+            </p>
+          </AlertDescription>
+        </Alert>
       )}
+      
+      <div className="flex items-center gap-4">
+        <Button
+          type="button"
+          variant={isRecording ? "destructive" : "secondary"}
+          size="lg"
+          onClick={isRecording ? handleStopRecording : handleStartRecording}
+          disabled={!browserSupport.isFullySupported}
+          className={`min-h-touch gap-2 ${isRecording ? "animate-pulse" : ""}`}
+          data-testid={isRecording ? "button-stop-recording" : "button-start-recording"}
+        >
+          {isRecording ? (
+            <>
+              <Square className="w-5 h-5" />
+              Stop Recording
+            </>
+          ) : (
+            <>
+              <Mic className="w-5 h-5" />
+              Record Voice Note
+            </>
+          )}
+        </Button>
+        
+        {isRecording && (
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-destructive rounded-full animate-pulse" />
+            <span className="font-mono text-lg font-semibold">
+              {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
