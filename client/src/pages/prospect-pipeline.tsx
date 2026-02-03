@@ -845,11 +845,12 @@ export default function DealPipelinePage() {
           onClick={() => handleOpenDeal(deal)}
           data-testid={`deal-card-${deal.id}`}
         >
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start gap-2 mb-2">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold truncate max-w-[200px] sm:max-w-[250px]">{deal.businessName}</h3>
-              {renderTemperatureBadge(deal.temperature)}
+              <h3 className="font-semibold truncate flex-1 min-w-0">{deal.businessName}</h3>
+              <div className="flex-shrink-0">{renderTemperatureBadge(deal.temperature)}</div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {renderStageBadge(deal.currentStage)}
@@ -860,7 +861,6 @@ export default function DealPipelinePage() {
               )}
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         </div>
 
         {deal.businessCity && (
@@ -988,8 +988,8 @@ export default function DealPipelinePage() {
                       data-testid={`deal-card-${deal.id}`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-medium text-sm truncate flex-1">{deal.businessName}</h4>
-                        {renderTemperatureBadge(deal.temperature)}
+                        <h4 className="font-medium text-sm truncate flex-1 min-w-0">{deal.businessName}</h4>
+                        <div className="flex-shrink-0">{renderTemperatureBadge(deal.temperature)}</div>
                       </div>
                       {deal.estimatedCommission && (
                         <p className="text-sm text-green-600 dark:text-green-400 font-medium mb-1">
