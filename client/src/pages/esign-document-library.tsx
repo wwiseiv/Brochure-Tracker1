@@ -692,12 +692,12 @@ export default function ESignDocumentLibrary() {
 
             <div className="space-y-2">
               <Label>Link to Deal (Optional)</Label>
-              <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+              <Select value={selectedDealId || "none"} onValueChange={(val) => setSelectedDealId(val === "none" ? "" : val)}>
                 <SelectTrigger data-testid="select-link-deal">
                   <SelectValue placeholder="Select a deal to link..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No deal selected</SelectItem>
+                  <SelectItem value="none">No deal selected</SelectItem>
                   {deals.map(deal => (
                     <SelectItem key={deal.id} value={String(deal.id)}>
                       {deal.businessName}
