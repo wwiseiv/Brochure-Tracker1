@@ -12799,6 +12799,167 @@ Generate the following content in JSON format:
     }
   });
 
+  // POST /api/email-digest/pause - Pause digests for a period
+  app.post("/api/email-digest/pause", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { days } = req.body;
+      
+      if (!days || days < 1 || days > 30) {
+        return res.status(400).json({ error: 'Invalid pause duration (1-30 days)' });
+      }
+      
+      const pausedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      
+      const updated = await storage.updateEmailDigestPreferences(userId, { pausedUntil } as any);
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Preferences not found' });
+      }
+      
+      res.json({ success: true, pausedUntil });
+    } catch (error: any) {
+      console.error('Error pausing digest:', error);
+      res.status(500).json({ error: 'Failed to pause digest' });
+    }
+  });
+
+  // POST /api/email-digest/resume - Resume paused digests
+  app.post("/api/email-digest/resume", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const updated = await storage.updateEmailDigestPreferences(userId, { pausedUntil: null } as any);
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Preferences not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error resuming digest:', error);
+      res.status(500).json({ error: 'Failed to resume digest' });
+    }
+  });
+
+  // GET /api/email-digest/preview - Preview what digest would be sent now
+  app.get("/api/email-digest/preview", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const prefs = await storage.getEmailDigestPreferences(userId);
+      
+      if (!prefs) {
+        return res.json({
+          notifications: [],
+          content: null,
+          message: 'No digest preferences configured',
+        });
+      }
+      
+      const { gatherDigestData, generateDigestContent } = await import('./services/email-digest');
+      
+      const data = await gatherDigestData(userId, prefs.timezone, {
+        includeAppointments: prefs.includeAppointments,
+        includeFollowups: prefs.includeFollowups,
+        includeStaleDeals: prefs.includeStaleDeals,
+        includePipelineSummary: prefs.includePipelineSummary,
+        includeRecentWins: prefs.includeRecentWins,
+        includeQuarterlyCheckins: prefs.includeQuarterlyCheckins,
+        includeNewReferrals: prefs.includeNewReferrals,
+        appointmentLookaheadDays: prefs.appointmentLookaheadDays,
+        staleDealThresholdDays: prefs.staleDealThresholdDays,
+      }, 'daily');
+      
+      const hasContent = data.appointments.length > 0 ||
+        data.followups.length > 0 ||
+        data.staleDeals.length > 0 ||
+        data.recentWins.length > 0 ||
+        data.pipelineSummary.totalDeals > 0;
+      
+      if (!hasContent) {
+        return res.json({
+          data: null,
+          content: null,
+          message: 'No pending content for digest',
+        });
+      }
+      
+      const content = await generateDigestContent(data, 'Sales Rep', 'daily', prefs.includeAiTips);
+      
+      res.json({
+        data,
+        content,
+        previewHtml: `<p>Subject: ${content.subject}</p><p>${content.greeting}</p>`,
+      });
+    } catch (error: any) {
+      console.error('Error generating digest preview:', error);
+      res.status(500).json({ error: 'Failed to generate preview' });
+    }
+  });
+
+  // POST /api/email-digest/send-now - Manually trigger digest for current user
+  app.post("/api/email-digest/send-now", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const { triggerDigestForUser } = await import('./cron');
+      const result = await triggerDigestForUser(userId);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          notificationCount: result.notificationCount || 0,
+          sentAt: result.sentAt,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error sending digest now:', error);
+      res.status(500).json({ error: 'Failed to send digest' });
+    }
+  });
+
+  // GET /api/admin/email-digest/stats - Get scheduler statistics (admin only)
+  app.get("/api/admin/email-digest/stats", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      if (membership.role !== "master_admin") {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
+      const { getDigestSchedulerStats } = await import('./cron');
+      const stats = getDigestSchedulerStats();
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error getting scheduler stats:', error);
+      res.status(500).json({ error: 'Failed to get stats' });
+    }
+  });
+
+  // GET /api/digest/timezones - Get list of common timezones
+  app.get("/api/digest/timezones", (req, res) => {
+    res.json([
+      { value: 'America/New_York', label: 'Eastern Time (ET)' },
+      { value: 'America/Chicago', label: 'Central Time (CT)' },
+      { value: 'America/Denver', label: 'Mountain Time (MT)' },
+      { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+      { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+      { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' },
+      { value: 'Europe/London', label: 'London (GMT/BST)' },
+      { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+      { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+      { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+      { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+    ]);
+  });
+
   // ============================================================================
   // MARKETING FLYER GENERATION API
   // ============================================================================

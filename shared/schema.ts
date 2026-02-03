@@ -2309,12 +2309,23 @@ export const emailDigestPreferences = pgTable("email_digest_preferences", {
   dailyDigestEnabled: boolean("daily_digest_enabled").default(false).notNull(),
   weeklyDigestEnabled: boolean("weekly_digest_enabled").default(false).notNull(),
   
+  // Immediate/threshold-based digest (new feature)
+  immediateDigestEnabled: boolean("immediate_digest_enabled").default(false).notNull(),
+  immediateThreshold: integer("immediate_threshold").default(5).notNull(), // Send when this many notifications accumulate
+  
+  // Pause functionality (new feature)
+  pausedUntil: timestamp("paused_until"), // If set and > now, digests are paused
+  
   // Delivery Settings
   emailAddress: varchar("email_address", { length: 255 }).notNull(),
   timezone: varchar("timezone", { length: 50 }).default("America/New_York").notNull(),
   dailySendTime: varchar("daily_send_time", { length: 10 }).default("06:00").notNull(),
   weeklySendDay: varchar("weekly_send_day", { length: 10 }).default("monday").notNull(),
   weeklySendTime: varchar("weekly_send_time", { length: 10 }).default("06:00").notNull(),
+  
+  // Business hours for immediate digests (new feature)
+  businessHoursStart: integer("business_hours_start").default(8).notNull(), // 8 AM
+  businessHoursEnd: integer("business_hours_end").default(20).notNull(), // 8 PM
   
   // Content Preferences
   includeAppointments: boolean("include_appointments").default(true).notNull(),
@@ -2333,6 +2344,7 @@ export const emailDigestPreferences = pgTable("email_digest_preferences", {
   // Tracking
   lastDailySentAt: timestamp("last_daily_sent_at"),
   lastWeeklySentAt: timestamp("last_weekly_sent_at"),
+  lastImmediateSentAt: timestamp("last_immediate_sent_at"), // new
   totalEmailsSent: integer("total_emails_sent").default(0).notNull(),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),

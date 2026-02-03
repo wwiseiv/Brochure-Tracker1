@@ -337,7 +337,7 @@ export interface IStorage {
   getEmailDigestHistory(userId: string, limit?: number): Promise<EmailDigestHistory[]>;
   createEmailDigestHistory(data: InsertEmailDigestHistory): Promise<EmailDigestHistory>;
   updateEmailDigestHistory(id: number, data: Partial<InsertEmailDigestHistory>): Promise<EmailDigestHistory | undefined>;
-  getDueEmailDigests(digestType: 'daily' | 'weekly'): Promise<EmailDigestPreferences[]>;
+  getDueEmailDigests(digestType: 'daily' | 'weekly' | 'immediate'): Promise<EmailDigestPreferences[]>;
   
   // Presentation Training
   getPresentationModules(): Promise<PresentationModule[]>;
@@ -2039,13 +2039,16 @@ export class DatabaseStorage implements IStorage {
     return history;
   }
 
-  async getDueEmailDigests(digestType: 'daily' | 'weekly'): Promise<EmailDigestPreferences[]> {
+  async getDueEmailDigests(digestType: 'daily' | 'weekly' | 'immediate'): Promise<EmailDigestPreferences[]> {
     if (digestType === 'daily') {
       return db.select().from(emailDigestPreferences)
         .where(eq(emailDigestPreferences.dailyDigestEnabled, true));
-    } else {
+    } else if (digestType === 'weekly') {
       return db.select().from(emailDigestPreferences)
         .where(eq(emailDigestPreferences.weeklyDigestEnabled, true));
+    } else {
+      return db.select().from(emailDigestPreferences)
+        .where(eq(emailDigestPreferences.immediateDigestEnabled, true));
     }
   }
 

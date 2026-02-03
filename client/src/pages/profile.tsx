@@ -35,8 +35,13 @@ import {
   CalendarClock,
   Send,
   History,
-  Loader2
+  Loader2,
+  Play,
+  Pause,
+  AlertCircle,
+  Zap
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Link } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DropWithBrochure, UserPreferences } from "@shared/schema";
@@ -88,11 +93,16 @@ interface EmailDigestPreferences {
   id?: number;
   dailyDigestEnabled: boolean;
   weeklyDigestEnabled: boolean;
+  immediateDigestEnabled: boolean;
+  immediateThreshold: number;
+  pausedUntil?: string;
   emailAddress: string;
   timezone: string;
   dailySendTime: string;
   weeklySendDay: string;
   weeklySendTime: string;
+  businessHoursStart: number;
+  businessHoursEnd: number;
   includeAppointments: boolean;
   includeFollowups: boolean;
   includeStaleDeals: boolean;
@@ -142,6 +152,48 @@ export default function ProfilePage() {
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pauseDigest = useMutation({
+    mutationFn: async (days: number) => {
+      const res = await apiRequest("POST", "/api/email-digest/pause", { days });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-digest/preferences"] });
+      toast({
+        title: "Digests paused",
+        description: "Email digests have been paused.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to pause digests.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resumeDigest = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/email-digest/resume");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-digest/preferences"] });
+      toast({
+        title: "Digests resumed",
+        description: "Email digests have been resumed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to resume digests.",
         variant: "destructive",
       });
     },
@@ -402,6 +454,26 @@ export default function ProfilePage() {
             <h3 className="font-semibold">Email Digest Settings</h3>
           </div>
           
+          {digestPrefs?.pausedUntil && new Date(digestPrefs.pausedUntil) > new Date() && (
+            <Alert className="mb-4" data-testid="alert-digest-paused">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Digests Paused</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>Paused until {new Date(digestPrefs.pausedUntil).toLocaleDateString()}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resumeDigest.mutate()}
+                  disabled={resumeDigest.isPending}
+                  data-testid="button-resume-digest"
+                >
+                  {resumeDigest.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Resume
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="digest-email" className="text-sm font-medium">
@@ -554,6 +626,52 @@ export default function ProfilePage() {
                 >
                   {sendTestEmail.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Send Test Weekly Digest
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex items-center gap-3 flex-1">
+                <Zap className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <Label htmlFor="immediate-digest" className="text-sm font-medium cursor-pointer">
+                    Instant Alerts
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Get notified when important updates accumulate
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="immediate-digest"
+                checked={digestPrefs?.immediateDigestEnabled ?? false}
+                onCheckedChange={(checked) => handleDigestToggle('immediateDigestEnabled', checked)}
+                disabled={digestLoading || updateDigestPrefs.isPending}
+                data-testid="switch-immediate-digest"
+              />
+            </div>
+
+            {digestPrefs?.immediateDigestEnabled && (
+              <div className="space-y-2 pl-8">
+                <Label className="text-sm text-muted-foreground">
+                  Send when {digestPrefs?.immediateThreshold || 5}+ updates accumulate (during business hours)
+                </Label>
+              </div>
+            )}
+
+            {(digestPrefs?.dailyDigestEnabled || digestPrefs?.weeklyDigestEnabled || digestPrefs?.immediateDigestEnabled) && 
+             !(digestPrefs?.pausedUntil && new Date(digestPrefs.pausedUntil) > new Date()) && (
+              <div className="pt-4 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => pauseDigest.mutate(7)}
+                  disabled={pauseDigest.isPending}
+                  data-testid="button-pause-digest"
+                >
+                  {pauseDigest.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
+                  Pause digests for 7 days
                 </Button>
               </div>
             )}
