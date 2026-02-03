@@ -499,9 +499,9 @@ export default function TeamManagementPage() {
       return;
     }
 
-    const managerId = newRole === "agent" && newManagerId ? parseInt(newManagerId) : null;
+    const managerId = newRole === "agent" && newManagerId && newManagerId !== "none" ? parseInt(newManagerId) : null;
     
-    if (newRole === "agent" && newManagerId) {
+    if (newRole === "agent" && newManagerId && newManagerId !== "none") {
       const manager = members?.find(m => m.id === parseInt(newManagerId));
       if (!manager || manager.role !== "relationship_manager") {
         toast({
@@ -523,9 +523,9 @@ export default function TeamManagementPage() {
   const handleEditMember = () => {
     if (!selectedMember) return;
 
-    const managerId = editRole === "agent" && editManagerId ? parseInt(editManagerId) : null;
+    const managerId = editRole === "agent" && editManagerId && editManagerId !== "none" ? parseInt(editManagerId) : null;
     
-    if (editRole === "agent" && editManagerId) {
+    if (editRole === "agent" && editManagerId && editManagerId !== "none") {
       const manager = members?.find(m => m.id === parseInt(editManagerId));
       if (!manager || manager.role !== "relationship_manager") {
         toast({
@@ -571,9 +571,9 @@ export default function TeamManagementPage() {
       return;
     }
 
-    const managerId = inviteRole === "agent" && inviteManagerId ? parseInt(inviteManagerId) : null;
+    const managerId = inviteRole === "agent" && inviteManagerId && inviteManagerId !== "none" ? parseInt(inviteManagerId) : null;
     
-    if (inviteRole === "agent" && inviteManagerId) {
+    if (inviteRole === "agent" && inviteManagerId && inviteManagerId !== "none") {
       const manager = members?.find(m => m.id === parseInt(inviteManagerId));
       if (!manager || manager.role !== "relationship_manager") {
         toast({
