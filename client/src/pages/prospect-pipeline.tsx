@@ -12,6 +12,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RoleplayCoach } from "@/components/RoleplayCoach";
+import { DealMeetingRecorder } from "@/components/DealMeetingRecorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -1503,26 +1504,7 @@ export default function DealPipelinePage() {
                   <p className="text-sm text-muted-foreground">
                     Record your conversation during meetings. The recording will be analyzed by AI and sent to the office for coaching review.
                   </p>
-                  {selectedDeal.merchantId ? (
-                    <Button 
-                      variant="default"
-                      className="w-full"
-                      onClick={() => {
-                        navigate(`/merchants/${selectedDeal.merchantId}`);
-                      }}
-                      data-testid="button-go-to-merchant-for-recording"
-                    >
-                      <Video className="w-4 h-4 mr-2" />
-                      Record Pickup Meeting
-                    </Button>
-                  ) : (
-                    <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
-                      <p className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-500 flex-shrink-0" />
-                        <span>Meeting recording is available after the deal is won and converted to an active merchant. Win this deal first to unlock recording features!</span>
-                      </p>
-                    </div>
-                  )}
+                  <DealMeetingRecorder deal={selectedDeal} />
                 </Card>
 
                 {/* Prep for Visit - Role Play Section */}

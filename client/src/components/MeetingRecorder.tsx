@@ -34,7 +34,7 @@ interface MeetingRecorderProps {
 
 type RecordingState = "idle" | "recording" | "processing" | "completed" | "error" | "pending_upload";
 
-const MAX_RECORDING_SECONDS = 60 * 60; // 60 minutes
+const MAX_RECORDING_SECONDS = 90 * 60; // 90 minutes
 
 export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) {
   const { toast } = useToast();
@@ -192,7 +192,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
             stopRecording();
             toast({
               title: "Maximum length reached",
-              description: "Recording automatically stopped at 60 minutes.",
+              description: "Recording automatically stopped at 90 minutes.",
             });
             return MAX_RECORDING_SECONDS;
           }
@@ -458,7 +458,7 @@ export function MeetingRecorder({ merchant, onComplete }: MeetingRecorderProps) 
           <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
             <Clock className="w-4 h-4" />
             <span className="font-mono">{formatTime(recordingTime)}</span>
-            <span className="text-xs text-muted-foreground">/ 60:00</span>
+            <span className="text-xs text-muted-foreground">/ 90:00</span>
           </div>
         </div>
         <Button
