@@ -241,13 +241,14 @@ export function HamburgerMenu() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
-  const { hasFeature, isLoading: permLoading } = usePermissions();
+  const { hasFeature, isLoading: permLoading, error: permError, role } = usePermissions();
 
   const isManager = userRole?.role === "master_admin" || userRole?.role === "relationship_manager";
   const isAdmin = userRole?.role === "master_admin";
   
   const canAccessPath = (path: string): boolean => {
-    if (permLoading) return true;
+    // Show all items while loading, on error, or if no role data (not authenticated)
+    if (permLoading || permError || !role) return true;
     const featureId = pathToFeatureMap[path];
     if (!featureId) return true;
     return hasFeature(featureId);
