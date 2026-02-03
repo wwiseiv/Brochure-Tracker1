@@ -1,5 +1,7 @@
 # PCBancard Field Sales Platform - Complete Feature Map
 
+> **NOTE:** For comprehensive technical documentation including code sections, AI model specifications, step-by-step workflows, and known issues, see **[COMPREHENSIVE_SYSTEM_DOCUMENTATION.md](./COMPREHENSIVE_SYSTEM_DOCUMENTATION.md)**
+
 This document provides a detailed breakdown of every feature in the platform, organized by category. Use this as your reference for enhancing features stage by stage.
 
 ---
