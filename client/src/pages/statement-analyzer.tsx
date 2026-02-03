@@ -6,6 +6,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { HamburgerMenu } from "@/components/BottomNav";
 import type { Deal, StatementAnalysisJob } from "@shared/schema";
+import { sanitizeStatementData, type SafeStatementData, type ConfidenceScore as SafeConfidenceScore, type ValidationIssue as SafeValidationIssue } from "@/hooks/use-safe-statement-data";
+import { ManualReviewSheet } from "@/components/ManualReviewSheet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -318,6 +320,9 @@ export default function StatementAnalyzer() {
   const [showMyAnalyses, setShowMyAnalyses] = useState(false);
   const [viewAllJobs, setViewAllJobs] = useState(false);
   const [filterAgentId, setFilterAgentId] = useState<string>("all");
+  const [showManualReview, setShowManualReview] = useState(false);
+  const [reviewJobId, setReviewJobId] = useState<number | null>(null);
+  const [reviewJobData, setReviewJobData] = useState<any>(null);
 
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -354,6 +359,7 @@ export default function StatementAnalyzer() {
   const pendingJobs = jobs.filter(j => j.status === "pending" || j.status === "processing");
   const completedJobs = jobs.filter(j => j.status === "completed");
   const failedJobs = jobs.filter(j => j.status === "failed");
+  const needsReviewJobs = jobs.filter((j: any) => j.needsManualReview === true || (j.confidence && j.confidence < 70));
 
   useEffect(() => {
     if (selectedJobId) {
@@ -735,8 +741,57 @@ export default function StatementAnalyzer() {
     });
   };
 
-  const loadJobResults = (job: StatementAnalysisJob) => {
+  const loadJobResults = (job: StatementAnalysisJob & { needsManualReview?: boolean; confidence?: number; reviewReasons?: string[]; validationIssues?: any[]; extractedData?: any }) => {
     if (job.status === "completed" && job.results) {
+      // Check if manual review is needed based on needsManualReview flag or low confidence
+      const needsReview = job.needsManualReview === true || (typeof job.confidence === 'number' && job.confidence < 70);
+      
+      if (needsReview) {
+        // Extract statement data from results structure - backend stores it as results.statementData
+        const resultData = job.results as any;
+        const statementData = resultData?.statementData || job.extractedData || {};
+        
+        // Convert backend statementData format to ManualReviewSheet expected format
+        // Use sanitizeStatementData to ensure all fields have valid defaults
+        const rawForReview = {
+          merchantInfo: {
+            name: statementData.merchantName || '',
+            processor: statementData.processorName || '',
+            statementDate: statementData.statementPeriod || new Date().toISOString().split('T')[0],
+            mid: statementData.merchantId || '',
+          },
+          volumeData: {
+            totalVolume: statementData.totalVolume || 0,
+            totalTransactions: statementData.totalTransactions || 0,
+            avgTicket: statementData.averageTicket || (statementData.totalVolume && statementData.totalTransactions 
+              ? statementData.totalVolume / statementData.totalTransactions : 0),
+            cardBreakdown: statementData.cardMix || { visa: 0, mastercard: 0, discover: 0, amex: 0, other: 0 },
+          },
+          fees: Array.isArray(statementData.fees) ? statementData.fees : [],
+          effectiveRate: statementData.fees?.totalFees && statementData.totalVolume 
+            ? (statementData.fees.totalFees / statementData.totalVolume * 100) : 0,
+        };
+        
+        // Apply sanitization to ensure safe defaults
+        const extractedForReview = sanitizeStatementData(rawForReview);
+        
+        setReviewJobId(job.id);
+        setReviewJobData({
+          extractedData: extractedForReview,
+          confidence: {
+            overall: job.confidence || 50,
+            merchantInfo: 50,
+            volumeData: 50,
+            fees: 50,
+          },
+          reviewReasons: Array.isArray(job.reviewReasons) ? job.reviewReasons : ["Low confidence extraction - please verify data"],
+          validationIssues: Array.isArray(job.validationIssues) ? job.validationIssues : [],
+        });
+        setShowManualReview(true);
+        return;
+      }
+      
+      // Normal completed job - show results
       setResults(job.results as AnalysisResult);
       setShowMyAnalyses(false);
     } else if (job.status === "pending" || job.status === "processing") {
@@ -754,13 +809,20 @@ export default function StatementAnalyzer() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, job?: any) => {
+    // Check for low confidence that needs review even if status is "completed"
+    const needsReview = job?.needsManualReview === true || (typeof job?.confidence === 'number' && job.confidence < 70);
+    
     switch (status) {
       case "pending":
         return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Pending</Badge>;
       case "processing":
         return <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><Loader2 className="h-3 w-3 animate-spin" />Processing</Badge>;
       case "completed":
+        // Show "Needs Review" for completed jobs with low confidence
+        if (needsReview) {
+          return <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"><AlertTriangle className="h-3 w-3" />Needs Review</Badge>;
+        }
         return <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" />Completed</Badge>;
       case "failed":
         return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
@@ -1564,7 +1626,7 @@ ${new Date().toLocaleDateString()}
                         <p className="font-medium text-sm truncate">
                           {job.jobName || `Analysis #${job.id}`}
                         </p>
-                        {getStatusBadge(job.status)}
+                        {getStatusBadge(job.status, job)}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {viewAllJobs && job.agentName && (
@@ -2982,6 +3044,38 @@ ${new Date().toLocaleDateString()}
             </Card>
           )}
         </div>
+      )}
+      
+      {/* Manual Review Sheet for low-confidence extractions */}
+      {reviewJobId && reviewJobData && (
+        <ManualReviewSheet
+          isOpen={showManualReview}
+          onClose={() => {
+            setShowManualReview(false);
+            setReviewJobId(null);
+            setReviewJobData(null);
+          }}
+          jobId={reviewJobId}
+          extractedData={reviewJobData.extractedData || {
+            merchantInfo: { name: '', processor: '', statementDate: '', mid: '' },
+            volumeData: { totalVolume: 0, totalTransactions: 0, avgTicket: 0, cardBreakdown: { visa: 0, mastercard: 0, discover: 0, amex: 0, other: 0 } },
+            fees: [],
+            effectiveRate: 0,
+          }}
+          confidence={reviewJobData.confidence || { overall: 50, merchantInfo: 50, volumeData: 50, fees: 50 }}
+          reviewReasons={reviewJobData.reviewReasons || []}
+          validationIssues={reviewJobData.validationIssues || []}
+          onReviewComplete={(correctedData) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/statement-analysis/jobs"] });
+            toast({
+              title: "Review Complete",
+              description: "Data has been corrected and analysis updated.",
+            });
+            setShowManualReview(false);
+            setReviewJobId(null);
+            setReviewJobData(null);
+          }}
+        />
       )}
     </div>
   );
