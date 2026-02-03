@@ -3028,3 +3028,83 @@ export const DEFAULT_APPROVED_CLAIMS = [
   { claim: "PCI-compliant terminals and systems", category: "security" },
   { claim: "Accept all major cards: Visa, Mastercard, Amex, Discover", category: "technology" },
 ];
+
+// =====================================================
+// USER IMPERSONATION SYSTEM
+// =====================================================
+
+// Impersonation session statuses
+export const IMPERSONATION_SESSION_STATUSES = ["active", "ended", "expired"] as const;
+export type ImpersonationSessionStatus = typeof IMPERSONATION_SESSION_STATUSES[number];
+
+// Impersonation sessions table - tracks active and past impersonation sessions
+export const impersonationSessions = pgTable("impersonation_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  originalUserId: varchar("original_user_id", { length: 255 }).notNull(),
+  impersonatedUserId: varchar("impersonated_user_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  sessionToken: varchar("session_token", { length: 500 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const impersonationSessionsRelations = relations(impersonationSessions, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [impersonationSessions.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertImpersonationSessionSchema = createInsertSchema(impersonationSessions).omit({
+  id: true,
+  startedAt: true,
+  endedAt: true,
+});
+export type InsertImpersonationSession = z.infer<typeof insertImpersonationSessionSchema>;
+export type ImpersonationSession = typeof impersonationSessions.$inferSelect;
+
+// Impersonation action types
+export const IMPERSONATION_ACTIONS = ["start", "end", "action_performed", "expired"] as const;
+export type ImpersonationAction = typeof IMPERSONATION_ACTIONS[number];
+
+// Impersonation audit log - tracks all impersonation events for compliance
+export const impersonationAuditLog = pgTable("impersonation_audit_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").references(() => impersonationSessions.id),
+  originalUserId: varchar("original_user_id", { length: 255 }).notNull(),
+  impersonatedUserId: varchar("impersonated_user_id", { length: 255 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  
+  action: varchar("action", { length: 50 }).notNull(),
+  actionDetails: jsonb("action_details"),
+  
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const impersonationAuditLogRelations = relations(impersonationAuditLog, ({ one }) => ({
+  session: one(impersonationSessions, {
+    fields: [impersonationAuditLog.sessionId],
+    references: [impersonationSessions.id],
+  }),
+  organization: one(organizations, {
+    fields: [impersonationAuditLog.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertImpersonationAuditLogSchema = createInsertSchema(impersonationAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertImpersonationAuditLog = z.infer<typeof insertImpersonationAuditLogSchema>;
+export type ImpersonationAuditLog = typeof impersonationAuditLog.$inferSelect;
