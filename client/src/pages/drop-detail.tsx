@@ -42,7 +42,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeIcon";
 import { DropDetailSkeleton } from "@/components/LoadingState";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { RoleplayCoach } from "@/components/RoleplayCoach";
 import { DropMeetingRecorder } from "@/components/DropMeetingRecorder";
@@ -413,6 +413,7 @@ export default function DropDetailPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
+            <HamburgerMenu />
             <Button variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="w-5 h-5" />
             </Button>

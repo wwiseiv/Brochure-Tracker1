@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
+import { HamburgerMenu } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -1051,6 +1052,7 @@ export default function HelpPage() {
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center gap-3 p-4">
+          <HamburgerMenu />
           <Link href="/profile">
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="w-5 h-5" />

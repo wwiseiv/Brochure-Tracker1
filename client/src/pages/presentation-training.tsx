@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
 import { ListenButton } from "@/components/ListenButton";
 import {
@@ -316,6 +316,7 @@ export default function PresentationTrainingPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+            <HamburgerMenu />
             <GraduationCap className="w-6 h-6 text-primary" />
             <h1 className="font-semibold text-lg">Teach Me the Presentation</h1>
           </div>
@@ -413,6 +414,7 @@ export default function PresentationTrainingPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
+            <HamburgerMenu />
             <GraduationCap className="w-6 h-6 text-primary" />
             <h1 className="font-semibold text-lg" data-testid="text-page-title">
               Teach Me the Presentation

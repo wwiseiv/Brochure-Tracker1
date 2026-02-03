@@ -15,7 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeIcon";
 import { StatusBadge } from "@/components/StatusBadge";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -759,6 +759,7 @@ export default function MerchantDetailPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
+            <HamburgerMenu />
             <Button 
               variant="ghost" 
               size="icon" 
@@ -783,6 +784,7 @@ export default function MerchantDetailPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
+            <HamburgerMenu />
             <Button 
               variant="ghost" 
               size="icon" 
@@ -817,6 +819,7 @@ export default function MerchantDetailPage() {
     <div className="min-h-screen bg-background pb-32">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
+          <HamburgerMenu />
           <Button 
             variant="ghost" 
             size="icon" 

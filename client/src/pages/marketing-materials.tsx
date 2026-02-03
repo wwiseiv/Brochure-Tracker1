@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
@@ -646,6 +646,7 @@ ${repEmail}`;
     <div className="min-h-screen bg-background pb-20 overflow-y-auto">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
+          <HamburgerMenu />
           <Tooltip delayDuration={700}>
             <TooltipTrigger asChild>
               <Link href="/">

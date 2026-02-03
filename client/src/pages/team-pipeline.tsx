@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { Loader2 } from "lucide-react";
 import {
   Sheet,
@@ -201,6 +201,7 @@ export default function TeamPipelinePage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
+            <HamburgerMenu />
             <Link href="/">
               <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="h-5 w-5" />

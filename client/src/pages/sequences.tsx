@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -527,6 +527,7 @@ export default function SequencesPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
+            <HamburgerMenu />
             <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-home">
               <ArrowLeft className="w-5 h-5" />
             </Button>

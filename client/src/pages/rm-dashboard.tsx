@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -155,6 +155,7 @@ export default function RMDashboardPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            <HamburgerMenu />
             <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-home">
               <ArrowLeft className="h-5 w-5" />
             </Button>

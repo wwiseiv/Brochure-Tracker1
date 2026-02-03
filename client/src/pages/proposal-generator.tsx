@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
@@ -3624,6 +3624,7 @@ export default function ProposalGeneratorPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
           <div className="container flex items-center gap-4 h-14 px-4">
+            <HamburgerMenu />
             <Button
               variant="ghost"
               size="icon"
@@ -3660,6 +3661,7 @@ export default function ProposalGeneratorPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container flex items-center gap-4 h-14 px-4">
+          <HamburgerMenu />
           <Tooltip delayDuration={700}>
             <TooltipTrigger asChild>
               <Button
