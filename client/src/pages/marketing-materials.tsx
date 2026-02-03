@@ -868,7 +868,7 @@ ${repEmail}`;
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
                         <Button
                           size="lg"
                           className="flex-1 gap-2 min-h-12"
@@ -881,7 +881,7 @@ ${repEmail}`;
                         <Button
                           variant={job.savedToLibrary ? "secondary" : "outline"}
                           size="lg"
-                          className="gap-2 min-h-12"
+                          className="gap-2 min-h-12 px-3"
                           onClick={() => saveToLibraryMutation.mutate(job.jobId)}
                           disabled={job.savedToLibrary || savingJobId === job.jobId}
                           data-testid={`button-save-library-${job.jobId}`}
@@ -908,7 +908,7 @@ ${repEmail}`;
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="min-h-12 min-w-12 text-muted-foreground hover:text-destructive"
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
                               onClick={() => handleDeleteClick(job.jobId)}
                               disabled={deleteMutation.isPending && deletingJobId === job.jobId}
                               data-testid={`button-delete-job-${job.jobId}`}
