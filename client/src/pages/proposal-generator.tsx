@@ -18,7 +18,7 @@ import { DictationInput } from "@/components/DictationInput";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ProposalJobStep, ProposalJobStatus, ProposalJobStepStatus, PricingComparison, MerchantScrapedData, SalespersonInfo, Deal } from "@shared/schema";
 import {
   ArrowLeft,
@@ -390,6 +390,9 @@ export default function ProposalGeneratorPage() {
   const [parseJobsOpen, setParseJobsOpen] = useState(false);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   
+  // Delete proposal state
+  const [proposalToDelete, setProposalToDelete] = useState<{ id: number; name: string } | null>(null);
+  
   // Push notifications for background job alerts
   const { isSubscribed, isSupported, permission } = usePushNotifications();
 
@@ -612,6 +615,34 @@ export default function ProposalGeneratorPage() {
       toast({
         title: "Error",
         description: "Failed to delete parse job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProposalMutation = useMutation({
+    mutationFn: async (proposalId: number) => {
+      const res = await fetch(`/api/proposals/${proposalId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete proposal");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
+      setProposalToDelete(null);
+      toast({
+        title: "Proposal Deleted",
+        description: "The proposal has been permanently deleted",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete proposal",
         variant: "destructive",
       });
     },
@@ -2845,6 +2876,14 @@ export default function ProposalGeneratorPage() {
                     >
                       <Download className="w-4 h-4" />
                     </a>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setProposalToDelete({ id: proposal.id, name: proposal.merchantName })}
+                      data-testid={`delete-proposal-${proposal.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -2852,6 +2891,42 @@ export default function ProposalGeneratorPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Proposal Confirmation Dialog */}
+      <Dialog open={!!proposalToDelete} onOpenChange={(open) => !open && setProposalToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Proposal</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the proposal for "{proposalToDelete?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setProposalToDelete(null)}
+              data-testid="cancel-delete-proposal"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => proposalToDelete && deleteProposalMutation.mutate(proposalToDelete.id)}
+              disabled={deleteProposalMutation.isPending}
+              data-testid="confirm-delete-proposal"
+            >
+              {deleteProposalMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Sticky footer with guidance for Manual Upload */}
       <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 z-40">
