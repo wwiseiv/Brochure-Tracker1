@@ -932,7 +932,7 @@ export default function MerchantDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate(`/pipeline`)}
+                onClick={() => navigate(`/prospects/pipeline`)}
                 data-testid="button-view-pipeline"
               >
                 View Pipeline
