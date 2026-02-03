@@ -5278,13 +5278,258 @@ Respond in JSON format:
   });
 
   // ============================================
+  // MERCHANT INTELLIGENCE API
+  // ============================================
+  
+  app.get("/api/merchant-intelligence", isAuthenticated, async (req: any, res) => {
+    try {
+      const { dealId, merchantId, dropId } = req.query;
+      
+      if (!dealId && !merchantId && !dropId) {
+        return res.status(400).json({ error: "Must provide dealId, merchantId, or dropId" });
+      }
+      
+      const intelligence = await storage.getMerchantIntelligence({
+        dealId: dealId ? parseInt(dealId) : undefined,
+        merchantId: merchantId ? parseInt(merchantId) : undefined,
+        dropId: dropId ? parseInt(dropId) : undefined,
+      });
+      
+      res.json({ intelligence: intelligence || null });
+    } catch (error) {
+      console.error("Error fetching merchant intelligence:", error);
+      res.status(500).json({ error: "Failed to fetch merchant intelligence" });
+    }
+  });
+  
+  app.post("/api/merchant-intelligence/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { dealId, merchantId, dropId } = req.body;
+      
+      if (!dealId && !merchantId && !dropId) {
+        return res.status(400).json({ error: "Must provide dealId, merchantId, or dropId" });
+      }
+      
+      // Import the intelligence service
+      const { scrapeWebsiteIntelligence, analyzeTranscripts, buildRoleplayPersonaPrompt, buildCoachingContextSummary } = await import('./services/merchantIntelligence');
+      
+      // Gather base information from deal, merchant, or drop
+      let websiteUrl: string | null = null;
+      let baseInfo: { businessName?: string; businessType?: string; notes?: string; stage?: string; temperature?: string } = {};
+      let transcripts: string[] = [];
+      
+      if (dealId) {
+        const deal = await storage.getDeal(parseInt(dealId));
+        if (deal) {
+          websiteUrl = deal.website || null;
+          baseInfo = {
+            businessName: deal.businessName,
+            businessType: deal.businessType || undefined,
+            notes: deal.notes || undefined,
+            stage: deal.currentStage,
+            temperature: deal.temperature,
+          };
+          
+          // Get transcripts from deal recordings
+          const recordings = await storage.getMeetingRecordingsByDeal(parseInt(dealId));
+          transcripts = recordings
+            .filter(r => r.aiSummary)
+            .map(r => r.aiSummary!)
+            .slice(0, 5);
+        }
+      }
+      
+      if (merchantId) {
+        const merchant = await storage.getMerchant(parseInt(merchantId));
+        if (merchant) {
+          baseInfo.businessName = baseInfo.businessName || merchant.businessName;
+          baseInfo.businessType = baseInfo.businessType || merchant.businessType || undefined;
+          baseInfo.notes = baseInfo.notes || merchant.notes || undefined;
+          
+          // Get merchant recordings
+          const recordings = await storage.getMeetingRecordingsByMerchant(parseInt(merchantId));
+          if (transcripts.length === 0) {
+            transcripts = recordings
+              .filter(r => r.aiSummary)
+              .map(r => r.aiSummary!)
+              .slice(0, 5);
+          }
+        }
+      }
+      
+      if (dropId) {
+        const drop = await storage.getDrop(parseInt(dropId));
+        if (drop) {
+          baseInfo.businessName = baseInfo.businessName || drop.businessName || undefined;
+          baseInfo.businessType = baseInfo.businessType || drop.businessType || undefined;
+          baseInfo.notes = baseInfo.notes || drop.textNotes || undefined;
+        }
+      }
+      
+      // Check if we already have intelligence cached
+      let intelligence = await storage.getMerchantIntelligence({
+        dealId: dealId ? parseInt(dealId) : undefined,
+        merchantId: merchantId ? parseInt(merchantId) : undefined,
+        dropId: dropId ? parseInt(dropId) : undefined,
+      });
+      
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      
+      // If intelligence exists and is recent, return it
+      if (intelligence && intelligence.lastUpdatedAt > oneHourAgo) {
+        return res.json({ intelligence, status: 'cached' });
+      }
+      
+      // Create or update intelligence record
+      if (!intelligence) {
+        intelligence = await storage.createMerchantIntelligence({
+          dealId: dealId ? parseInt(dealId) : null,
+          merchantId: merchantId ? parseInt(merchantId) : null,
+          dropId: dropId ? parseInt(dropId) : null,
+          websiteUrl,
+          websiteStatus: websiteUrl ? 'pending' : 'completed',
+          transcriptStatus: transcripts.length > 0 ? 'pending' : 'completed',
+        });
+      }
+      
+      // Start background processing
+      res.json({ 
+        intelligence, 
+        status: 'processing',
+        message: 'Intelligence gathering started in background'
+      });
+      
+      // Background processing (fire and forget)
+      (async () => {
+        try {
+          let websiteIntel = null;
+          let transcriptIntel = null;
+          
+          // Scrape website if available
+          if (websiteUrl && intelligence.websiteStatus !== 'completed') {
+            await storage.updateMerchantIntelligence(intelligence.id, { websiteStatus: 'scraping' });
+            
+            try {
+              websiteIntel = await scrapeWebsiteIntelligence(websiteUrl);
+              
+              if (websiteIntel) {
+                await storage.updateMerchantIntelligence(intelligence.id, {
+                  websiteStatus: 'completed',
+                  websiteScrapedAt: new Date(),
+                  scrapedBusinessName: websiteIntel.businessName || null,
+                  scrapedDescription: websiteIntel.description || null,
+                  scrapedIndustry: websiteIntel.industry || null,
+                  scrapedServices: websiteIntel.services || null,
+                  scrapedHours: websiteIntel.hours || null,
+                  scrapedOwnerName: websiteIntel.ownerName || null,
+                  scrapedMenuItems: websiteIntel.menuItems || null,
+                  scrapedPricingIndicators: websiteIntel.pricingIndicators || null,
+                  scrapedUniqueSellingPoints: websiteIntel.uniqueSellingPoints || null,
+                  scrapedRecentNews: websiteIntel.recentNews || null,
+                  scrapedEstablishedYear: websiteIntel.establishedYear || null,
+                });
+              } else {
+                await storage.updateMerchantIntelligence(intelligence.id, { websiteStatus: 'failed' });
+              }
+            } catch (scrapeError) {
+              console.error('[MerchantIntelligence] Website scrape failed:', scrapeError);
+              await storage.updateMerchantIntelligence(intelligence.id, { websiteStatus: 'failed' });
+            }
+          }
+          
+          // Analyze transcripts if available
+          if (transcripts.length > 0 && intelligence.transcriptStatus !== 'completed') {
+            await storage.updateMerchantIntelligence(intelligence.id, { transcriptStatus: 'analyzing' });
+            
+            try {
+              transcriptIntel = await analyzeTranscripts(transcripts);
+              
+              if (transcriptIntel) {
+                await storage.updateMerchantIntelligence(intelligence.id, {
+                  transcriptStatus: 'completed',
+                  transcriptAnalyzedAt: new Date(),
+                  communicationStyle: transcriptIntel.communicationStyle || null,
+                  decisionMakingStyle: transcriptIntel.decisionMakingStyle || null,
+                  keyStakeholders: transcriptIntel.keyStakeholders || null,
+                  knownObjections: transcriptIntel.knownObjections || null,
+                  knownConcerns: transcriptIntel.knownConcerns || null,
+                  questionsAsked: transcriptIntel.questionsAsked || null,
+                  interestsExpressed: transcriptIntel.interestsExpressed || null,
+                  painPoints: transcriptIntel.painPoints || null,
+                });
+              } else {
+                await storage.updateMerchantIntelligence(intelligence.id, { transcriptStatus: 'failed' });
+              }
+            } catch (transcriptError) {
+              console.error('[MerchantIntelligence] Transcript analysis failed:', transcriptError);
+              await storage.updateMerchantIntelligence(intelligence.id, { transcriptStatus: 'failed' });
+            }
+          }
+          
+          // Generate persona prompts
+          const updatedIntel = await storage.getMerchantIntelligence({ 
+            dealId: dealId ? parseInt(dealId) : undefined,
+            merchantId: merchantId ? parseInt(merchantId) : undefined,
+            dropId: dropId ? parseInt(dropId) : undefined,
+          });
+          
+          if (updatedIntel) {
+            // Reconstruct intel objects from stored data
+            const storedWebsiteIntel = updatedIntel.scrapedBusinessName ? {
+              businessName: updatedIntel.scrapedBusinessName || undefined,
+              description: updatedIntel.scrapedDescription || undefined,
+              industry: updatedIntel.scrapedIndustry || undefined,
+              services: updatedIntel.scrapedServices as string[] || undefined,
+              hours: updatedIntel.scrapedHours || undefined,
+              ownerName: updatedIntel.scrapedOwnerName || undefined,
+              menuItems: updatedIntel.scrapedMenuItems as string[] || undefined,
+              pricingIndicators: updatedIntel.scrapedPricingIndicators || undefined,
+              uniqueSellingPoints: updatedIntel.scrapedUniqueSellingPoints as string[] || undefined,
+              recentNews: updatedIntel.scrapedRecentNews || undefined,
+              establishedYear: updatedIntel.scrapedEstablishedYear || undefined,
+            } : null;
+            
+            const storedTranscriptIntel = updatedIntel.communicationStyle ? {
+              communicationStyle: updatedIntel.communicationStyle as any,
+              decisionMakingStyle: updatedIntel.decisionMakingStyle as any,
+              keyStakeholders: updatedIntel.keyStakeholders as string[] || undefined,
+              knownObjections: updatedIntel.knownObjections as string[] || undefined,
+              knownConcerns: updatedIntel.knownConcerns as string[] || undefined,
+              questionsAsked: updatedIntel.questionsAsked as string[] || undefined,
+              interestsExpressed: updatedIntel.interestsExpressed as string[] || undefined,
+              painPoints: updatedIntel.painPoints as string[] || undefined,
+            } : null;
+            
+            const roleplayPrompt = buildRoleplayPersonaPrompt(baseInfo, storedWebsiteIntel, storedTranscriptIntel);
+            const coachingSummary = buildCoachingContextSummary(baseInfo, storedWebsiteIntel, storedTranscriptIntel);
+            
+            await storage.updateMerchantIntelligence(updatedIntel.id, {
+              roleplayPersonaPrompt: roleplayPrompt,
+              coachingContextSummary: coachingSummary,
+            });
+          }
+          
+          console.log('[MerchantIntelligence] Background processing completed for:', baseInfo.businessName);
+        } catch (bgError) {
+          console.error('[MerchantIntelligence] Background processing failed:', bgError);
+        }
+      })();
+      
+    } catch (error) {
+      console.error("Error generating merchant intelligence:", error);
+      res.status(500).json({ error: "Failed to generate merchant intelligence" });
+    }
+  });
+
+  // ============================================
   // ROLE-PLAY COACH API
   // ============================================
 
   app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { dropId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona } = req.body;
+      const { dropId, dealId, merchantId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona } = req.body;
 
       if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
         return res.status(400).json({ 
@@ -5299,11 +5544,44 @@ Respond in JSON format:
       const isCoachingMode = mode === "coaching";
 
       let businessContext = "";
+      let merchantIntelligenceContext = "";
       let drop = null;
+
+      // Fetch merchant intelligence if available
+      if (dealId || merchantId || dropId) {
+        const intelligence = await storage.getMerchantIntelligence({
+          dealId: dealId ? parseInt(dealId) : undefined,
+          merchantId: merchantId ? parseInt(merchantId) : undefined,
+          dropId: dropId ? parseInt(dropId) : undefined,
+        });
+        
+        if (intelligence) {
+          if (isCoachingMode && intelligence.coachingContextSummary) {
+            merchantIntelligenceContext = intelligence.coachingContextSummary;
+          } else if (!isCoachingMode && intelligence.roleplayPersonaPrompt) {
+            merchantIntelligenceContext = intelligence.roleplayPersonaPrompt;
+          }
+        }
+      }
+
+      // Get deal info if provided
+      if (dealId) {
+        const deal = await storage.getDeal(parseInt(dealId));
+        if (deal) {
+          businessContext = getBusinessContextPrompt(
+            deal.businessType || "other",
+            deal.businessName || "",
+            deal.notes || ""
+          );
+          businessContext += `\nPipeline Stage: ${deal.currentStage}`;
+          businessContext += `\nLead Temperature: ${deal.temperature}`;
+          if (deal.contactName) businessContext += `\nContact: ${deal.contactName}`;
+        }
+      }
 
       if (dropId) {
         drop = await storage.getDrop(parseInt(dropId));
-        if (drop) {
+        if (drop && !businessContext) {
           businessContext = getBusinessContextPrompt(
             drop.businessType || "other",
             drop.businessName || "",
@@ -5361,6 +5639,7 @@ ${dailyEdgeContext}
 
 BUSINESS CONTEXT:
 ${businessContext}
+${merchantIntelligenceContext ? `\n${merchantIntelligenceContext}` : ''}
 
 YOUR ROLE AS COACH:
 - Answer the agent's questions about what to say, how to approach situations, and how to handle objections
@@ -5372,16 +5651,23 @@ YOUR ROLE AS COACH:
 - Keep responses focused and practical (2-4 sentences usually, more if they ask for detailed examples)
 - If they describe a situation, help them understand what to say and do
 - Incorporate today's mindset focus when giving encouragement or feedback
+- If merchant intelligence is available, tailor your advice to this specific merchant's situation
 
 You're their personal sales coach. Help them succeed!`;
       } else {
         const scenarioPrompt = getScenarioPrompt(scenario, selectedDifficulty as 'beginner' | 'intermediate' | 'advanced', persona);
+        
+        // Use merchant intelligence if available for more realistic role-play
+        const contextSection = merchantIntelligenceContext 
+          ? merchantIntelligenceContext 
+          : businessContext;
+        
         systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
 
 ${scenarioPrompt}
 
-${businessContext}
-${driveKnowledge ? `\nREFERENCE MATERIALS (use these to create realistic scenarios):\n${driveKnowledge.substring(0, 4000)}` : ''}
+${contextSection}
+${!merchantIntelligenceContext && driveKnowledge ? `\nREFERENCE MATERIALS (use these to create realistic scenarios):\n${driveKnowledge.substring(0, 4000)}` : ''}
 
 IMPORTANT GUIDELINES:
 - Stay in character as the business owner at all times
@@ -5393,6 +5679,7 @@ IMPORTANT GUIDELINES:
 - Keep responses conversational and not too long (1-3 sentences usually)
 - Never break character or acknowledge you're an AI
 - If the agent does well, let them progress; if they struggle, make it harder
+${merchantIntelligenceContext ? '- Use the specific details about this merchant to make the role-play realistic - their actual objections, communication style, and concerns' : ''}
 
 NEVER SAY THESE THINGS (they are unrealistic):
 - "I didn't catch that" or "Could you repeat that?" - Real merchants don't say this in sales conversations
@@ -5423,6 +5710,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         message: isCoachingMode 
           ? "Coaching session started. Ask me anything about sales techniques, what to say, or how to handle situations!"
           : "Role-play session started. Begin your approach!",
+        hasIntelligence: !!merchantIntelligenceContext,
       });
     } catch (error) {
       console.error("Error creating roleplay session:", error);
