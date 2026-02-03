@@ -6696,6 +6696,65 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     }
   });
 
+  // Advice Export Endpoints
+  app.post("/api/export/advice-document", isAuthenticated, async (req: any, res) => {
+    try {
+      const { content, title, subtitle, format } = req.body;
+      
+      if (!content || !title || !format) {
+        return res.status(400).json({ error: "Content, title, and format are required" });
+      }
+      
+      if (format !== "pdf" && format !== "docx") {
+        return res.status(400).json({ error: "Format must be 'pdf' or 'docx'" });
+      }
+
+      const userId = req.user?.id;
+      const member = await storage.getOrganizationMemberByUserId(userId, null);
+      const agentName = member ? `${member.firstName || ""} ${member.lastName || ""}`.trim() : undefined;
+      
+      const { generateAdvicePdf, generateAdviceWord } = await import("./services/advice-export-service");
+      
+      if (format === "pdf") {
+        const pdfBuffer = await generateAdvicePdf({ content, title, subtitle, format: "pdf", agentName });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-z0-9]/gi, "_")}.pdf"`);
+        res.send(pdfBuffer);
+      } else {
+        const docxBuffer = await generateAdviceWord({ content, title, subtitle, format: "docx", agentName });
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-z0-9]/gi, "_")}.docx"`);
+        res.send(docxBuffer);
+      }
+    } catch (error: any) {
+      console.error("[AdviceExport] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate document" });
+    }
+  });
+
+  app.post("/api/export/email-advice", isAuthenticated, async (req: any, res) => {
+    try {
+      const { email, content, title, subtitle } = req.body;
+      
+      if (!email || !content || !title) {
+        return res.status(400).json({ error: "Email, content, and title are required" });
+      }
+
+      const userId = req.user?.id;
+      const member = await storage.getOrganizationMemberByUserId(userId, null);
+      const agentName = member ? `${member.firstName || ""} ${member.lastName || ""}`.trim() : undefined;
+      
+      const { emailAdvice } = await import("./services/advice-export-service");
+      
+      await emailAdvice({ email, content, title, subtitle, agentName });
+      
+      res.json({ success: true, message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("[AdviceExport] Email error:", error);
+      res.status(500).json({ error: error.message || "Failed to send email" });
+    }
+  });
+
   app.post("/api/roleplay/sessions/:id/end", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
