@@ -2,6 +2,13 @@
 // Connection: google-drive integration
 
 import { google } from 'googleapis';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+const execAsync = promisify(exec);
 
 let connectionSettings: any;
 
@@ -173,31 +180,64 @@ export async function readTextFile(fileId: string): Promise<string> {
   }
 }
 
-// Read content from a PDF file (exports as text)
+// Read content from a PDF file using pdftotext for accurate extraction
 export async function readPdfFile(fileId: string, fileName: string): Promise<string> {
+  const tempDir = os.tmpdir();
+  const tempPdfPath = path.join(tempDir, `drive_pdf_${Date.now()}_${fileId}.pdf`);
+  const tempTextPath = path.join(tempDir, `drive_pdf_${Date.now()}_${fileId}.txt`);
+  
   try {
     const drive = await getGoogleDriveClient();
     
-    // Download the PDF file as arraybuffer
+    // Download the PDF file
     const response = await drive.files.get({
       fileId,
       alt: 'media'
     }, { responseType: 'arraybuffer' });
     
-    // Convert buffer to string and extract readable text
     const buffer = Buffer.from(response.data as ArrayBuffer);
-    const text = extractTextFromPdfBuffer(buffer);
     
-    if (text.trim()) {
-      console.log(`Extracted ${text.length} chars from PDF: ${fileName}`);
-      return text;
+    // Write to temp file
+    await fs.promises.writeFile(tempPdfPath, buffer);
+    
+    // Use pdftotext to extract text (from poppler-utils)
+    try {
+      await execAsync(`pdftotext -layout "${tempPdfPath}" "${tempTextPath}"`, { timeout: 30000 });
+      const text = await fs.promises.readFile(tempTextPath, 'utf-8');
+      
+      // Clean up extracted text
+      const cleanedText = text
+        .replace(/\f/g, '\n\n') // Replace form feeds with line breaks
+        .replace(/\s+/g, ' ')   // Normalize whitespace
+        .trim();
+      
+      if (cleanedText.length > 50) {
+        console.log(`[pdftotext] Extracted ${cleanedText.length} chars from PDF: ${fileName}`);
+        return cleanedText;
+      }
+    } catch (pdftotextError: any) {
+      console.log(`[pdftotext] Failed for ${fileName}:`, pdftotextError?.message || 'unknown error');
     }
     
-    // If no text extracted, return file metadata as placeholder
-    return `[PDF Document: ${fileName}]`;
+    // Fallback: try simple regex extraction
+    const fallbackText = extractTextFromPdfBuffer(buffer);
+    if (fallbackText.length > 50) {
+      console.log(`[fallback] Extracted ${fallbackText.length} chars from PDF: ${fileName}`);
+      return fallbackText;
+    }
+    
+    // If no text extracted, return placeholder
+    console.log(`[pdf] No readable text found in: ${fileName}`);
+    return `[PDF Document: ${fileName} - content not extractable]`;
   } catch (error) {
     console.error('Error reading PDF file:', error);
     return '';
+  } finally {
+    // Cleanup temp files
+    try {
+      await fs.promises.unlink(tempPdfPath).catch(() => {});
+      await fs.promises.unlink(tempTextPath).catch(() => {});
+    } catch {}
   }
 }
 

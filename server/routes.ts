@@ -3621,20 +3621,28 @@ Notes: ${notes || "No notes provided"}`;
         },
       });
       
-      // Fetch custom training materials from Google Drive (Little Rock folder)
-      // Use a timeout to prevent slow Drive fetches from blocking the response
-      let driveKnowledge = '';
+      // Fetch custom training materials - prefer database (faster), fallback to Google Drive
+      let trainingKnowledge = '';
       try {
-        const drivePromise = buildDriveKnowledgeContext();
-        const timeoutPromise = new Promise<string>((_, reject) => 
-          setTimeout(() => reject(new Error('Drive fetch timeout')), 10000)
-        );
-        driveKnowledge = await Promise.race([drivePromise, timeoutPromise]);
-        if (driveKnowledge) {
-          console.log("Loaded Google Drive training materials for prospecting advice");
+        // First, try to get training materials from database (already synced from Google Drive)
+        trainingKnowledge = await storage.getTrainingKnowledgeContext();
+        if (trainingKnowledge) {
+          console.log("[SalesSpark] Loaded training materials from database");
+        }
+        
+        // If database is empty, fallback to Google Drive with timeout
+        if (!trainingKnowledge) {
+          const drivePromise = buildDriveKnowledgeContext();
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error('Drive fetch timeout')), 10000)
+          );
+          trainingKnowledge = await Promise.race([drivePromise, timeoutPromise]);
+          if (trainingKnowledge) {
+            console.log("[SalesSpark] Loaded training materials from Google Drive (database was empty)");
+          }
         }
       } catch (driveError: any) {
-        console.log("Google Drive not available or timed out, using built-in knowledge only:", driveError?.message || driveError);
+        console.log("[SalesSpark] Training materials unavailable, using built-in knowledge only:", driveError?.message || driveError);
       }
       
       const businessContext = `
@@ -3672,7 +3680,7 @@ OBJECTION HANDLING BASICS:
 `;
 
       const prompt = `${businessContext}
-${driveKnowledge}
+${trainingKnowledge}
 
 ---
 
@@ -3698,7 +3706,7 @@ Keep the tone encouraging but practical. These are experienced salespeople who n
 
 Format the response clearly with numbered action items. Be specific - instead of "visit local businesses," say "Walk into 5 restaurants on Main Street during the slow 2-4pm window and ask to speak with the owner about their processing statement."`;
 
-      console.log("Prospecting Advice request received:", { inputLength: userInput.length, hasDriveKnowledge: driveKnowledge.length > 0 });
+      console.log("[SalesSpark] Prospecting Advice request received:", { inputLength: userInput.length, hasTrainingKnowledge: trainingKnowledge.length > 0 });
       
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
