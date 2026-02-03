@@ -516,7 +516,7 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
 
           <div className="flex-1 overflow-hidden flex flex-col">
             {!sessionId ? (
-              <div className="p-4 space-y-4 overflow-auto">
+              <div className="p-4 space-y-4 overflow-auto pb-24">
                 <div>
                   <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
                   <div className="grid grid-cols-2 gap-2 mb-4">
@@ -642,7 +642,7 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                 </Button>
               </div>
             ) : showFeedback && feedback ? (
-              <div className="p-4 space-y-4 overflow-auto">
+              <div className="p-4 space-y-4 overflow-auto pb-24">
                 <div className="text-center">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-3">
                     <Award className="w-8 h-8 text-primary" />
