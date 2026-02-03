@@ -79,6 +79,7 @@ import {
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
+import { seedRoleplayPersonas } from "./seed-roleplay-personas";
 import { getMerchantCache, formatDuration, CacheCategory } from "./services/cache-service";
 import { paginate, paginateByStage, normalizeDealParams, decodeCursor, DealPaginationParams, KanbanPaginationParams } from "./services/pagination";
 import { getDuplicateDetector, type Prospect as DuplicateProspect, type DuplicateCheckResult } from "./services/duplicate-detection";
@@ -1204,6 +1205,10 @@ export async function registerRoutes(
         let aiSummary = "";
         let keyTakeaways: string[] = [];
         let sentiment = "neutral";
+        let transcription = "";
+        let objections: string[] = [];
+        let concerns: string[] = [];
+        let actionItems: string[] = [];
 
         try {
           // Fetch the audio file and convert to base64
@@ -1223,17 +1228,25 @@ export async function registerRoutes(
 Business: ${recording.businessName || "Unknown"}
 Contact: ${recording.contactName || "Unknown"}
 
-Please listen to this audio recording and provide:
-1. A brief summary (2-3 sentences) of what was discussed in the meeting
-2. 3-5 key takeaways or important points from the conversation
-3. Overall sentiment of the interaction (positive, neutral, or negative)
+Please listen to this audio recording and provide a comprehensive analysis:
+1. TRANSCRIPTION: A full text transcription of the conversation
+2. SUMMARY: A brief summary (2-3 sentences) of what was discussed
+3. KEY POINTS: 3-5 key takeaways or important points
+4. OBJECTIONS: Any specific objections the merchant raised (e.g., "I don't want to change processors", "Your rates are too high")
+5. CONCERNS: Any concerns or worries the merchant expressed (e.g., "I'm worried about downtime", "What about my current contract?")
+6. ACTION ITEMS: Follow-up actions needed based on the conversation (e.g., "Send pricing proposal", "Schedule follow-up call")
+7. SENTIMENT: Overall sentiment (positive, neutral, or negative)
 
 If the audio is unclear or you cannot understand it, still provide your best analysis based on what you can hear.
 
 Format your response as JSON:
 {
+  "transcription": "Full conversation text here...",
   "summary": "Brief summary of the actual conversation here",
   "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
+  "objections": ["objection 1", "objection 2"],
+  "concerns": ["concern 1", "concern 2"],
+  "actionItems": ["action 1", "action 2"],
   "sentiment": "positive|neutral|negative"
 }`;
 
@@ -1262,8 +1275,12 @@ Format your response as JSON:
           const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
+            transcription = parsed.transcription || "";
             aiSummary = parsed.summary || "";
             keyTakeaways = parsed.keyTakeaways || [];
+            objections = parsed.objections || [];
+            concerns = parsed.concerns || [];
+            actionItems = parsed.actionItems || [];
             sentiment = parsed.sentiment || "neutral";
           }
         } catch (analysisError: any) {
@@ -1300,6 +1317,10 @@ Format your response as JSON:
           aiSummary,
           keyTakeaways,
           sentiment,
+          transcription: transcription || null,
+          objections: objections.length > 0 ? objections : null,
+          concerns: concerns.length > 0 ? concerns : null,
+          actionItems: actionItems.length > 0 ? actionItems : null,
         });
 
         // Format duration for email
@@ -5888,7 +5909,7 @@ Respond in JSON format:
   app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { dropId, dealId, merchantId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona } = req.body;
+      const { dropId, dealId, merchantId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona, personaId } = req.body;
 
       if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
         return res.status(400).json({ 
@@ -5953,12 +5974,19 @@ Respond in JSON format:
         businessContext += `\n\nThe agent wants to practice handling these specific objections: ${customObjections}`;
       }
 
+      // Fetch database persona if personaId provided
+      let dbPersona = null;
+      if (personaId) {
+        dbPersona = await storage.getRoleplayPersona(parseInt(personaId));
+      }
+
       const session = await storage.createRoleplaySession({
         agentId: userId,
         dropId: dropId ? parseInt(dropId) : null,
+        personaId: personaId ? parseInt(personaId) : null,
         scenario,
         mode: mode || "roleplay",
-        businessContext: `${businessContext}\nDifficulty: ${selectedDifficulty}${persona ? `\nPersona: ${persona}` : ''}`,
+        businessContext: `${businessContext}\nDifficulty: ${selectedDifficulty}${dbPersona ? `\nPersona: ${dbPersona.name}` : (persona ? `\nPersona: ${persona}` : '')}`,
         status: "active",
       });
 
@@ -6014,7 +6042,17 @@ YOUR ROLE AS COACH:
 
 You're their personal sales coach. Help them succeed!`;
       } else {
-        const scenarioPrompt = getScenarioPrompt(scenario, selectedDifficulty as 'beginner' | 'intermediate' | 'advanced', persona);
+        // Use database persona's systemPrompt if available, otherwise use legacy method
+        let roleplaySystemPrompt: string;
+        
+        if (dbPersona && dbPersona.systemPrompt) {
+          // Use the rich persona systemPrompt from database
+          roleplaySystemPrompt = dbPersona.systemPrompt;
+        } else {
+          // Fall back to legacy persona handling
+          const scenarioPrompt = getScenarioPrompt(scenario, selectedDifficulty as 'beginner' | 'intermediate' | 'advanced', persona);
+          roleplaySystemPrompt = scenarioPrompt;
+        }
         
         // Use merchant intelligence if available for more realistic role-play
         const contextSection = merchantIntelligenceContext 
@@ -6023,7 +6061,7 @@ You're their personal sales coach. Help them succeed!`;
         
         systemMessage = `You are playing the role of a business owner in a sales role-play training exercise.
 
-${scenarioPrompt}
+${roleplaySystemPrompt}
 
 ${contextSection}
 ${!merchantIntelligenceContext && driveKnowledge ? `\nREFERENCE MATERIALS (use these to create realistic scenarios):\n${driveKnowledge.substring(0, 4000)}` : ''}
@@ -6077,14 +6115,21 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     }
   });
 
-  // Get available personas for roleplay
+  // Get available personas for roleplay (from database)
   app.get("/api/roleplay/personas", isAuthenticated, async (_req: any, res) => {
     try {
-      const personas = Object.entries(ROLEPLAY_PERSONAS).map(([key, value]) => ({
-        id: key,
-        name: value.name,
-        description: value.description,
-        difficulty: value.difficulty,
+      const dbPersonas = await storage.getRoleplayPersonas();
+      const personas = dbPersonas.map((p) => ({
+        id: p.id,
+        name: p.name,
+        businessType: p.businessType,
+        personality: p.personality,
+        background: p.background,
+        painPoints: p.painPoints,
+        objections: p.objections,
+        communicationStyle: p.communicationStyle,
+        difficultyLevel: p.difficultyLevel,
+        isGeneral: p.isGeneral,
       }));
       res.json({ personas });
     } catch (error) {
@@ -6999,6 +7044,11 @@ Remember: You're not just sharing information - you're helping them BELIEVE diff
     console.log(`[EquipIQ] Seeded ${result.vendors} vendors, ${result.products} products, ${result.businessTypes} business types`);
   }).catch(err => {
     console.error("[EquipIQ] Error seeding data:", err);
+  });
+
+  // Initialize Role-play Personas on startup
+  seedRoleplayPersonas().catch(err => {
+    console.error("[RoleplayPersonas] Error seeding personas:", err);
   });
 
   // Get all vendors

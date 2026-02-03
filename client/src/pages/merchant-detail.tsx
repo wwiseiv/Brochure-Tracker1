@@ -60,6 +60,7 @@ import {
   Trash2,
   Star,
   MessageSquare,
+  Target,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
@@ -1822,22 +1823,91 @@ export default function MerchantDetailPage() {
                       <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
                         {recording.aiSummary && (
                           <div>
-                            <h4 className="text-sm font-medium mb-2">AI Summary</h4>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-purple-500" />
+                              AI Summary
+                            </h4>
                             <p className="text-sm text-muted-foreground">{recording.aiSummary}</p>
                           </div>
                         )}
                         
                         {recording.keyTakeaways && recording.keyTakeaways.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-medium mb-2">Key Takeaways</h4>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              Key Points
+                            </h4>
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {recording.keyTakeaways.map((takeaway, i) => (
                                 <li key={i} className="flex items-start gap-2">
-                                  <span className="text-primary mt-1">•</span>
+                                  <span className="text-green-500 mt-1">•</span>
                                   <span>{takeaway}</span>
                                 </li>
                               ))}
                             </ul>
+                          </div>
+                        )}
+
+                        {recording.objections && recording.objections.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 text-amber-500" />
+                              Merchant Objections
+                            </h4>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {recording.objections.map((objection, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-amber-500 mt-1">•</span>
+                                  <span>{objection}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {recording.concerns && recording.concerns.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <MessageSquare className="w-4 h-4 text-blue-500" />
+                              Merchant Concerns
+                            </h4>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {recording.concerns.map((concern, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-blue-500 mt-1">•</span>
+                                  <span>{concern}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {recording.actionItems && recording.actionItems.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <Target className="w-4 h-4 text-red-500" />
+                              Action Items
+                            </h4>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {recording.actionItems.map((action, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-red-500 mt-1">•</span>
+                                  <span>{action}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {recording.transcription && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              Transcription
+                            </h4>
+                            <div className="bg-muted/50 rounded-lg p-3 max-h-48 overflow-y-auto">
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{recording.transcription}</p>
+                            </div>
                           </div>
                         )}
                         

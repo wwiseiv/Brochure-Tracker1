@@ -68,6 +68,15 @@ interface SessionFeedback {
   topTip: string;
 }
 
+interface Persona {
+  id: number;
+  name: string;
+  businessType: string | null;
+  personality: string | null;
+  difficultyLevel: string;
+  isGeneral: boolean;
+}
+
 const scenarioOptions: { value: RoleplayScenario; label: string; description: string }[] = [
   { 
     value: "cold_approach", 
@@ -121,6 +130,9 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
   // Merchant intelligence state
   const [isGeneratingIntelligence, setIsGeneratingIntelligence] = useState(false);
   const [hasIntelligence, setHasIntelligence] = useState(false);
+  
+  // Persona selection state
+  const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
 
   // Transcribe audio and send to session (defined before hook to use in callback)
   const transcribeAudioRef = useRef<((blob: Blob) => Promise<void>) | null>(null);
@@ -159,6 +171,20 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
     scrollToBottom();
   }, [messages]);
 
+  // Fetch personas for roleplay mode
+  const { data: personasData, isLoading: isLoadingPersonas } = useQuery<{ personas: Persona[] }>({
+    queryKey: ["/api/roleplay/personas"],
+    enabled: mode === "roleplay" && isOpen,
+  });
+
+  // Sort personas: General personas first, then by difficulty
+  const sortedPersonas = personasData?.personas ? [...personasData.personas].sort((a, b) => {
+    if (a.isGeneral !== b.isGeneral) return a.isGeneral ? -1 : 1;
+    const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
+    return (difficultyOrder[a.difficultyLevel as keyof typeof difficultyOrder] || 0) - 
+           (difficultyOrder[b.difficultyLevel as keyof typeof difficultyOrder] || 0);
+  }) : [];
+
   // Generate merchant intelligence before starting session
   const generateIntelligenceMutation = useMutation({
     mutationFn: async () => {
@@ -189,6 +215,7 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
         scenario,
         mode,
         customObjections: customObjections.trim() || undefined,
+        personaId: mode === "roleplay" && selectedPersonaId ? selectedPersonaId : undefined,
       });
       return res.json();
     },
@@ -440,6 +467,7 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
     setMessages([]);
     setFeedback(null);
     setShowFeedback(false);
+    setSelectedPersonaId(null);
   };
 
   return (
@@ -574,6 +602,49 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                       className="min-h-[80px]"
                       data-testid="input-custom-objections"
                     />
+                  </div>
+                )}
+
+                {mode === "roleplay" && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Prospect Persona (optional)
+                    </label>
+                    <Select
+                      value={selectedPersonaId?.toString() || ""}
+                      onValueChange={(value) => setSelectedPersonaId(value ? parseInt(value) : null)}
+                    >
+                      <SelectTrigger data-testid="select-persona">
+                        <SelectValue placeholder={isLoadingPersonas ? "Loading personas..." : "Use default scenario-based persona"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Use default (scenario-based)</SelectItem>
+                        {sortedPersonas.map((persona) => (
+                          <SelectItem key={persona.id} value={persona.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <span>{persona.name}</span>
+                              {persona.isGeneral && (
+                                <Badge variant="secondary" className="text-xs px-1 py-0">
+                                  General
+                                </Badge>
+                              )}
+                              <Badge 
+                                variant={
+                                  persona.difficultyLevel === "hard" ? "destructive" :
+                                  persona.difficultyLevel === "medium" ? "default" : "secondary"
+                                }
+                                className="text-xs px-1 py-0"
+                              >
+                                {persona.difficultyLevel}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Choose a specific persona for more challenging practice, or leave as default
+                    </p>
                   </div>
                 )}
 

@@ -777,6 +777,7 @@ export const roleplaySessions = pgTable("roleplay_sessions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   agentId: varchar("agent_id").notNull(),
   dropId: integer("drop_id").references(() => drops.id),
+  personaId: integer("persona_id"), // References roleplayPersonas
   scenario: varchar("scenario", { length: 50 }).notNull(),
   mode: varchar("mode", { length: 20 }).default("roleplay").notNull(),
   businessContext: text("business_context"),
@@ -790,6 +791,7 @@ export const roleplaySessions = pgTable("roleplay_sessions", {
 export const insertRoleplaySessionSchema = z.object({
   agentId: z.string(),
   dropId: z.number().nullable().optional(),
+  personaId: z.number().nullable().optional(),
   scenario: z.enum(ROLEPLAY_SCENARIOS),
   mode: z.enum(ROLEPLAY_MODES).optional(),
   businessContext: z.string().nullable().optional(),
@@ -818,6 +820,30 @@ export type RoleplayMessage = typeof roleplayMessages.$inferSelect;
 export type RoleplaySessionWithMessages = RoleplaySession & {
   messages: RoleplayMessage[];
 };
+
+// Role-play personas table (7 specific personas + 1 general combined)
+export const roleplayPersonas = pgTable("roleplay_personas", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 100 }).notNull(),
+  businessType: varchar("business_type", { length: 50 }).notNull(),
+  personality: text("personality").notNull(), // Detailed personality description
+  background: text("background").notNull(), // Business background and history
+  painPoints: text("pain_points").array(), // Current challenges they face
+  objections: text("objections").array(), // Common objections they raise
+  communicationStyle: varchar("communication_style", { length: 50 }).notNull(),
+  difficultyLevel: varchar("difficulty_level", { length: 20 }).notNull(), // easy, medium, hard
+  isGeneral: boolean("is_general").default(false).notNull(), // True for the combined general persona
+  isActive: boolean("is_active").default(true).notNull(),
+  systemPrompt: text("system_prompt").notNull(), // AI system prompt for this persona
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRoleplayPersonaSchema = createInsertSchema(roleplayPersonas).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertRoleplayPersona = z.infer<typeof insertRoleplayPersonaSchema>;
+export type RoleplayPersona = typeof roleplayPersonas.$inferSelect;
 
 // Brochure holder types for custody tracking
 export const HOLDER_TYPES = ["house", "relationship_manager", "agent"] as const;
@@ -918,8 +944,12 @@ export const meetingRecordings = pgTable("meeting_recordings", {
   recordingUrl: text("recording_url"),
   durationSeconds: integer("duration_seconds"),
   status: varchar("status", { length: 30 }).default("recording").notNull(),
+  transcription: text("transcription"), // Full audio transcription
   aiSummary: text("ai_summary"),
   keyTakeaways: text("key_takeaways").array(),
+  objections: text("objections").array(), // Merchant objections identified by AI
+  concerns: text("concerns").array(), // Merchant concerns identified by AI
+  actionItems: text("action_items").array(), // Action items for follow-up
   sentiment: varchar("sentiment", { length: 30 }),
   emailSentAt: timestamp("email_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

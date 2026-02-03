@@ -20,6 +20,7 @@ import {
   feedbackSubmissions,
   roleplaySessions,
   roleplayMessages,
+  roleplayPersonas,
   brochureLocations,
   brochureLocationHistory,
   meetingRecordings,
@@ -68,6 +69,7 @@ import {
   type RoleplayMessage,
   type InsertRoleplayMessage,
   type RoleplaySessionWithMessages,
+  type RoleplayPersona,
   type BrochureLocation,
   type InsertBrochureLocation,
   type BrochureLocationHistory,
@@ -257,6 +259,10 @@ export interface IStorage {
   getRoleplayMessages(sessionId: number): Promise<RoleplayMessage[]>;
   deleteRoleplaySession(id: number): Promise<boolean>;
   deleteAllRoleplaySessions(agentId: string): Promise<number>;
+  
+  // Roleplay Personas
+  getRoleplayPersonas(): Promise<RoleplayPersona[]>;
+  getRoleplayPersona(id: number): Promise<RoleplayPersona | undefined>;
   
   // Brochure Locations (Individual brochure custody tracking)
   getBrochureLocation(brochureId: string): Promise<BrochureLocation | undefined>;
@@ -1169,6 +1175,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(roleplayMessages).where(inArray(roleplayMessages.sessionId, sessionIds));
     const result = await db.delete(roleplaySessions).where(eq(roleplaySessions.agentId, agentId));
     return result.rowCount ?? 0;
+  }
+
+  // Roleplay Personas
+  async getRoleplayPersonas(): Promise<RoleplayPersona[]> {
+    return db.select().from(roleplayPersonas).where(eq(roleplayPersonas.isActive, true)).orderBy(roleplayPersonas.id);
+  }
+
+  async getRoleplayPersona(id: number): Promise<RoleplayPersona | undefined> {
+    const [persona] = await db.select().from(roleplayPersonas).where(eq(roleplayPersonas.id, id));
+    return persona;
   }
 
   // Brochure Locations (Individual brochure custody tracking)
