@@ -178,6 +178,70 @@ Prospect: "Well, I don't know if I've actually made that decision..."
 - Ask questions, listen deeply, and let the prospect discover their own need.
 - The goal isn't to close everyone - it's to find the businesses you CAN help.
 - When you help someone see what they're losing, you're doing them a SERVICE.
+
+## 2026 PCBANCARD SALES PROCESS
+
+### Phase 1: PROSPECTING (Get the Appointment)
+**Objective:** Get the appointment scheduled
+
+**Jason's Drop-In-The-Door Pitch:**
+"Hi my name is ___. I'm sorry I don't have time to stay long. I'm working with local business owners, helping them eliminate one of their biggest expenses. I just wanted to drop in and see if I could schedule about 15 minutes of your time either ___ at ___ o'clock or ___ at ____ o'clock, which one would work better for you?"
+
+**Video Brochure Script:**
+"Hello, my name is ___. I have just been helping some [industry] business owners in the [area] area. I apologize, but I can't stay long. I have [business A] and [business B] waiting for me to help them. I also understand that you are probably pretty busy. So I can respect your time and see if I can put hundreds, if not thousands back into your bottom line, I would like to leave this Video Brochure with you. All I ask is that you take a quick look inside when you have 5 free minutes. Does that sound fair to you?"
+
+**Key Tips:**
+- Use alternative choice close for appointment time
+- Create social proof by mentioning other businesses
+- Keep initial pitch to 30 seconds maximum
+- Leave with a specific appointment time, not "I'll call you"
+
+### Phase 2: DISCOVERY (The Appointment)
+**Objective:** Understand merchant needs and collect processing statement
+
+**Request Statement Script:**
+"What I would like to do is create a custom proposal for your business showing exactly how much money I can put back into your business each month. I'll do a side-by-side comparison of Traditional Processing, Surcharging and Dual Pricing, and I'll include any equipment costs as well. In order to do that I will need one-month processing statement."
+
+**Key Tips:**
+- Use Merchant Survey or POS Questionnaire during discovery
+- Take detailed notes
+- Walk through Pitch Book to explain Dual Pricing
+- If merchant wants to close during presentation, call your mentor immediately
+
+### Phase 3: PROPOSAL & CLOSE
+**Objective:** Present savings and close the deal
+
+**Closing Script:**
+"To get you up and running today, I will need a copy of your driver's license, business license, voided check, and processing statements."
+
+**Option Close:**
+"Mr./Mrs. Merchant, which direction would you like to go? Like I said I can lower your rates and save you $50, $100 or we can eliminate your fees by implementing our Dual Pricing Program. Which program would you like to move forward with?"
+
+**Key Tips:**
+- Give merchant two options - neither being NO
+- Text your mentor before closing call
+- Walk through the proposal showing exact savings
+- Use the e-signature form for fastest processing
+
+### COMMON OBJECTIONS & RESPONSES
+
+**"I don't want to charge my customers more"**
+Response: "I can tell you that only about 1 out of every 50 business owners who implement this program find it's not the right fit. That's only about 2% of the time. If I'm personally willing to give you my guarantee and knowing you have a 98% chance of saving all that money, are you at least willing to give it a chance?"
+
+Alternative: "Mr./Mrs. Merchant, we have partnered with Darren Waller Foundation. A portion of that service fee goes back to your community. Now your customers understand that this fee is not just helping the business owner, but helping their local community."
+
+**"I don't want to be the first/only one around here"**
+Response: "I can understand that. How about this: I get 5 other businesses in the area that have the same fear and have them agree to start the program all together, and then it becomes the norm? Would that make it easier?"
+
+**"I'm going to stay where I am for now"**
+Response: "I'm giving you my word – my personal guarantee – if this program negatively impacts your business in any way, I will drive out here the same day if needed. I'll swap that terminal, turn off that feature, or whatever I need to do. If I'm personally willing to give you my guarantee, are you at least willing to give it a chance?"
+
+### TOP CLOSING TIPS
+1. Use references - have merchants call other merchants doing the program
+2. FOLLOW UP! 2-3 times is normal - change is hard for everyone
+3. Just get them to TRY the program - no ETFs, month-to-month
+4. Use the Option Close - give two choices, neither being NO
+5. GET OUT THERE AND TALK TO MERCHANTS IN PERSON
 `;
 
 export function getBusinessContextPrompt(businessType: string, businessName: string, notes?: string): string {
