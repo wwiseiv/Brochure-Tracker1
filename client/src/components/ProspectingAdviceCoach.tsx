@@ -21,6 +21,7 @@ import {
   ChevronUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AdviceExportToolbar } from "./AdviceExportToolbar";
 
 interface ProspectingAdviceCoachProps {
   className?: string;
@@ -286,11 +287,19 @@ export function ProspectingAdviceCoach({ className }: ProspectingAdviceCoachProp
                   <Sparkles className="w-4 h-4" />
                   Your Prospecting Ideas
                 </h4>
-                <ListenButton 
-                  text={advice} 
-                  size="icon"
-                  data-testid="button-listen-advice"
-                />
+                <div className="flex items-center gap-1">
+                  <ListenButton 
+                    text={advice} 
+                    size="icon"
+                    data-testid="button-listen-advice"
+                  />
+                  <AdviceExportToolbar
+                    content={advice}
+                    title="Sales Spark Advice"
+                    subtitle="Prospecting Ideas"
+                    variant="dropdown"
+                  />
+                </div>
               </div>
               {ttsError && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">

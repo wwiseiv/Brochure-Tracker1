@@ -41,6 +41,7 @@ import {
   Users,
 } from "lucide-react";
 import type { RoleplayScenario } from "@shared/schema";
+import { AdviceExportToolbar } from "./AdviceExportToolbar";
 
 interface RoleplayCoachProps {
   dropId?: number;
@@ -712,6 +713,21 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                     <span className="text-muted-foreground">/100</span>
                   </div>
                   <Progress value={feedback.overallScore} className="h-3 mb-4" />
+                  <AdviceExportToolbar
+                    content={[
+                      `Overall Score: ${feedback.overallScore}/100`,
+                      feedback.strengths?.length ? `\nStrengths:\n${feedback.strengths.map(s => `• ${s}`).join("\n")}` : "",
+                      feedback.areasToImprove?.length ? `\nAreas to Improve:\n${feedback.areasToImprove.map(a => `• ${a}`).join("\n")}` : "",
+                      feedback.topTip ? `\nTop Tip:\n${feedback.topTip}` : "",
+                      feedback.nepqUsage ? `\nNEPQ Technique Usage:\n${feedback.nepqUsage}` : "",
+                      feedback.objectionHandling ? `\nObjection Handling:\n${feedback.objectionHandling}` : "",
+                      feedback.rapportBuilding ? `\nRapport Building:\n${feedback.rapportBuilding}` : ""
+                    ].filter(Boolean).join("\n")}
+                    title="Role-Play Session Feedback"
+                    subtitle={`Score: ${feedback.overallScore}/100`}
+                    variant="inline"
+                    className="justify-center mt-2"
+                  />
                 </div>
 
                 <div className="grid gap-4">

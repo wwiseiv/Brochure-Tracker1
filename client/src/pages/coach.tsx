@@ -62,6 +62,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { RoleplayScenario, RoleplaySession, UserPermissions } from "@shared/schema";
 import { format } from "date-fns";
 import { ListenButton } from "@/components/ListenButton";
+import { AdviceExportToolbar } from "@/components/AdviceExportToolbar";
 
 interface Message {
   id: number;
@@ -803,6 +804,21 @@ function SessionHistoryCard({
             )}
             {sessionFeedback && (
               <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Session Feedback:</span>
+                  <AdviceExportToolbar
+                    content={[
+                      `Overall Score: ${sessionFeedback.overallScore}/100`,
+                      sessionFeedback.strengths?.length ? `\nStrengths:\n${sessionFeedback.strengths.map(s => `• ${s}`).join("\n")}` : "",
+                      sessionFeedback.areasToImprove?.length ? `\nAreas to Improve:\n${sessionFeedback.areasToImprove.map(a => `• ${a}`).join("\n")}` : "",
+                      sessionFeedback.topTip ? `\nTop Tip:\n${sessionFeedback.topTip}` : "",
+                      sessionFeedback.nepqUsage ? `\nNEPQ Technique Usage:\n${sessionFeedback.nepqUsage}` : ""
+                    ].filter(Boolean).join("\n")}
+                    title="Role-Play Session Feedback"
+                    subtitle={`Score: ${sessionFeedback.overallScore}/100 - ${format(new Date(session.createdAt), "MMM d, yyyy")}`}
+                    variant="dropdown"
+                  />
+                </div>
                 {sessionFeedback.topTip && (
                   <div className="text-sm">
                     <span className="font-medium">Top Tip:</span>{" "}
@@ -1662,6 +1678,21 @@ export default function CoachPage() {
                   <span className="text-muted-foreground">/100</span>
                 </div>
                 <Progress value={feedback.overallScore} className="h-3 mb-4" />
+                <AdviceExportToolbar
+                  content={[
+                    `Overall Score: ${feedback.overallScore}/100`,
+                    feedback.strengths?.length ? `\nStrengths:\n${feedback.strengths.map(s => `• ${s}`).join("\n")}` : "",
+                    feedback.areasToImprove?.length ? `\nAreas to Improve:\n${feedback.areasToImprove.map(a => `• ${a}`).join("\n")}` : "",
+                    feedback.topTip ? `\nTop Tip:\n${feedback.topTip}` : "",
+                    feedback.nepqUsage ? `\nNEPQ Technique Usage:\n${feedback.nepqUsage}` : "",
+                    feedback.objectionHandling ? `\nObjection Handling:\n${feedback.objectionHandling}` : "",
+                    feedback.rapportBuilding ? `\nRapport Building:\n${feedback.rapportBuilding}` : ""
+                  ].filter(Boolean).join("\n")}
+                  title="Role-Play Session Feedback"
+                  subtitle={`Score: ${feedback.overallScore}/100`}
+                  variant="inline"
+                  className="justify-center mt-2"
+                />
               </div>
 
               <div className="grid gap-4">
