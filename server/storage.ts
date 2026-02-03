@@ -173,6 +173,12 @@ import {
   type InsertEmailDigestPreferences,
   type EmailDigestHistory,
   type InsertEmailDigestHistory,
+  impersonationSessions,
+  impersonationAuditLog,
+  type ImpersonationSession,
+  type InsertImpersonationSession,
+  type ImpersonationAuditLog,
+  type InsertImpersonationAuditLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -391,6 +397,18 @@ export interface IStorage {
   createPushSubscription(data: InsertPushSubscription): Promise<PushSubscription>;
   getPushSubscriptionsByUser(userId: string): Promise<PushSubscription[]>;
   deletePushSubscription(userId: string, endpoint: string): Promise<void>;
+  
+  // Impersonation
+  createImpersonationSession(data: InsertImpersonationSession): Promise<ImpersonationSession>;
+  getImpersonationSession(id: number): Promise<ImpersonationSession | undefined>;
+  getImpersonationSessionByToken(token: string): Promise<ImpersonationSession | undefined>;
+  getActiveImpersonationSessions(originalUserId: string): Promise<ImpersonationSession[]>;
+  getAllActiveImpersonationSessions(): Promise<ImpersonationSession[]>;
+  endImpersonationSession(id: number): Promise<void>;
+  endAllImpersonationSessionsForUser(originalUserId: string): Promise<void>;
+  createImpersonationAuditLog(data: InsertImpersonationAuditLog): Promise<ImpersonationAuditLog>;
+  getImpersonationAuditLogs(orgId?: number, limit?: number, offset?: number): Promise<ImpersonationAuditLog[]>;
+  getImpersonatableUsers(requestingUserId: string, orgId: number): Promise<OrganizationMember[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2548,6 +2566,96 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(proposalParseJobs)
       .where(eq(proposalParseJobs.status, "pending"))
       .orderBy(proposalParseJobs.createdAt);
+  }
+
+  // Impersonation
+  async createImpersonationSession(data: InsertImpersonationSession): Promise<ImpersonationSession> {
+    const [created] = await db.insert(impersonationSessions).values(data as any).returning();
+    return created;
+  }
+
+  async getImpersonationSession(id: number): Promise<ImpersonationSession | undefined> {
+    const [session] = await db.select().from(impersonationSessions).where(eq(impersonationSessions.id, id));
+    return session;
+  }
+
+  async getImpersonationSessionByToken(token: string): Promise<ImpersonationSession | undefined> {
+    const [session] = await db.select().from(impersonationSessions)
+      .where(and(
+        eq(impersonationSessions.sessionToken, token),
+        eq(impersonationSessions.status, "active")
+      ));
+    return session;
+  }
+
+  async getActiveImpersonationSessions(originalUserId: string): Promise<ImpersonationSession[]> {
+    return db.select().from(impersonationSessions)
+      .where(and(
+        eq(impersonationSessions.originalUserId, originalUserId),
+        eq(impersonationSessions.status, "active")
+      ))
+      .orderBy(desc(impersonationSessions.startedAt));
+  }
+
+  async getAllActiveImpersonationSessions(): Promise<ImpersonationSession[]> {
+    return db.select().from(impersonationSessions)
+      .where(eq(impersonationSessions.status, "active"))
+      .orderBy(desc(impersonationSessions.startedAt));
+  }
+
+  async endImpersonationSession(id: number): Promise<void> {
+    await db.update(impersonationSessions)
+      .set({ status: "ended", endedAt: new Date() })
+      .where(eq(impersonationSessions.id, id));
+  }
+
+  async endAllImpersonationSessionsForUser(originalUserId: string): Promise<void> {
+    await db.update(impersonationSessions)
+      .set({ status: "ended", endedAt: new Date() })
+      .where(and(
+        eq(impersonationSessions.originalUserId, originalUserId),
+        eq(impersonationSessions.status, "active")
+      ));
+  }
+
+  async createImpersonationAuditLog(data: InsertImpersonationAuditLog): Promise<ImpersonationAuditLog> {
+    const [created] = await db.insert(impersonationAuditLog).values(data as any).returning();
+    return created;
+  }
+
+  async getImpersonationAuditLogs(orgId?: number, limit: number = 50, offset: number = 0): Promise<ImpersonationAuditLog[]> {
+    let query = db.select().from(impersonationAuditLog);
+    
+    if (orgId) {
+      query = query.where(eq(impersonationAuditLog.organizationId, orgId)) as any;
+    }
+    
+    return query.orderBy(desc(impersonationAuditLog.createdAt)).limit(limit).offset(offset);
+  }
+
+  async getImpersonatableUsers(requestingUserId: string, orgId: number): Promise<OrganizationMember[]> {
+    const requestingMember = await this.getOrganizationMember(orgId, requestingUserId);
+    if (!requestingMember) return [];
+
+    const allMembers = await this.getOrganizationMembers(orgId);
+    
+    switch (requestingMember.role) {
+      case 'master_admin':
+        return allMembers.filter(m => 
+          m.userId !== requestingUserId && 
+          m.role !== 'master_admin'
+        );
+      
+      case 'relationship_manager':
+        return allMembers.filter(m => 
+          m.userId !== requestingUserId && 
+          m.role === 'agent' &&
+          m.managerId === requestingMember.id
+        );
+      
+      default:
+        return [];
+    }
   }
 }
 
