@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +36,7 @@ import {
   Shield,
   Users,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   UserPlus,
   CalendarClock,
@@ -119,6 +126,9 @@ interface EmailDigestPreferences {
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
   const { toast } = useToast();
+  
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
+  const [digestSettingsOpen, setDigestSettingsOpen] = useState(false);
   
   const { data: drops } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
@@ -354,107 +364,130 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Tooltip delayDuration={700}>
-              <TooltipTrigger asChild>
-                <Settings className="w-5 h-5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Settings</p>
-              </TooltipContent>
-            </Tooltip>
-            <h3 className="font-semibold">Notification Settings</h3>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="flex items-center justify-between min-h-[48px]">
-              <div className="flex items-center gap-3 flex-1">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                <Label htmlFor="notifications-enabled" className="text-sm font-medium cursor-pointer">
-                  Enable Notifications
-                </Label>
-              </div>
-              <Switch
-                id="notifications-enabled"
-                checked={preferences?.notificationsEnabled ?? true}
-                onCheckedChange={(checked) => handleToggle("notificationsEnabled", checked)}
-                disabled={preferencesLoading || updatePreferences.isPending}
-                data-testid="switch-notifications-enabled"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reminder-timing" className="text-sm font-medium">
-                Remind me before pickup
-              </Label>
-              <Select
-                value={String(preferences?.reminderHoursBefore ?? 24)}
-                onValueChange={handleReminderChange}
-                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+        <Collapsible open={notificationSettingsOpen} onOpenChange={setNotificationSettingsOpen}>
+          <Card className="p-4">
+            <CollapsibleTrigger asChild>
+              <button 
+                className="w-full flex items-center justify-between hover-elevate active-elevate-2 rounded -m-2 p-2"
+                data-testid="button-toggle-notification-settings"
               >
-                <SelectTrigger 
-                  id="reminder-timing" 
-                  className="w-full min-h-[48px]"
-                  data-testid="select-reminder-timing"
-                >
-                  <SelectValue placeholder="Select timing" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REMINDER_OPTIONS.map((option) => (
-                    <SelectItem 
-                      key={option.value} 
-                      value={option.value}
-                      data-testid={`option-reminder-${option.value}`}
+                <div className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="font-semibold">Notification Settings</h3>
+                </div>
+                {notificationSettingsOpen ? (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+            
+            <CollapsibleContent className="pt-4">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between min-h-[48px]">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    <Label htmlFor="notifications-enabled" className="text-sm font-medium cursor-pointer">
+                      Enable Notifications
+                    </Label>
+                  </div>
+                  <Switch
+                    id="notifications-enabled"
+                    checked={preferences?.notificationsEnabled ?? true}
+                    onCheckedChange={(checked) => handleToggle("notificationsEnabled", checked)}
+                    disabled={preferencesLoading || updatePreferences.isPending}
+                    data-testid="switch-notifications-enabled"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reminder-timing" className="text-sm font-medium">
+                    Remind me before pickup
+                  </Label>
+                  <Select
+                    value={String(preferences?.reminderHoursBefore ?? 24)}
+                    onValueChange={handleReminderChange}
+                    disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+                  >
+                    <SelectTrigger 
+                      id="reminder-timing" 
+                      className="w-full min-h-[48px]"
+                      data-testid="select-reminder-timing"
                     >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                      <SelectValue placeholder="Select timing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REMINDER_OPTIONS.map((option) => (
+                        <SelectItem 
+                          key={option.value} 
+                          value={option.value}
+                          data-testid={`option-reminder-${option.value}`}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex items-center justify-between min-h-[48px]">
-              <div className="flex items-center gap-3 flex-1">
-                <Mail className="w-5 h-5 text-muted-foreground" />
-                <Label htmlFor="email-notifications" className="text-sm font-medium cursor-pointer">
-                  Email Notifications
-                </Label>
+                <div className="flex items-center justify-between min-h-[48px]">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Mail className="w-5 h-5 text-muted-foreground" />
+                    <Label htmlFor="email-notifications" className="text-sm font-medium cursor-pointer">
+                      Email Notifications
+                    </Label>
+                  </div>
+                  <Switch
+                    id="email-notifications"
+                    checked={preferences?.emailNotifications ?? true}
+                    onCheckedChange={(checked) => handleToggle("emailNotifications", checked)}
+                    disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+                    data-testid="switch-email-notifications"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between min-h-[48px]">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Smartphone className="w-5 h-5 text-muted-foreground" />
+                    <Label htmlFor="push-notifications" className="text-sm font-medium cursor-pointer">
+                      Push Notifications
+                    </Label>
+                  </div>
+                  <Switch
+                    id="push-notifications"
+                    checked={preferences?.pushNotifications ?? true}
+                    onCheckedChange={(checked) => handleToggle("pushNotifications", checked)}
+                    disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
+                    data-testid="switch-push-notifications"
+                  />
+                </div>
               </div>
-              <Switch
-                id="email-notifications"
-                checked={preferences?.emailNotifications ?? true}
-                onCheckedChange={(checked) => handleToggle("emailNotifications", checked)}
-                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
-                data-testid="switch-email-notifications"
-              />
-            </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-            <div className="flex items-center justify-between min-h-[48px]">
-              <div className="flex items-center gap-3 flex-1">
-                <Smartphone className="w-5 h-5 text-muted-foreground" />
-                <Label htmlFor="push-notifications" className="text-sm font-medium cursor-pointer">
-                  Push Notifications
-                </Label>
-              </div>
-              <Switch
-                id="push-notifications"
-                checked={preferences?.pushNotifications ?? true}
-                onCheckedChange={(checked) => handleToggle("pushNotifications", checked)}
-                disabled={preferencesLoading || updatePreferences.isPending || !preferences?.notificationsEnabled}
-                data-testid="switch-push-notifications"
-              />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <CalendarClock className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-semibold">Email Digest Settings</h3>
-          </div>
-          
-          {digestPrefs?.pausedUntil && new Date(digestPrefs.pausedUntil) > new Date() && (
+        <Collapsible open={digestSettingsOpen} onOpenChange={setDigestSettingsOpen}>
+          <Card className="p-4">
+            <CollapsibleTrigger asChild>
+              <button 
+                className="w-full flex items-center justify-between hover-elevate active-elevate-2 rounded -m-2 p-2"
+                data-testid="button-toggle-digest-settings"
+              >
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="font-semibold">Email Digest Settings</h3>
+                </div>
+                {digestSettingsOpen ? (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+            
+            <CollapsibleContent className="pt-4">
+              {digestPrefs?.pausedUntil && new Date(digestPrefs.pausedUntil) > new Date() && (
             <Alert className="mb-4" data-testid="alert-digest-paused">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Digests Paused</AlertTitle>
@@ -707,14 +740,16 @@ export default function ProfilePage() {
               </div>
             </details>
 
-            {digestPrefs?.totalEmailsSent !== undefined && digestPrefs.totalEmailsSent > 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
-                <History className="w-4 h-4" />
-                <span>{digestPrefs.totalEmailsSent} emails sent</span>
-              </div>
-            )}
-          </div>
-        </Card>
+              {digestPrefs?.totalEmailsSent !== undefined && digestPrefs.totalEmailsSent > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
+                  <History className="w-4 h-4" />
+                  <span>{digestPrefs.totalEmailsSent} emails sent</span>
+                </div>
+              )}
+            </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         <Card className="p-2">
           <div className="space-y-1">
