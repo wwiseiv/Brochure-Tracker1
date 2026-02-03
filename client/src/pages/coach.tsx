@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { HamburgerMenu } from "@/components/BottomNav";
 import {
   Collapsible,
   CollapsibleContent,
@@ -1358,6 +1359,7 @@ export default function CoachPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 bg-background border-b px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
+          <HamburgerMenu />
           <Tooltip delayDuration={700}>
             <TooltipTrigger asChild>
               <Button 

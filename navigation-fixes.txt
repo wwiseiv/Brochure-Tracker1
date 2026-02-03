@@ -1,0 +1,119 @@
+/**
+ * PCBancard Navigation Fix Snippets
+ * ==================================
+ * 
+ * Copy and paste these fixes into the corresponding files.
+ * Generated: 2026-02-03T03:31:11.054Z
+ */
+
+// ============================================
+// STANDARD IMPORT (add to top of each file)
+// ============================================
+import { HamburgerMenu } from "@/components/BottomNav";
+
+
+// ============================================
+// FIX FOR: accept-invite.tsx
+// ============================================
+
+// STEP 1: Add import at top of file (with other imports)
+import { HamburgerMenu } from "@/components/BottomNav";
+
+// STEP 2: Find your header/title section and update it to:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <h1 className="text-xl font-semibold">AcceptInvitePage</h1>
+</div>
+
+// STEP 3: If you have a back button, consider keeping both:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <ArrowLeft className="h-5 w-5" />
+  </Button>
+  <h1 className="text-xl font-semibold">AcceptInvitePage</h1>
+</div>
+
+// ============================================
+// FIX FOR: access-denied.tsx
+// ============================================
+
+// STEP 1: Add import at top of file (with other imports)
+import { HamburgerMenu } from "@/components/BottomNav";
+
+// STEP 2: Find your header/title section and update it to:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <h1 className="text-xl font-semibold">AccessDenied</h1>
+</div>
+
+// STEP 3: If you have a back button, consider keeping both:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <ArrowLeft className="h-5 w-5" />
+  </Button>
+  <h1 className="text-xl font-semibold">AccessDenied</h1>
+</div>
+
+// ============================================
+// FIX FOR: complete-profile.tsx
+// ============================================
+
+// STEP 1: Add import at top of file (with other imports)
+import { HamburgerMenu } from "@/components/BottomNav";
+
+// STEP 2: Find your header/title section and update it to:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <h1 className="text-xl font-semibold">profileSchema</h1>
+</div>
+
+// STEP 3: If you have a back button, consider keeping both:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <ArrowLeft className="h-5 w-5" />
+  </Button>
+  <h1 className="text-xl font-semibold">profileSchema</h1>
+</div>
+
+// ============================================
+// FIX FOR: landing.tsx
+// ============================================
+
+// STEP 1: Add import at top of file (with other imports)
+import { HamburgerMenu } from "@/components/BottomNav";
+
+// STEP 2: Find your header/title section and update it to:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <h1 className="text-xl font-semibold">coreFeatures</h1>
+</div>
+
+// STEP 3: If you have a back button, consider keeping both:
+<div className="flex items-center gap-3">
+  <HamburgerMenu />
+  <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <ArrowLeft className="h-5 w-5" />
+  </Button>
+  <h1 className="text-xl font-semibold">coreFeatures</h1>
+</div>
+
+
+// ============================================
+// VERIFICATION CHECKLIST
+// ============================================
+// After applying fixes, verify each page:
+// 
+// [ ] HamburgerMenu is visible in top-left
+// [ ] Menu opens when clicked
+// [ ] All navigation items work
+// [ ] Page title is still visible
+// [ ] Back button still works (if applicable)
+//
+// Pages to verify:
+// [ ] accept-invite.tsx
+// [ ] access-denied.tsx
+// [ ] complete-profile.tsx
+// [ ] landing.tsx

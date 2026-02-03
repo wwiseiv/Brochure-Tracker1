@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { HamburgerMenu } from "@/components/BottomNav";
 import type { Deal, StatementAnalysisJob } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1434,6 +1435,7 @@ ${new Date().toLocaleDateString()}
     <div className="container mx-auto p-4 max-w-6xl print:p-0">
       <div className="flex items-center justify-between gap-4 mb-6 print:hidden">
         <div className="flex items-center gap-4">
+          <HamburgerMenu />
           <Link href="/">
             <Tooltip delayDuration={700}>
               <TooltipTrigger asChild>

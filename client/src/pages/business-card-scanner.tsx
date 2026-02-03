@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { HamburgerMenu } from "@/components/BottomNav";
 import {
   Camera,
   Upload,
@@ -172,6 +173,7 @@ export default function BusinessCardScanner() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3 p-4">
+          <HamburgerMenu />
           <Tooltip delayDuration={700}>
             <TooltipTrigger asChild>
               <Button
