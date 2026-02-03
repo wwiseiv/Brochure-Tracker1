@@ -1535,12 +1535,12 @@ export default function ProposalGeneratorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedDealId} onValueChange={setSelectedDealId}>
+          <Select value={selectedDealId || "none"} onValueChange={(v) => setSelectedDealId(v === "none" ? "" : v)}>
             <SelectTrigger data-testid="select-link-deal">
               <SelectValue placeholder="Select a deal to link..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No deal selected</SelectItem>
+              <SelectItem value="none">No deal selected</SelectItem>
               {deals?.map((deal) => (
                 <SelectItem key={deal.id} value={String(deal.id)}>
                   {deal.businessName}
