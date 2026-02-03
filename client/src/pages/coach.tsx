@@ -79,6 +79,30 @@ interface SessionFeedback {
   objectionHandling: string;
   rapportBuilding: string;
   topTip: string;
+  psychographicAdaptation?: string;
+  emotionalDriversUsed?: string[];
+  tonalEffectiveness?: string;
+  correctiveScript?: string;
+  analysis?: {
+    psychographicType: string;
+    psychographicConfidence: number;
+    linguisticMarkers: string[];
+    driversUsed: string[];
+    driverEffectiveness: number;
+    missedOpportunities: string[];
+    tonePattern: string[];
+    tonalAppropriateness: number;
+    tonalSuggestions: string[];
+  };
+}
+
+interface Persona {
+  id: number;
+  name: string;
+  businessType: string | null;
+  personality: string | null;
+  difficultyLevel: string;
+  isGeneral: boolean;
 }
 
 interface SessionWithMessages extends RoleplaySession {
@@ -936,10 +960,24 @@ export default function CoachPage() {
   const [isObjectionsTranscribing, setIsObjectionsTranscribing] = useState(false);
   const objectionsMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const objectionsAudioChunksRef = useRef<Blob[]>([]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
 
   const { data: myPermissions } = useQuery<UserPermissions>({
     queryKey: ["/api/me/permissions"],
   });
+
+  // Fetch personas for roleplay mode
+  const { data: personasData, isLoading: isLoadingPersonas } = useQuery<{ personas: Persona[] }>({
+    queryKey: ["/api/roleplay/personas"],
+    enabled: mode === "roleplay",
+  });
+
+  // Sort personas: General personas first, then by difficulty
+  const sortedPersonas = personasData?.personas ? [...personasData.personas].sort((a, b) => {
+    if (a.isGeneral !== b.isGeneral) return a.isGeneral ? -1 : 1;
+    const difficultyOrder: Record<string, number> = { easy: 0, medium: 1, hard: 2 };
+    return (difficultyOrder[a.difficultyLevel] || 0) - (difficultyOrder[b.difficultyLevel] || 0);
+  }) : [];
 
   const handleBack = () => {
     navigate("/");
@@ -964,6 +1002,7 @@ export default function CoachPage() {
         mode,
         customObjections: customObjections.trim() || undefined,
         difficulty: mode === "roleplay" ? difficulty : undefined,
+        personaId: mode === "roleplay" && selectedPersonaId ? selectedPersonaId : undefined,
       });
       return res.json();
     },
@@ -1608,6 +1647,65 @@ export default function CoachPage() {
                 </div>
               )}
 
+              {mode === "roleplay" && sortedPersonas.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Practice Persona (Optional)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Choose a specific business owner persona to practice with, or leave unselected for a random persona.
+                  </p>
+                  {isLoadingPersonas ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      <button
+                        onClick={() => setSelectedPersonaId(null)}
+                        className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
+                          selectedPersonaId === null
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        data-testid="persona-random"
+                      >
+                        <div className="font-medium text-sm">Random Persona</div>
+                        <div className="text-xs text-muted-foreground">AI will generate a persona based on the scenario</div>
+                      </button>
+                      {sortedPersonas.map((persona) => (
+                        <button
+                          key={persona.id}
+                          onClick={() => setSelectedPersonaId(persona.id)}
+                          className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
+                            selectedPersonaId === persona.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                          data-testid={`persona-${persona.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium text-sm">{persona.name}</div>
+                            <Badge variant={
+                              persona.difficultyLevel === "easy" ? "outline" :
+                              persona.difficultyLevel === "hard" ? "destructive" : "secondary"
+                            } className="text-xs">
+                              {persona.difficultyLevel}
+                            </Badge>
+                          </div>
+                          {persona.businessType && (
+                            <div className="text-xs text-muted-foreground mt-1 capitalize">
+                              {persona.businessType} business
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {scenario === "objection_handling" && (
                 <div>
                   <label className="text-sm font-medium mb-2 block">
@@ -1759,6 +1857,103 @@ export default function CoachPage() {
                       <ListenButton text={feedback.nepqUsage} size="sm" data-testid="listen-feedback-nepq" />
                     </div>
                     <p className="text-sm text-muted-foreground">{feedback.nepqUsage}</p>
+                  </Card>
+                )}
+
+                {/* Enhanced Analysis: Psychographic Adaptation */}
+                {feedback.psychographicAdaptation && (
+                  <Card className="p-3 border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span className="font-medium text-purple-700 dark:text-purple-400">Psychographic Adaptation</span>
+                      {feedback.analysis?.psychographicType && (
+                        <Badge variant="outline" className="ml-auto text-xs">
+                          {feedback.analysis.psychographicType} ({Math.round(feedback.analysis.psychographicConfidence * 100)}%)
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{feedback.psychographicAdaptation}</p>
+                    {feedback.analysis?.linguisticMarkers && feedback.analysis.linguisticMarkers.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {feedback.analysis.linguisticMarkers.map((marker, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{marker}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {/* Enhanced Analysis: Emotional Drivers */}
+                {feedback.emotionalDriversUsed && feedback.emotionalDriversUsed.length > 0 && (
+                  <Card className="p-3 border-rose-200 dark:border-rose-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Flame className="w-4 h-4 text-rose-600" />
+                      <span className="font-medium text-rose-700 dark:text-rose-400">Emotional Drivers Used</span>
+                      {feedback.analysis?.driverEffectiveness !== undefined && (
+                        <Badge variant="outline" className="ml-auto text-xs">
+                          {Math.round(feedback.analysis.driverEffectiveness * 100)}% effective
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {feedback.emotionalDriversUsed.map((driver, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs capitalize">{driver}</Badge>
+                      ))}
+                    </div>
+                    {feedback.analysis?.missedOpportunities && feedback.analysis.missedOpportunities.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <p className="text-xs font-medium text-amber-600 mb-1">Missed Opportunities:</p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5">
+                          {feedback.analysis.missedOpportunities.map((opp, i) => (
+                            <li key={i}>• {opp}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {/* Enhanced Analysis: Tonal Effectiveness */}
+                {feedback.tonalEffectiveness && (
+                  <Card className="p-3 border-teal-200 dark:border-teal-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Volume2 className="w-4 h-4 text-teal-600" />
+                      <span className="font-medium text-teal-700 dark:text-teal-400">Tonal Effectiveness</span>
+                      {feedback.analysis?.tonalAppropriateness !== undefined && (
+                        <Badge variant="outline" className="ml-auto text-xs">
+                          {Math.round(feedback.analysis.tonalAppropriateness * 100)}% appropriate
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{feedback.tonalEffectiveness}</p>
+                    {feedback.analysis?.tonePattern && feedback.analysis.tonePattern.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {feedback.analysis.tonePattern.map((tone, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs capitalize">{tone}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {feedback.analysis?.tonalSuggestions && feedback.analysis.tonalSuggestions.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <p className="text-xs font-medium text-teal-600 mb-1">Suggestions:</p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5">
+                          {feedback.analysis.tonalSuggestions.map((sug, i) => (
+                            <li key={i}>• {sug}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {/* Corrective Script */}
+                {feedback.correctiveScript && (
+                  <Card className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/50 dark:to-purple-950/50 border-indigo-200 dark:border-indigo-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <GraduationCap className="w-4 h-4 text-indigo-600" />
+                      <span className="font-medium text-indigo-700 dark:text-indigo-400">Try This Instead</span>
+                    </div>
+                    <p className="text-sm italic text-indigo-800 dark:text-indigo-200">"{feedback.correctiveScript}"</p>
                   </Card>
                 )}
               </div>
