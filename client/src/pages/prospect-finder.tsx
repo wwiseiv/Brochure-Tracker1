@@ -824,7 +824,7 @@ export default function ProspectFinderPage() {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="space-y-6 px-4 py-4 pb-32">
+            <div className="space-y-6 px-4 py-4" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
               {mccData?.categories.map((category) => {
                 const IconComponent = getCategoryIcon(category.id);
                 const codes = groupedMCCCodes[category.id] || [];
@@ -906,8 +906,8 @@ export default function ProspectFinderPage() {
           </SheetHeader>
 
           <div 
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-32" 
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4" 
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}
           >
           {searchResults?.businesses.length === 0 ? (
             <div className="text-center py-12">

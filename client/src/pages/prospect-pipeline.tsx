@@ -1200,8 +1200,8 @@ export default function DealPipelinePage() {
               </SheetHeader>
 
               <div 
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-32 space-y-6" 
-                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-6" 
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 0px))' }}
               >
                 <div className="flex gap-2 flex-wrap">
                   {selectedDeal.businessPhone && (
@@ -2043,8 +2043,8 @@ export default function DealPipelinePage() {
             <SheetTitle>Create New Deal</SheetTitle>
           </SheetHeader>
           <div 
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 pb-40" 
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-4" 
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="space-y-2">
               <Label>Business Name *</Label>

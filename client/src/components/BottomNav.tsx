@@ -279,12 +279,12 @@ export function HamburgerMenu() {
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[280px] p-0 flex flex-col max-h-[100dvh]">
+      <SheetContent side="left" className="w-[280px] p-0 flex flex-col" style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-bottom, 0px))' }}>
         <SheetHeader className="p-4 border-b flex-shrink-0">
           <SheetTitle className="text-left">Menu</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="py-2 pb-32">
+          <div className="py-2" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
             {filteredCategories.map((category) => (
               <div key={category.title} className="mb-2">
                 <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">

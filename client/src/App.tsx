@@ -240,6 +240,16 @@ function AppContent() {
   );
 }
 
+function HelpPageWrapper() {
+  return (
+    <ImpersonationProvider>
+      <PermissionProvider>
+        <HelpPage />
+      </PermissionProvider>
+    </ImpersonationProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -247,7 +257,7 @@ function App() {
         <Toaster />
         <Switch>
           <Route path="/accept-invite" component={AcceptInvitePage} />
-          <Route path="/help" component={HelpPage} />
+          <Route path="/help" component={HelpPageWrapper} />
           <Route component={AppContent} />
         </Switch>
       </TooltipProvider>
