@@ -49,6 +49,13 @@ import {
   getCoachingHint,
   ROLEPLAY_PERSONAS,
   buildDailyEdgeCoachingContext,
+  buildEnhancedFeedbackPrompt,
+  getEnhancedCoachingHint,
+  mapDifficultyLevel,
+  PSYCHOGRAPHIC_TYPES,
+  EMOTIONAL_DRIVERS,
+  TONAL_TECHNIQUES,
+  QUICK_REFERENCE,
 } from "./roleplay-knowledge";
 import { 
   insertRoleplaySessionSchema, 
@@ -6814,32 +6821,45 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         .map(m => `${m.role === "user" ? "Agent" : "Prospect"}: ${m.content}`)
         .join("\n");
 
-      const feedbackPrompt = `You are a sales coach reviewing a role-play practice session. Analyze this conversation between a sales agent and a simulated prospect.
+      // Build enhanced feedback with psychographic/emotional/tonal analysis
+      const conversationHistory = allMessages
+        .filter(m => m.role !== "system")
+        .map(m => ({ role: m.role, content: m.content }));
+      
+      const enhancedAnalysis = buildEnhancedFeedbackPrompt(conversationHistory);
+
+      const feedbackPrompt = `You are an expert sales coach reviewing a role-play practice session using advanced analytical frameworks.
 
 CONVERSATION:
 ${conversationText}
 
 SALES TRAINING REFERENCE:
-${SALES_TRAINING_KNOWLEDGE.substring(0, 4000)}
+${SALES_TRAINING_KNOWLEDGE.substring(0, 3000)}
+
+${enhancedAnalysis.prompt}
 
 Provide constructive feedback in JSON format:
 {
   "overallScore": <1-100>,
-  "strengths": ["strength 1", "strength 2"],
+  "strengths": ["strength 1", "strength 2", "strength 3"],
   "areasToImprove": ["area 1", "area 2"],
   "nepqUsage": "Did they use NEPQ questioning techniques? How well?",
   "objectionHandling": "How did they handle objections?",
   "rapportBuilding": "Did they build rapport effectively?",
+  "psychographicAdaptation": "How well did they adapt to the prospect's psychographic type?",
+  "emotionalDriversUsed": ["driver1", "driver2"],
+  "tonalEffectiveness": "Were tones used appropriately and at the right times?",
+  "correctiveScript": "Rewrite one key moment with the correct Type → Driver → Tone formula",
   "topTip": "One specific actionable tip for their next conversation"
 }`;
 
       const feedbackResponse = await client.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
-          { role: "system", content: "You are an expert sales coach. Provide feedback in valid JSON format only." },
+          { role: "system", content: "You are an expert sales coach trained in psychographic classification, emotional drivers, and tonal techniques. Provide feedback in valid JSON format only." },
           { role: "user", content: feedbackPrompt }
         ],
-        max_completion_tokens: 1000,
+        max_completion_tokens: 1500,
       });
 
       const feedbackText = feedbackResponse.choices[0]?.message?.content || "{}";
@@ -6847,7 +6867,23 @@ Provide constructive feedback in JSON format:
       let feedback;
       try {
         const jsonMatch = feedbackText.match(/\{[\s\S]*\}/);
-        feedback = jsonMatch ? JSON.parse(jsonMatch[0]) : { overallScore: 50, topTip: "Keep practicing!" };
+        const parsedFeedback = jsonMatch ? JSON.parse(jsonMatch[0]) : { overallScore: 50, topTip: "Keep practicing!" };
+        
+        // Merge AI feedback with programmatic analysis
+        feedback = {
+          ...parsedFeedback,
+          analysis: {
+            psychographicType: enhancedAnalysis.psychographicAnalysis.detectedType,
+            psychographicConfidence: Math.round(enhancedAnalysis.psychographicAnalysis.confidence * 100),
+            linguisticMarkers: enhancedAnalysis.psychographicAnalysis.markers,
+            driversUsed: enhancedAnalysis.driverAnalysis.usedDrivers,
+            driverEffectiveness: Math.round(enhancedAnalysis.driverAnalysis.effectiveness * 100),
+            missedOpportunities: enhancedAnalysis.driverAnalysis.missedOpportunities,
+            tonePattern: enhancedAnalysis.tonalAnalysis.tonePattern,
+            tonalAppropriateness: Math.round(enhancedAnalysis.tonalAnalysis.appropriateness * 100),
+            tonalSuggestions: enhancedAnalysis.tonalAnalysis.suggestions,
+          }
+        };
       } catch {
         feedback = { overallScore: 50, topTip: "Keep practicing!" };
       }

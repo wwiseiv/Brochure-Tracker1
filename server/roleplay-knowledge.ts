@@ -1,3 +1,38 @@
+import {
+  PSYCHOGRAPHIC_TYPES,
+  EMOTIONAL_DRIVERS,
+  TONAL_TECHNIQUES,
+  DIFFICULTY_RULES,
+  NEPQ_PRINCIPLES,
+  QUICK_REFERENCE,
+  generateEnhancedSystemPrompt,
+  generateCoachingFeedbackPrompt,
+  detectPsychographicType,
+  analyzeEmotionalDrivers,
+  analyzeTonalUsage,
+  type PsychographicType,
+  type EmotionalDriver,
+  type TonalTechnique,
+  type DifficultyRules
+} from './coaching-enhancement';
+
+// Re-export everything from coaching-enhancement for backward compatibility
+export {
+  PSYCHOGRAPHIC_TYPES,
+  EMOTIONAL_DRIVERS,
+  TONAL_TECHNIQUES,
+  DIFFICULTY_RULES,
+  NEPQ_PRINCIPLES,
+  QUICK_REFERENCE,
+  generateEnhancedSystemPrompt,
+  generateCoachingFeedbackPrompt,
+  detectPsychographicType,
+  analyzeEmotionalDrivers,
+  analyzeTonalUsage
+};
+
+export type { PsychographicType, EmotionalDriver, TonalTechnique, DifficultyRules };
+
 export const SALES_TRAINING_KNOWLEDGE = `
 # PCBancard Dual Pricing Sales Training Knowledge Base
 
@@ -447,4 +482,129 @@ export function buildDailyEdgeCoachingContext(dailyEdgeContent: {
   context += `--- END MINDSET FOCUS ---\n`;
 
   return context;
+}
+
+// =====================================================================
+// ENHANCED COACHING INTEGRATION FUNCTIONS
+// =====================================================================
+
+/**
+ * Build an enhanced system prompt for roleplay with psychographic type
+ */
+export function buildEnhancedRoleplayPrompt(
+  basePrompt: string,
+  difficulty: 'easy' | 'medium' | 'hard',
+  psychographicType?: string
+): string {
+  return generateEnhancedSystemPrompt(basePrompt, difficulty, psychographicType);
+}
+
+/**
+ * Generate comprehensive feedback with multi-dimensional analysis
+ */
+export function buildEnhancedFeedbackPrompt(conversationHistory: Array<{role: string, content: string}>): {
+  prompt: string;
+  psychographicAnalysis: ReturnType<typeof detectPsychographicType>;
+  driverAnalysis: ReturnType<typeof analyzeEmotionalDrivers>;
+  tonalAnalysis: ReturnType<typeof analyzeTonalUsage>;
+} {
+  const agentMessages = conversationHistory
+    .filter(m => m.role === 'user')
+    .map(m => m.content);
+
+  const psychographicAnalysis = detectPsychographicType(conversationHistory);
+  const driverAnalysis = analyzeEmotionalDrivers(agentMessages);
+  const tonalAnalysis = analyzeTonalUsage(conversationHistory);
+
+  const detectedType = PSYCHOGRAPHIC_TYPES[psychographicAnalysis.detectedType];
+  
+  const prompt = `${generateCoachingFeedbackPrompt()}
+
+PROSPECT PSYCHOGRAPHIC ANALYSIS:
+- Detected Type: ${detectedType?.name || 'Unknown'} (${(psychographicAnalysis.confidence * 100).toFixed(0)}% confidence)
+- Type Description: ${detectedType?.coreProfile?.substring(0, 200) || 'N/A'}...
+- Linguistic Markers Found: ${psychographicAnalysis.markers.join(', ') || 'None detected'}
+
+RECOMMENDED APPROACH FOR THIS TYPE:
+- Effective Drivers: ${detectedType?.effectiveDrivers?.join(', ') || 'N/A'}
+- Recommended Tones: ${detectedType?.recommendedTones?.join(', ') || 'N/A'}
+- What Works: ${detectedType?.whatWorks?.slice(0, 2).join('; ') || 'N/A'}
+- What Fails: ${detectedType?.whatFails?.slice(0, 2).join('; ') || 'N/A'}
+
+AGENT'S EMOTIONAL DRIVER USAGE:
+- Drivers Used: ${driverAnalysis.usedDrivers.join(', ') || 'None detected'}
+- Missed Opportunities: ${driverAnalysis.missedOpportunities.join('; ') || 'None'}
+- Driver Effectiveness: ${(driverAnalysis.effectiveness * 100).toFixed(0)}%
+
+AGENT'S TONAL PATTERNS:
+- Tone Sequence: ${tonalAnalysis.tonePattern.join(' → ') || 'Not analyzed'}
+- Appropriateness Score: ${(tonalAnalysis.appropriateness * 100).toFixed(0)}%
+- Suggestions: ${tonalAnalysis.suggestions.join('; ') || 'Keep up the good work'}
+
+${QUICK_REFERENCE}
+
+Provide feedback that specifically addresses:
+1. How well did they adapt to this prospect's psychographic type?
+2. Were emotional drivers used appropriately for this type?
+3. Was the tonal sequence effective (Curious early, Challenging only after trust)?
+4. Specific script rewrites using the correct Type → Driver → Tone formula
+`;
+
+  return {
+    prompt,
+    psychographicAnalysis,
+    driverAnalysis,
+    tonalAnalysis
+  };
+}
+
+/**
+ * Get coaching hints enhanced with psychographic awareness
+ */
+export function getEnhancedCoachingHint(
+  userMessage: string,
+  aiResponse: string,
+  conversationHistory: Array<{role: string, content: string}>
+): string | null {
+  // First get the basic coaching hint
+  const basicHint = getCoachingHint(userMessage, aiResponse, conversationHistory);
+  
+  // Then add psychographic-aware hints
+  const psychoAnalysis = detectPsychographicType(conversationHistory);
+  const detectedType = PSYCHOGRAPHIC_TYPES[psychoAnalysis.detectedType];
+  
+  if (psychoAnalysis.confidence > 0.4 && detectedType) {
+    const userLower = userMessage.toLowerCase();
+    
+    // Check if they're using wrong driver for this type
+    if (detectedType.avoidFor && detectedType.avoidFor.includes('greed')) {
+      if (userLower.includes('save') || userLower.includes('profit') || userLower.includes('money')) {
+        return `This prospect appears to be a ${detectedType.name}. Avoid greed-based appeals - try ${detectedType.effectiveDrivers.join(' or ')} instead.`;
+      }
+    }
+    
+    // Check if they're using appropriate approaches
+    if (detectedType.effectiveDrivers.includes('salvation')) {
+      if (!userLower.includes('help') && !userLower.includes('relief') && !userLower.includes('solve')) {
+        return `Consider using Salvation language with this ${detectedType.name} - focus on relief and solving problems rather than gains.`;
+      }
+    }
+  }
+  
+  return basicHint;
+}
+
+/**
+ * Map difficulty levels between systems
+ */
+export function mapDifficultyLevel(level: string): 'easy' | 'medium' | 'hard' {
+  const mapping: Record<string, 'easy' | 'medium' | 'hard'> = {
+    'beginner': 'easy',
+    'easy': 'easy',
+    'intermediate': 'medium',
+    'medium': 'medium',
+    'advanced': 'hard',
+    'hard': 'hard'
+  };
+  return mapping[level.toLowerCase()] || 'medium';
 }

@@ -1,5 +1,67 @@
 import { db } from "./db";
 import { roleplayPersonas } from "@shared/schema";
+import { PSYCHOGRAPHIC_TYPES, DIFFICULTY_RULES } from "./coaching-enhancement";
+
+// Helper function to build enhanced system prompts with psychographic framework
+function buildEnhancedPersonaPrompt(
+  basePersona: {
+    name: string;
+    age?: number;
+    businessType: string;
+    personality: string;
+    situation: string;
+    objections: string[];
+    agreementConditions: string[];
+  },
+  psychographicType: keyof typeof PSYCHOGRAPHIC_TYPES,
+  difficultyLevel: 'easy' | 'medium' | 'hard'
+): string {
+  const psychoType = PSYCHOGRAPHIC_TYPES[psychographicType];
+  const diffRules = DIFFICULTY_RULES[difficultyLevel];
+
+  return `You are ${basePersona.name}${basePersona.age ? `, a ${basePersona.age}-year-old` : ','} ${basePersona.businessType} owner.
+
+=== PSYCHOGRAPHIC PROFILE: ${psychoType.name.toUpperCase()} ===
+${psychoType.coreProfile.substring(0, 400)}
+
+PRIMARY FEAR: ${psychoType.primaryFear}
+PRIMARY DESIRE: ${psychoType.primaryDesire}
+
+LINGUISTIC PATTERNS TO USE:
+${psychoType.linguisticMarkers.slice(0, 6).map(m => `- "${m}"`).join('\n')}
+
+RESPOND POSITIVELY WHEN THEY:
+${psychoType.whatWorks.slice(0, 3).map(w => `- ${w}`).join('\n')}
+
+RESIST/PUSH BACK WHEN THEY:
+${psychoType.whatFails.slice(0, 3).map(f => `- ${f}`).join('\n')}
+
+=== DIFFICULTY: ${difficultyLevel.toUpperCase()} ===
+${diffRules.openness}
+
+OBJECTION PATTERN:
+${diffRules.objectionPattern}
+
+DECISION TIMELINE:
+${diffRules.decisionTimeline}
+
+DO NOT:
+${diffRules.restrictions.map(r => `- ${r}`).join('\n')}
+
+=== CHARACTER DETAILS ===
+PERSONALITY: ${basePersona.personality}
+
+CURRENT SITUATION: ${basePersona.situation}
+
+OBJECTIONS TO RAISE:
+${basePersona.objections.map(o => `- "${o}"`).join('\n')}
+
+BUYING SIGNALS (when appropriate):
+${diffRules.buyingSignals.slice(0, 2).map(s => `- ${s}`).join('\n')}
+
+Only agree to next steps if the salesperson:
+${basePersona.agreementConditions.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
+}
 
 const ROLEPLAY_PERSONAS = [
   {
