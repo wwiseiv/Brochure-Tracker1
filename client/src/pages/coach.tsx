@@ -1868,7 +1868,7 @@ export default function CoachPage() {
                       <span className="font-medium text-purple-700 dark:text-purple-400">Psychographic Adaptation</span>
                       {feedback.analysis?.psychographicType && (
                         <Badge variant="outline" className="ml-auto text-xs">
-                          {feedback.analysis.psychographicType} ({Math.round(feedback.analysis.psychographicConfidence * 100)}%)
+                          {feedback.analysis.psychographicType} ({Math.round(feedback.analysis.psychographicConfidence > 1 ? feedback.analysis.psychographicConfidence : feedback.analysis.psychographicConfidence * 100)}%)
                         </Badge>
                       )}
                     </div>
@@ -1891,7 +1891,7 @@ export default function CoachPage() {
                       <span className="font-medium text-rose-700 dark:text-rose-400">Emotional Drivers Used</span>
                       {feedback.analysis?.driverEffectiveness !== undefined && (
                         <Badge variant="outline" className="ml-auto text-xs">
-                          {Math.round(feedback.analysis.driverEffectiveness * 100)}% effective
+                          {Math.round(feedback.analysis.driverEffectiveness > 1 ? feedback.analysis.driverEffectiveness : feedback.analysis.driverEffectiveness * 100)}% effective
                         </Badge>
                       )}
                     </div>
@@ -1921,7 +1921,7 @@ export default function CoachPage() {
                       <span className="font-medium text-teal-700 dark:text-teal-400">Tonal Effectiveness</span>
                       {feedback.analysis?.tonalAppropriateness !== undefined && (
                         <Badge variant="outline" className="ml-auto text-xs">
-                          {Math.round(feedback.analysis.tonalAppropriateness * 100)}% appropriate
+                          {Math.round(feedback.analysis.tonalAppropriateness > 1 ? feedback.analysis.tonalAppropriateness : feedback.analysis.tonalAppropriateness * 100)}% appropriate
                         </Badge>
                       )}
                     </div>

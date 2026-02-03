@@ -50,3 +50,6 @@ VAPID_PUBLIC_KEY = "BIi5Dw9Oj5MdMsQkrqww5Ixnj3fUvwfVYjxI2LeGf-qo4DzVtRltUglbFQgu
 VAPID_PRIVATE_KEY = "RsLuVrAMbcViHWC5lDgEfbm_EolVtdn54FlryYNHhHo"
 VAPID_EMAIL = "support@pcbancard.com"
 INTERNAL_SECRET = "prospect-job-secret-key-2026"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-87d771ac-879c-48d3-8d80-c5abc5bc81cc"
