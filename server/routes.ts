@@ -2205,6 +2205,282 @@ Format your response as JSON:
   });
 
   // ============================================
+  // IMPERSONATION API
+  // ============================================
+
+  // Get list of users that can be impersonated
+  app.get("/api/impersonation/available-users", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      // Only admins and managers can impersonate
+      if (membership.role !== "master_admin" && membership.role !== "relationship_manager") {
+        return res.status(403).json({ error: "Not authorized to impersonate users" });
+      }
+      
+      const users = await storage.getImpersonatableUsers(userId, membership.organization.id);
+      
+      // Get user details for each member
+      const usersWithDetails = await Promise.all(
+        users.map(async (member) => {
+          const user = await authStorage.getUser(member.userId);
+          return {
+            id: member.id,
+            userId: member.userId,
+            firstName: user?.firstName || member.firstName || "Unknown",
+            lastName: user?.lastName || member.lastName || "User",
+            email: user?.email || null,
+            role: member.role,
+          };
+        })
+      );
+      
+      res.json(usersWithDetails);
+    } catch (error) {
+      console.error("Error fetching impersonatable users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Start impersonation session
+  app.post("/api/impersonation/start", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const originalUserId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const { targetUserId, reason } = req.body;
+      
+      if (!targetUserId) {
+        return res.status(400).json({ error: "Target user ID is required" });
+      }
+      
+      // Only admins and managers can impersonate
+      if (membership.role !== "master_admin" && membership.role !== "relationship_manager") {
+        return res.status(403).json({ error: "Not authorized to impersonate users" });
+      }
+      
+      // Verify the target user can be impersonated by this user
+      const impersonatableUsers = await storage.getImpersonatableUsers(originalUserId, membership.organization.id);
+      const canImpersonate = impersonatableUsers.some(u => u.userId === targetUserId);
+      
+      if (!canImpersonate) {
+        return res.status(403).json({ error: "Cannot impersonate this user" });
+      }
+      
+      // Get target user info
+      const targetUser = await authStorage.getUser(targetUserId);
+      const targetMembership = await storage.getOrganizationMember(membership.organization.id, targetUserId);
+      
+      // Generate session token
+      const crypto = await import("crypto");
+      const sessionToken = crypto.randomUUID();
+      
+      // Create impersonation session
+      const session = await storage.createImpersonationSession({
+        originalUserId,
+        impersonatedUserId: targetUserId,
+        sessionToken,
+        reason: reason || null,
+        expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000), // 4 hours
+        startedAt: new Date(),
+        status: "active",
+        organizationId: membership.organization.id,
+      });
+      
+      // Create audit log entry
+      await storage.createImpersonationAuditLog({
+        sessionId: session.id,
+        originalUserId,
+        impersonatedUserId: targetUserId,
+        action: "start",
+        reason: reason || null,
+        organizationId: membership.organization.id,
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+      
+      res.json({
+        sessionId: session.id,
+        sessionToken,
+        impersonatedUser: {
+          userId: targetUserId,
+          firstName: targetUser?.firstName || targetMembership?.firstName || "Unknown",
+          lastName: targetUser?.lastName || targetMembership?.lastName || "User",
+          email: targetUser?.email || null,
+          role: targetMembership?.role || "agent",
+        },
+        expiresAt: session.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error starting impersonation:", error);
+      res.status(500).json({ error: "Failed to start impersonation" });
+    }
+  });
+
+  // End impersonation session
+  app.post("/api/impersonation/end", isAuthenticated, async (req: any, res) => {
+    try {
+      const { sessionToken } = req.body;
+      
+      if (!sessionToken) {
+        return res.status(400).json({ error: "Session token is required" });
+      }
+      
+      const session = await storage.getImpersonationSessionByToken(sessionToken);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Impersonation session not found" });
+      }
+      
+      // End the session
+      await storage.endImpersonationSession(session.id);
+      
+      // Log the end action
+      await storage.createImpersonationAuditLog({
+        sessionId: session.id,
+        originalUserId: session.originalUserId,
+        impersonatedUserId: session.impersonatedUserId,
+        action: "end",
+        reason: null,
+        organizationId: session.organizationId,
+        ipAddress: req.ip || null,
+        userAgent: req.get("User-Agent") || null,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error ending impersonation:", error);
+      res.status(500).json({ error: "Failed to end impersonation" });
+    }
+  });
+
+  // Validate impersonation session
+  app.get("/api/impersonation/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionToken = req.headers["x-impersonation-token"] as string;
+      
+      if (!sessionToken) {
+        return res.json({ valid: false, session: null });
+      }
+      
+      const session = await storage.getImpersonationSessionByToken(sessionToken);
+      
+      if (!session) {
+        return res.json({ valid: false, session: null });
+      }
+      
+      // Check if session is expired
+      if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+        await storage.endImpersonationSession(session.id);
+        return res.json({ valid: false, session: null, reason: "expired" });
+      }
+      
+      // Get user details
+      const impersonatedUser = await authStorage.getUser(session.impersonatedUserId);
+      const originalUser = await authStorage.getUser(session.originalUserId);
+      
+      res.json({
+        valid: true,
+        session: {
+          id: session.id,
+          impersonatedUser: {
+            userId: session.impersonatedUserId,
+            firstName: impersonatedUser?.firstName || "Unknown",
+            lastName: impersonatedUser?.lastName || "User",
+            email: impersonatedUser?.email || null,
+          },
+          originalUser: {
+            userId: session.originalUserId,
+            firstName: originalUser?.firstName || "Unknown",
+            lastName: originalUser?.lastName || "User",
+          },
+          startedAt: session.startedAt,
+          expiresAt: session.expiresAt,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating impersonation:", error);
+      res.status(500).json({ error: "Failed to validate session" });
+    }
+  });
+
+  // Get active impersonation sessions (admin only)
+  app.get("/api/impersonation/sessions", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const sessions = await storage.getAllActiveImpersonationSessions();
+      
+      // Get user details for each session
+      const sessionsWithDetails = await Promise.all(
+        sessions.map(async (session) => {
+          const originalUser = await authStorage.getUser(session.originalUserId);
+          const impersonatedUser = await authStorage.getUser(session.impersonatedUserId);
+          
+          return {
+            id: session.id,
+            originalUser: {
+              userId: session.originalUserId,
+              firstName: originalUser?.firstName || "Unknown",
+              lastName: originalUser?.lastName || "User",
+            },
+            impersonatedUser: {
+              userId: session.impersonatedUserId,
+              firstName: impersonatedUser?.firstName || "Unknown",
+              lastName: impersonatedUser?.lastName || "User",
+            },
+            startedAt: session.startedAt,
+            expiresAt: session.expiresAt,
+            reason: session.reason,
+          };
+        })
+      );
+      
+      res.json(sessionsWithDetails);
+    } catch (error) {
+      console.error("Error fetching impersonation sessions:", error);
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  // Get impersonation audit log (admin only)
+  app.get("/api/impersonation/audit-log", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { limit = 50, offset = 0 } = req.query;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      const logs = await storage.getImpersonationAuditLogs(
+        membership?.organization.id,
+        parseInt(limit as string),
+        parseInt(offset as string)
+      );
+      
+      // Get user details for each log entry
+      const logsWithDetails = await Promise.all(
+        logs.map(async (log) => {
+          const originalUser = await authStorage.getUser(log.originalUserId);
+          const impersonatedUser = await authStorage.getUser(log.impersonatedUserId);
+          
+          return {
+            ...log,
+            originalUser: {
+              firstName: originalUser?.firstName || "Unknown",
+              lastName: originalUser?.lastName || "User",
+            },
+            impersonatedUser: {
+              firstName: impersonatedUser?.firstName || "Unknown",
+              lastName: impersonatedUser?.lastName || "User",
+            },
+          };
+        })
+      );
+      
+      res.json(logsWithDetails);
+    } catch (error) {
+      console.error("Error fetching impersonation audit log:", error);
+      res.status(500).json({ error: "Failed to fetch audit log" });
+    }
+  });
+
+  // ============================================
   // LEADERBOARD API
   // ============================================
 
