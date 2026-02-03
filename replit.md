@@ -53,7 +53,12 @@ Preferred communication style: Simple, everyday language.
     - **Quarterly Check-ins**: Scheduled check-ins for active merchants with reminders
 - **AI-Powered Features**:
     - **Voice Note Summaries & Lead Scoring**: AI-generated summaries and lead quality scores.
-    - **AI Role-Play Coach**: Conversational AI for sales training with voice I/O, performance feedback, and email reporting, supporting various difficulty levels and personas. Integrates with Google Drive for custom training materials.
+    - **AI Role-Play Coach**: Conversational AI for sales training with voice I/O, performance feedback, and email reporting, supporting various difficulty levels and personas. Integrates with Google Drive for custom training materials. Includes export functionality for session feedback (copy, email, PDF, Word).
+    - **Coaching Advice Export**: All coaching features (Sales Spark, Role-Play Coach) include an export toolbar for advice content:
+        - Copy to clipboard for quick sharing
+        - Email to self for later reference
+        - PDF export with Claude AI-formatted professional document
+        - Word export for editing and customization
     - **Daily Edge Motivation System**: Mindset training based on "The Salesperson's Secret Code" with daily content, streak tracking, belief progress, and interactive AI chat.
     - **Meeting Recording & Analysis**: Record, transcribe, and analyze sales conversations for summaries and sentiment.
     - **AI Email Drafter**: AI-powered email composition.
