@@ -244,6 +244,7 @@ function DuplicateMatchCard({
               checked={selected}
               onCheckedChange={() => onSelect?.()}
               onClick={(e) => e.stopPropagation()}
+              data-testid={`checkbox-select-match-${match.id}`}
             />
           )}
           <div>
@@ -358,17 +359,17 @@ export function DuplicateScanner({ onMergeRequest }: DuplicateScannerProps) {
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold">{scanResults.totalProspects}</div>
+                <div className="text-2xl font-bold" data-testid="text-total-prospects">{scanResults.totalProspects}</div>
                 <div className="text-sm text-muted-foreground">Total Prospects</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400" data-testid="text-duplicate-groups">
                   {scanResults.duplicateGroups}
                 </div>
                 <div className="text-sm text-muted-foreground">Duplicate Groups</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-duplicate-pairs">
                   {scanResults.duplicatePairs}
                 </div>
                 <div className="text-sm text-muted-foreground">Duplicate Pairs</div>

@@ -78,6 +78,7 @@ import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
 import { getMerchantCache, formatDuration, CacheCategory } from "./services/cache-service";
+import { getDuplicateDetector, type Prospect as DuplicateProspect, type DuplicateCheckResult } from "./services/duplicate-detection";
 import { seedDemoDeals, deleteDemoDeals, checkDemoDealsExist } from "./seed-demo-data";
 import { researchBusiness } from "./business-research";
 import { extractBusinessCardData } from "./services/business-card-scanner";
@@ -9824,6 +9825,324 @@ Generate the following content in JSON format:
       res.status(500).json({ error: "Failed to create prospect from business card" });
     }
   });
+
+  // ============================================
+  // DUPLICATE DETECTION ROUTES
+  // ============================================
+
+  const duplicateDetector = getDuplicateDetector({
+    duplicateThreshold: 0.75,
+    potentialDuplicateThreshold: 0.6,
+    phoneMatchIsDuplicate: true,
+  });
+
+  // Check for duplicates before creating a prospect
+  app.post("/api/prospects/check-duplicate", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const agentId = req.user.claims.sub;
+      const { businessName, phone, address, city, state, zip, website, email } = req.body;
+
+      if (!businessName) {
+        return res.status(400).json({ error: "Business name is required" });
+      }
+
+      // Get existing prospects for this agent
+      const existingProspects = await db.select()
+        .from(prospects)
+        .where(eq(prospects.agentId, agentId));
+
+      const newProspect: DuplicateProspect = {
+        businessName,
+        phone,
+        address,
+        city,
+        state,
+        zip,
+        website,
+        email,
+      };
+
+      const result = duplicateDetector.checkDuplicate(newProspect, existingProspects as DuplicateProspect[]);
+
+      res.json({
+        ...result,
+        matches: result.matches.map(m => ({
+          id: m.prospect.id,
+          businessName: m.prospect.businessName,
+          phone: m.prospect.phone,
+          address: m.prospect.address,
+          city: m.prospect.city,
+          state: m.prospect.state,
+          score: m.score,
+          confidence: m.confidence,
+          reasons: m.reasons,
+          matchDetails: m.matchDetails,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Check duplicate error:", error);
+      res.status(500).json({ error: "Failed to check duplicate" });
+    }
+  });
+
+  // Scan entire prospect list for duplicates
+  app.post("/api/prospects/scan-duplicates", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const agentId = req.user.claims.sub;
+      const { threshold } = req.body;
+
+      const allProspects = await db.select()
+        .from(prospects)
+        .where(eq(prospects.agentId, agentId));
+
+      // Create a request-specific detector to avoid race conditions with shared config
+      const requestDetector = threshold && typeof threshold === 'number'
+        ? new (await import('./services/duplicate-detection')).default({
+            ...duplicateDetector.getConfig(),
+            potentialDuplicateThreshold: threshold,
+          })
+        : duplicateDetector;
+
+      const duplicates = requestDetector.findDuplicatesInList(allProspects as DuplicateProspect[]);
+
+      // Group duplicates for easier handling
+      const groups = groupDuplicatePairs(duplicates);
+
+      res.json({
+        totalProspects: allProspects.length,
+        duplicatePairs: duplicates.length,
+        duplicateGroups: groups.length,
+        groups: groups.map(group => ({
+          prospects: group.map(p => ({
+            id: p.id,
+            businessName: p.businessName,
+            phone: p.phone,
+            address: p.address,
+            city: p.city,
+            state: p.state,
+          })),
+        })),
+        pairs: duplicates.slice(0, 50).map(d => ({
+          prospect1: {
+            id: d.prospect1.id,
+            businessName: d.prospect1.businessName,
+            phone: d.prospect1.phone,
+          },
+          prospect2: {
+            id: d.prospect2.id,
+            businessName: d.prospect2.businessName,
+            phone: d.prospect2.phone,
+          },
+          score: d.score,
+          reasons: d.reasons,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Scan duplicates error:", error);
+      res.status(500).json({ error: "Failed to scan duplicates" });
+    }
+  });
+
+  // Merge duplicate prospects
+  app.post("/api/prospects/merge", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const agentId = req.user.claims.sub;
+      const { keepId, mergeIds } = req.body;
+
+      if (!keepId || !mergeIds || !Array.isArray(mergeIds)) {
+        return res.status(400).json({ error: "keepId and mergeIds array are required" });
+      }
+
+      // Verify ownership of the prospect to keep
+      const prospectToKeep = await db.select()
+        .from(prospects)
+        .where(and(
+          eq(prospects.id, keepId),
+          eq(prospects.agentId, agentId)
+        ))
+        .limit(1);
+
+      if (prospectToKeep.length === 0) {
+        return res.status(404).json({ error: "Prospect to keep not found" });
+      }
+
+      // Get prospects to merge
+      const prospectsToMerge = await db.select()
+        .from(prospects)
+        .where(and(
+          eq(prospects.agentId, agentId),
+          or(...mergeIds.map((id: number) => eq(prospects.id, id)))
+        ));
+
+      // Merge data - fill in missing fields from merged prospects
+      const kept = prospectToKeep[0];
+      const updates: Record<string, any> = {};
+
+      for (const merge of prospectsToMerge) {
+        if (!kept.phone && merge.phone) updates.phone = merge.phone;
+        if (!kept.email && merge.email) updates.email = merge.email;
+        if (!kept.website && merge.website) updates.website = merge.website;
+        if (!kept.address && merge.address) {
+          updates.address = merge.address;
+          updates.city = merge.city;
+          updates.state = merge.state;
+          updates.zip = merge.zip;
+        }
+        // Add notes about merge
+        const existingNotes = kept.notes || '';
+        const mergeNote = `Merged from: ${merge.businessName} (ID: ${merge.id})`;
+        updates.notes = [existingNotes, mergeNote].filter(Boolean).join('\n');
+      }
+
+      // Update the kept prospect
+      if (Object.keys(updates).length > 0) {
+        await db.update(prospects)
+          .set(updates)
+          .where(eq(prospects.id, keepId));
+      }
+
+      // Delete merged prospects
+      for (const id of mergeIds) {
+        await db.delete(prospects)
+          .where(and(
+            eq(prospects.id, id),
+            eq(prospects.agentId, agentId)
+          ));
+      }
+
+      res.json({
+        success: true,
+        keptId: keepId,
+        mergedCount: mergeIds.length,
+        fieldsUpdated: Object.keys(updates),
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Merge error:", error);
+      res.status(500).json({ error: "Failed to merge prospects" });
+    }
+  });
+
+  // Get duplicate detection configuration
+  app.get("/api/prospects/duplicate-config", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const config = duplicateDetector.getConfig();
+
+      res.json({
+        config,
+        thresholdExplanation: {
+          duplicateThreshold: "Score at or above this is considered a definite duplicate",
+          potentialDuplicateThreshold: "Score at or above this triggers a warning",
+        },
+        weightExplanation: {
+          nameWeight: "How much business name similarity matters",
+          phoneWeight: "How much phone number match matters",
+          addressWeight: "How much address similarity matters",
+          domainWeight: "How much website/email domain match matters",
+        },
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Get duplicate config error:", error);
+      res.status(500).json({ error: "Failed to get duplicate config" });
+    }
+  });
+
+  // Update duplicate detection configuration (admin only)
+  app.put("/api/prospects/duplicate-config", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      
+      // Only master_admin can update config
+      if (membership.role !== "master_admin") {
+        return res.status(403).json({ error: "Only admins can update duplicate detection config" });
+      }
+
+      const updates = req.body;
+      const allowedKeys = [
+        "duplicateThreshold",
+        "potentialDuplicateThreshold",
+        "nameWeight",
+        "phoneWeight",
+        "addressWeight",
+        "domainWeight",
+        "minNameSimilarity",
+        "phoneMatchIsDuplicate",
+      ];
+
+      const validUpdates: Record<string, any> = {};
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedKeys.includes(key)) {
+          if (typeof value === "number" && value >= 0 && value <= 1) {
+            validUpdates[key] = value;
+          } else if (typeof value === "boolean") {
+            validUpdates[key] = value;
+          }
+        }
+      }
+
+      if (Object.keys(validUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid configuration updates" });
+      }
+
+      duplicateDetector.updateConfig(validUpdates);
+
+      res.json({
+        success: true,
+        updated: validUpdates,
+        newConfig: duplicateDetector.getConfig(),
+      });
+    } catch (error: any) {
+      console.error("[Prospects] Update duplicate config error:", error);
+      res.status(500).json({ error: "Failed to update duplicate config" });
+    }
+  });
+
+  // Helper function to group duplicate pairs into clusters
+  function groupDuplicatePairs(
+    pairs: Array<{ prospect1: DuplicateProspect; prospect2: DuplicateProspect; score: number }>
+  ): DuplicateProspect[][] {
+    const groups: Map<number, Set<number>> = new Map();
+
+    function findGroup(groups: Map<number, Set<number>>, id: number): number | null {
+      for (const [groupId, members] of groups) {
+        if (members.has(id)) return groupId;
+      }
+      return null;
+    }
+
+    for (const pair of pairs) {
+      const id1 = pair.prospect1.id!;
+      const id2 = pair.prospect2.id!;
+
+      const group1 = findGroup(groups, id1);
+      const group2 = findGroup(groups, id2);
+
+      if (group1 && group2) {
+        if (group1 !== group2) {
+          for (const id of groups.get(group2)!) {
+            groups.get(group1)!.add(id);
+          }
+          groups.delete(group2);
+        }
+      } else if (group1) {
+        groups.get(group1)!.add(id2);
+      } else if (group2) {
+        groups.get(group2)!.add(id1);
+      } else {
+        groups.set(id1, new Set([id1, id2]));
+      }
+    }
+
+    const prospectMap = new Map<number, DuplicateProspect>();
+    for (const pair of pairs) {
+      if (pair.prospect1.id) prospectMap.set(pair.prospect1.id, pair.prospect1);
+      if (pair.prospect2.id) prospectMap.set(pair.prospect2.id, pair.prospect2);
+    }
+
+    return Array.from(groups.values()).map(idSet =>
+      Array.from(idSet).map(id => prospectMap.get(id)!).filter(Boolean)
+    );
+  }
 
   // Get agent's prospects with filtering
   app.get("/api/prospects", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
