@@ -2170,6 +2170,14 @@ export const statementAnalysisJobs = pgTable("statement_analysis_jobs", {
   notificationSent: boolean("notification_sent").default(false),
   notificationSentAt: timestamp("notification_sent_at"),
   
+  // Validation & Manual Review (for hardened extraction)
+  confidence: integer("confidence"),
+  needsManualReview: boolean("needs_manual_review").default(false),
+  reviewReasons: jsonb("review_reasons"),
+  validationResult: jsonb("validation_result"),
+  manuallyReviewed: boolean("manually_reviewed").default(false),
+  reviewedAt: timestamp("reviewed_at"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2191,6 +2199,12 @@ export const insertStatementAnalysisJobSchema = createInsertSchema(statementAnal
   errorMessage: true,
   notificationSent: true,
   notificationSentAt: true,
+  confidence: true,
+  needsManualReview: true,
+  reviewReasons: true,
+  validationResult: true,
+  manuallyReviewed: true,
+  reviewedAt: true,
 });
 export type InsertStatementAnalysisJob = z.infer<typeof insertStatementAnalysisJobSchema>;
 export type StatementAnalysisJob = typeof statementAnalysisJobs.$inferSelect;

@@ -91,6 +91,7 @@ import { extractStatementFromFiles } from "./proposal-intelligence/services/stat
 import webpush from "web-push";
 import fs from "fs";
 import path from "path";
+import { validateAndSanitize, getDefaultSanitizedData } from "./services/statement-validator";
 
 // Internal secret for background job processing
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'prospect-job-internal-key-' + Date.now();
@@ -11307,10 +11308,101 @@ Generate the following content in JSON format:
         return res.status(403).json({ error: "Access denied" });
       }
 
-      res.json(job);
+      // Include validation info in response
+      const response = {
+        ...job,
+        extractedData: job.results?.statementData || getDefaultSanitizedData(),
+        confidence: job.confidence || 0,
+        needsManualReview: job.needsManualReview || job.status === 'needs_review',
+        reviewReasons: job.reviewReasons || [],
+        validationIssues: (job.validationResult as any)?.issues || [],
+      };
+
+      res.json(response);
     } catch (error: any) {
       console.error("[StatementJobs] Get job error:", error);
       res.status(500).json({ error: "Failed to fetch analysis job" });
+    }
+  });
+
+  // POST /api/statement-analysis/jobs/:id/manual-review - Submit manual review corrections
+  app.post("/api/statement-analysis/jobs/:id/manual-review", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const jobId = parseInt(req.params.id);
+      
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const job = await storage.getStatementAnalysisJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.agentId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (job.status !== 'needs_review') {
+        return res.status(400).json({ error: "Job is not awaiting manual review" });
+      }
+
+      const { correctedData, userConfirmed } = req.body;
+      
+      // Validate the manually entered data
+      const manualValidation = validateAndSanitize(correctedData);
+      
+      // If user explicitly confirmed, trust their input more
+      const finalData = userConfirmed 
+        ? { ...manualValidation.data, ...correctedData }
+        : manualValidation.data;
+      
+      // Re-run analysis with corrected data
+      const statementData: StatementData = {
+        processorName: finalData.merchantInfo?.processor,
+        merchantName: finalData.merchantInfo?.name,
+        merchantId: finalData.merchantInfo?.mid,
+        totalVolume: finalData.volumeData?.totalVolume || 0,
+        totalTransactions: finalData.volumeData?.totalTransactions || 0,
+        averageTicket: finalData.volumeData?.avgTicket,
+        cardMix: finalData.volumeData?.cardBreakdown,
+        fees: {
+          totalFees: finalData.fees?.reduce((sum: number, f: any) => sum + (f.amount || 0), 0) || 0,
+        },
+      };
+      
+      const analysis = analyzeStatement(statementData);
+      const talkingPoints = generateTalkingPoints(analysis);
+
+      const results = {
+        statementData,
+        analysis,
+        talkingPoints,
+        processedAt: new Date().toISOString(),
+        manuallyReviewed: true,
+      };
+
+      await storage.updateStatementAnalysisJob(jobId, {
+        status: 'completed',
+        completedAt: new Date(),
+        results: results,
+        manuallyReviewed: true,
+        reviewedAt: new Date(),
+        needsManualReview: false,
+        progress: 100,
+        progressMessage: 'Analysis complete (manually reviewed)',
+      });
+
+      res.json({ 
+        success: true, 
+        extractedData: finalData,
+        results,
+      });
+    } catch (error: any) {
+      console.error("[StatementJobs] Manual review error:", error);
+      res.status(500).json({ error: "Failed to submit manual review" });
     }
   });
 
