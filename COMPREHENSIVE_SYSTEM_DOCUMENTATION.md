@@ -1,8 +1,10 @@
 # PCBancard Field Sales Platform - Comprehensive System Documentation
 
-**Version:** 2.0 | **Last Updated:** February 2026 | **For:** Claude Opus 4.5 Analysis
+**Version:** 2.1 | **Last Updated:** February 3, 2026 | **For:** Claude Opus 4.5 Analysis
 
 This document provides exhaustive technical details, step-by-step workflows, AI model specifications, code references, and known issues for the entire PCBancard platform.
+
+> **Recent Updates (v2.1):** Fixed mobile scrolling issues, implemented smart email digest scheduling, added cursor-based pagination, configurable cache system, and fuzzy duplicate detection.
 
 ---
 
@@ -16,6 +18,7 @@ This document provides exhaustive technical details, step-by-step workflows, AI 
 6. [Complete Feature List](#6-complete-feature-list)
 7. [Code Architecture Overview](#7-code-architecture-overview)
 8. [API Endpoints Reference](#8-api-endpoints-reference)
+9. [Version 2.1 Changelog](#9-version-21-changelog-february-3-2026)
 
 ---
 
@@ -82,9 +85,22 @@ else if (blobType.includes("mp4")) ext = "m4a";
 ```
 
 #### Mobile Safari Scroll Issues
-**Location:** Deal Pipeline sheet content
-**Issue:** iOS Safari sometimes has scroll jank in bottom sheets
-**Partial Fix:** Added `overscroll-contain` class
+**Status:** ✅ FIXED
+**Location:** Deal Pipeline sheets, Hamburger menu, Prospect Finder sheets
+**Issue:** iOS Safari scroll issues due to `vh` units not accounting for dynamic viewport
+**Solution:** 
+- Changed all `vh` units to `dvh` (dynamic viewport height)
+- Added `min-h-0` to flex containers for proper scroll behavior
+- Added `env(safe-area-inset-bottom)` padding to account for bottom nav and iOS safe areas
+- Fixed Help page by wrapping with PermissionProvider
+
+```typescript
+// Example fix in BottomNav.tsx:
+<SheetContent side="left" className="w-[280px] p-0 flex flex-col" 
+  style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-bottom, 0px))' }}>
+  <ScrollArea className="flex-1 min-h-0">
+    <div style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
+```
 
 #### Proposal Generator - PDF Parsing Timeouts
 **Location:** `server/services/proposal-parse-service.ts`
@@ -94,31 +110,76 @@ else if (blobType.includes("mp4")) ext = "m4a";
 ### 1.3 Data Issues
 
 #### Merchant Intelligence Cache
-**Location:** `server/services/merchantIntelligence.ts`
-**Issue:** 1-hour cache TTL may be too long for rapidly changing businesses
-**Configuration:** Hardcoded in routes.ts line ~5367
+**Status:** ✅ FIXED - Now Configurable
+**Location:** `server/services/cache-service.ts`
+**Solution:** Implemented a configurable cache service with admin controls
 
 ```typescript
-const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-if (intelligence && intelligence.lastUpdatedAt > oneHourAgo) {
-  return res.json({ intelligence, status: 'cached' });
-}
+// New cache service with configurable TTL:
+const cacheConfig = await storage.getCacheConfiguration('merchant_intelligence');
+const ttlMs = (cacheConfig?.ttlMinutes || 60) * 60 * 1000;
+
+// Admin API endpoints:
+// GET /api/admin/cache/config - View cache settings
+// PATCH /api/admin/cache/config/:key - Update TTL
+// POST /api/admin/cache/invalidate/:key - Force refresh
 ```
 
 #### Prospect Finder - Duplicate Detection
-**Location:** `server/services/prospect-search.ts`
-**Issue:** Duplicate detection only checks exact business name match, not fuzzy matching
+**Status:** ✅ FIXED - Fuzzy Matching Implemented
+**Location:** `server/services/duplicate-detection.ts`
+**Solution:** Implemented fuzzy duplicate detection using Levenshtein distance and normalized matching
+
+```typescript
+// Fuzzy matching with configurable threshold:
+function calculateSimilarity(str1: string, str2: string): number {
+  const normalized1 = normalizeBusinessName(str1);
+  const normalized2 = normalizeBusinessName(str2);
+  return 1 - (levenshteinDistance(normalized1, normalized2) / Math.max(normalized1.length, normalized2.length));
+}
+
+// Checks: exact match, fuzzy name (>85% similarity), phone match, address match
+```
 
 ### 1.4 Performance Issues
 
 #### Large Pipeline Queries
-**Location:** `server/routes.ts` - Deal Pipeline endpoints
-**Issue:** Loading all deals without pagination can be slow for high-volume users
-**Recommendation:** Add cursor-based pagination
+**Status:** ✅ FIXED - Cursor-Based Pagination Implemented
+**Location:** `server/services/pagination.ts`
+**Solution:** Implemented efficient cursor-based pagination with proper schema field mapping
+
+```typescript
+// New pagination service:
+interface PaginationParams {
+  cursor?: string;  // Base64url encoded cursor
+  limit?: number;   // Default: 50, Max: 100
+  sortBy?: 'stage' | 'updatedAt' | 'businessName';
+  sortOrder?: 'asc' | 'desc';
+}
+
+// API usage:
+// GET /api/deals?cursor=xxx&limit=50&sortBy=stage
+// Response includes: { deals: [...], nextCursor: 'yyy', hasMore: true }
+```
 
 #### Email Digest Processing
-**Location:** `server/routes.ts` - Email digest cron
-**Issue:** Runs every 15 minutes for all users, could be optimized with better scheduling
+**Status:** ✅ FIXED - Smart Scheduling Implemented
+**Location:** `server/services/smart-digest-scheduler.ts`
+**Solution:** Replaced fixed 15-minute cron with adaptive EventEmitter-based scheduler
+
+```typescript
+// Smart digest scheduler features:
+- Adaptive timing (1-30 min based on user preferences)
+- Immediate digest option (threshold-based, e.g., 5+ notifications)
+- Pause/resume functionality with pausedUntil timestamp
+- Business hours enforcement for immediate digests (8 AM - 8 PM)
+- Timezone-aware scheduling per user
+
+// New API endpoints:
+// POST /api/email-digest/pause - Pause digests for N days
+// POST /api/email-digest/resume - Resume paused digests
+// GET /api/email-digest/stats - Scheduler statistics
+```
 
 ---
 
@@ -1044,16 +1105,65 @@ POST /api/roleplay/sessions/:id/end
 
 ---
 
+## 9. Version 2.1 Changelog (February 3, 2026)
+
+### 9.1 Mobile Scrolling Fixes
+- **Problem:** Hamburger menu and deal sheets wouldn't scroll to bottom on iOS Safari
+- **Solution:** 
+  - Replaced `vh` units with `dvh` (dynamic viewport height)
+  - Added `min-h-0` to flex containers for proper overflow behavior
+  - Added `env(safe-area-inset-bottom)` padding for iOS safe areas
+  - Wrapped Help page with PermissionProvider to fix runtime error
+- **Files Changed:** `client/src/components/BottomNav.tsx`, `client/src/pages/prospect-pipeline.tsx`, `client/src/pages/prospect-finder.tsx`, `client/src/App.tsx`
+
+### 9.2 Smart Email Digest Scheduler
+- **Problem:** Fixed 15-minute cron inefficient for varying user preferences
+- **Solution:** EventEmitter-based adaptive scheduler with:
+  - Immediate digest option (threshold-based during business hours)
+  - Pause/resume functionality
+  - Timezone-aware scheduling
+  - 1-30 minute adaptive intervals
+- **New Files:** `server/services/smart-digest-scheduler.ts`
+- **New Schema Columns:** `pausedUntil`, `immediateDigestEnabled`, `immediateThreshold`, `businessHoursStart`, `businessHoursEnd`, `lastImmediateSentAt`
+
+### 9.3 Cursor-Based Pagination
+- **Problem:** Loading all deals caused performance issues for high-volume users
+- **Solution:** Implemented cursor-based pagination with:
+  - Base64url encoded cursors
+  - Configurable sort options (stage, updatedAt, businessName)
+  - Proper schema field mapping for numeric filtering
+- **New Files:** `server/services/pagination.ts`
+
+### 9.4 Configurable Cache System
+- **Problem:** 1-hour hardcoded cache TTL for Merchant Intelligence
+- **Solution:** Admin-configurable cache service with:
+  - Per-feature TTL configuration
+  - Cache invalidation API
+  - Admin dashboard integration
+- **New Files:** `server/services/cache-service.ts`
+
+### 9.5 Fuzzy Duplicate Detection
+- **Problem:** Prospect Finder only detected exact name matches
+- **Solution:** Implemented fuzzy matching using:
+  - Levenshtein distance algorithm
+  - Business name normalization
+  - 85% similarity threshold
+  - Phone and address matching
+- **New Files:** `server/services/duplicate-detection.ts`
+
+---
+
 ## Appendix A: Enhancement Opportunities
 
-1. **Statement Analyzer:** Add processor-specific parsing templates for better accuracy
-2. **Proposal Generator:** Add e-signature integration to send proposals directly
-3. **Prospect Finder:** Add Google Places API for richer business data
-4. **Role-Play Coach:** Add voice cloning for realistic merchant voices
-5. **Marketing Generator:** Add A/B testing for flyer effectiveness
-6. **Pipeline:** Add weighted pipeline forecasting
-7. **Email Digest:** Add personalization based on user performance data
+1. ~~**Statement Analyzer:** Add processor-specific parsing templates for better accuracy~~ (Still pending)
+2. ~~**Proposal Generator:** Add e-signature integration to send proposals directly~~ (Still pending)
+3. ~~**Prospect Finder:** Add Google Places API for richer business data~~ (Still pending)
+4. ~~**Role-Play Coach:** Add voice cloning for realistic merchant voices~~ (Still pending)
+5. ~~**Marketing Generator:** Add A/B testing for flyer effectiveness~~ (Still pending)
+6. ~~**Pipeline:** Add weighted pipeline forecasting~~ (Still pending)
+7. ~~**Email Digest:** Add personalization based on user performance data~~ (Partially done with smart scheduling)
 
 ---
 
 *This document should be updated whenever significant features are added or modified.*
+*Last updated: February 3, 2026*
