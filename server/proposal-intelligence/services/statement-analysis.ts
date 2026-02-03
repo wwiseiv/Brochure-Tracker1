@@ -6,6 +6,7 @@ import {
   ASSESSMENT_FEES,
   DEFAULT_CARD_MIX,
   AVERAGE_RATES_BY_CATEGORY,
+  normalizeMerchantType,
   type MerchantCategory,
   type CardMix
 } from "../data/interchange-rates";
@@ -118,8 +119,17 @@ export interface HiddenFee {
   recommendation: string;
 }
 
-function getAverageInterchangeRate(brand: string, merchantType: MerchantCategory, isCardPresent: boolean): { percent: number; fixed: number } {
-  const categoryRates = AVERAGE_RATES_BY_CATEGORY[merchantType];
+function getAverageInterchangeRate(brand: string, merchantType: MerchantCategory | string | undefined, isCardPresent: boolean): { percent: number; fixed: number } {
+  const normalizedType = normalizeMerchantType(merchantType as string);
+  const categoryRates = AVERAGE_RATES_BY_CATEGORY[normalizedType];
+  
+  if (!categoryRates) {
+    const fallbackRates = AVERAGE_RATES_BY_CATEGORY.retail;
+    const baseRate = isCardPresent ? fallbackRates.cardPresent : fallbackRates.cardNotPresent;
+    console.warn(`[StatementAnalysis] Unknown merchant type "${merchantType}", using retail rates`);
+    return { percent: baseRate, fixed: 0.10 };
+  }
+  
   const baseRate = isCardPresent ? categoryRates.cardPresent : categoryRates.cardNotPresent;
   
   switch (brand) {

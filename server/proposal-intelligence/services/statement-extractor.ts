@@ -2,12 +2,19 @@ import { ObjectStorageService } from "../../replit_integrations/object_storage/o
 import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
 import * as pdfParseModule from "pdf-parse";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 import {
   identifyProcessor,
   findSimilarExtractions,
   storeExtraction,
   buildFewShotPrompt
 } from "./learning-service";
+
+const execAsync = promisify(exec);
 
 // Handle both ESM and CJS module formats
 const pdfParse = (pdfParseModule as any).default || pdfParseModule;
@@ -142,11 +149,11 @@ async function safePdfParse(buffer: Buffer): Promise<{ text: string; numpages: n
       }, 30000);
 
       pdfParse(buffer)
-        .then((result) => {
+        .then((result: { text: string; numpages: number } | null) => {
           clearTimeout(timeout);
           resolve(result);
         })
-        .catch((err) => {
+        .catch((err: Error) => {
           clearTimeout(timeout);
           console.warn(`[StatementExtractor] pdf-parse error: ${err?.message}`);
           resolve(null);
@@ -159,28 +166,29 @@ async function safePdfParse(buffer: Buffer): Promise<{ text: string; numpages: n
 }
 
 async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
-  console.log(`[StatementExtractor] Analyzing PDF with Claude, buffer size: ${buffer.length}`);
+  console.log(`[StatementExtractor] Analyzing PDF with multi-model fallback, buffer size: ${buffer.length}`);
   
-  // Try pdf-parse first, but fallback to Claude's native PDF support if it fails
+  // Try pdf-parse first
   let pdfText: string | null = null;
   
-  // Use safe wrapper to handle async errors from pdf-parse (P4e/d4e is not a function errors)
   const pdfData = await safePdfParse(buffer);
   if (pdfData && pdfData.text) {
     pdfText = pdfData.text;
     console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText?.length || 0}, pages: ${pdfData.numpages}`);
   } else {
-    console.warn("[StatementExtractor] pdf-parse failed or returned no text. Will use Claude native PDF analysis.");
+    console.warn("[StatementExtractor] pdf-parse failed. Will try AI vision analysis.");
     pdfText = null;
   }
   
-  try {
-    if (pdfText && pdfText.trim().length > 100) {
-      // PDF has extractable text, use text-based analysis
-      console.log(`[StatementExtractor] Using text-based PDF analysis`);
+  const errors: string[] = [];
+  
+  // Strategy 1: Claude with text if pdf-parse succeeded and has good content
+  if (pdfText && pdfText.trim().length > 100) {
+    try {
+      console.log(`[StatementExtractor] Trying Claude text-based analysis`);
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [
           {
             role: "user",
@@ -190,46 +198,187 @@ async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promi
       });
 
       const responseText = response.content[0].type === "text" ? response.content[0].text : "";
-      console.log(`[StatementExtractor] Claude text analysis response length: ${responseText.length}`);
+      console.log(`[StatementExtractor] Claude text analysis success, response length: ${responseText.length}`);
       
-      return parseExtractedData(responseText);
-    } else {
-      // PDF text extraction failed or PDF is scanned/image-based, use native document type
-      console.log(`[StatementExtractor] Using Claude native PDF document analysis (pdf-parse failed or PDF is scanned)`);
-      const base64 = buffer.toString("base64");
-      
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 4096,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64
-                }
-              },
-              {
-                type: "text",
-                text: EXTRACTION_PROMPT
-              }
-            ]
-          }
-        ]
-      });
-
-      const responseText = response.content[0].type === "text" ? response.content[0].text : "";
-      console.log(`[StatementExtractor] Claude document response length: ${responseText.length}`);
-      
-      return parseExtractedData(responseText);
+      const result = parseExtractedData(responseText);
+      if (result.confidence > 0 && (result.totalVolume || result.totalFees)) {
+        return result;
+      }
+      errors.push("Claude text extraction returned low confidence data");
+    } catch (error: any) {
+      console.warn("[StatementExtractor] Claude text analysis failed:", error?.message);
+      errors.push(`Claude text: ${error?.message}`);
     }
+  }
+  
+  // Strategy 2: Convert PDF to images and use Claude vision
+  try {
+    console.log(`[StatementExtractor] Trying PDF-to-image + Claude vision analysis`);
+    const result = await analyzePDFWithVision(anthropic, buffer);
+    if (result.confidence > 0 && (result.totalVolume || result.totalFees)) {
+      console.log(`[StatementExtractor] Claude vision analysis success`);
+      return result;
+    }
+    errors.push("Claude vision extraction returned low confidence data");
   } catch (error: any) {
-    console.error("[StatementExtractor] Claude PDF analysis error:", error?.message || error);
-    throw new Error(`PDF analysis failed: ${error?.message || "Unknown error"}`);
+    console.warn("[StatementExtractor] Claude vision analysis failed:", error?.message);
+    errors.push(`Claude vision: ${error?.message}`);
+  }
+  
+  throw new Error(`All PDF analysis methods failed. Errors: ${errors.join("; ")}`);
+}
+
+async function analyzePDFWithVision(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
+  // Write buffer to temp file
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'statement-'));
+  const tempPdfPath = path.join(tempDir, 'statement.pdf');
+  
+  try {
+    fs.writeFileSync(tempPdfPath, buffer);
+    console.log(`[StatementExtractor] Wrote PDF to temp file: ${tempPdfPath}`);
+    
+    // Get page count
+    let pageCount = 1;
+    try {
+      const { stdout } = await execAsync(`pdfinfo "${tempPdfPath}" 2>/dev/null || echo "Pages: 1"`);
+      const pagesMatch = stdout.match(/Pages:\s*(\d+)/);
+      pageCount = pagesMatch ? Math.min(parseInt(pagesMatch[1], 10), 10) : 1;
+    } catch {
+      pageCount = 1;
+    }
+    
+    console.log(`[StatementExtractor] PDF has ${pageCount} pages, converting to images...`);
+    
+    // Determine which pages to convert - prioritize first, last, and summary pages
+    const pagesToConvert: number[] = [];
+    if (pageCount === 1) {
+      pagesToConvert.push(1);
+    } else if (pageCount <= 5) {
+      // Convert all pages for short statements
+      for (let i = 1; i <= pageCount; i++) {
+        pagesToConvert.push(i);
+      }
+    } else {
+      // For longer statements, prioritize key pages: first 2, last 2, and middle
+      pagesToConvert.push(1, 2); // First pages often have merchant info
+      if (pageCount > 4) {
+        pagesToConvert.push(Math.floor(pageCount / 2)); // Middle page
+      }
+      pagesToConvert.push(pageCount - 1, pageCount); // Last pages often have summaries
+    }
+    
+    // Convert PDF pages to images using pdftoppm
+    const imageBuffers: { page: number; buffer: Buffer }[] = [];
+    const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB max total image size
+    let totalSize = 0;
+    
+    for (const page of pagesToConvert) {
+      if (totalSize >= MAX_TOTAL_SIZE) {
+        console.log(`[StatementExtractor] Reached image size limit, stopping at page ${page - 1}`);
+        break;
+      }
+      
+      try {
+        const outputPrefix = path.join(tempDir, `page`);
+        await execAsync(
+          `pdftoppm -jpeg -r 150 -f ${page} -l ${page} "${tempPdfPath}" "${outputPrefix}"`,
+          { timeout: 30000 }
+        );
+        
+        // Find the generated file - pdftoppm uses various naming patterns
+        const files = fs.readdirSync(tempDir);
+        const pageFile = files.find(f => {
+          if (!f.endsWith('.jpg')) return false;
+          // Match patterns like: page-1.jpg, page-01.jpg, page-001.jpg
+          const match = f.match(/page-0*(\d+)\.jpg/);
+          return match && parseInt(match[1], 10) === page;
+        });
+        
+        if (pageFile) {
+          const imagePath = path.join(tempDir, pageFile);
+          const imageBuffer = fs.readFileSync(imagePath);
+          const imageSize = imageBuffer.length;
+          
+          if (totalSize + imageSize <= MAX_TOTAL_SIZE) {
+            imageBuffers.push({ page, buffer: imageBuffer });
+            totalSize += imageSize;
+            console.log(`[StatementExtractor] Converted page ${page} to image (${Math.round(imageSize / 1024)}KB)`);
+          }
+        } else {
+          console.warn(`[StatementExtractor] Could not find output for page ${page}`);
+        }
+      } catch (err: any) {
+        console.warn(`[StatementExtractor] Failed to convert page ${page}:`, err?.message);
+      }
+    }
+    
+    // Require at least 1 page for single-page PDFs, or 2 pages for multi-page PDFs
+    const minPagesRequired = pageCount === 1 ? 1 : 2;
+    if (imageBuffers.length < minPagesRequired) {
+      throw new Error(`Insufficient pages converted: ${imageBuffers.length}/${minPagesRequired} required`);
+    }
+    
+    // Sort by page number to maintain order
+    imageBuffers.sort((a, b) => a.page - b.page);
+    
+    console.log(`[StatementExtractor] Analyzing ${imageBuffers.length} page images with Claude vision (${Math.round(totalSize / 1024)}KB total)`);
+    
+    // Build message content with all images
+    const content: any[] = [];
+    
+    for (const { buffer: imgBuffer } of imageBuffers) {
+      content.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: "image/jpeg",
+          data: imgBuffer.toString("base64")
+        }
+      });
+    }
+    
+    const pageNumbers = imageBuffers.map(b => b.page).join(", ");
+    content.push({
+      type: "text",
+      text: `These are pages ${pageNumbers} from a ${pageCount}-page merchant processing statement. ${EXTRACTION_PROMPT}`
+    });
+    
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      messages: [
+        {
+          role: "user",
+          content
+        }
+      ]
+    });
+
+    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log(`[StatementExtractor] Claude vision response length: ${responseText.length}`);
+    
+    return parseExtractedData(responseText);
+    
+  } finally {
+    // Cleanup temp directory with retries
+    const cleanupWithRetry = (retries = 3) => {
+      try {
+        const files = fs.readdirSync(tempDir);
+        for (const file of files) {
+          try {
+            fs.unlinkSync(path.join(tempDir, file));
+          } catch {
+            // Ignore individual file errors
+          }
+        }
+        fs.rmdirSync(tempDir);
+      } catch (err) {
+        if (retries > 0) {
+          setTimeout(() => cleanupWithRetry(retries - 1), 100);
+        }
+      }
+    };
+    cleanupWithRetry();
   }
 }
 

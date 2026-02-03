@@ -295,6 +295,83 @@ export const AVERAGE_RATES_BY_CATEGORY: Record<MerchantCategory, { cardPresent: 
   education: { cardPresent: 1.45, cardNotPresent: 1.75 },
 };
 
+export const MERCHANT_TYPE_MAPPINGS: Record<string, MerchantCategory> = {
+  dental: "healthcare",
+  medical: "healthcare",
+  doctor: "healthcare",
+  physician: "healthcare",
+  clinic: "healthcare",
+  hospital: "healthcare",
+  pharmacy: "healthcare",
+  optometry: "healthcare",
+  veterinary: "healthcare",
+  vet: "healthcare",
+  chiropractor: "healthcare",
+  therapy: "healthcare",
+  spa: "service",
+  salon: "service",
+  barber: "service",
+  beauty: "service",
+  auto: "service",
+  automotive: "service",
+  repair: "service",
+  gas: "retail",
+  "gas station": "retail",
+  convenience: "retail",
+  grocery: "supermarket",
+  food: "restaurant",
+  bar: "restaurant",
+  cafe: "restaurant",
+  coffee: "qsr",
+  "fast food": "qsr",
+  pizza: "qsr",
+  hotel: "lodging",
+  motel: "lodging",
+  inn: "lodging",
+  vacation: "lodging",
+  rental: "service",
+  professional: "service",
+  legal: "service",
+  accounting: "service",
+  consulting: "service",
+  contractor: "service",
+  construction: "service",
+  wholesale: "b2b",
+  manufacturing: "b2b",
+  industrial: "b2b",
+  school: "education",
+  university: "education",
+  college: "education",
+  nonprofit: "government",
+  "non-profit": "government",
+  charity: "government",
+  online: "ecommerce",
+  "e-commerce": "ecommerce",
+  internet: "ecommerce",
+};
+
+export function normalizeMerchantType(rawType: string | undefined | null): MerchantCategory {
+  if (!rawType) return "retail";
+  
+  const normalized = rawType.toLowerCase().trim();
+  
+  if (normalized in AVERAGE_RATES_BY_CATEGORY) {
+    return normalized as MerchantCategory;
+  }
+  
+  if (normalized in MERCHANT_TYPE_MAPPINGS) {
+    return MERCHANT_TYPE_MAPPINGS[normalized];
+  }
+  
+  for (const [keyword, category] of Object.entries(MERCHANT_TYPE_MAPPINGS)) {
+    if (normalized.includes(keyword)) {
+      return category;
+    }
+  }
+  
+  return "retail";
+}
+
 export const DOWNGRADE_REASONS = [
   "Not settled within 24-48 hours (batch not closed)",
   "AVS (Address Verification) not used for CNP transactions",

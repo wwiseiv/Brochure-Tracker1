@@ -9,6 +9,7 @@ import {
   DEFAULT_CARD_MIX,
   AVERAGE_RATES_BY_CATEGORY,
   DUAL_PRICING_INFO,
+  normalizeMerchantType,
   type CardMix,
   type MerchantCategory,
 } from "../data/interchange-rates";
@@ -44,12 +45,13 @@ export interface InterchangeCalculation {
 export function calculateInterchange(
   monthlyVolume: number,
   averageTicket: number,
-  category: MerchantCategory = "retail",
+  category: MerchantCategory | string = "retail",
   isCardPresent: boolean = true,
   cardMix: CardMix = DEFAULT_CARD_MIX
 ): InterchangeCalculation {
   const transactionCount = Math.round(monthlyVolume / averageTicket);
-  const categoryRates = AVERAGE_RATES_BY_CATEGORY[category];
+  const normalizedCategory = normalizeMerchantType(category as string);
+  const categoryRates = AVERAGE_RATES_BY_CATEGORY[normalizedCategory] || AVERAGE_RATES_BY_CATEGORY.retail;
   const baseRate = isCardPresent ? categoryRates.cardPresent : categoryRates.cardNotPresent;
 
   const visaVolume = monthlyVolume * cardMix.visa;
