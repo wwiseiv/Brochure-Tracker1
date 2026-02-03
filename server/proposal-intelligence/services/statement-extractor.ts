@@ -131,21 +131,46 @@ export async function extractStatementFromFiles(
   throw new Error("No valid files could be processed");
 }
 
+// Safe wrapper for pdf-parse that handles async errors
+async function safePdfParse(buffer: Buffer): Promise<{ text: string; numpages: number } | null> {
+  return new Promise((resolve) => {
+    try {
+      // Set a timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        console.warn("[StatementExtractor] pdf-parse timed out after 30s");
+        resolve(null);
+      }, 30000);
+
+      pdfParse(buffer)
+        .then((result) => {
+          clearTimeout(timeout);
+          resolve(result);
+        })
+        .catch((err) => {
+          clearTimeout(timeout);
+          console.warn(`[StatementExtractor] pdf-parse error: ${err?.message}`);
+          resolve(null);
+        });
+    } catch (syncError: any) {
+      console.warn(`[StatementExtractor] pdf-parse sync error: ${syncError?.message}`);
+      resolve(null);
+    }
+  });
+}
+
 async function analyzePDFWithClaude(anthropic: Anthropic, buffer: Buffer): Promise<ExtractedStatementData> {
   console.log(`[StatementExtractor] Analyzing PDF with Claude, buffer size: ${buffer.length}`);
   
   // Try pdf-parse first, but fallback to Claude's native PDF support if it fails
   let pdfText: string | null = null;
   
-  try {
-    console.log(`[StatementExtractor] Extracting text from PDF using pdf-parse...`);
-    const pdfData = await pdfParse(buffer);
+  // Use safe wrapper to handle async errors from pdf-parse (P4e/d4e is not a function errors)
+  const pdfData = await safePdfParse(buffer);
+  if (pdfData && pdfData.text) {
     pdfText = pdfData.text;
     console.log(`[StatementExtractor] PDF text extracted, length: ${pdfText?.length || 0}, pages: ${pdfData.numpages}`);
-  } catch (parseError: any) {
-    // pdf-parse failed (common issue with "P4e/d4e is not a function" errors)
-    // This happens with certain PDF structures - fallback to Claude's native PDF support
-    console.warn(`[StatementExtractor] pdf-parse failed: ${parseError?.message}. Falling back to Claude native PDF analysis.`);
+  } else {
+    console.warn("[StatementExtractor] pdf-parse failed or returned no text. Will use Claude native PDF analysis.");
     pdfText = null;
   }
   
