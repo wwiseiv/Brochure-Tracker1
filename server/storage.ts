@@ -390,6 +390,7 @@ export interface IStorage {
   createStatementAnalysisJob(data: InsertStatementAnalysisJob): Promise<StatementAnalysisJob>;
   getStatementAnalysisJob(id: number): Promise<StatementAnalysisJob | undefined>;
   getStatementAnalysisJobsByUser(userId: string): Promise<StatementAnalysisJob[]>;
+  getStatementAnalysisJobsByOrg(orgId: number, agentId?: string): Promise<StatementAnalysisJob[]>;
   updateStatementAnalysisJob(id: number, updates: Partial<StatementAnalysisJob>): Promise<StatementAnalysisJob | undefined>;
   getPendingStatementAnalysisJobs(): Promise<StatementAnalysisJob[]>;
   
@@ -2476,6 +2477,20 @@ export class DatabaseStorage implements IStorage {
   async getStatementAnalysisJobsByUser(userId: string): Promise<StatementAnalysisJob[]> {
     return db.select().from(statementAnalysisJobs)
       .where(eq(statementAnalysisJobs.agentId, userId))
+      .orderBy(desc(statementAnalysisJobs.createdAt));
+  }
+
+  async getStatementAnalysisJobsByOrg(orgId: number, agentId?: string): Promise<StatementAnalysisJob[]> {
+    if (agentId) {
+      return db.select().from(statementAnalysisJobs)
+        .where(and(
+          eq(statementAnalysisJobs.organizationId, orgId),
+          eq(statementAnalysisJobs.agentId, agentId)
+        ))
+        .orderBy(desc(statementAnalysisJobs.createdAt));
+    }
+    return db.select().from(statementAnalysisJobs)
+      .where(eq(statementAnalysisJobs.organizationId, orgId))
       .orderBy(desc(statementAnalysisJobs.createdAt));
   }
 

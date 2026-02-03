@@ -10944,12 +10944,46 @@ Generate the following content in JSON format:
     }
   });
 
-  // GET /api/statement-analysis/jobs - List user's analysis jobs
+  // GET /api/statement-analysis/jobs - List user's analysis jobs (or org-wide for managers/admins)
   app.get("/api/statement-analysis/jobs", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const jobs = await storage.getStatementAnalysisJobsByUser(userId);
-      res.json({ jobs });
+      const { viewAll, agentId } = req.query;
+      
+      // Get user's membership and role
+      const membership = await storage.getUserMembership(userId);
+      const isManagerOrAdmin = membership?.role === "master_admin" || membership?.role === "relationship_manager";
+      
+      let jobs;
+      let agentMap: Record<string, { firstName: string; lastName: string }> = {};
+      
+      // If viewAll=true and user is manager/admin, fetch org-wide jobs
+      if (viewAll === "true" && isManagerOrAdmin && membership?.organization?.id) {
+        const filterAgentId = agentId && agentId !== "all" ? (agentId as string) : undefined;
+        jobs = await storage.getStatementAnalysisJobsByOrg(membership.organization.id, filterAgentId);
+        
+        // Build agent map for display names
+        const orgMembers = await storage.getOrganizationMembers(membership.organization.id);
+        for (const member of orgMembers) {
+          const user = await authStorage.getUser(member.userId);
+          agentMap[member.userId] = {
+            firstName: user?.firstName || member.firstName || "Unknown",
+            lastName: user?.lastName || member.lastName || "User"
+          };
+        }
+        
+        // Enrich jobs with agent names
+        jobs = jobs.map(job => ({
+          ...job,
+          agentName: agentMap[job.agentId] 
+            ? `${agentMap[job.agentId].firstName} ${agentMap[job.agentId].lastName}`
+            : "Unknown Agent"
+        }));
+      } else {
+        jobs = await storage.getStatementAnalysisJobsByUser(userId);
+      }
+      
+      res.json({ jobs, isManagerOrAdmin });
     } catch (error: any) {
       console.error("[StatementJobs] List jobs error:", error);
       res.status(500).json({ error: "Failed to fetch analysis jobs" });

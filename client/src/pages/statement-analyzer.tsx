@@ -314,13 +314,32 @@ export default function StatementAnalyzer() {
   const [selectedDealId, setSelectedDealId] = useState<string>("");
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [showMyAnalyses, setShowMyAnalyses] = useState(false);
+  const [viewAllJobs, setViewAllJobs] = useState(false);
+  const [filterAgentId, setFilterAgentId] = useState<string>("all");
 
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
 
-  const { data: jobsData, isLoading: jobsLoading } = useQuery<{ jobs: StatementAnalysisJob[] }>({
-    queryKey: ["/api/statement-analysis/jobs"],
+  const { data: orgMembers } = useQuery<Array<{ id: number; userId: string; firstName?: string; lastName?: string; role: string }>>({
+    queryKey: ["/api/organization/members"],
+    retry: false,
+  });
+
+  const { data: jobsData, isLoading: jobsLoading } = useQuery<{ jobs: (StatementAnalysisJob & { agentName?: string })[]; isManagerOrAdmin?: boolean }>({
+    queryKey: ["/api/statement-analysis/jobs", viewAllJobs ? "all" : "mine", filterAgentId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (viewAllJobs) {
+        params.set("viewAll", "true");
+        if (filterAgentId !== "all") {
+          params.set("agentId", filterAgentId);
+        }
+      }
+      const res = await fetch(`/api/statement-analysis/jobs?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch jobs");
+      return res.json();
+    },
     refetchInterval: (query) => {
       const data = query.state.data as { jobs: StatementAnalysisJob[] } | undefined;
       const hasPendingJobs = data?.jobs?.some(j => j.status === "pending" || j.status === "processing");
@@ -329,6 +348,7 @@ export default function StatementAnalyzer() {
   });
 
   const jobs = jobsData?.jobs || [];
+  const isManagerOrAdmin = jobsData?.isManagerOrAdmin || false;
   const pendingJobs = jobs.filter(j => j.status === "pending" || j.status === "processing");
   const completedJobs = jobs.filter(j => j.status === "completed");
   const failedJobs = jobs.filter(j => j.status === "failed");
@@ -1465,12 +1485,46 @@ ${new Date().toLocaleDateString()}
       {showMyAnalyses && (
         <Card className="mb-6 print:hidden" data-testid="my-analyses-panel">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <History className="h-5 w-5" />
-              My Analyses
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" />
+                {viewAllJobs ? "Team Analyses" : "My Analyses"}
+              </CardTitle>
+              {isManagerOrAdmin && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant={viewAllJobs ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setViewAllJobs(!viewAllJobs);
+                      setFilterAgentId("all");
+                    }}
+                    data-testid="toggle-view-all"
+                  >
+                    {viewAllJobs ? "View Mine Only" : "View Team"}
+                  </Button>
+                  {viewAllJobs && orgMembers && orgMembers.length > 0 && (
+                    <select
+                      value={filterAgentId}
+                      onChange={(e) => setFilterAgentId(e.target.value)}
+                      className="h-8 px-2 text-sm border rounded-md bg-background"
+                      data-testid="agent-filter-select"
+                    >
+                      <option value="all">All Agents</option>
+                      {orgMembers.map((member) => (
+                        <option key={member.userId} value={member.userId}>
+                          {member.firstName || "Unknown"} {member.lastName || "User"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </div>
             <CardDescription>
-              View your past and pending statement analyses
+              {viewAllJobs 
+                ? "View team's past and pending statement analyses" 
+                : "View your past and pending statement analyses"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1505,6 +1559,9 @@ ${new Date().toLocaleDateString()}
                         {getStatusBadge(job.status)}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
+                        {viewAllJobs && job.agentName && (
+                          <span className="font-medium text-foreground mr-2">{job.agentName}</span>
+                        )}
                         {formatJobDate(job.createdAt)}
                         {job.status === "processing" && job.progressMessage && (
                           <span className="ml-2">{job.progressMessage}</span>
