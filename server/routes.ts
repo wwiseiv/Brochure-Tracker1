@@ -6885,7 +6885,21 @@ Provide constructive feedback in JSON format:
           }
         };
       } catch {
-        feedback = { overallScore: 50, topTip: "Keep practicing!" };
+        feedback = { 
+          overallScore: 50, 
+          topTip: "Keep practicing!",
+          analysis: {
+            psychographicType: enhancedAnalysis.psychographicAnalysis.detectedType || "belonger",
+            psychographicConfidence: Math.round((enhancedAnalysis.psychographicAnalysis.confidence || 0) * 100),
+            linguisticMarkers: enhancedAnalysis.psychographicAnalysis.markers || [],
+            driversUsed: enhancedAnalysis.driverAnalysis.usedDrivers || [],
+            driverEffectiveness: Math.round((enhancedAnalysis.driverAnalysis.effectiveness || 0) * 100),
+            missedOpportunities: enhancedAnalysis.driverAnalysis.missedOpportunities || [],
+            tonePattern: enhancedAnalysis.tonalAnalysis.tonePattern || [],
+            tonalAppropriateness: Math.round((enhancedAnalysis.tonalAnalysis.appropriateness || 0) * 100),
+            tonalSuggestions: enhancedAnalysis.tonalAnalysis.suggestions || [],
+          }
+        };
       }
 
       const endedAt = new Date();
