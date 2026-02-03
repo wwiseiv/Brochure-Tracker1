@@ -8,6 +8,15 @@ import {
   PricingSpreadsheetData
 } from "./document-classifier";
 import webpush from "web-push";
+import { createPDFParser, ParseProgress } from "./robust-pdf-parser";
+import Anthropic from "@anthropic-ai/sdk";
+import { ObjectStorageService } from "../replit_integrations/object_storage/objectStorage";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+// File size threshold for using robust parser (5MB)
+const ROBUST_PARSER_SIZE_THRESHOLD = 5 * 1024 * 1024;
 
 interface MergedExtractionResult {
   merchantName?: string;
@@ -121,7 +130,32 @@ export async function processProposalParseJob(jobId: number): Promise<void> {
         .map(c => files.find(f => f.path === c.path)!)
         .filter(Boolean);
 
-      result = await extractStatementOnly(statementFileData);
+      // Check if any PDF is large enough to need robust parsing
+      const objectStorage = new ObjectStorageService();
+      let useRobustParser = false;
+      let largePdfPath = "";
+      
+      for (const file of statementFileData) {
+        if (file.mimeType === "application/pdf" || file.name.endsWith(".pdf")) {
+          const needsRobust = await shouldUseRobustParser(file.path, objectStorage);
+          if (needsRobust) {
+            useRobustParser = true;
+            largePdfPath = file.path;
+            console.log(`[ProposalParse] Large PDF detected (${file.name}), using robust parser`);
+            break;
+          }
+        }
+      }
+
+      if (useRobustParser) {
+        await storage.updateProposalParseJob(jobId, {
+          progress: 45,
+          progressMessage: "Processing large document with enhanced parser...",
+        });
+        result = await processLargePDFWithRobustParser(largePdfPath, jobId, objectStorage);
+      } else {
+        result = await extractStatementOnly(statementFileData);
+      }
     } else if (hasProposal) {
       await storage.updateProposalParseJob(jobId, {
         progress: 40,
@@ -403,6 +437,232 @@ async function extractProposalPdf(
     extractionStatus: parsedResult.extractionStatus || "success",
     confidence: 80,
   };
+}
+
+/**
+ * Process a large PDF using the robust parser with chunked processing
+ * This is used for PDFs over the size threshold or when standard parsing times out
+ */
+async function processLargePDFWithRobustParser(
+  filePath: string,
+  jobId: number,
+  objectStorage: ObjectStorageService
+): Promise<MergedExtractionResult> {
+  const anthropicApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+  const anthropicBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  
+  if (!anthropicApiKey || !anthropicBaseUrl) {
+    throw new Error("Claude API not configured for robust PDF parsing");
+  }
+
+  const anthropic = new Anthropic({
+    apiKey: anthropicApiKey,
+    baseURL: anthropicBaseUrl,
+  });
+
+  // Create robust parser with optimized settings for statements
+  const parser = createPDFParser({
+    perPageTimeout: 45000,      // 45 seconds per page
+    maxTotalTimeout: 900000,    // 15 minutes total
+    maxRetries: 3,
+    maxPages: 30,               // Most statements are under 30 pages
+    parallelPages: 1,           // Sequential for stability
+    skipFailedPages: true,
+  });
+
+  // Download file to temp location
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'robust-parse-'));
+  const tempPdfPath = path.join(tempDir, 'document.pdf');
+  
+  try {
+    // Download from object storage using GCS File object
+    const file = await objectStorage.getObjectEntityFile(filePath);
+    const [fileBuffer] = await file.download();
+    fs.writeFileSync(tempPdfPath, fileBuffer);
+    console.log(`[RobustParse] Downloaded PDF to temp: ${tempPdfPath}, size: ${fileBuffer.length}`);
+
+    const extractionPrompt = `Extract all merchant processing statement data from this page.
+Return ONLY valid JSON with this structure:
+{
+  "merchantName": "Business name",
+  "processorName": "Processor/ISO name",
+  "statementPeriod": "Statement period dates",
+  "totalVolume": 0,
+  "totalTransactions": 0,
+  "totalFees": 0,
+  "merchantType": "business type",
+  "fees": {
+    "interchange": 0, "assessments": 0, "monthlyFees": 0, 
+    "pciFees": 0, "otherFees": 0
+  },
+  "cardMix": {
+    "visa": { "volume": 0, "transactions": 0 },
+    "mastercard": { "volume": 0, "transactions": 0 },
+    "discover": { "volume": 0, "transactions": 0 },
+    "amex": { "volume": 0, "transactions": 0 }
+  },
+  "pageType": "summary|detail|fee_breakdown|other"
+}
+Include only data visible on this specific page. Numbers should be positive without $ or commas.`;
+
+    // Process with progress updates
+    const result = await parser.parse(
+      tempPdfPath,
+      extractionPrompt,
+      async (progress: ParseProgress) => {
+        // Update job progress
+        const percentComplete = Math.round(40 + (progress.percentComplete * 0.5)); // 40-90% range
+        await storage.updateProposalParseJob(jobId, {
+          progress: percentComplete,
+          progressMessage: progress.currentStep,
+        });
+      }
+    );
+
+    console.log(`[RobustParse] Completed: ${result.pageResults.length} pages, success: ${result.success}`);
+
+    // Merge page results into unified extraction
+    const mergedData = mergePageResults(result.pageResults);
+    
+    return {
+      merchantName: mergedData.merchantName,
+      proposalType: "interchange_plus",
+      currentState: {
+        totalVolume: mergedData.totalVolume || 0,
+        totalTransactions: mergedData.totalTransactions || 0,
+        avgTicket: mergedData.totalTransactions > 0 
+          ? mergedData.totalVolume / mergedData.totalTransactions : 0,
+        cardBreakdown: mergedData.cardMix || {
+          visa: { volume: 0, transactions: 0 },
+          mastercard: { volume: 0, transactions: 0 },
+          discover: { volume: 0, transactions: 0 },
+          amex: { volume: 0, transactions: 0 },
+        },
+        fees: mergedData.fees || { totalFees: mergedData.totalFees || 0 },
+        effectiveRatePercent: mergedData.totalVolume > 0 
+          ? ((mergedData.totalFees || 0) / mergedData.totalVolume) * 100 : 0,
+      },
+      documentTypes: ["processing_statement"],
+      extractionWarnings: [...result.warnings, ...(result.errors || [])],
+      extractionStatus: result.success ? "success" : "partial",
+      confidence: result.success ? 85 : 60,
+    };
+
+  } finally {
+    // Cleanup temp files
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn("[RobustParse] Failed to cleanup temp dir:", e);
+    }
+  }
+}
+
+/**
+ * Merge data extracted from multiple pages into a unified result
+ */
+function mergePageResults(pageResults: any[]): any {
+  const merged: any = {
+    merchantName: null,
+    processorName: null,
+    totalVolume: 0,
+    totalTransactions: 0,
+    totalFees: 0,
+    fees: {},
+    cardMix: {
+      visa: { volume: 0, transactions: 0 },
+      mastercard: { volume: 0, transactions: 0 },
+      discover: { volume: 0, transactions: 0 },
+      amex: { volume: 0, transactions: 0 },
+    },
+  };
+
+  // Track which values we've found to avoid double-counting
+  let foundSummaryPage = false;
+
+  for (const page of pageResults) {
+    if (!page.success || !page.data) continue;
+    
+    const data = page.data;
+    
+    // Take merchant info from first page that has it
+    if (!merged.merchantName && data.merchantName) {
+      merged.merchantName = data.merchantName;
+    }
+    if (!merged.processorName && data.processorName) {
+      merged.processorName = data.processorName;
+    }
+    if (!merged.statementPeriod && data.statementPeriod) {
+      merged.statementPeriod = data.statementPeriod;
+    }
+    if (!merged.merchantType && data.merchantType) {
+      merged.merchantType = data.merchantType;
+    }
+
+    // For summary pages, use their totals directly (only from first summary found)
+    if (data.pageType === 'summary' && !foundSummaryPage) {
+      if (data.totalVolume > 0) merged.totalVolume = data.totalVolume;
+      if (data.totalTransactions > 0) merged.totalTransactions = data.totalTransactions;
+      if (data.totalFees > 0) merged.totalFees = data.totalFees;
+      foundSummaryPage = true; // Mark that we've used a summary page
+    }
+
+    // Merge fee breakdowns
+    if (data.fees) {
+      for (const [key, value] of Object.entries(data.fees)) {
+        if (typeof value === 'number' && value > 0) {
+          if (!merged.fees[key] || merged.fees[key] < value) {
+            merged.fees[key] = value;
+          }
+        }
+      }
+    }
+
+    // Merge card mix (take highest values)
+    if (data.cardMix) {
+      for (const cardType of ['visa', 'mastercard', 'discover', 'amex']) {
+        const cardData = data.cardMix[cardType];
+        if (cardData) {
+          if (cardData.volume > merged.cardMix[cardType].volume) {
+            merged.cardMix[cardType].volume = cardData.volume;
+          }
+          if (cardData.transactions > merged.cardMix[cardType].transactions) {
+            merged.cardMix[cardType].transactions = cardData.transactions;
+          }
+        }
+      }
+    }
+  }
+
+  // Calculate totalFees from breakdown if not found
+  if (merged.totalFees === 0 && Object.keys(merged.fees).length > 0) {
+    merged.totalFees = Object.values(merged.fees)
+      .filter((v): v is number => typeof v === 'number')
+      .reduce((sum, val) => sum + val, 0);
+  }
+  merged.fees.totalFees = merged.totalFees;
+
+  return merged;
+}
+
+/**
+ * Check if a file should use the robust parser based on size
+ */
+async function shouldUseRobustParser(
+  filePath: string,
+  objectStorage: ObjectStorageService
+): Promise<boolean> {
+  try {
+    // Get file from object storage and check its metadata
+    const file = await objectStorage.getObjectEntityFile(filePath);
+    const [metadata] = await file.getMetadata();
+    const fileSize = parseInt(metadata.size as string) || 0;
+    console.log(`[ProposalParse] File size check: ${filePath} = ${fileSize} bytes`);
+    return fileSize > ROBUST_PARSER_SIZE_THRESHOLD;
+  } catch (e) {
+    console.warn("[ProposalParse] Could not check file size:", e);
+    return false;
+  }
 }
 
 async function sendPushNotification(
