@@ -677,29 +677,43 @@ function DailyEdgeSection() {
                 }}
                 data-testid="input-daily-edge-chat"
               />
-              <Button
-                size="icon"
-                variant={isDailyEdgeRecording ? "destructive" : "outline"}
-                onClick={isDailyEdgeRecording ? stopDailyEdgeRecording : startDailyEdgeRecording}
-                disabled={isSending || isDailyEdgeTranscribing}
-                className={`h-11 w-11 flex-shrink-0 ${isDailyEdgeRecording ? "animate-pulse" : ""}`}
-                data-testid="button-mic-daily-edge"
-              >
-                {isDailyEdgeTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-              </Button>
-              <Button
-                onClick={handleSendMessage}
-                disabled={!chatInput.trim() || isSending || isDailyEdgeRecording || isDailyEdgeTranscribing}
-                size="icon"
-                className="h-11 w-11 flex-shrink-0"
-                data-testid="button-send-daily-edge"
-              >
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant={isDailyEdgeRecording ? "destructive" : "outline"}
+                    onClick={isDailyEdgeRecording ? stopDailyEdgeRecording : startDailyEdgeRecording}
+                    disabled={isSending || isDailyEdgeTranscribing}
+                    className={`h-11 w-11 flex-shrink-0 ${isDailyEdgeRecording ? "animate-pulse" : ""}`}
+                    data-testid="button-mic-daily-edge"
+                  >
+                    {isDailyEdgeTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isDailyEdgeRecording ? "Stop recording" : "Record voice message"}</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!chatInput.trim() || isSending || isDailyEdgeRecording || isDailyEdgeTranscribing}
+                    size="icon"
+                    className="h-11 w-11 flex-shrink-0"
+                    data-testid="button-send-daily-edge"
+                  >
+                    {isSending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Send message</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>

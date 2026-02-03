@@ -457,23 +457,37 @@ export default function EquipIQPage() {
                       disabled={recommendMutation.isPending || isRecording || isTranscribing}
                       data-testid="chat-input"
                     />
-                    <Button
-                      size="icon"
-                      variant={isRecording ? "destructive" : "outline"}
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={recommendMutation.isPending || isTranscribing}
-                      className={isRecording ? "animate-pulse" : ""}
-                      data-testid="button-mic"
-                    >
-                      {isTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                    </Button>
-                    <Button
-                      onClick={handleSendMessage}
-                      disabled={!chatInput.trim() || recommendMutation.isPending || isRecording || isTranscribing}
-                      data-testid="button-send"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant={isRecording ? "destructive" : "outline"}
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={recommendMutation.isPending || isTranscribing}
+                          className={isRecording ? "animate-pulse" : ""}
+                          data-testid="button-mic"
+                        >
+                          {isTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isRecording ? "Stop recording" : "Record voice message"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleSendMessage}
+                          disabled={!chatInput.trim() || recommendMutation.isPending || isRecording || isTranscribing}
+                          data-testid="button-send"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Send message</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </CardContent>

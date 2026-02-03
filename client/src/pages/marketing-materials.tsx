@@ -741,18 +741,25 @@ ${repEmail}`;
                     data-testid={`template-image-${template.id}`}
                   />
                   {canDeleteThisTemplate && (
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTemplateClick(template.id, template.isStatic ?? false);
-                      }}
-                      data-testid={`button-delete-template-${template.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTemplateClick(template.id, template.isStatic ?? false);
+                          }}
+                          data-testid={`button-delete-template-${template.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete template</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                   {!template.isStatic && (
                     <Badge className="absolute top-2 left-2 bg-primary/80 text-primary-foreground">

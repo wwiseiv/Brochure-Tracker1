@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ListenButton } from "@/components/ListenButton";
 import { 
   FileText, 
@@ -1434,9 +1435,14 @@ ${new Date().toLocaleDateString()}
       <div className="flex items-center justify-between gap-4 mb-6 print:hidden">
         <div className="flex items-center gap-4">
           <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back-home">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-back-home">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Go back - Return to home page</TooltipContent>
+            </Tooltip>
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Statement Analyzer</h1>
@@ -1569,9 +1575,14 @@ ${new Date().toLocaleDateString()}
                       </p>
                     </div>
                     {job.status === "completed" && (
-                      <Button variant="ghost" size="icon" className="shrink-0">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="shrink-0">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View analysis - Open full results</TooltipContent>
+                      </Tooltip>
                     )}
                     {(job.status === "pending" || job.status === "processing") && (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />

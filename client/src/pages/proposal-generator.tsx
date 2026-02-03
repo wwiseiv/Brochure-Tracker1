@@ -1641,14 +1641,19 @@ export default function ProposalGeneratorPage() {
                     {f.uploaded && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                     {f.error && <XCircle className="h-4 w-4 text-red-500" />}
                     {!f.uploading && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={(e) => { e.stopPropagation(); removeStatementFile(i); }}
-                        data-testid={`button-remove-statement-file-${i}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => { e.stopPropagation(); removeStatementFile(i); }}
+                            data-testid={`button-remove-statement-file-${i}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove file - Delete from upload list</TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 ))}
@@ -1853,17 +1858,22 @@ export default function ProposalGeneratorPage() {
                         <p className="text-xs text-muted-foreground">{(dualPricingFile.size / 1024).toFixed(1)} KB</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDualPricingFile(null);
-                      }}
-                      data-testid="button-remove-dual-pricing"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDualPricingFile(null);
+                          }}
+                          data-testid="button-remove-dual-pricing"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Remove file - Delete dual pricing document</TooltipContent>
+                    </Tooltip>
                   </div>
                 ) : (
                   <div className="py-4">
@@ -1935,17 +1945,22 @@ export default function ProposalGeneratorPage() {
                         <p className="text-xs text-muted-foreground">{(interchangePlusFile.size / 1024).toFixed(1)} KB</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInterchangePlusFile(null);
-                      }}
-                      data-testid="button-remove-interchange-plus"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInterchangePlusFile(null);
+                          }}
+                          data-testid="button-remove-interchange-plus"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Remove file - Delete interchange plus document</TooltipContent>
+                    </Tooltip>
                   </div>
                 ) : (
                   <div className="py-4">
@@ -2416,15 +2431,20 @@ export default function ProposalGeneratorPage() {
                             Retry
                           </Button>
                         )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => deleteParseJobMutation.mutate(job.id)}
-                          disabled={deleteParseJobMutation.isPending}
-                          data-testid={`button-delete-job-${job.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-muted-foreground" />
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteParseJobMutation.mutate(job.id)}
+                              disabled={deleteParseJobMutation.isPending}
+                              data-testid={`button-delete-job-${job.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete job - Remove from history</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                   ))

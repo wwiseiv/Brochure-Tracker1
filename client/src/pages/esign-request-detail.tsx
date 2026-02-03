@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ArrowLeft,
   Send,
@@ -435,9 +436,14 @@ export default function ESignRequestDetailPage() {
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/esign")} data-testid="button-back-esign">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <Tooltip delayDuration={700}>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => navigate("/esign")} data-testid="button-back-esign">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Go back - Return to E-Sign requests</TooltipContent>
+            </Tooltip>
             <div className="flex-1">
               <h1 className="text-lg font-semibold">E-Sign Request #{request.id}</h1>
               <p className="text-sm text-muted-foreground">{request.merchantName}</p>
@@ -478,19 +484,24 @@ export default function ESignRequestDetailPage() {
                     {formatStatus(request.status)}
                   </Badge>
                   {request.status !== "draft" && request.status !== "completed" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => refreshStatusMutation.mutate()}
-                      disabled={refreshStatusMutation.isPending}
-                      data-testid="button-refresh-status"
-                    >
-                      {refreshStatusMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                    </Button>
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => refreshStatusMutation.mutate()}
+                          disabled={refreshStatusMutation.isPending}
+                          data-testid="button-refresh-status"
+                        >
+                          {refreshStatusMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Refresh status - Check for signer updates</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </div>
@@ -615,15 +626,20 @@ export default function ESignRequestDetailPage() {
                         {formatStatus(signer.status)}
                       </Badge>
                       {canEdit && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeSignerMutation.mutate(signer.id)}
-                          disabled={removeSignerMutation.isPending}
-                          data-testid={`button-remove-signer-${signer.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeSignerMutation.mutate(signer.id)}
+                              disabled={removeSignerMutation.isPending}
+                              data-testid={`button-remove-signer-${signer.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove signer - Delete from request</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

@@ -996,6 +996,7 @@ export default function TeamManagementPage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => openEditDialog(member)}
+                                  title="Edit user profile and role assignment"
                                   data-testid={`button-edit-member-${member.id}`}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -1005,6 +1006,7 @@ export default function TeamManagementPage() {
                                   size="icon"
                                   onClick={() => openDeleteDialog(member)}
                                   disabled={!canDeleteMember(member)}
+                                  title={canDeleteMember(member) ? "Remove user from organization (cannot be undone)" : "Cannot delete this user"}
                                   className={!canDeleteMember(member) ? "opacity-50 cursor-not-allowed" : ""}
                                   data-testid={`button-delete-member-${member.id}`}
                                 >
