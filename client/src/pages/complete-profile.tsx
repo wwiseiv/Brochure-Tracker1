@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -13,10 +15,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { User } from "lucide-react";
+import { User, Upload, Building2, MapPin, Camera, ImageIcon } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
 const profileSchema = z.object({
@@ -26,6 +29,10 @@ const profileSchema = z.object({
   phone: z.string()
     .min(10, "Phone number must be at least 10 digits")
     .regex(/^[\d\s\-\(\)]+$/, "Please enter a valid phone number"),
+  company: z.string().optional(),
+  territory: z.string().optional(),
+  profilePhotoUrl: z.string().optional(),
+  companyLogoUrl: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -40,6 +47,12 @@ function formatPhoneNumber(value: string): string {
 export default function CompleteProfilePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const profilePhotoRef = useRef<HTMLInputElement>(null);
+  const companyLogoRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -48,8 +61,78 @@ export default function CompleteProfilePage() {
       lastName: "",
       email: "",
       phone: "",
+      company: "",
+      territory: "",
+      profilePhotoUrl: "",
+      companyLogoUrl: "",
     },
   });
+
+  const uploadFile = async (file: File, type: "photo" | "logo"): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const res = await fetch("/api/uploads/proxy", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        throw new Error("Upload failed");
+      }
+      
+      const data = await res.json();
+      return data.objectPath;
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Could not upload image. Please try again.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    setUploadingPhoto(true);
+    const url = await uploadFile(file, "photo");
+    setUploadingPhoto(false);
+    
+    if (url) {
+      form.setValue("profilePhotoUrl", url);
+    }
+  };
+
+  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCompanyLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    setUploadingLogo(true);
+    const url = await uploadFile(file, "logo");
+    setUploadingLogo(false);
+    
+    if (url) {
+      form.setValue("companyLogoUrl", url);
+    }
+  };
 
   const updateProfile = useMutation({
     mutationFn: async (data: ProfileFormData) => {
@@ -91,7 +174,7 @@ export default function CompleteProfilePage() {
         </div>
       </header>
 
-      <main className="flex-1 container max-w-md mx-auto px-4 py-8 flex items-center justify-center">
+      <main className="flex-1 container max-w-lg mx-auto px-4 py-8">
         <Card className="w-full">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -99,56 +182,58 @@ export default function CompleteProfilePage() {
             </div>
             <CardTitle className="text-xl">Complete Your Profile</CardTitle>
             <CardDescription>
-              Please provide your contact information to get started. This helps us personalize your experience and enables important notifications.
+              Please provide your information to get started. This helps us personalize your experience.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your first name"
-                          className="min-h-[48px]"
-                          data-testid="input-first-name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="John"
+                            className="min-h-[48px]"
+                            data-testid="input-first-name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your last name"
-                          className="min-h-[48px]"
-                          data-testid="input-last-name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Smith"
+                            className="min-h-[48px]"
+                            data-testid="input-last-name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Email *</FormLabel>
                       <FormControl>
                         <Input
                           type="email"
@@ -168,7 +253,7 @@ export default function CompleteProfilePage() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>Phone *</FormLabel>
                       <FormControl>
                         <Input
                           type="tel"
@@ -187,10 +272,134 @@ export default function CompleteProfilePage() {
                   )}
                 />
 
+                <div className="border-t pt-6">
+                  <p className="text-sm text-muted-foreground mb-4">Optional Information</p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="company"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <Building2 className="w-4 h-4" />
+                            Company
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Your company"
+                              className="min-h-[48px]"
+                              data-testid="input-company"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="territory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            Territory
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Sales region"
+                              className="min-h-[48px]"
+                              data-testid="input-territory"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-6">
+                  <p className="text-sm text-muted-foreground mb-4">Profile Images (Optional)</p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        <Camera className="w-4 h-4" />
+                        Profile Photo
+                      </Label>
+                      <div 
+                        className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover-elevate transition-colors"
+                        onClick={() => profilePhotoRef.current?.click()}
+                        data-testid="upload-profile-photo"
+                      >
+                        {profilePhotoPreview ? (
+                          <img 
+                            src={profilePhotoPreview} 
+                            alt="Profile preview" 
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                            <p className="text-xs text-muted-foreground text-center">
+                              {uploadingPhoto ? "Uploading..." : "Click to upload"}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        ref={profilePhotoRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoSelect}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        <ImageIcon className="w-4 h-4" />
+                        Company Logo
+                      </Label>
+                      <div 
+                        className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover-elevate transition-colors"
+                        onClick={() => companyLogoRef.current?.click()}
+                        data-testid="upload-company-logo"
+                      >
+                        {companyLogoPreview ? (
+                          <img 
+                            src={companyLogoPreview} 
+                            alt="Logo preview" 
+                            className="max-w-full max-h-16 object-contain"
+                          />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                            <p className="text-xs text-muted-foreground text-center">
+                              {uploadingLogo ? "Uploading..." : "Click to upload"}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        ref={companyLogoRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoSelect}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full min-h-[48px] text-base font-semibold"
-                  disabled={updateProfile.isPending}
+                  disabled={updateProfile.isPending || uploadingPhoto || uploadingLogo}
                   data-testid="button-submit-profile"
                 >
                   {updateProfile.isPending ? "Saving..." : "Complete Profile"}

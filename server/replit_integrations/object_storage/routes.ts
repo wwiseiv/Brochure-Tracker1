@@ -2,6 +2,16 @@ import type { Express, Request, Response } from "express";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { randomUUID } from "crypto";
 import multer from "multer";
+import { isAuthenticated } from "../auth/replitAuth";
+
+// Allowed image MIME types for profile/logo uploads
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml"
+];
 
 /**
  * Register object storage routes for file uploads.
@@ -15,10 +25,17 @@ import multer from "multer";
  * - Add file metadata storage (save to database after upload)
  * - Add ACL policies for access control
  */
-// Configure multer for memory storage
+// Configure multer for memory storage with image filtering
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for images
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed (JPEG, PNG, GIF, WebP, SVG)"));
+    }
+  }
 });
 
 export function registerObjectStorageRoutes(app: Express): void {
@@ -97,8 +114,10 @@ export function registerObjectStorageRoutes(app: Express): void {
    * 
    * Uses multipart/form-data for file upload.
    * Returns the object path for later retrieval.
+   * 
+   * NOTE: Requires authentication and only accepts image files.
    */
-  app.post("/api/uploads/proxy", upload.single("file"), async (req: Request, res: Response) => {
+  app.post("/api/uploads/proxy", isAuthenticated, upload.single("file"), async (req: Request, res: Response) => {
     console.log("[Upload Proxy] Request received");
     try {
       if (!req.file) {

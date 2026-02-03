@@ -78,6 +78,10 @@ export const organizationMembers = pgTable("organization_members", {
   lastName: varchar("last_name", { length: 100 }),
   email: varchar("email", { length: 255 }),
   phone: varchar("phone", { length: 20 }),
+  company: varchar("company", { length: 150 }),
+  territory: varchar("territory", { length: 100 }),
+  profilePhotoUrl: text("profile_photo_url"),
+  companyLogoUrl: text("company_logo_url"),
   profileComplete: boolean("profile_complete").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -108,6 +112,10 @@ export const insertOrganizationMemberSchema = z.object({
   lastName: z.string().max(100).nullable().optional(),
   email: z.string().email().max(255).nullable().optional(),
   phone: z.string().max(20).nullable().optional(),
+  company: z.string().max(150).nullable().optional(),
+  territory: z.string().max(100).nullable().optional(),
+  profilePhotoUrl: z.string().nullable().optional(),
+  companyLogoUrl: z.string().nullable().optional(),
   profileComplete: z.boolean().optional(),
 });
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;

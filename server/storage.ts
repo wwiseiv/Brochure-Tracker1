@@ -230,7 +230,7 @@ export interface IStorage {
   createOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
   updateOrganizationMember(id: number, data: Partial<Pick<OrganizationMember, 'role' | 'managerId'>>): Promise<OrganizationMember | undefined>;
   updateOrganizationMemberRole(id: number, role: OrgMemberRole): Promise<OrganizationMember | undefined>;
-  updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; profileComplete?: boolean }): Promise<OrganizationMember | undefined>;
+  updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; company?: string | null; territory?: string | null; profilePhotoUrl?: string | null; companyLogoUrl?: string | null; profileComplete?: boolean }): Promise<OrganizationMember | undefined>;
   deleteOrganizationMember(id: number): Promise<boolean>;
   getAgentsByManager(managerId: number): Promise<OrganizationMember[]>;
   
@@ -686,7 +686,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; profileComplete?: boolean }): Promise<OrganizationMember | undefined> {
+  async updateMemberProfile(id: number, data: { firstName?: string; lastName?: string; email?: string; phone?: string; company?: string | null; territory?: string | null; profilePhotoUrl?: string | null; companyLogoUrl?: string | null; profileComplete?: boolean }): Promise<OrganizationMember | undefined> {
     const [updated] = await db
       .update(organizationMembers)
       .set(data)

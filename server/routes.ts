@@ -1472,6 +1472,10 @@ Format your response as JSON:
         lastName: z.string().min(1, "Last name is required").max(100),
         email: z.string().email("Invalid email address").max(255),
         phone: z.string().min(10, "Phone number must be at least 10 digits").max(20),
+        company: z.string().max(150).optional(),
+        territory: z.string().max(100).optional(),
+        profilePhotoUrl: z.string().optional().or(z.literal("")),
+        companyLogoUrl: z.string().optional().or(z.literal("")),
       });
 
       const parsed = profileSchema.safeParse(req.body);
@@ -1491,6 +1495,10 @@ Format your response as JSON:
         lastName: parsed.data.lastName,
         email: parsed.data.email,
         phone: parsed.data.phone,
+        company: parsed.data.company || null,
+        territory: parsed.data.territory || null,
+        profilePhotoUrl: parsed.data.profilePhotoUrl || null,
+        companyLogoUrl: parsed.data.companyLogoUrl || null,
         profileComplete: true,
       });
 
