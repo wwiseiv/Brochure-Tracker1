@@ -2627,6 +2627,83 @@ export const DEAL_ACTIVITY_TYPES = [
 ] as const;
 export type DealActivityType = typeof DEAL_ACTIVITY_TYPES[number];
 
+// Merchant Intelligence table - Cached website scraping and transcript analysis for role-play
+export const merchantIntelligence = pgTable("merchant_intelligence", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  
+  // Can be linked to deal, merchant, or drop
+  dealId: integer("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").references(() => merchants.id, { onDelete: "cascade" }),
+  dropId: integer("drop_id").references(() => drops.id, { onDelete: "cascade" }),
+  
+  // Website Intelligence
+  websiteUrl: text("website_url"),
+  websiteScrapedAt: timestamp("website_scraped_at"),
+  websiteStatus: varchar("website_status", { length: 20 }).default("pending"), // pending, scraping, completed, failed
+  
+  // Scraped Business Details
+  scrapedBusinessName: text("scraped_business_name"),
+  scrapedDescription: text("scraped_description"),
+  scrapedIndustry: text("scraped_industry"),
+  scrapedServices: jsonb("scraped_services"), // string[]
+  scrapedHours: text("scraped_hours"),
+  scrapedOwnerName: text("scraped_owner_name"),
+  scrapedMenuItems: jsonb("scraped_menu_items"), // For restaurants: string[]
+  scrapedPricingIndicators: text("scraped_pricing_indicators"),
+  scrapedUniqueSellingPoints: jsonb("scraped_unique_selling_points"), // string[]
+  scrapedRecentNews: text("scraped_recent_news"),
+  scrapedEstablishedYear: varchar("scraped_established_year", { length: 10 }),
+  
+  // Transcript Intelligence (extracted from meeting recordings)
+  transcriptAnalyzedAt: timestamp("transcript_analyzed_at"),
+  transcriptStatus: varchar("transcript_status", { length: 20 }).default("pending"), // pending, analyzing, completed, failed
+  
+  // Communication Style Analysis
+  communicationStyle: varchar("communication_style", { length: 30 }), // formal, casual, direct, analytical
+  decisionMakingStyle: varchar("decision_making_style", { length: 50 }), // quick, deliberate, consensus_needed, price_focused
+  keyStakeholders: jsonb("key_stakeholders"), // Array of stakeholder names/roles
+  
+  // Objections & Concerns from transcripts
+  knownObjections: jsonb("known_objections"), // string[] of actual objections raised
+  knownConcerns: jsonb("known_concerns"), // string[] of concerns expressed
+  questionsAsked: jsonb("questions_asked"), // string[] of questions they asked
+  
+  // Interests & Priorities
+  interestsExpressed: jsonb("interests_expressed"), // string[] of things they showed interest in
+  painPoints: jsonb("pain_points"), // string[] of problems they mentioned
+  
+  // Combined AI-Generated Context
+  roleplayPersonaPrompt: text("roleplay_persona_prompt"), // Pre-generated prompt for AI role-play
+  coachingContextSummary: text("coaching_context_summary"), // Summary for coaching mode
+  
+  // Metadata
+  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const merchantIntelligenceRelations = relations(merchantIntelligence, ({ one }) => ({
+  deal: one(deals, {
+    fields: [merchantIntelligence.dealId],
+    references: [deals.id],
+  }),
+  merchant: one(merchants, {
+    fields: [merchantIntelligence.merchantId],
+    references: [merchants.id],
+  }),
+  drop: one(drops, {
+    fields: [merchantIntelligence.dropId],
+    references: [drops.id],
+  }),
+}));
+
+export const insertMerchantIntelligenceSchema = createInsertSchema(merchantIntelligence).omit({
+  id: true,
+  createdAt: true,
+  lastUpdatedAt: true,
+});
+export type InsertMerchantIntelligence = z.infer<typeof insertMerchantIntelligenceSchema>;
+export type MerchantIntelligence = typeof merchantIntelligence.$inferSelect;
+
 // Deal Activities table - Activity timeline for deals
 export const dealActivities = pgTable("deal_activities", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

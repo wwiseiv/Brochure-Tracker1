@@ -179,6 +179,9 @@ import {
   type InsertImpersonationSession,
   type ImpersonationAuditLog,
   type InsertImpersonationAuditLog,
+  merchantIntelligence,
+  type MerchantIntelligence,
+  type InsertMerchantIntelligence,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -287,6 +290,12 @@ export interface IStorage {
   getVoiceNotesByMerchant(merchantId: number, orgId: number): Promise<VoiceNote[]>;
   getVoiceNote(id: number): Promise<VoiceNote | undefined>;
   deleteVoiceNote(id: number, orgId: number): Promise<void>;
+  
+  // Merchant Intelligence
+  getMerchantIntelligence(options: { dealId?: number; merchantId?: number; dropId?: number }): Promise<MerchantIntelligence | undefined>;
+  createMerchantIntelligence(data: InsertMerchantIntelligence): Promise<MerchantIntelligence>;
+  updateMerchantIntelligence(id: number, data: Partial<MerchantIntelligence>): Promise<MerchantIntelligence | undefined>;
+  getMeetingRecordingsByDeal(dealId: number): Promise<MeetingRecording[]>;
   
   // Training Documents
   getTrainingDocuments(): Promise<TrainingDocument[]>;
@@ -1383,6 +1392,46 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVoiceNote(id: number, orgId: number): Promise<void> {
     await db.delete(voiceNotes).where(and(eq(voiceNotes.id, id), eq(voiceNotes.orgId, orgId)));
+  }
+
+  // Merchant Intelligence
+  async getMerchantIntelligence(options: { dealId?: number; merchantId?: number; dropId?: number }): Promise<MerchantIntelligence | undefined> {
+    const conditions = [];
+    if (options.dealId) conditions.push(eq(merchantIntelligence.dealId, options.dealId));
+    if (options.merchantId) conditions.push(eq(merchantIntelligence.merchantId, options.merchantId));
+    if (options.dropId) conditions.push(eq(merchantIntelligence.dropId, options.dropId));
+    
+    if (conditions.length === 0) return undefined;
+    
+    const [result] = await db
+      .select()
+      .from(merchantIntelligence)
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+      .orderBy(desc(merchantIntelligence.lastUpdatedAt))
+      .limit(1);
+    return result;
+  }
+
+  async createMerchantIntelligence(data: InsertMerchantIntelligence): Promise<MerchantIntelligence> {
+    const [created] = await db.insert(merchantIntelligence).values(data as any).returning();
+    return created;
+  }
+
+  async updateMerchantIntelligence(id: number, data: Partial<MerchantIntelligence>): Promise<MerchantIntelligence | undefined> {
+    const [updated] = await db
+      .update(merchantIntelligence)
+      .set({ ...data, lastUpdatedAt: new Date() })
+      .where(eq(merchantIntelligence.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getMeetingRecordingsByDeal(dealId: number): Promise<MeetingRecording[]> {
+    return db
+      .select()
+      .from(meetingRecordings)
+      .where(eq(meetingRecordings.dealId, dealId))
+      .orderBy(desc(meetingRecordings.createdAt));
   }
 
   // Training Documents
