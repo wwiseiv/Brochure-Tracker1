@@ -202,19 +202,18 @@ export function BottomNav() {
             return (
               <Tooltip key={item.path} delayDuration={700}>
                 <TooltipTrigger asChild>
-                  <Link href={item.path}>
-                    <button
-                      data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
-                      className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] py-2 px-2 rounded-lg transition-colors scroll-snap-align-center ${
-                        isActive
-                          ? "text-primary bg-primary/10"
-                          : "text-muted-foreground hover-elevate"
-                      }`}
-                      style={{ scrollSnapAlign: 'center' }}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-[10px] font-medium whitespace-nowrap">{item.label}</span>
-                    </button>
+                  <Link
+                    href={item.path}
+                    data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] py-2 px-2 rounded-lg transition-colors scroll-snap-align-center no-underline ${
+                      isActive
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover-elevate"
+                    }`}
+                    style={{ scrollSnapAlign: 'center' }}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-[10px] font-medium whitespace-nowrap">{item.label}</span>
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -295,20 +294,20 @@ export function HamburgerMenu() {
                   const isActive = location === item.path;
                   const Icon = item.icon;
                   return (
-                    <Link key={item.path} href={item.path}>
-                      <button
-                        onClick={() => setOpen(false)}
-                        data-testid={`menu-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                          isActive
-                            ? "bg-primary/10 text-primary border-l-2 border-primary"
-                            : "text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5 flex-shrink-0" />
-                        <span className="text-sm font-medium">{item.label}</span>
-                        <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground" />
-                      </button>
+                    <Link 
+                      key={item.path} 
+                      href={item.path}
+                      onClick={() => setOpen(false)}
+                      data-testid={`menu-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors no-underline ${
+                        isActive
+                          ? "bg-primary/10 text-primary border-l-2 border-primary"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground" />
                     </Link>
                   );
                 })}
