@@ -6733,8 +6733,8 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       const sanitizedSubtitle = subtitle ? String(subtitle).trim().substring(0, 500) : undefined;
       const sanitizedContent = content.trim();
 
-      const userId = req.user?.id;
-      const member = await storage.getOrganizationMemberByUserId(userId, null);
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const member = userId ? await storage.getUserMembership(userId) : undefined;
       const agentName = member ? `${member.firstName || ""} ${member.lastName || ""}`.trim() : undefined;
       
       const { generateAdvicePdf, generateAdviceWord } = await import("./services/advice-export-service");
@@ -6784,8 +6784,8 @@ Remember: You're helping them practice real sales conversations. Be challenging 
       const sanitizedSubtitle = subtitle ? String(subtitle).trim().substring(0, 500) : undefined;
       const sanitizedContent = content.trim();
 
-      const userId = req.user?.id;
-      const member = await storage.getOrganizationMemberByUserId(userId, null);
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const member = userId ? await storage.getUserMembership(userId) : undefined;
       const agentName = member ? `${member.firstName || ""} ${member.lastName || ""}`.trim() : undefined;
       
       const { emailAdvice } = await import("./services/advice-export-service");
