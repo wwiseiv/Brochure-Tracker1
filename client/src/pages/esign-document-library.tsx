@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HamburgerMenu } from "@/components/BottomNav";
 import { 
   ArrowLeft,
   FileText, 
@@ -343,19 +344,7 @@ export default function ESignDocumentLibrary() {
       <div className="flex-shrink-0 bg-background border-b">
         <div className="p-4">
           <div className="flex items-center gap-3 mb-4">
-            <Tooltip delayDuration={700}>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setLocation("/")}
-                  data-testid="button-back-home"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Go back - Return to home page</TooltipContent>
-            </Tooltip>
+            <HamburgerMenu />
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl font-bold truncate">E-Sign Document Library</h1>
               <p className="text-sm text-muted-foreground line-clamp-1">Send merchant applications and agreements for electronic signature</p>

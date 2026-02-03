@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { ListenButton } from "@/components/ListenButton";
 import { 
   Bot, 
@@ -372,6 +372,7 @@ export default function EquipIQPage() {
       <div className="px-4 py-6 max-w-md mx-auto md:max-w-2xl lg:max-w-4xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
+            <HamburgerMenu />
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Lightbulb className="w-5 h-5 text-primary" />
             </div>
