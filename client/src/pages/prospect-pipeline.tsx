@@ -1028,7 +1028,7 @@ export default function DealPipelinePage() {
 
     return (
       <div className="space-y-4">
-        {/* Stage Progress Summary Bar */}
+        {/* Stage Progress Summary Bar - Clickable shortcuts */}
         <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto">
           <div className="flex gap-1 min-w-max">
             {STAGE_ORDER.map((stage, idx) => {
@@ -1036,14 +1036,21 @@ export default function DealPipelinePage() {
               const config = DEAL_STAGE_CONFIG[stage];
               const isTerminal = TERMINAL_STAGES.includes(stage);
               return (
-                <div
+                <button
                   key={stage}
-                  className={`flex flex-col items-center px-2 py-1 rounded ${count > 0 ? config.color : 'bg-muted/30 text-muted-foreground'}`}
-                  title={`${config.label}: ${count} deals`}
+                  onClick={() => {
+                    const stageColumn = document.querySelector(`[data-testid="stage-column-${stage}"]`);
+                    if (stageColumn) {
+                      stageColumn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }
+                  }}
+                  className={`flex flex-col items-center px-2 py-1 rounded cursor-pointer hover-elevate active-elevate-2 transition-all ${count > 0 ? config.color : 'bg-muted/30 text-muted-foreground'}`}
+                  title={`Jump to ${config.label}: ${count} deals`}
+                  data-testid={`shortcut-stage-${stage}`}
                 >
                   <span className="text-xs font-medium">{count}</span>
                   <span className="text-[10px] whitespace-nowrap">{config.label}</span>
-                </div>
+                </button>
               );
             })}
           </div>
