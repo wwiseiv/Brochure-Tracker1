@@ -2980,12 +2980,9 @@ Format your response as JSON:
   });
 
   // User API - Check if demo deals exist for user's organization
-  app.get("/api/user/demo-deals/status", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/demo-deals/status", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
-      if (!membership) {
-        return res.status(403).json({ error: "No organization membership" });
-      }
       const orgId = membership.organization.id;
       
       const exists = await checkDemoDealsExist(orgId);
@@ -3001,12 +2998,9 @@ Format your response as JSON:
   });
 
   // User API - Seed demo deals for user's organization (any logged in user can trigger)
-  app.post("/api/user/demo-deals/seed", isAuthenticated, async (req: any, res) => {
+  app.post("/api/user/demo-deals/seed", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
-      if (!membership) {
-        return res.status(403).json({ error: "No organization membership" });
-      }
       const userId = req.user.claims.sub;
       const orgId = membership.organization.id;
       
@@ -3034,12 +3028,9 @@ Format your response as JSON:
   });
 
   // User API - Delete demo deals for user's organization (any logged in user can delete)
-  app.delete("/api/user/demo-deals", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/user/demo-deals", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership;
-      if (!membership) {
-        return res.status(403).json({ error: "No organization membership" });
-      }
       const orgId = membership.organization.id;
       
       const deleted = await deleteDemoDeals(orgId);
