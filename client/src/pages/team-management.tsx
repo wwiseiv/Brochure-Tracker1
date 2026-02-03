@@ -69,7 +69,9 @@ import {
   Check,
   Settings,
   Lock,
+  Eye,
 } from "lucide-react";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import type { OrganizationMember, OrgMemberRole, UserPermissions } from "@shared/schema";
@@ -169,6 +171,7 @@ function TeamManagementSkeleton() {
 export default function TeamManagementPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { startImpersonation, isLoading: impersonationLoading, canImpersonate, availableUsers } = useImpersonation();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -613,6 +616,23 @@ export default function TeamManagementPage() {
     return true;
   };
 
+  const canImpersonateMember = (member: OrganizationMember): boolean => {
+    if (member.id === userRole?.memberId) return false;
+    return availableUsers.some(u => u.userId === member.userId);
+  };
+
+  const handleImpersonate = async (member: OrganizationMember) => {
+    try {
+      await startImpersonation(member.userId, `Team management: viewing as ${member.firstName || ''} ${member.lastName || ''}`);
+    } catch (error) {
+      toast({
+        title: "Impersonation failed",
+        description: error instanceof Error ? error.message : "Failed to start impersonation",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-6">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
@@ -951,6 +971,18 @@ export default function TeamManagementPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
+                                {canImpersonate && canImpersonateMember(member) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleImpersonate(member)}
+                                    disabled={impersonationLoading}
+                                    title="View as this user"
+                                    data-testid={`button-impersonate-member-${member.id}`}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
