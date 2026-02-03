@@ -210,6 +210,10 @@ export interface IStorage {
   createMerchant(data: InsertMerchant): Promise<Merchant>;
   updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined>;
   deleteMerchant(id: number, userId: string): Promise<boolean>;
+  deleteMerchantWithRole(id: number, orgId: number): Promise<boolean>;
+  
+  // Drops
+  deleteDrop(id: number): Promise<boolean>;
   
   // Reminders
   getReminder(id: number): Promise<Reminder | undefined>;
@@ -783,6 +787,50 @@ export class DatabaseStorage implements IStorage {
     }
     
     return false;
+  }
+
+  async deleteMerchantWithRole(id: number, orgId: number): Promise<boolean> {
+    // Delete merchant after role-based checks have been done in route
+    // Also clean up related drops by unlinking them (set merchantId to null)
+    const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id));
+    if (!merchant || merchant.orgId !== orgId) return false;
+    
+    // Unlink drops associated with this merchant
+    await db.update(drops).set({ merchantId: null }).where(eq(drops.merchantId, id));
+    
+    // Delete the merchant
+    await db.delete(merchants).where(eq(merchants.id, id));
+    return true;
+  }
+
+  async deleteDrop(id: number): Promise<boolean> {
+    // Delete drop and clean up related data
+    const [drop] = await db.select().from(drops).where(eq(drops.id, id));
+    if (!drop) return false;
+    
+    // Delete associated reminders
+    await db.delete(reminders).where(eq(reminders.dropId, id));
+    
+    // Update brochure status back to available if it was deployed
+    if (drop.brochureId) {
+      await db.update(brochures)
+        .set({ status: 'available' })
+        .where(eq(brochures.id, drop.brochureId));
+    }
+    
+    // Update merchant stats if linked
+    if (drop.merchantId) {
+      const [merchant] = await db.select().from(merchants).where(eq(merchants.id, drop.merchantId));
+      if (merchant && merchant.totalDrops && merchant.totalDrops > 0) {
+        await db.update(merchants)
+          .set({ totalDrops: merchant.totalDrops - 1 })
+          .where(eq(merchants.id, drop.merchantId));
+      }
+    }
+    
+    // Delete the drop
+    await db.delete(drops).where(eq(drops.id, id));
+    return true;
   }
 
   async getMerchantByBusinessName(orgId: number, businessName: string): Promise<Merchant | undefined> {

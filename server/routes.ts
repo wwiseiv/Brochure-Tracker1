@@ -29,6 +29,7 @@ import {
   deals,
   dealActivities,
   organizations,
+  merchants,
 } from "@shared/schema";
 import { db } from "./db";
 import { sendInvitationEmail, sendFeedbackEmail, generateInviteToken, sendThankYouEmail, sendMeetingRecordingEmail, sendRoleplaySessionEmail } from "./email";
@@ -59,7 +60,6 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
-import { db } from "./db";
 import { 
   presentationPracticeResponses, 
   presentationProgress, 
@@ -67,6 +67,7 @@ import {
   prospects,
   prospectActivities,
   prospectSearches,
+  drops,
 } from "@shared/schema";
 import { eq, and, desc, ilike, or, asc, lte, gte, count, sql } from "drizzle-orm";
 import { 
@@ -941,6 +942,71 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating drop:", error);
       res.status(500).json({ error: "Failed to update drop" });
+    }
+  });
+
+  // DELETE /api/drops/:id - Delete a drop with role-based permissions
+  app.delete("/api/drops/:id", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const dropId = parseInt(req.params.id);
+      if (isNaN(dropId)) {
+        return res.status(400).json({ error: "Invalid drop ID" });
+      }
+      
+      const existingDrop = await storage.getDrop(dropId);
+      if (!existingDrop) {
+        return res.status(404).json({ error: "Drop not found" });
+      }
+      
+      const userId = req.user.claims.sub;
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const role = membership.role;
+      const orgId = membership.organization.id;
+      
+      // Ensure drop belongs to this org
+      if (existingDrop.orgId !== orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Role-based delete permissions:
+      // - master_admin: can delete any drop in org
+      // - relationship_manager: can delete own + managed agents' drops
+      // - agent: can delete own drops only
+      let canDelete = false;
+      
+      if (role === "master_admin") {
+        canDelete = true;
+      } else if (role === "relationship_manager") {
+        // Check if drop belongs to this manager or one of their managed agents
+        if (existingDrop.agentId === userId) {
+          canDelete = true;
+        } else {
+          // Get managed agents
+          const allMembers = await storage.getOrganizationMembers(orgId);
+          const rmMember = allMembers.find(m => m.userId === userId);
+          if (rmMember) {
+            const managedAgentIds = allMembers
+              .filter(m => m.managerId === rmMember.id)
+              .map(m => m.userId);
+            if (managedAgentIds.includes(existingDrop.agentId)) {
+              canDelete = true;
+            }
+          }
+        }
+      } else {
+        // Agent can only delete own drops
+        canDelete = existingDrop.agentId === userId;
+      }
+      
+      if (!canDelete) {
+        return res.status(403).json({ error: "You don't have permission to delete this drop" });
+      }
+      
+      await storage.deleteDrop(dropId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting drop:", error);
+      res.status(500).json({ error: "Failed to delete drop" });
     }
   });
 
@@ -3937,18 +4003,49 @@ Format the response clearly with numbered action items. Be specific - instead of
         return res.status(404).json({ error: "Merchant not found" });
       }
       
-      const membership = req.orgMembership;
+      const membership = req.orgMembership as OrgMembershipInfo;
       if (merchant.orgId !== membership.organization.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       
       const userId = req.user.claims.sub;
-      const deleted = await storage.deleteMerchant(merchantId, userId);
+      const role = membership.role;
       
-      if (!deleted) {
-        return res.status(403).json({ error: "You can only delete merchants you created or sample merchants" });
+      // Role-based delete permissions:
+      // - master_admin: can delete any merchant in org
+      // - relationship_manager: can delete own + managed agents' merchants
+      // - agent: can delete own merchants only
+      let canDelete = false;
+      
+      if (role === "master_admin") {
+        canDelete = true;
+      } else if (role === "relationship_manager") {
+        // Check if merchant was created by this manager or one of their managed agents
+        if (merchant.createdBy === userId) {
+          canDelete = true;
+        } else {
+          // Get managed agents
+          const allMembers = await storage.getOrganizationMembers(membership.organization.id);
+          const rmMember = allMembers.find(m => m.userId === userId);
+          if (rmMember) {
+            const managedAgentIds = allMembers
+              .filter(m => m.managerId === rmMember.id)
+              .map(m => m.userId);
+            if (managedAgentIds.includes(merchant.createdBy || '')) {
+              canDelete = true;
+            }
+          }
+        }
+      } else {
+        // Agent can only delete own merchants or sample merchants
+        canDelete = merchant.createdBy === userId || merchant.isSample === true;
       }
       
+      if (!canDelete) {
+        return res.status(403).json({ error: "You don't have permission to delete this merchant" });
+      }
+      
+      await storage.deleteMerchantWithRole(merchantId, orgId);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting merchant:", error);
@@ -11405,8 +11502,38 @@ Generate the following content in JSON format:
         return res.status(403).json({ error: "Access denied" });
       }
 
-      if (role === "agent" && existingDeal.assignedAgentId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
+      // Role-based delete permissions:
+      // - master_admin: can delete any deal in org
+      // - relationship_manager: can delete own + managed agents' deals
+      // - agent: can delete own deals only
+      let canDelete = false;
+      
+      if (role === "master_admin") {
+        canDelete = true;
+      } else if (role === "relationship_manager") {
+        // Check if deal belongs to this manager or one of their managed agents
+        if (existingDeal.assignedAgentId === userId) {
+          canDelete = true;
+        } else {
+          // Get managed agents
+          const allMembers = await storage.getOrganizationMembers(orgId);
+          const rmMember = allMembers.find(m => m.userId === userId);
+          if (rmMember) {
+            const managedAgentIds = allMembers
+              .filter(m => m.managerId === rmMember.id)
+              .map(m => m.userId);
+            if (existingDeal.assignedAgentId && managedAgentIds.includes(existingDeal.assignedAgentId)) {
+              canDelete = true;
+            }
+          }
+        }
+      } else {
+        // Agent can only delete own deals
+        canDelete = existingDeal.assignedAgentId === userId;
+      }
+      
+      if (!canDelete) {
+        return res.status(403).json({ error: "You don't have permission to delete this deal" });
       }
 
       await storage.archiveDeal(id);
