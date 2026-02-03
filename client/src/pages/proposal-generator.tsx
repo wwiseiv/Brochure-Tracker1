@@ -3754,14 +3754,16 @@ export default function ProposalGeneratorPage() {
           <div className="py-4 space-y-4">
             {activeJob && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{activeJob.fileNames.join(", ")}</p>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 overflow-hidden">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={activeJob.fileNames.join(", ")}>{activeJob.fileNames.join(", ")}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Started: {new Date(activeJob.createdAt).toLocaleTimeString()}
                     </p>
                   </div>
-                  {getParseJobStatusBadge(activeJob.status)}
+                  <div className="shrink-0">
+                    {getParseJobStatusBadge(activeJob.status)}
+                  </div>
                 </div>
                 
                 {(activeJob.status === "pending" || activeJob.status === "processing") && (
