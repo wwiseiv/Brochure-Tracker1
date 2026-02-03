@@ -1517,8 +1517,10 @@ export default function DealPipelinePage() {
                     Practice your pitch with our AI role-play coach before visiting this business.
                   </p>
                   <RoleplayCoach
+                    dealId={selectedDeal.id}
+                    merchantId={selectedDeal.merchantId || undefined}
                     businessName={selectedDeal.businessName}
-                    businessType="general"
+                    businessType={selectedDeal.businessType || "general"}
                   />
                 </Card>
 

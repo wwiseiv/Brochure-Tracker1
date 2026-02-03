@@ -40,8 +40,56 @@ export interface TranscriptIntelligence {
   painPoints?: string[];
 }
 
+// URL validation to prevent SSRF attacks
+function isValidScrapeUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    
+    // Only allow http/https schemes
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      console.log('[MerchantIntelligence] Invalid protocol:', url.protocol);
+      return false;
+    }
+    
+    // Block private/loopback IPs
+    const hostname = url.hostname.toLowerCase();
+    const privatePatterns = [
+      /^localhost$/i,
+      /^127\.\d+\.\d+\.\d+$/,
+      /^10\.\d+\.\d+\.\d+$/,
+      /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
+      /^192\.168\.\d+\.\d+$/,
+      /^0\.0\.0\.0$/,
+      /^\[::1\]$/,
+      /^::1$/,
+      /^fc00:/i,
+      /^fd00:/i,
+      /^169\.254\.\d+\.\d+$/,
+      /\.local$/i,
+      /\.internal$/i,
+      /\.corp$/i,
+    ];
+    
+    if (privatePatterns.some(pattern => pattern.test(hostname))) {
+      console.log('[MerchantIntelligence] Blocked private IP/hostname:', hostname);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    console.log('[MerchantIntelligence] Invalid URL:', urlString);
+    return false;
+  }
+}
+
 export async function scrapeWebsiteIntelligence(websiteUrl: string): Promise<WebsiteIntelligence | null> {
   console.log('[MerchantIntelligence] Scraping website:', websiteUrl);
+  
+  // Validate URL to prevent SSRF
+  if (!isValidScrapeUrl(websiteUrl)) {
+    console.log('[MerchantIntelligence] URL validation failed:', websiteUrl);
+    return null;
+  }
   
   try {
     const response = await fetch(websiteUrl, {
