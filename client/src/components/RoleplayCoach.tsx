@@ -611,14 +611,14 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                       Prospect Persona (optional)
                     </label>
                     <Select
-                      value={selectedPersonaId?.toString() || ""}
-                      onValueChange={(value) => setSelectedPersonaId(value ? parseInt(value) : null)}
+                      value={selectedPersonaId?.toString() || "default"}
+                      onValueChange={(value) => setSelectedPersonaId(value === "default" ? null : parseInt(value))}
                     >
                       <SelectTrigger data-testid="select-persona">
-                        <SelectValue placeholder={isLoadingPersonas ? "Loading personas..." : "Use default scenario-based persona"} />
+                        <SelectValue placeholder={isLoadingPersonas ? "Loading personas..." : "Select a persona..."} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Use default (scenario-based)</SelectItem>
+                        <SelectItem value="default">Use default (scenario-based)</SelectItem>
                         {sortedPersonas.map((persona) => (
                           <SelectItem key={persona.id} value={persona.id.toString()}>
                             <div className="flex items-center gap-2">
@@ -643,7 +643,7 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Choose a specific persona for more challenging practice, or leave as default
+                      Choose a specific business owner type for realistic practice. The "General" persona covers all industries.
                     </p>
                   </div>
                 )}
