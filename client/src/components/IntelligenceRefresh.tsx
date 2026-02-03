@@ -565,7 +565,6 @@ export function StaleDataWarning({ merchantId, onRefresh }: StaleDataWarningProp
         variant="outline"
         onClick={handleRefresh}
         disabled={refresh.isPending}
-        className="border-yellow-300 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-900"
         data-testid="button-refresh-stale"
       >
         <RefreshCw className={`h-3 w-3 mr-1 ${refresh.isPending ? 'animate-spin' : ''}`} />

@@ -77,6 +77,7 @@ import {
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
 import { seedPresentationContent } from "./presentation-seed";
+import { getMerchantCache, formatDuration, CacheCategory } from "./services/cache-service";
 import { seedDemoDeals, deleteDemoDeals, checkDemoDealsExist } from "./seed-demo-data";
 import { researchBusiness } from "./business-research";
 import { extractBusinessCardData } from "./services/business-card-scanner";
@@ -3992,6 +3993,243 @@ Format the response clearly with numbered action items. Be specific - instead of
     } catch (error) {
       console.error("Error fetching merchant recordings:", error);
       res.status(500).json({ error: "Failed to fetch merchant recordings" });
+    }
+  });
+
+  // ============================================
+  // MERCHANT INTELLIGENCE CACHE API
+  // ============================================
+
+  const merchantCache = getMerchantCache();
+
+  // Get cache status for a merchant
+  app.get("/api/merchants/:id/intelligence/cache-status", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+
+      // Verify merchant belongs to user's organization
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const cacheStatus = merchantCache.getMerchantCacheStatus(merchantId);
+      const config = merchantCache.getConfig();
+
+      res.json({
+        merchantId,
+        cacheStatus: cacheStatus.map(s => ({
+          category: s.category,
+          isCached: s.cached,
+          ttlRemaining: s.ttlRemaining,
+          ttlRemainingFormatted: s.ttlRemaining 
+            ? formatDuration(s.ttlRemaining)
+            : null,
+          lastUpdated: s.lastUpdated?.toISOString() || null,
+          configuredTTL: merchantCache.getTTLForCategory(s.category),
+          configuredTTLFormatted: formatDuration(merchantCache.getTTLForCategory(s.category)),
+        })),
+        config: {
+          defaultTTL: formatDuration(config.defaultTTL),
+          maxSize: config.maxSize,
+          cleanupInterval: formatDuration(config.cleanupInterval),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching cache status:", error);
+      res.status(500).json({ error: "Failed to fetch cache status" });
+    }
+  });
+
+  // Refresh intelligence data for a merchant
+  app.post("/api/merchants/:id/intelligence/refresh", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+
+      // Verify merchant belongs to user's organization
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const categories = req.body.categories as CacheCategory[] | undefined;
+
+      // If specific categories requested, invalidate only those
+      if (categories && Array.isArray(categories)) {
+        for (const category of categories) {
+          const keyMap: Record<string, string> = {
+            merchantInfo: 'info',
+            businessHours: 'hours',
+            reviews: 'reviews',
+            competitors: 'competitors',
+            pricing: 'pricing',
+            socialMedia: 'social',
+            contactInfo: 'contact',
+            financialEstimates: 'financial',
+          };
+          const suffix = keyMap[category];
+          if (suffix) {
+            const key = merchantCache.generateKey('merchant', merchantId, suffix);
+            merchantCache.delete(key);
+          }
+        }
+
+        return res.json({
+          success: true,
+          refreshed: categories,
+          refreshedAt: new Date().toISOString(),
+        });
+      }
+
+      // Invalidate all cached data for this merchant
+      const invalidated = merchantCache.invalidateMerchant(merchantId);
+
+      res.json({
+        success: true,
+        refreshed: 'all',
+        invalidatedEntries: invalidated,
+        refreshedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error refreshing intelligence:", error);
+      res.status(500).json({ error: "Failed to refresh intelligence" });
+    }
+  });
+
+  // Invalidate cache for a merchant
+  app.delete("/api/merchants/:id/intelligence/cache", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ error: "Invalid merchant ID" });
+      }
+
+      // Verify merchant belongs to user's organization
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      const membership = req.orgMembership;
+      if (merchant.orgId !== membership.organization.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invalidated = merchantCache.invalidateMerchant(merchantId);
+
+      res.json({
+        success: true,
+        invalidatedEntries: invalidated,
+      });
+    } catch (error) {
+      console.error("Error invalidating cache:", error);
+      res.status(500).json({ error: "Failed to invalidate cache" });
+    }
+  });
+
+  // Admin: Get overall cache statistics
+  app.get("/api/admin/cache/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const stats = merchantCache.getStats();
+
+      res.json({
+        stats: {
+          ...stats,
+          hitRatePercent: (stats.hitRate * 100).toFixed(2) + '%',
+          avgEntryAgeFormatted: formatDuration(stats.avgEntryAge),
+        },
+        config: merchantCache.getConfig(),
+      });
+    } catch (error) {
+      console.error("Error fetching cache stats:", error);
+      res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
+  // Admin: Update cache configuration
+  app.post("/api/admin/cache/config", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const updates = req.body;
+      const allowedKeys = [
+        'defaultTTL',
+        'merchantInfoTTL',
+        'businessHoursTTL',
+        'reviewsTTL',
+        'competitorsTTL',
+        'pricingTTL',
+        'socialMediaTTL',
+        'contactInfoTTL',
+        'financialEstimatesTTL',
+      ];
+
+      const validUpdates: Record<string, number> = {};
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedKeys.includes(key) && typeof value === 'number' && value > 0) {
+          validUpdates[key] = value;
+        }
+      }
+
+      if (Object.keys(validUpdates).length === 0) {
+        return res.status(400).json({ error: 'No valid configuration updates provided' });
+      }
+
+      merchantCache.updateConfig(validUpdates);
+
+      res.json({
+        success: true,
+        updated: validUpdates,
+        newConfig: merchantCache.getConfig(),
+      });
+    } catch (error) {
+      console.error("Error updating cache config:", error);
+      res.status(500).json({ error: "Failed to update cache config" });
+    }
+  });
+
+  // Admin: Clear entire cache
+  app.post("/api/admin/cache/clear", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      merchantCache.clear();
+
+      res.json({ success: true, message: 'Cache cleared' });
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      res.status(500).json({ error: "Failed to clear cache" });
     }
   });
 
