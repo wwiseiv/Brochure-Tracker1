@@ -98,8 +98,14 @@ Preferred communication style: Simple, everyday language.
     - **Organization Features**: Org-level feature disables
     - **Audit Logging**: Full change history for compliance
     - **React Integration**: PermissionContext with hooks (`usePermissions`, `useFeatureAccess`, `useRole`, `useStage`) and guard components (`RequireFeature`, `RequireRole`, `RequireStage`)
+- **User Impersonation System**: Secure session-based impersonation for admin/manager oversight:
+    - **Session Management**: UUID token-based sessions with 4-hour expiration and automatic cleanup
+    - **Hierarchical Permissions**: Admins can impersonate non-admin users; managers can only impersonate their assigned agents
+    - **Audit Logging**: Comprehensive logs with sessionId, originalUserId, impersonatedUserId, reason, IP address, user agent, and timestamps
+    - **UI Integration**: ImpersonationBanner component shows when impersonating with one-click "End Session"; Eye icon button in Team Management page
+    - **React Integration**: ImpersonationContext with hooks (`useImpersonation`) providing startImpersonation, endImpersonation, and session state
+    - **API Endpoints**: `/api/impersonation/start`, `/end`, `/validate`, `/available-users`, `/sessions` (admin-only), `/audit-log` (admin-only)
     - **Permission-aware Navigation**: Bottom nav and hamburger menu filter items based on user's effective permissions
-    - **API Endpoints**: `/api/permissions/me` (user permissions), `/api/permissions/features` (registry), `/api/permissions/users` (list users), role/stage/override management endpoints
 - **Data Isolation**: Role-based data access.
 - **My Work History**: Centralized view of user's proposals and statement analyses.
 - **Team Leaderboard**: Optional leaderboard for top agents.
