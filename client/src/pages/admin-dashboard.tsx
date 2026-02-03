@@ -669,7 +669,21 @@ export default function AdminDashboardPage() {
                                   )}
                                 </div>
                               </div>
-                              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDropToDelete({ id: drop.id, name: drop.businessName || "Unnamed Business" });
+                                  }}
+                                  data-testid={`button-delete-drop-${drop.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
                             </div>
                           </Card>
                         );
