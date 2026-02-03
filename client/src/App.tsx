@@ -45,6 +45,8 @@ import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
 import { PermissionProvider } from "@/contexts/PermissionContext";
+import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 
 import { useLocation } from "wouter";
 
@@ -227,11 +229,14 @@ function AppContent() {
   }
 
   return (
-    <PermissionProvider>
-      <ProfileCompletionGuard>
-        <AuthenticatedRouter />
-      </ProfileCompletionGuard>
-    </PermissionProvider>
+    <ImpersonationProvider>
+      <ImpersonationBanner />
+      <PermissionProvider>
+        <ProfileCompletionGuard>
+          <AuthenticatedRouter />
+        </ProfileCompletionGuard>
+      </PermissionProvider>
+    </ImpersonationProvider>
   );
 }
 
