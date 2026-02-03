@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -162,6 +163,43 @@ export default function HelpPage() {
   const [feedbackType, setFeedbackType] = useState<string>("feature_suggestion");
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [showAiChat, setShowAiChat] = useState(false);
+  const aiResponseRef = useRef<HTMLDivElement>(null);
+
+  const askAIMutation = useMutation({
+    mutationFn: async (question: string) => {
+      const res = await apiRequest("POST", "/api/help-chat", { message: question });
+      const data = await res.json();
+      return data.response;
+    },
+    onSuccess: (response) => {
+      setAiResponse(response);
+      setShowAiChat(true);
+      setTimeout(() => {
+        aiResponseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "AI couldn't answer",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAskAI = () => {
+    if (!searchQuery.trim()) return;
+    setAiResponse(null);
+    askAIMutation.mutate(searchQuery);
+  };
+
+  const isQuestionLike = (text: string) => {
+    const questionIndicators = ["?", "how ", "what ", "why ", "where ", "when ", "can i ", "how do ", "help me ", "explain ", "tell me "];
+    const lower = text.toLowerCase();
+    return questionIndicators.some(q => lower.includes(q));
+  };
 
   const feedbackMutation = useMutation({
     mutationFn: async (data: { type: string; subject: string; message: string }) => {
@@ -1033,28 +1071,110 @@ export default function HelpPage() {
           </p>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search help topics..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10"
-            data-testid="input-help-search"
-          />
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search topics or ask a question..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!e.target.value) {
+                  setShowAiChat(false);
+                  setAiResponse(null);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && isQuestionLike(searchQuery)) {
+                  handleAskAI();
+                }
+              }}
+              className="pl-10 pr-10"
+              data-testid="input-help-search"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                onClick={() => {
+                  setSearchQuery("");
+                  setShowAiChat(false);
+                  setAiResponse(null);
+                }}
+                data-testid="button-clear-search"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          
           {searchQuery && (
             <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-              onClick={() => setSearchQuery("")}
-              data-testid="button-clear-search"
+              onClick={handleAskAI}
+              disabled={askAIMutation.isPending}
+              className="w-full"
+              variant={isQuestionLike(searchQuery) ? "default" : "outline"}
+              data-testid="button-ask-ai"
             >
-              <X className="w-4 h-4" />
+              {askAIMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Thinking...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Ask AI: "{searchQuery.length > 30 ? searchQuery.substring(0, 30) + "..." : searchQuery}"
+                </>
+              )}
             </Button>
           )}
         </div>
+
+        {showAiChat && aiResponse && (
+          <Card ref={aiResponseRef} className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                AI Answer
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="whitespace-pre-wrap text-sm">{aiResponse}</div>
+              </div>
+              <div className="mt-4 pt-3 border-t flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowAiChat(false);
+                    setAiResponse(null);
+                    setSearchQuery("");
+                  }}
+                  data-testid="button-clear-ai-response"
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Clear
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(aiResponse);
+                    toast({ title: "Copied to clipboard" });
+                  }}
+                  data-testid="button-copy-ai-response"
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  Copy
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {!searchQuery && (
           <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
