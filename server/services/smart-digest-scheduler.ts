@@ -369,6 +369,8 @@ export class SmartDigestScheduler extends EventEmitter {
         staleDealThresholdDays: prefs.staleDealThresholdDays,
       }, digestType === 'immediate' ? 'daily' : digestType);
       
+      const notificationCount = data.appointments.length + data.followups.length + data.staleDeals.length + data.recentWins.length;
+      
       const hasContent = data.appointments.length > 0 ||
         data.followups.length > 0 ||
         data.staleDeals.length > 0 ||
@@ -384,6 +386,21 @@ export class SmartDigestScheduler extends EventEmitter {
           notificationCount: 0,
           sentAt: new Date(),
         };
+      }
+      
+      // For immediate digests, check if notification count meets threshold
+      if (digestType === 'immediate') {
+        const threshold = prefs.immediateThreshold || 5;
+        if (notificationCount < threshold) {
+          this.log(`Skipping immediate digest for user ${prefs.userId}: ${notificationCount} notifications < ${threshold} threshold`);
+          return {
+            userId: prefs.userId,
+            digestType,
+            success: true,
+            notificationCount,
+            sentAt: new Date(),
+          };
+        }
       }
       
       const digest = await generateDigestContent(data, 'Sales Rep', digestType === 'immediate' ? 'daily' : digestType, prefs.includeAiTips);
@@ -430,7 +447,7 @@ export class SmartDigestScheduler extends EventEmitter {
         userId: prefs.userId,
         digestType,
         success: result.success,
-        notificationCount: data.appointments.length + data.followups.length + data.staleDeals.length,
+        notificationCount,
         error: result.error,
         sentAt: new Date(),
       };
