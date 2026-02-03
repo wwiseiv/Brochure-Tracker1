@@ -122,7 +122,7 @@ const PHASES = ["All", "Prospecting", "Active Selling", "Closing", "Post-Sale"] 
 const STAGE_ORDER = [
   "prospect", "cold_call", "appointment_set", "presentation_made",
   "proposal_sent", "statement_analysis", "negotiating", "follow_up",
-  "documents_sent", "documents_signed", "sold", "installation_scheduled", "active_merchant"
+  "documents_sent", "documents_signed", "sold", "dead", "installation_scheduled", "active_merchant"
 ];
 
 const TERMINAL_STAGES = ["sold", "dead", "active_merchant"];
@@ -164,7 +164,7 @@ export default function DealPipelinePage() {
   const [phaseFilter, setPhaseFilter] = useState<string>("All");
   const [temperatureFilter, setTemperatureFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban");
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingStage, setEditingStage] = useState("");
   const [editingNotes, setEditingNotes] = useState("");
@@ -957,61 +957,177 @@ export default function DealPipelinePage() {
     return <SwipeableDealCard key={deal.id} deal={deal} />;
   };
 
+  // Group stages by phase for visual organization
+  const PHASE_GROUPS = {
+    "Prospecting": ["prospect", "cold_call", "appointment_set"],
+    "Active Selling": ["presentation_made", "proposal_sent", "statement_analysis", "negotiating", "follow_up"],
+    "Closing": ["documents_sent", "documents_signed", "sold", "dead"],
+    "Post-Sale": ["installation_scheduled", "active_merchant"]
+  };
+
   const renderKanbanView = () => {
-    const visibleStages = getStagesForPhase(phaseFilter);
+    // Get all deals (unfiltered for Kanban - show everything)
+    const allDeals = (dealsData || []).filter(d => !d.archived);
+    
+    // Apply only search and temperature filters in Kanban, not phase filter
+    const kanbanFilteredDeals = allDeals.filter((deal) => {
+      const matchesSearch = deal.businessName.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTemperature = temperatureFilter === "all" || deal.temperature === temperatureFilter;
+      return matchesSearch && matchesTemperature;
+    });
 
     return (
-      <div className="overflow-x-auto pb-4 -mx-4 px-4">
-        <div className="flex gap-4" style={{ minWidth: `${visibleStages.length * 280}px` }}>
-          {visibleStages.map((stage) => {
-            const stageDeals = filteredDeals.filter(d => d.currentStage === stage);
-            const config = DEAL_STAGE_CONFIG[stage];
-            const count = pipelineCounts?.[stage] || stageDeals.length;
+      <div className="space-y-4">
+        {/* Stage Progress Summary Bar */}
+        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto">
+          <div className="flex gap-1 min-w-max">
+            {STAGE_ORDER.map((stage, idx) => {
+              const count = kanbanFilteredDeals.filter(d => d.currentStage === stage).length;
+              const config = DEAL_STAGE_CONFIG[stage];
+              const isTerminal = TERMINAL_STAGES.includes(stage);
+              return (
+                <div
+                  key={stage}
+                  className={`flex flex-col items-center px-2 py-1 rounded ${count > 0 ? config.color : 'bg-muted/30 text-muted-foreground'}`}
+                  title={`${config.label}: ${count} deals`}
+                >
+                  <span className="text-xs font-medium">{count}</span>
+                  <span className="text-[10px] whitespace-nowrap">{config.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-            return (
-              <div
-                key={stage}
-                className="flex-shrink-0 w-[260px] bg-muted/50 rounded-lg p-3"
-                data-testid={`stage-column-${stage}`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`text-xs ${config.color}`}>{config.label}</Badge>
-                    <span className="text-sm text-muted-foreground">{count}</span>
+        {/* Kanban Board - Full width with horizontal scroll */}
+        <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="flex gap-3" style={{ minWidth: `${STAGE_ORDER.length * 200 + (Object.keys(PHASE_GROUPS).length * 20)}px` }}>
+            {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
+              <div key={phaseName} className="flex gap-2">
+                {/* Phase Divider Label - shown between groups */}
+                {phaseIdx > 0 && (
+                  <div className="flex items-center">
+                    <div className="w-px h-full bg-border mx-1" />
                   </div>
-                </div>
-                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                  {stageDeals.map((deal) => (
-                    <Card
-                      key={deal.id}
-                      className="p-3 cursor-pointer hover-elevate"
-                      onClick={() => handleOpenDeal(deal)}
-                      data-testid={`deal-card-${deal.id}`}
+                )}
+                
+                {stages.map((stage) => {
+                  const stageDeals = kanbanFilteredDeals.filter(d => d.currentStage === stage);
+                  const config = DEAL_STAGE_CONFIG[stage];
+                  const StageIcon = config.icon;
+                  const isTerminal = TERMINAL_STAGES.includes(stage);
+
+                  return (
+                    <div
+                      key={stage}
+                      className={`flex-shrink-0 w-[180px] md:w-[200px] lg:w-[220px] rounded-lg ${isTerminal ? 'bg-muted/30' : 'bg-muted/50'}`}
+                      data-testid={`stage-column-${stage}`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-medium text-sm truncate flex-1 min-w-0">{deal.businessName}</h4>
-                        <div className="flex-shrink-0">{renderTemperatureBadge(deal.temperature)}</div>
+                      {/* Stage Header */}
+                      <div className={`px-3 py-2 rounded-t-lg ${config.color} border-b border-border/50`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <StageIcon className="w-3.5 h-3.5" />
+                            <span className="text-xs font-semibold">{config.label}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-xs h-5 px-1.5 bg-background/50">
+                            {stageDeals.length}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] opacity-70 mt-0.5">{phaseName}</p>
                       </div>
-                      {deal.estimatedCommission && (
-                        <p className="text-sm text-green-600 dark:text-green-400 font-medium mb-1">
-                          {formatCurrency(parseFloat(deal.estimatedCommission))}
-                        </p>
-                      )}
-                      {deal.nextFollowUpAt && new Date(deal.nextFollowUpAt) <= new Date() && (
-                        <p className="text-xs text-red-600 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          Follow-up overdue
-                        </p>
-                      )}
-                    </Card>
-                  ))}
-                  {stageDeals.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">No deals</p>
-                  )}
-                </div>
+                      
+                      {/* Deal Cards */}
+                      <div className="p-2 space-y-2 max-h-[50vh] md:max-h-[60vh] overflow-y-auto">
+                        {stageDeals.map((deal) => (
+                          <Card
+                            key={deal.id}
+                            className="p-2.5 cursor-pointer hover-elevate border-l-2"
+                            style={{ borderLeftColor: deal.temperature === 'hot' ? '#ef4444' : deal.temperature === 'warm' ? '#f59e0b' : '#3b82f6' }}
+                            onClick={() => handleOpenDeal(deal)}
+                            data-testid={`deal-card-${deal.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-1 mb-1">
+                              <h4 className="font-medium text-xs leading-tight line-clamp-2 flex-1 min-w-0">
+                                {deal.businessName}
+                              </h4>
+                            </div>
+                            
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {renderTemperatureBadge(deal.temperature)}
+                              {deal.estimatedCommission && parseFloat(deal.estimatedCommission) > 0 && (
+                                <Badge variant="outline" className="text-[10px] h-4 px-1 text-green-600 border-green-200 dark:text-green-400 dark:border-green-800">
+                                  {formatCurrency(parseFloat(deal.estimatedCommission))}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {/* Location */}
+                            {deal.businessCity && (
+                              <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 truncate">
+                                <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                {deal.businessCity}{deal.businessState ? `, ${deal.businessState}` : ''}
+                              </p>
+                            )}
+                            
+                            {/* Follow-up indicator */}
+                            {deal.nextFollowUpAt && (
+                              <p className={`text-[10px] mt-1 flex items-center gap-1 ${new Date(deal.nextFollowUpAt) <= new Date() ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+                                {new Date(deal.nextFollowUpAt) <= new Date() ? (
+                                  <>
+                                    <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                    Overdue
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-2.5 h-2.5 shrink-0" />
+                                    {format(new Date(deal.nextFollowUpAt), 'MMM d')}
+                                  </>
+                                )}
+                              </p>
+                            )}
+                            
+                            {/* Quick Actions */}
+                            <div className="flex gap-1 mt-2 pt-1.5 border-t border-border/50">
+                              {deal.businessPhone && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-1.5 text-[10px]"
+                                  onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${deal.businessPhone}`; }}
+                                  data-testid={`deal-call-${deal.id}`}
+                                >
+                                  <Phone className="w-2.5 h-2.5 mr-0.5" />
+                                  Call
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-1.5 text-[10px]"
+                                onClick={(e) => { e.stopPropagation(); handleOpenDeal(deal); }}
+                                data-testid={`deal-view-${deal.id}`}
+                              >
+                                <ChevronRight className="w-2.5 h-2.5" />
+                                View
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                        
+                        {stageDeals.length === 0 && (
+                          <div className="text-center py-6">
+                            <StageIcon className="w-6 h-6 mx-auto text-muted-foreground/40 mb-1" />
+                            <p className="text-[10px] text-muted-foreground">No deals</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -1069,14 +1185,15 @@ export default function DealPipelinePage() {
         </div>
       </header>
 
-      <main className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 py-4 md:py-6 space-y-4">
+      <main className={`${viewMode === 'kanban' ? 'w-full px-4' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2">
+            {/* Summary Stats - Always visible */}
+            <div className="grid grid-cols-3 gap-2 max-w-3xl">
               <Card className="p-3 text-center">
                 <p className="text-2xl font-bold text-primary">{totalDeals}</p>
                 <p className="text-xs text-muted-foreground">Total Deals</p>
@@ -1091,21 +1208,24 @@ export default function DealPipelinePage() {
               </Card>
             </div>
 
-            <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div className="flex gap-2" style={{ minWidth: "fit-content" }}>
-                {PHASES.map((phase) => (
-                  <Button
-                    key={phase}
-                    variant={phaseFilter === phase ? "default" : "outline"}
-                    className="whitespace-nowrap"
-                    onClick={() => setPhaseFilter(phase)}
-                    data-testid={`stage-filter-${phase.toLowerCase().replace(" ", "-")}`}
-                  >
-                    {phase}
-                  </Button>
-                ))}
+            {/* Phase Filters - Only show in List view */}
+            {viewMode === 'list' && (
+              <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="flex gap-2" style={{ minWidth: "fit-content" }}>
+                  {PHASES.map((phase) => (
+                    <Button
+                      key={phase}
+                      variant={phaseFilter === phase ? "default" : "outline"}
+                      className="whitespace-nowrap"
+                      onClick={() => setPhaseFilter(phase)}
+                      data-testid={`stage-filter-${phase.toLowerCase().replace(" ", "-")}`}
+                    >
+                      {phase}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex gap-2">
               <div className="relative flex-1">
