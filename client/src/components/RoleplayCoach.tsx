@@ -67,6 +67,21 @@ interface SessionFeedback {
   objectionHandling: string;
   rapportBuilding: string;
   topTip: string;
+  psychographicAdaptation?: string;
+  emotionalDriversUsed?: string[];
+  tonalEffectiveness?: string;
+  correctiveScript?: string;
+  analysis?: {
+    psychographicType: string;
+    psychographicConfidence: number;
+    linguisticMarkers: string[];
+    driversUsed: string[];
+    driverEffectiveness: number;
+    missedOpportunities: string[];
+    tonePattern: string[];
+    tonalAppropriateness: number;
+    tonalSuggestions: string[];
+  };
 }
 
 interface Persona {
@@ -721,7 +736,11 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                       feedback.topTip ? `\nTop Tip:\n${feedback.topTip}` : "",
                       feedback.nepqUsage ? `\nNEPQ Technique Usage:\n${feedback.nepqUsage}` : "",
                       feedback.objectionHandling ? `\nObjection Handling:\n${feedback.objectionHandling}` : "",
-                      feedback.rapportBuilding ? `\nRapport Building:\n${feedback.rapportBuilding}` : ""
+                      feedback.rapportBuilding ? `\nRapport Building:\n${feedback.rapportBuilding}` : "",
+                      feedback.analysis ? `\n--- Advanced Analysis ---\nProspect Type: ${feedback.analysis.psychographicType} (${feedback.analysis.psychographicConfidence}% confidence)\nEmotional Drivers Used: ${feedback.analysis.driversUsed?.join(", ") || "None"} (${feedback.analysis.driverEffectiveness}% effectiveness)\nTonal Pattern: ${feedback.analysis.tonePattern?.join(" → ") || "N/A"} (${feedback.analysis.tonalAppropriateness}% appropriateness)` : "",
+                      feedback.analysis?.missedOpportunities?.length ? `\nMissed Opportunities:\n${feedback.analysis.missedOpportunities.map(m => `• ${m}`).join("\n")}` : "",
+                      feedback.psychographicAdaptation ? `\nPsychographic Adaptation:\n${feedback.psychographicAdaptation}` : "",
+                      feedback.correctiveScript ? `\nCorrective Script:\n"${feedback.correctiveScript}"` : ""
                     ].filter(Boolean).join("\n")}
                     title="Role-Play Session Feedback"
                     subtitle={`Score: ${feedback.overallScore}/100`}
@@ -782,6 +801,102 @@ export function RoleplayCoach({ dropId, dealId, merchantId, businessName, busine
                         <span className="font-medium text-blue-700">NEPQ Technique Usage</span>
                       </div>
                       <p className="text-sm text-muted-foreground">{feedback.nepqUsage}</p>
+                    </Card>
+                  )}
+
+                  {feedback.analysis && (
+                    <Card className="p-3 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users className="w-4 h-4 text-purple-600" />
+                        <span className="font-medium text-purple-700 dark:text-purple-300">Advanced Analysis</span>
+                      </div>
+                      
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <p className="font-medium text-purple-700 dark:text-purple-300 mb-1">Prospect Type Detected</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="capitalize">
+                              {feedback.analysis.psychographicType}
+                            </Badge>
+                            <span className="text-muted-foreground text-xs">
+                              ({feedback.analysis.psychographicConfidence}% confidence)
+                            </span>
+                          </div>
+                          {feedback.analysis.linguisticMarkers?.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Markers: {feedback.analysis.linguisticMarkers.slice(0, 4).join(", ")}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="font-medium text-purple-700 dark:text-purple-300 mb-1">Emotional Drivers</p>
+                          <div className="flex flex-wrap gap-1">
+                            {feedback.analysis.driversUsed?.length > 0 ? (
+                              feedback.analysis.driversUsed.map((driver, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs capitalize">
+                                  {driver}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground text-xs">None detected</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Progress value={feedback.analysis.driverEffectiveness} className="h-1.5 flex-1" />
+                            <span className="text-xs text-muted-foreground">{feedback.analysis.driverEffectiveness}%</span>
+                          </div>
+                          {feedback.analysis.missedOpportunities?.length > 0 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              Tip: {feedback.analysis.missedOpportunities[0]}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="font-medium text-purple-700 dark:text-purple-300 mb-1">Tonal Pattern</p>
+                          {feedback.analysis.tonePattern?.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {feedback.analysis.tonePattern.map((tone, i) => (
+                                <Badge key={i} variant="outline" className="text-xs capitalize">
+                                  {tone}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">Pattern not analyzed</span>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <Progress value={feedback.analysis.tonalAppropriateness} className="h-1.5 flex-1" />
+                            <span className="text-xs text-muted-foreground">{feedback.analysis.tonalAppropriateness}%</span>
+                          </div>
+                          {feedback.analysis.tonalSuggestions?.length > 0 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              {feedback.analysis.tonalSuggestions[0]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {feedback.psychographicAdaptation && (
+                    <Card className="p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-indigo-600" />
+                        <span className="font-medium text-indigo-700 dark:text-indigo-300">Psychographic Adaptation</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{feedback.psychographicAdaptation}</p>
+                    </Card>
+                  )}
+
+                  {feedback.correctiveScript && (
+                    <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lightbulb className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Corrective Script</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground italic">"{feedback.correctiveScript}"</p>
                     </Card>
                   )}
                 </div>
