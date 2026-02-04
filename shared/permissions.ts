@@ -294,13 +294,13 @@ export const FEATURES: FeatureDefinition[] = [
   },
   {
     id: 'brochure_inventory',
-    name: 'Brochure Inventory',
+    name: 'Inventory Tracking',
     description: 'Track brochure inventory and assignments',
     category: 'brochure_management',
     routes: ['/inventory'],
     apiEndpoints: ['/api/inventory/*'],
     roleDefaults: { admin: true, manager: true, agent: true },
-    stageDefaults: { trainee: true, active: true, senior: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
     icon: 'Package'
   },
   {
@@ -316,14 +316,36 @@ export const FEATURES: FeatureDefinition[] = [
   },
   {
     id: 'referral_tracking',
-    name: 'Referral Management',
+    name: 'Referral Tracking',
     description: 'Track and manage merchant referrals',
     category: 'brochure_management',
     routes: ['/referrals'],
     apiEndpoints: ['/api/referrals/*'],
     roleDefaults: { admin: true, manager: true, agent: true },
-    stageDefaults: { trainee: true, active: true, senior: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
     icon: 'UserPlus'
+  },
+  {
+    id: 'todays_pickups',
+    name: "Today's Pickups",
+    description: "Dashboard section showing today's scheduled pickups",
+    category: 'brochure_management',
+    routes: [],
+    apiEndpoints: [],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
+    icon: 'Calendar'
+  },
+  {
+    id: 'coming_up_section',
+    name: 'Coming Up',
+    description: 'Dashboard section showing upcoming pickups',
+    category: 'brochure_management',
+    routes: [],
+    apiEndpoints: [],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
+    icon: 'CalendarDays'
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -407,7 +429,7 @@ export const FEATURES: FeatureDefinition[] = [
     routes: ['/my-work', '/my-analytics'],
     apiEndpoints: ['/api/my-work/*'],
     roleDefaults: { admin: true, manager: true, agent: true },
-    stageDefaults: { trainee: true, active: true, senior: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
     icon: 'BarChart2'
   },
   {

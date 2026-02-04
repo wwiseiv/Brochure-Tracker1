@@ -296,84 +296,90 @@ export default function DashboardPage() {
           </Tooltip>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <section>
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h2 className="text-lg font-semibold">Today's Pickups</h2>
-              <div className="flex items-center gap-2">
-                <Tooltip delayDuration={700}>
-                  <TooltipTrigger asChild>
-                    <Link href="/route">
-                      <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
-                        <Route className="w-4 h-4" />
-                        Plan Route
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Optimize your driving route</p>
-                  </TooltipContent>
-                </Tooltip>
-                <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  {todaysPickups.length}
-                </span>
-              </div>
-            </div>
-            
-            {todaysPickups.length > 0 ? (
-              <div className="space-y-3">
-                {todaysPickups.slice(0, 3).map((drop) => (
-                  <DropCard key={drop.id} drop={drop} variant="urgent" />
-                ))}
-                {todaysPickups.length > 3 && (
+        {(hasFeature("todays_pickups") || hasFeature("coming_up_section")) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {hasFeature("todays_pickups") && (
+              <section>
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h2 className="text-lg font-semibold">Today's Pickups</h2>
+                  <div className="flex items-center gap-2">
+                    <Tooltip delayDuration={700}>
+                      <TooltipTrigger asChild>
+                        <Link href="/route">
+                          <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-route-planner">
+                            <Route className="w-4 h-4" />
+                            Plan Route
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Optimize your driving route</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      {todaysPickups.length}
+                    </span>
+                  </div>
+                </div>
+                
+                {todaysPickups.length > 0 ? (
+                  <div className="space-y-3">
+                    {todaysPickups.slice(0, 3).map((drop) => (
+                      <DropCard key={drop.id} drop={drop} variant="urgent" />
+                    ))}
+                    {todaysPickups.length > 3 && (
+                      <Tooltip delayDuration={700}>
+                        <TooltipTrigger asChild>
+                          <Link href="/history?filter=today">
+                            <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
+                              View all {todaysPickups.length} pickups
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View all today's scheduled pickups</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                ) : (
+                  <EmptyState type="today" />
+                )}
+              </section>
+            )}
+
+            {hasFeature("coming_up_section") && (
+              <section className="md:block hidden">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold">Coming Up</h2>
                   <Tooltip delayDuration={700}>
                     <TooltipTrigger asChild>
-                      <Link href="/history?filter=today">
-                        <Button variant="ghost" className="w-full min-h-touch gap-1 text-primary" data-testid="button-view-all-today">
-                          View all {todaysPickups.length} pickups
+                      <Link href="/history?filter=upcoming">
+                        <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-upcoming-grid">
+                          View all
                           <ChevronRight className="w-4 h-4" />
                         </Button>
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>View all today's scheduled pickups</p>
+                      <p>View all upcoming pickups</p>
                     </TooltipContent>
                   </Tooltip>
+                </div>
+                {upcomingPickups.length > 0 ? (
+                  <div className="space-y-3">
+                    {upcomingPickups.slice(0, 3).map((drop) => (
+                      <DropCard key={drop.id} drop={drop} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState type="upcoming" />
                 )}
-              </div>
-            ) : (
-              <EmptyState type="today" />
+              </section>
             )}
-          </section>
-
-          <section className="md:block hidden">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Coming Up</h2>
-              <Tooltip delayDuration={700}>
-                <TooltipTrigger asChild>
-                  <Link href="/history?filter=upcoming">
-                    <Button variant="ghost" className="min-h-touch text-primary gap-1" data-testid="button-view-upcoming-grid">
-                      View all
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View all upcoming pickups</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            {upcomingPickups.length > 0 ? (
-              <div className="space-y-3">
-                {upcomingPickups.slice(0, 3).map((drop) => (
-                  <DropCard key={drop.id} drop={drop} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState type="upcoming" />
-            )}
-          </section>
-        </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link href="/history?filter=upcoming">
@@ -755,7 +761,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {upcomingPickups.length > 0 && (
+        {hasFeature("coming_up_section") && upcomingPickups.length > 0 && (
           <section className="md:hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Coming Up</h2>
