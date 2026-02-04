@@ -15,7 +15,6 @@ import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera, FileImage, Target, Mail, FileSignature, Phone, ClipboardList, Flame, Thermometer, Snowflake, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure, UserPreferences, UserPermissions } from "@shared/schema";
 
@@ -145,14 +144,6 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-card border-b border-border">
-          <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
-            </div>
-            <div className="w-8 h-8 rounded-full bg-muted" />
-          </div>
-        </header>
         <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6">
           <DashboardSkeleton />
         </main>
@@ -163,10 +154,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
-          </div>
+        <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-end gap-2">
           <div className="flex items-center gap-2">
             {canAccessFeature("activity_feed") && (
               <Tooltip delayDuration={700}>

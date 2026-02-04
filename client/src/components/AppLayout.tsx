@@ -187,11 +187,8 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader className="p-4">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center">
           <img src={pcbLogoFullColor} alt="PCBancard" className="h-8 w-auto" />
-          <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
-            BrochureTracker
-          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
