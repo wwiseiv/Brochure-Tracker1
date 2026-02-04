@@ -138,12 +138,8 @@ export function ImpersonationProvider({ children }: ImpersonationProviderProps) 
   // Start impersonation mutation
   const startMutation = useMutation({
     mutationFn: async ({ targetUserId, reason }: { targetUserId: string; reason?: string }) => {
-      const response = await apiRequest<StartImpersonationResponse>('/api/impersonation/start', {
-        method: 'POST',
-        body: JSON.stringify({ targetUserId, reason }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return response;
+      const response = await apiRequest('POST', '/api/impersonation/start', { targetUserId, reason });
+      return await response.json() as StartImpersonationResponse;
     },
     onSuccess: (data) => {
       setSessionToken(data.sessionToken);
@@ -172,11 +168,7 @@ export function ImpersonationProvider({ children }: ImpersonationProviderProps) 
   const endMutation = useMutation({
     mutationFn: async () => {
       if (!sessionToken) return;
-      await apiRequest('/api/impersonation/end', {
-        method: 'POST',
-        body: JSON.stringify({ sessionToken }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      await apiRequest('POST', '/api/impersonation/end', { sessionToken });
     },
     onSuccess: () => {
       setSessionToken(null);
