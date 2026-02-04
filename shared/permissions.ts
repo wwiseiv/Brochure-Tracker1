@@ -550,6 +550,21 @@ export const FEATURES: FeatureDefinition[] = [
     stageDefaults: { trainee: false, active: false, senior: false },
     icon: 'ToggleLeft'
   },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMMUNICATION FEATURES
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'email_digest',
+    name: 'Email Digest',
+    description: 'Receive daily/weekly email digest summaries',
+    category: 'communication',
+    routes: [],
+    apiEndpoints: ['/api/digest/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Mail'
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

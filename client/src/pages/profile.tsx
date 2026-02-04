@@ -475,6 +475,7 @@ export default function ProfilePage() {
           </Card>
         </Collapsible>
 
+        {canAccessFeature('email_digest') && (
         <Collapsible open={digestSettingsOpen} onOpenChange={setDigestSettingsOpen}>
           <Card className="p-4">
             <CollapsibleTrigger asChild>
@@ -758,6 +759,7 @@ export default function ProfilePage() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
+        )}
 
         <Card className="p-2">
           <div className="space-y-1">

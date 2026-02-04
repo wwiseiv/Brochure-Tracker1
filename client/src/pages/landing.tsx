@@ -328,12 +328,21 @@ export default function LandingPage() {
           <p className="text-sm text-muted-foreground mb-6">
             Join PCBancard field representatives using the most comprehensive sales platform
           </p>
-          <a href="/api/login">
-            <Button variant="outline" className="w-full md:w-auto min-h-touch gap-2 px-8" data-testid="button-login-bottom">
-              Log In to Continue
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </a>
+          <div className="flex flex-col items-center gap-3">
+            <a href="/api/login">
+              <Button variant="outline" className="w-full md:w-auto min-h-touch gap-2 px-8" data-testid="button-login-bottom">
+                Log In to Continue
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </a>
+            <a 
+              href="/api/logout" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="link-use-different-account"
+            >
+              Use a different account
+            </a>
+          </div>
         </section>
       </main>
 
