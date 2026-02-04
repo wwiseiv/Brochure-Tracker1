@@ -1783,6 +1783,58 @@ Format your response as JSON:
     }
   });
 
+  // Consolidate all organizations - merge all members into the primary org (admin only)
+  app.post("/api/organization/consolidate", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership;
+      const currentOrgId = membership.organization.id;
+      
+      // Get all organizations
+      const allOrgs = await db.select().from(organizations);
+      
+      // Get all organization members from other organizations
+      const otherOrgMembers = await db.select()
+        .from(organizationMembers)
+        .where(sql`${organizationMembers.orgId} != ${currentOrgId}`);
+      
+      let movedCount = 0;
+      const skipped: string[] = [];
+      
+      for (const member of otherOrgMembers) {
+        // Check if this user already exists in the current organization
+        const existingInCurrentOrg = await db.select()
+          .from(organizationMembers)
+          .where(sql`${organizationMembers.orgId} = ${currentOrgId} AND ${organizationMembers.userId} = ${member.userId}`)
+          .limit(1);
+        
+        if (existingInCurrentOrg.length > 0) {
+          // User already exists in current org, skip
+          skipped.push(member.email || member.userId);
+          continue;
+        }
+        
+        // Move member to current organization
+        await db.update(organizationMembers)
+          .set({ orgId: currentOrgId })
+          .where(eq(organizationMembers.id, member.id));
+        
+        movedCount++;
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Consolidated ${movedCount} team members into your organization`,
+        movedCount,
+        skipped,
+        currentOrgId,
+        otherOrgsFound: allOrgs.filter(o => o.id !== currentOrgId).map(o => ({ id: o.id, name: o.name }))
+      });
+    } catch (error) {
+      console.error("Error consolidating organizations:", error);
+      res.status(500).json({ error: "Failed to consolidate organizations" });
+    }
+  });
+
   // ============================================
   // USER PERMISSIONS API (RBAC)
   // ============================================

@@ -345,6 +345,27 @@ export default function TeamManagementPage() {
     },
   });
 
+  const consolidateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/organization/consolidate", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization/members"] });
+      toast({
+        title: "Team consolidated",
+        description: data.message || `Moved ${data.movedCount} members to your organization.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to consolidate",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // User Permissions State - Feature-based
   const [isPermissionsSheetOpen, setIsPermissionsSheetOpen] = useState(false);
   const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<OrganizationMember | null>(null);
@@ -884,8 +905,22 @@ export default function TeamManagementPage() {
                   <TableBody>
                     {!members || members.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          No team members found
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <div className="flex flex-col items-center gap-3">
+                            <p className="text-muted-foreground">No team members found</p>
+                            {userRole?.role === "master_admin" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => consolidateMutation.mutate()}
+                                disabled={consolidateMutation.isPending}
+                                data-testid="button-consolidate-teams"
+                              >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${consolidateMutation.isPending ? 'animate-spin' : ''}`} />
+                                {consolidateMutation.isPending ? "Consolidating..." : "Import Team from Other Orgs"}
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (
