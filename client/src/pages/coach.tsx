@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { usePermissions } from "@/contexts/PermissionContext";
 import {
   MessageSquare,
   Mic,
@@ -973,6 +974,8 @@ export default function CoachPage() {
     queryKey: ["/api/me/permissions"],
   });
 
+  const { hasFeature } = usePermissions();
+
   // Fetch personas for roleplay mode
   const { data: personasData, isLoading: isLoadingPersonas } = useQuery<{ personas: Persona[] }>({
     queryKey: ["/api/roleplay/personas"],
@@ -1508,7 +1511,7 @@ export default function CoachPage() {
               </Link>
 
               {/* Proposal Generator Link - only show if user has permission */}
-              {myPermissions?.canAccessProposals !== false && (
+              {hasFeature("proposal_generator") && (
                 <Link href="/proposal-generator" className="block">
                   <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
                     <div className="flex items-center justify-between gap-3">
@@ -1528,7 +1531,7 @@ export default function CoachPage() {
               )}
 
               {/* Statement Analyzer Link - only show if user has permission */}
-              {myPermissions?.canAccessProposals !== false && (
+              {hasFeature("statement_analyzer") && (
                 <Link href="/statement-analyzer" className="block">
                   <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-statement-analyzer">
                     <div className="flex items-center justify-between gap-3">
@@ -1548,7 +1551,7 @@ export default function CoachPage() {
               )}
 
               {/* EquipIQ Link - only show if user has permission */}
-              {myPermissions?.canAccessEquipIQ !== false && (
+              {hasFeature("equipiq") && (
                 <Link href="/equipiq" className="block">
                   <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-equipiq">
                     <div className="flex items-center justify-between gap-3">
