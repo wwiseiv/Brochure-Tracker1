@@ -4,7 +4,16 @@ import { authStorage } from "./replit_integrations/auth";
 import type { OrganizationMember, Organization, OrgMemberRole } from "@shared/schema";
 import { sendNewMemberNotification } from "./email";
 
-const ADMIN_EMAIL = "wwiseiv@icloud.com";
+const ADMIN_EMAILS = [
+  "wwiseiv@icloud.com",
+  "emma@pcbancard.com"
+];
+
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const lowerEmail = email.toLowerCase();
+  return ADMIN_EMAILS.some(adminEmail => adminEmail.toLowerCase() === lowerEmail);
+}
 
 export interface OrgMembershipInfo extends OrganizationMember {
   organization: Organization;
@@ -28,6 +37,20 @@ export async function getUserOrgMembership(req: Request): Promise<OrgMembershipI
   const membership = await storage.getUserMembership(userId);
   
   return membership || null;
+}
+
+async function autoUpgradeAdminIfNeeded(userId: string, membership: OrgMembershipInfo): Promise<OrgMembershipInfo> {
+  const authUser = await authStorage.getUser(userId);
+  const authEmail = authUser?.email;
+  if (isAdminEmail(authEmail) && membership.role !== 'master_admin') {
+    await storage.updateOrganizationMemberRole(membership.id, 'master_admin');
+    membership.role = 'master_admin';
+    if (!membership.email && authEmail) {
+      await storage.updateOrganizationMember(membership.id, { email: authEmail });
+      membership.email = authEmail;
+    }
+  }
+  return membership;
 }
 
 export async function bootstrapUserOrganization(userId: string): Promise<OrgMembershipInfo> {
@@ -55,7 +78,7 @@ export async function bootstrapUserOrganization(userId: string): Promise<OrgMemb
           await storage.updateInvitationStatus(pendingInvitation.id, "accepted", new Date());
           
           sendNewMemberNotification({
-            adminEmail: ADMIN_EMAIL,
+            adminEmail: ADMIN_EMAILS[0],
             memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "New User",
             memberEmail: userEmail,
             organizationName: inviteOrg.name,
@@ -79,8 +102,8 @@ export async function bootstrapUserOrganization(userId: string): Promise<OrgMemb
 
   const primaryOrg = await storage.getPrimaryOrganization();
   if (primaryOrg) {
-    const isAdminEmail = userEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    const role: OrgMemberRole = isAdminEmail ? "master_admin" : "agent";
+    const userIsAdmin = isAdminEmail(userEmail);
+    const role: OrgMemberRole = userIsAdmin ? "master_admin" : "agent";
     
     try {
       const member = await storage.createOrganizationMember({
@@ -90,9 +113,9 @@ export async function bootstrapUserOrganization(userId: string): Promise<OrgMemb
         managerId: null,
       });
       
-      if (!isAdminEmail) {
+      if (!userIsAdmin) {
         sendNewMemberNotification({
-          adminEmail: ADMIN_EMAIL,
+          adminEmail: ADMIN_EMAILS[0],
           memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "New User",
           memberEmail: userEmail || "Unknown",
           organizationName: primaryOrg.name,
@@ -143,6 +166,9 @@ export function requireRole(...allowedRoles: OrgMemberRole[]): RequestHandler {
       if (!membership) {
         membership = await bootstrapUserOrganization(userId);
       }
+      
+      // Auto-upgrade admin users
+      membership = await autoUpgradeAdminIfNeeded(userId, membership);
 
       req.orgMembership = membership;
 
@@ -175,6 +201,9 @@ export function requireOrgAccess(): RequestHandler {
       if (!membership) {
         membership = await bootstrapUserOrganization(userId);
       }
+      
+      // Auto-upgrade admin users
+      membership = await autoUpgradeAdminIfNeeded(userId, membership);
 
       req.orgMembership = membership;
       next();
@@ -199,6 +228,9 @@ export function ensureOrgMembership(): RequestHandler {
       if (!membership) {
         membership = await bootstrapUserOrganization(userId);
       }
+      
+      // Auto-upgrade admin users
+      membership = await autoUpgradeAdminIfNeeded(userId, membership);
       
       req.orgMembership = membership;
 

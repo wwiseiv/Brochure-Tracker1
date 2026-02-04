@@ -26,6 +26,7 @@ Preferred communication style: Simple, everyday language.
 - **Reminder System**: Automated follow-up notifications.
 - **CRM & Deal Pipeline**: Comprehensive 14-stage sales pipeline (Prospecting, Active Selling, Closing, Post-Sale phases) with Kanban/list views, deal detail sheets, follow-up tracking, and manager analytics. Integrates with AI tools and e-sign services.
 - **User & Team Management**: Multi-tenancy, three-tier RBAC (`master_admin`, `relationship_manager`, `agent`), user impersonation, and team activity feeds.
+    - **Admin Emails**: Admin users are configured in `server/rbac.ts` (ADMIN_EMAILS array). Users with these emails are automatically assigned `master_admin` role and full feature access. Current admins: `wwiseiv@icloud.com`, `emma@pcbancard.com`.
 - **AI-Powered Sales Tools**:
     - **Voice Note Analysis**: AI-generated summaries and lead scoring from voice notes.
     - **AI Role-Play Coach**: Conversational AI for sales training with voice I/O, performance feedback based on advanced sales psychology (psychographic classification, emotional driver analysis, tonal pattern evaluation, NEPQ integration), and export functionality.

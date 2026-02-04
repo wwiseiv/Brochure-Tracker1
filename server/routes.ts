@@ -1915,6 +1915,16 @@ Format your response as JSON:
         });
       }
       
+      // Sync permission role with org membership role (handles auto-upgrade from ensureOrgMembership)
+      const expectedPermRole = mapOrgRoleToUserRole(membership.role);
+      if (perms.role !== expectedPermRole) {
+        await storage.updateUserPermissions(userId, { 
+          role: expectedPermRole, 
+          agentStage: expectedPermRole === 'agent' ? (perms.agentStage || 'trainee') : null 
+        });
+        perms.role = expectedPermRole;
+      }
+      
       // Get org-level feature disables
       const orgFeatures = await storage.getOrganizationFeatures(membership.orgId);
       const overrides = { ...((perms.featureOverrides as Record<string, boolean>) || {}) };
