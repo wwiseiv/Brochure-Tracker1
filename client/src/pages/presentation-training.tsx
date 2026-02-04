@@ -72,6 +72,23 @@ interface ChatMessage {
   content: string;
 }
 
+interface PracticeDrillData {
+  title?: string;
+  duration?: string;
+  steps?: string[];
+  roleplayPrompt?: string;
+  badExample?: string;
+  goodExample?: string;
+  aiCoachingPrompt?: string;
+}
+
+interface WhyItWorksEnhancedData {
+  merchantMindset?: string;
+  commonMistake?: string;
+  howPhrasingPreventsResistance?: string;
+  skipConsequence?: string;
+}
+
 export default function PresentationTrainingPage() {
   const { toast } = useToast();
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
@@ -435,13 +452,13 @@ export default function PresentationTrainingPage() {
       </header>
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-72 p-0">
-          <SheetHeader className="p-4 border-b">
+        <SheetContent side="left" className="w-72 p-0 flex flex-col h-full max-h-[100dvh]">
+          <SheetHeader className="p-4 border-b shrink-0">
             <SheetTitle>Modules</SheetTitle>
           </SheetHeader>
-          <ScrollArea className="h-[calc(100vh-5rem)]">
+          <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
             {renderModulesList()}
-          </ScrollArea>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -579,54 +596,57 @@ export default function PresentationTrainingPage() {
                     )}
                   </div>
                   
-                  {currentLesson.whyItWorksEnhanced && typeof currentLesson.whyItWorksEnhanced === 'object' ? (
+                  {currentLesson.whyItWorksEnhanced && typeof currentLesson.whyItWorksEnhanced === 'object' ? (() => {
+                    const why = currentLesson.whyItWorksEnhanced as WhyItWorksEnhancedData;
+                    return (
                     <div className="space-y-4" data-testid="content-why-it-works-enhanced">
-                      {(currentLesson.whyItWorksEnhanced as any).merchantMindset && (
+                      {why.merchantMindset && (
                         <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg" data-testid="card-merchant-mindset">
                           <div className="flex items-center gap-2 mb-2">
                             <Users className="w-4 h-4 text-purple-500" />
                             <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300">Merchant Mindset</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {(currentLesson.whyItWorksEnhanced as any).merchantMindset}
+                            {why.merchantMindset}
                           </p>
                         </div>
                       )}
-                      {(currentLesson.whyItWorksEnhanced as any).commonMistake && (
+                      {why.commonMistake && (
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg" data-testid="card-common-mistake">
                           <div className="flex items-center gap-2 mb-2">
                             <AlertTriangle className="w-4 h-4 text-amber-500" />
                             <h4 className="text-sm font-medium text-amber-700 dark:text-amber-300">Common Mistake</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {(currentLesson.whyItWorksEnhanced as any).commonMistake}
+                            {why.commonMistake}
                           </p>
                         </div>
                       )}
-                      {(currentLesson.whyItWorksEnhanced as any).howPhrasingPreventsResistance && (
+                      {why.howPhrasingPreventsResistance && (
                         <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg" data-testid="card-phrasing-resistance">
                           <div className="flex items-center gap-2 mb-2">
                             <Lightbulb className="w-4 h-4 text-green-500" />
                             <h4 className="text-sm font-medium text-green-700 dark:text-green-300">How Phrasing Prevents Resistance</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {(currentLesson.whyItWorksEnhanced as any).howPhrasingPreventsResistance}
+                            {why.howPhrasingPreventsResistance}
                           </p>
                         </div>
                       )}
-                      {(currentLesson.whyItWorksEnhanced as any).skipConsequence && (
+                      {why.skipConsequence && (
                         <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg" data-testid="card-skip-consequence">
                           <div className="flex items-center gap-2 mb-2">
                             <Target className="w-4 h-4 text-red-500" />
                             <h4 className="text-sm font-medium text-red-700 dark:text-red-300">If You Skip This</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {(currentLesson.whyItWorksEnhanced as any).skipConsequence}
+                            {why.skipConsequence}
                           </p>
                         </div>
                       )}
                     </div>
-                  ) : currentLesson.psychology ? (
+                    );
+                  })() : currentLesson.psychology ? (
                     <>
                       <ListenButton text={currentLesson.psychology} data-testid="button-listen-psychology" />
                       <p className="text-sm text-muted-foreground leading-relaxed mt-2">
@@ -676,25 +696,30 @@ export default function PresentationTrainingPage() {
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="w-5 h-5 text-green-500" />
                     <h3 className="font-semibold flex-1">Practice Drill</h3>
-                    {currentLesson.practiceDrill && (currentLesson.practiceDrill as any).duration && (
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <Clock className="w-3 h-3" />
-                        {(currentLesson.practiceDrill as any).duration}
-                      </Badge>
-                    )}
+                    {(() => {
+                      const drill = currentLesson.practiceDrill as PracticeDrillData | null;
+                      return drill?.duration ? (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Clock className="w-3 h-3" />
+                          {drill.duration}
+                        </Badge>
+                      ) : null;
+                    })()}
                   </div>
                   
-                  {currentLesson.practiceDrill && typeof currentLesson.practiceDrill === 'object' && (
+                  {currentLesson.practiceDrill && typeof currentLesson.practiceDrill === 'object' && (() => {
+                    const drill = currentLesson.practiceDrill as PracticeDrillData;
+                    return (
                     <div className="space-y-4 mb-6" data-testid="content-practice-drill">
-                      {(currentLesson.practiceDrill as any).title && (
-                        <p className="text-sm font-medium" data-testid="text-drill-title">{(currentLesson.practiceDrill as any).title}</p>
+                      {drill.title && (
+                        <p className="text-sm font-medium" data-testid="text-drill-title">{drill.title}</p>
                       )}
                       
-                      {(currentLesson.practiceDrill as any).steps && (currentLesson.practiceDrill as any).steps.length > 0 && (
+                      {drill.steps && drill.steps.length > 0 && (
                         <div className="bg-muted/50 p-3 rounded-lg" data-testid="card-drill-steps">
                           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Steps</h4>
                           <ol className="space-y-1.5" data-testid="list-drill-steps">
-                            {(currentLesson.practiceDrill as any).steps.map((step: string, idx: number) => (
+                            {drill.steps.map((step: string, idx: number) => (
                               <li key={idx} className="flex items-start gap-2 text-sm" data-testid={`item-drill-step-${idx}`}>
                                 <span className="text-primary font-bold shrink-0">{idx + 1}.</span>
                                 <span>{step}</span>
@@ -704,57 +729,58 @@ export default function PresentationTrainingPage() {
                         </div>
                       )}
                       
-                      {(currentLesson.practiceDrill as any).roleplayPrompt && (
+                      {drill.roleplayPrompt && (
                         <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg" data-testid="card-roleplay-scenario">
                           <div className="flex items-center gap-2 mb-2">
                             <Users className="w-4 h-4 text-blue-500" />
                             <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300">Roleplay Scenario</h4>
                           </div>
                           <p className="text-sm text-muted-foreground italic">
-                            {(currentLesson.practiceDrill as any).roleplayPrompt}
+                            {drill.roleplayPrompt}
                           </p>
                         </div>
                       )}
                       
                       <div className="grid gap-3 sm:grid-cols-2" data-testid="grid-examples">
-                        {(currentLesson.practiceDrill as any).badExample && (
+                        {drill.badExample && (
                           <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg" data-testid="card-bad-example">
                             <div className="flex items-center gap-2 mb-2">
                               <ThumbsDown className="w-4 h-4 text-red-500" />
                               <h4 className="text-sm font-medium text-red-700 dark:text-red-300">Avoid This</h4>
                             </div>
                             <p className="text-sm text-muted-foreground italic">
-                              &ldquo;{(currentLesson.practiceDrill as any).badExample}&rdquo;
+                              &ldquo;{drill.badExample}&rdquo;
                             </p>
                           </div>
                         )}
                         
-                        {(currentLesson.practiceDrill as any).goodExample && (
+                        {drill.goodExample && (
                           <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg" data-testid="card-good-example">
                             <div className="flex items-center gap-2 mb-2">
                               <ThumbsUp className="w-4 h-4 text-green-500" />
                               <h4 className="text-sm font-medium text-green-700 dark:text-green-300">Do This</h4>
                             </div>
                             <p className="text-sm text-muted-foreground italic">
-                              &ldquo;{(currentLesson.practiceDrill as any).goodExample}&rdquo;
+                              &ldquo;{drill.goodExample}&rdquo;
                             </p>
                           </div>
                         )}
                       </div>
                       
-                      {(currentLesson.practiceDrill as any).aiCoachingPrompt && (
+                      {drill.aiCoachingPrompt && (
                         <div className="bg-primary/5 border border-primary/20 p-3 rounded-lg" data-testid="card-ai-coaching-prompt">
                           <div className="flex items-center gap-2 mb-2">
                             <Sparkles className="w-4 h-4 text-primary" />
                             <h4 className="text-sm font-medium text-primary">AI Coaching Prompt</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {(currentLesson.practiceDrill as any).aiCoachingPrompt}
+                            {drill.aiCoachingPrompt}
                           </p>
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                   
                   {currentLesson.practicePrompt && !currentLesson.practiceDrill && (
                     <>
