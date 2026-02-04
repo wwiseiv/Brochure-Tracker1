@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -112,6 +113,14 @@ interface HelpItem {
   icon: React.ReactNode;
 }
 
+interface HelpSectionData {
+  title: string;
+  description: string;
+  items: HelpItem[];
+  badge?: string;
+  requiredFeature?: string;
+}
+
 function HelpSection({ 
   title, 
   description, 
@@ -155,6 +164,7 @@ function HelpSection({
 
 export default function HelpPage() {
   const { toast } = useToast();
+  const { hasFeature } = usePermissions();
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
@@ -1176,131 +1186,87 @@ export default function HelpPage() {
           </Card>
         )}
 
-        {!searchQuery && (
-          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Rocket className="w-5 h-5 text-primary" />
-                Quick Links
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("pipeline")}
-                  data-testid="quicklink-pipeline"
-                >
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  Deal Pipeline
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("statement")}
-                  data-testid="quicklink-statement"
-                >
-                  <FileSpreadsheet className="w-3 h-3 mr-1" />
-                  Statement Analyzer
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("proposal")}
-                  data-testid="quicklink-proposal"
-                >
-                  <FileText className="w-3 h-3 mr-1" />
-                  Proposals
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("e-sign")}
-                  data-testid="quicklink-esign"
-                >
-                  <FileSignature className="w-3 h-3 mr-1" />
-                  E-Signatures
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("coach")}
-                  data-testid="quicklink-coach"
-                >
-                  <Brain className="w-3 h-3 mr-1" />
-                  AI Coach
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("equipiq")}
-                  data-testid="quicklink-equipiq"
-                >
-                  <Package className="w-3 h-3 mr-1" />
-                  EquipIQ
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("drop")}
-                  data-testid="quicklink-drops"
-                >
-                  <ClipboardList className="w-3 h-3 mr-1" />
-                  Drops
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("offline")}
-                  data-testid="quicklink-offline"
-                >
-                  <WifiOff className="w-3 h-3 mr-1" />
-                  Offline Mode
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => setSearchQuery("presentation")}
-                  data-testid="quicklink-training"
-                >
-                  <GraduationCap className="w-3 h-3 mr-1" />
-                  Training
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {!searchQuery && (() => {
+          const quickLinks = [
+            { label: "Deal Pipeline", searchTerm: "pipeline", icon: <TrendingUp className="w-3 h-3 mr-1" />, testId: "quicklink-pipeline", requiredFeature: "deal_pipeline" },
+            { label: "Statement Analyzer", searchTerm: "statement", icon: <FileSpreadsheet className="w-3 h-3 mr-1" />, testId: "quicklink-statement", requiredFeature: "statement_analyzer" },
+            { label: "Proposals", searchTerm: "proposal", icon: <FileText className="w-3 h-3 mr-1" />, testId: "quicklink-proposal", requiredFeature: "proposal_generator" },
+            { label: "E-Signatures", searchTerm: "e-sign", icon: <FileSignature className="w-3 h-3 mr-1" />, testId: "quicklink-esign", requiredFeature: "esign_integration" },
+            { label: "AI Coach", searchTerm: "coach", icon: <Brain className="w-3 h-3 mr-1" />, testId: "quicklink-coach", requiredFeature: "ai_coaching" },
+            { label: "EquipIQ", searchTerm: "equipiq", icon: <Package className="w-3 h-3 mr-1" />, testId: "quicklink-equipiq", requiredFeature: "equipiq" },
+            { label: "Drops", searchTerm: "drop", icon: <ClipboardList className="w-3 h-3 mr-1" />, testId: "quicklink-drops", requiredFeature: "drop_management" },
+            { label: "Offline Mode", searchTerm: "offline", icon: <WifiOff className="w-3 h-3 mr-1" />, testId: "quicklink-offline", requiredFeature: undefined },
+            { label: "Training", searchTerm: "presentation", icon: <GraduationCap className="w-3 h-3 mr-1" />, testId: "quicklink-training", requiredFeature: "presentation_training" },
+          ];
+          
+          const filteredQuickLinks = quickLinks.filter(link => 
+            !link.requiredFeature || hasFeature(link.requiredFeature)
+          );
+          
+          if (filteredQuickLinks.length === 0) return null;
+          
+          return (
+            <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Rocket className="w-5 h-5 text-primary" />
+                  Quick Links
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {filteredQuickLinks.map((link) => (
+                    <Button 
+                      key={link.testId}
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => setSearchQuery(link.searchTerm)}
+                      data-testid={link.testId}
+                    >
+                      {link.icon}
+                      {link.label}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {(() => {
           const query = searchQuery.toLowerCase().trim();
           
-          const allSections = [
+          const allSections: HelpSectionData[] = [
             { title: "Getting Started", description: "New to BrochureTracker? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
-            { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users" },
-            { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users" },
-            { title: "Marketing Materials", description: "Professional flyers and AI-generated marketing content for every industry.", items: marketingMaterialsFeatures, badge: "New" },
-            { title: "AI-Powered Prospecting", description: "Find new merchants with AI search, scan business cards, and build your sales pipeline.", items: prospectingFeatures, badge: "New" },
-            { title: "Deal Pipeline & CRM", description: "Track every deal through a 14-stage sales pipeline with follow-up tracking, temperature badges, and conversion analytics.", items: dealPipelineFeatures, badge: "CRM" },
-            { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users" },
-            { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users" },
-            { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users" },
-            { title: "Statement Analyzer", description: "Upload merchant statements, extract data with AI, identify savings opportunities, and generate sales scripts.", items: statementAnalyzerFeatures, badge: "Sales Tool" },
-            { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users" },
-            { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users" },
+            { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users", requiredFeature: "drop_management" },
+            { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users", requiredFeature: "ai_coaching" },
+            { title: "Marketing Materials", description: "Professional flyers and AI-generated marketing content for every industry.", items: marketingMaterialsFeatures, badge: "New", requiredFeature: "marketing_materials" },
+            { title: "AI-Powered Prospecting", description: "Find new merchants with AI search, scan business cards, and build your sales pipeline.", items: prospectingFeatures, badge: "New", requiredFeature: "ai_prospect_finder" },
+            { title: "Deal Pipeline & CRM", description: "Track every deal through a 14-stage sales pipeline with follow-up tracking, temperature badges, and conversion analytics.", items: dealPipelineFeatures, badge: "CRM", requiredFeature: "deal_pipeline" },
+            { title: "EquipIQ - Equipment Knowledge", description: "AI-powered equipment recommendations, product catalog, and training quizzes to master payment solutions.", items: equipIQFeatures, badge: "All Users", requiredFeature: "equipiq" },
+            { title: "Daily Edge - Mindset Training", description: "Build the winning mindset of top performers with daily motivational content and AI coaching.", items: dailyEdgeFeatures, badge: "All Users", requiredFeature: "daily_edge" },
+            { title: "E-Signature Documents", description: "Send merchant applications and agreements for electronic signature via SignNow.", items: esignFeatures, badge: "All Users", requiredFeature: "esign_integration" },
+            { title: "Statement Analyzer", description: "Upload merchant statements, extract data with AI, identify savings opportunities, and generate sales scripts.", items: statementAnalyzerFeatures, badge: "Sales Tool", requiredFeature: "statement_analyzer" },
+            { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users", requiredFeature: "proposal_generator" },
+            { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users", requiredFeature: "presentation_training" },
             { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
-            { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users" },
-            { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users" },
-            { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users" },
-            { title: "Team Activity Feed", description: "Stay connected with your team and celebrate wins together.", items: activityFeatures, badge: "All Users" },
-            { title: "Route Optimizer", description: "Plan the most efficient driving routes for your daily pickups.", items: routeFeatures, badge: "All Users" },
+            { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users", requiredFeature: "merchant_profiles" },
+            { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users", requiredFeature: "brochure_inventory" },
+            { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users", requiredFeature: "referral_tracking" },
+            { title: "Team Activity Feed", description: "Stay connected with your team and celebrate wins together.", items: activityFeatures, badge: "All Users", requiredFeature: "activity_feed" },
+            { title: "Route Optimizer", description: "Plan the most efficient driving routes for your daily pickups.", items: routeFeatures, badge: "All Users", requiredFeature: "route_planner" },
             { title: "Follow-up Sequences", description: "Automate your follow-up process with pre-built email sequences.", items: sequenceFeatures, badge: "All Users" },
             { title: "Smart Location Reminders", description: "Get notified when you're near merchants with pending pickups.", items: locationReminderFeatures, badge: "All Users" },
           ];
 
+          const permissionFilteredSections = allSections.filter(section => {
+            if (!section.requiredFeature) return true;
+            return hasFeature(section.requiredFeature);
+          });
+
           const filteredSections = query
-            ? allSections.map(section => {
+            ? permissionFilteredSections.map(section => {
                 const sectionMatches = section.title.toLowerCase().includes(query) || 
                                        section.description.toLowerCase().includes(query);
                 const filteredItems = section.items.filter(item =>
@@ -1311,7 +1277,7 @@ export default function HelpPage() {
                 if (filteredItems.length > 0) return { ...section, items: filteredItems };
                 return null;
               }).filter(Boolean)
-            : allSections;
+            : permissionFilteredSections;
 
           if (query && filteredSections.length === 0) {
             return (

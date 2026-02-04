@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { 
   MessageCircle, 
   X, 
@@ -28,6 +29,7 @@ export function HelpChatbot() {
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { hasFeature } = usePermissions();
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -87,12 +89,23 @@ export function HelpChatbot() {
     }
   };
 
-  const quickQuestions = [
-    "How do I create a proposal?",
-    "What is the Statement Analyzer?",
-    "How do I track a brochure drop?",
-    "Tell me about Sales Spark"
+  const allQuickQuestions = [
+    { question: "How do I create a proposal?", requiredFeature: "proposal_generator" },
+    { question: "What is the Statement Analyzer?", requiredFeature: "statement_analyzer" },
+    { question: "How do I track a brochure drop?", requiredFeature: "drop_management" },
+    { question: "Tell me about Sales Spark", requiredFeature: "sales_spark" },
+    { question: "How does the Deal Pipeline work?", requiredFeature: "deal_pipeline" },
+    { question: "What is EquipIQ?", requiredFeature: "equipiq" },
+    { question: "How do I use Role Play?", requiredFeature: "role_play" },
   ];
+  
+  const quickQuestions = useMemo(() => 
+    allQuickQuestions
+      .filter(q => !q.requiredFeature || hasFeature(q.requiredFeature))
+      .map(q => q.question)
+      .slice(0, 4),
+    [hasFeature]
+  );
 
   if (!isOpen) {
     return (
