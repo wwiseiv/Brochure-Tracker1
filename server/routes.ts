@@ -13933,7 +13933,7 @@ Additional context:
       chatMessages.push({ role: "user", content: trimmedMessage });
 
       const response = await client.chat.completions.create({
-        model: "gemini-2.5-flash",
+        model: "gpt-4o-mini",
         messages: chatMessages,
         max_tokens: 300,
         temperature: 0.8,
