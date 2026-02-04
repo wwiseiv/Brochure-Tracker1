@@ -27,6 +27,19 @@ export interface DiscoveredBusiness {
   ownerName: string | null;
   yearEstablished: string | null;
   description: string | null;
+  // Enhanced fields for comprehensive business data
+  yelpUrl: string | null;
+  googleMapsUrl: string | null;
+  facebookUrl: string | null;
+  instagramHandle: string | null;
+  reviewRating: number | null;
+  reviewCount: number | null;
+  priceRange: string | null;
+  acceptsCreditCards: boolean | null;
+  hasOnlineOrdering: boolean | null;
+  categories: string[] | null;
+  neighborhood: string | null;
+  source: string | null;
 }
 
 export interface SearchResult {
@@ -149,15 +162,62 @@ SEARCH PARAMETERS:
 - Business Types: ${businessTypeNames}
 - Number of Results Needed: ${maxResults}
 
+CRITICAL SEARCH SOURCES - Search ALL of these:
+1. Yelp listings and Yelp search results
+2. Google Maps / Google Business listings
+3. Facebook Business pages
+4. Yellow Pages and local directories
+5. Chamber of Commerce listings
+6. Sponsored/advertised local businesses
+7. Traditional websites if available
+
+IMPORTANT: Include businesses WITHOUT websites! Many small businesses only have:
+- Yelp pages
+- Google Business profiles
+- Facebook pages
+- Directory listings
+These are valuable prospects. Do NOT skip businesses just because they lack a website.
+
 REQUIREMENTS:
 1. Find REAL businesses that currently exist and are operating
 2. Include COMPLETE address information (street address, city, state, zip)
-3. Prioritize independent local businesses over national chains when possible
-4. Include phone numbers and websites when available
-5. Search for: ${primarySearchTerms.join(", ")} near ${zipCode}
+3. Prioritize independent local businesses over national chains
+4. Include phone numbers (essential for sales outreach)
+5. Capture Yelp URLs, Google Maps links, and social media profiles
+6. Include review ratings and review counts when available
+7. Note if they accept credit cards or have online ordering
+8. Search for: ${primarySearchTerms.join(", ")} near ${zipCode}
 
-Return ONLY a valid JSON array with this format (no markdown, no explanation):
-[{"name":"Business Name","address":"123 Main St","city":"City","state":"IN","zipCode":"${zipCode}","phone":"(555) 123-4567","website":"https://example.com","email":null,"hoursOfOperation":"Mon-Fri 9am-5pm","description":"Brief description","businessType":"${primarySearchTerms[0] || 'Business'}","mccCode":"0000","confidence":0.9}]`;
+Return ONLY a valid JSON array with this comprehensive format (no markdown, no explanation):
+[{
+  "name": "Business Name",
+  "address": "123 Main St",
+  "city": "City",
+  "state": "IN",
+  "zipCode": "${zipCode}",
+  "phone": "(555) 123-4567",
+  "website": "https://example.com or null if none",
+  "email": "contact@example.com or null",
+  "hoursOfOperation": "Mon-Fri 9am-5pm",
+  "description": "Brief description of the business",
+  "businessType": "${primarySearchTerms[0] || 'Business'}",
+  "mccCode": "0000",
+  "confidence": 0.9,
+  "ownerName": "Owner name if found or null",
+  "yearEstablished": "2015 or null",
+  "yelpUrl": "https://yelp.com/biz/... or null",
+  "googleMapsUrl": "https://maps.google.com/... or null",
+  "facebookUrl": "https://facebook.com/... or null",
+  "instagramHandle": "@handle or null",
+  "reviewRating": 4.5,
+  "reviewCount": 127,
+  "priceRange": "$$ or $ or $$$ or null",
+  "acceptsCreditCards": true,
+  "hasOnlineOrdering": false,
+  "categories": ["Italian", "Pizza", "Delivery"],
+  "neighborhood": "Downtown or null",
+  "source": "yelp/google/facebook/website/directory"
+}]`;
 
   // Add timeout to prevent hanging (90 seconds)
   const controller = new AbortController();
