@@ -1,5 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const IMPERSONATION_TOKEN_KEY = 'pcbancard_impersonation_token';
+
+function getImpersonationHeaders(): Record<string, string> {
+  if (typeof window !== 'undefined') {
+    const token = sessionStorage.getItem(IMPERSONATION_TOKEN_KEY);
+    if (token) {
+      return { 'X-Impersonation-Token': token };
+    }
+  }
+  return {};
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,9 +24,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...getImpersonationHeaders(),
+  };
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -31,6 +50,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: getImpersonationHeaders(),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
