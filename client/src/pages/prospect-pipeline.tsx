@@ -2517,8 +2517,6 @@ export default function DealPipelinePage() {
           </div>
         </SheetContent>
       </Sheet>
-
-      <BottomNav />
     </div>
   );
 }

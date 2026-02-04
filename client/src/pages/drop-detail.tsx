@@ -1546,8 +1546,6 @@ export default function DropDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <BottomNav />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { QrCode, ChevronRight, AlertTriangle, Calendar, Shield, Briefcase, Activity, Route, WifiOff, RefreshCw, Loader2, CloudUpload, Trophy, Search, TrendingUp, Sparkles, Camera, FileImage, Target, Mail, FileSignature, Phone, ClipboardList, Flame, Thermometer, Snowflake, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
@@ -44,6 +45,7 @@ interface UserRole {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { isOnline, syncStatus, pendingCount, syncPendingDrops } = useOfflineSync();
+  const { hasFeature } = usePermissions();
   
   const { data: drops, isLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
@@ -275,22 +277,24 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        <Tooltip delayDuration={700}>
-          <TooltipTrigger asChild>
-            <Link href="/scan">
-              <Button 
-                className="w-full min-h-touch-lg gap-3 text-lg font-semibold shadow-lg"
-                data-testid="button-scan-drop"
-              >
-                <QrCode className="w-7 h-7" />
-                Scan & Drop
-              </Button>
-            </Link>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Record a new brochure drop</p>
-          </TooltipContent>
-        </Tooltip>
+        {hasFeature("drop_management") && (
+          <Tooltip delayDuration={700}>
+            <TooltipTrigger asChild>
+              <Link href="/scan">
+                <Button 
+                  className="w-full min-h-touch-lg gap-3 text-lg font-semibold shadow-lg"
+                  data-testid="button-scan-drop"
+                >
+                  <QrCode className="w-7 h-7" />
+                  Scan & Drop
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Record a new brochure drop</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <section>
@@ -399,16 +403,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Deal Pipeline & CRM Section */}
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Target className="w-5 h-5 text-emerald-600" />
-              Deal Pipeline & CRM
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track deals, follow-ups, and close more sales
-            </p>
-          </div>
+        {hasFeature("deal_pipeline") && (
+          <section>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Target className="w-5 h-5 text-emerald-600" />
+                Deal Pipeline & CRM
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Track deals, follow-ups, and close more sales
+              </p>
+            </div>
 
           {/* Today's Action Items */}
           {todayItems && (todayItems.followUpsDue?.length > 0 || todayItems.appointmentsToday?.length > 0) && (
@@ -482,59 +487,65 @@ export default function DashboardPage() {
 
           {/* CRM Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Link href="/today">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-today-view">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                      <ClipboardList className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Today View</h3>
-                      <p className="text-xs text-muted-foreground">Daily action center</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
-
-            <Link href="/email">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-email-drafter">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                      <Mail className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">Email Drafter</h3>
-                        <Badge variant="secondary" className="text-xs">AI</Badge>
+            {hasFeature("today_dashboard") && (
+              <Link href="/today">
+                <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-today-view">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                        <ClipboardList className="w-5 h-5 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground">Write professional emails</p>
+                      <div>
+                        <h3 className="font-semibold">Today View</h3>
+                        <p className="text-xs text-muted-foreground">Daily action center</p>
+                      </div>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
+                </Card>
+              </Link>
+            )}
 
-            <Link href="/esign">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-esign">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
-                      <FileSignature className="w-5 h-5 text-white" />
+            {hasFeature("email_drafter") && (
+              <Link href="/email">
+                <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-email-drafter">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                        <Mail className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">Email Drafter</h3>
+                          <Badge variant="secondary" className="text-xs">AI</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Write professional emails</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold">E-Sign Documents</h3>
-                      <p className="text-xs text-muted-foreground">Send contracts for signature</p>
-                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
+                </Card>
+              </Link>
+            )}
+
+            {hasFeature("esign_integration") && (
+              <Link href="/esign">
+                <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-esign">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
+                        <FileSignature className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">E-Sign Documents</h3>
+                        <p className="text-xs text-muted-foreground">Send contracts for signature</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  </div>
+                </Card>
+              </Link>
+            )}
 
             {(isAdmin || isRM) && (
               <Link href="/pipeline-analytics">
@@ -556,81 +567,131 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+        )}
 
         {/* AI-Powered Prospecting Section */}
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              AI-Powered Prospecting
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Find and convert local businesses in your territory
-            </p>
-          </div>
-          
-          <div className="space-y-3">
-            <Link href="/prospects/search">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-prospect-finder">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
-                      <Search className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold">Prospect Finder</h3>
-                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                          AI-Powered
-                        </Badge>
+        {(hasFeature("ai_prospect_finder") || hasFeature("deal_pipeline") || hasFeature("business_card_scanner")) && (
+          <section>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                AI-Powered Prospecting
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Find and convert local businesses in your territory
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              {hasFeature("ai_prospect_finder") && (
+                <Link href="/prospects/search">
+                  <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-prospect-finder">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+                          <Search className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold">Prospect Finder</h3>
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              AI-Powered
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            Discover local businesses ready for better rates
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Discover local businesses ready for better rates
-                      </p>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
+                  </Card>
+                </Link>
+              )}
 
-            <Link href="/prospects/pipeline">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-my-pipeline">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold">My Pipeline</h3>
+              {hasFeature("deal_pipeline") && (
+                <Link href="/prospects/pipeline">
+                  <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-my-pipeline">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
+                          <TrendingUp className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold">My Pipeline</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            Track and manage your claimed prospects
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Track and manage your claimed prospects
-                      </p>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
+                  </Card>
+                </Link>
+              )}
 
-            <Link href="/prospects/scan-card">
-              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-scan-business-card">
+              {hasFeature("business_card_scanner") && (
+                <Link href="/prospects/scan-card">
+                  <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-scan-business-card">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                          <Camera className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold">Scan Business Card</h3>
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                              New
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            Snap a photo to add prospects instantly
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </Card>
+                </Link>
+              )}
+
+              <ProspectingAdviceCoach />
+            </div>
+          </section>
+        )}
+
+        {/* AI-Powered Marketing Section */}
+        {hasFeature("marketing_materials") && (
+          <section>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                AI-Powered Marketing
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Professional marketing materials for your prospects
+              </p>
+            </div>
+            
+            <Link href="/marketing">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-marketing-materials">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                      <Camera className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+                      <FileImage className="w-6 h-6 text-primary-foreground" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold">Scan Business Card</h3>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        <h3 className="font-semibold">Marketing Materials</h3>
+                        <Badge variant="secondary">
                           New
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        Snap a photo to add prospects instantly
+                        Industry-specific flyers ready to share
                       </p>
                     </div>
                   </div>
@@ -638,47 +699,8 @@ export default function DashboardPage() {
                 </div>
               </Card>
             </Link>
-
-            <ProspectingAdviceCoach />
-          </div>
-        </section>
-
-        {/* AI-Powered Marketing Section */}
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              AI-Powered Marketing
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Professional marketing materials for your prospects
-            </p>
-          </div>
-          
-          <Link href="/marketing">
-            <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-marketing-materials">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-                    <FileImage className="w-6 h-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold">Marketing Materials</h3>
-                      <Badge variant="secondary">
-                        New
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      Industry-specific flyers ready to share
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              </div>
-            </Card>
-          </Link>
-        </section>
+          </section>
+        )}
 
         {/* Leaderboard Section - Only shows when user has permission */}
         {(isAdmin || myPermissions?.canViewLeaderboard) && leaderboard && leaderboard.length > 0 && (
@@ -761,7 +783,6 @@ export default function DashboardPage() {
       </main>
 
       <LocationReminder nearbyDrop={nearbyDrop} onDismiss={dismissReminder} />
-      <BottomNav />
     </div>
   );
 }

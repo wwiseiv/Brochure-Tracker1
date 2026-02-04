@@ -25,7 +25,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -405,7 +404,6 @@ export default function AdminDashboardPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <HamburgerMenu />
             <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-home">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -862,8 +860,6 @@ export default function AdminDashboardPage() {
           </>
         )}
       </main>
-
-      <BottomNav />
 
       <Dialog open={!!editingMember} onOpenChange={(open) => !open && setEditingMember(null)}>
         <DialogContent className="sm:max-w-md">

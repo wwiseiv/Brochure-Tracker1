@@ -17,7 +17,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -294,7 +293,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <HamburgerMenu />
           <span className="font-semibold">Profile</span>
         </div>
       </header>
@@ -878,8 +876,6 @@ export default function ProfilePage() {
           </Tooltip>
         </div>
       </main>
-
-      <BottomNav />
     </div>
   );
 }

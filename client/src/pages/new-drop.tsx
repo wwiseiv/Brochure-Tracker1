@@ -38,7 +38,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
@@ -345,7 +344,6 @@ export default function NewDropPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <HamburgerMenu />
           <Button
             variant="ghost"
             size="icon"
@@ -656,8 +654,6 @@ export default function NewDropPage() {
           </form>
         </Form>
       </main>
-
-      <BottomNav />
 
       <AlertDialog open={showProhibitedDialog} onOpenChange={setShowProhibitedDialog}>
         <AlertDialogContent data-testid="dialog-prohibited-business">

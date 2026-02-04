@@ -16,7 +16,6 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { HamburgerMenu } from "@/components/BottomNav";
 import { AdviceExportToolbar } from "@/components/AdviceExportToolbar";
 import { InteractiveSalesRoleplay } from "@/components/InteractiveSalesRoleplay";
 import {
@@ -499,7 +498,6 @@ export default function SalesProcessPage() {
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2">
-              <HamburgerMenu />
               <Link href="/coach">
                 <Button 
                   variant="ghost" 

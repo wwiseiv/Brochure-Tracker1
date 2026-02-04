@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HamburgerMenu } from "@/components/BottomNav";
 import {
   ArrowLeft,
   Send,
@@ -437,7 +436,6 @@ export default function ESignRequestDetailPage() {
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
-            <HamburgerMenu />
             <Tooltip delayDuration={700}>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={() => navigate("/esign")} data-testid="button-back-esign">
