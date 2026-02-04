@@ -1408,8 +1408,8 @@ export default function TeamManagementPage() {
               </div>
             </div>
           ) : (
-            <ScrollArea className="flex-1 -mx-6">
-              <div className="space-y-4 py-3 px-4">
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-4 py-3">
                 {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
                   const features = featuresByCategory[category];
                   if (features.length === 0) return null;
@@ -1428,10 +1428,10 @@ export default function TeamManagementPage() {
                           return (
                             <div
                               key={feature.id}
-                              className="flex items-center gap-2 py-2 px-2 rounded-md bg-muted/30"
+                              className="flex items-center gap-3 py-2 px-3 rounded-md bg-muted/30"
                               data-testid={`feature-row-${feature.id}`}
                             >
-                              <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="flex-1 min-w-0">
                                 <Label className="font-medium text-sm block truncate">{feature.name}</Label>
                                 <p className="text-xs text-muted-foreground truncate">
                                   {feature.description}
@@ -1441,7 +1441,7 @@ export default function TeamManagementPage() {
                                 checked={state.enabled}
                                 onCheckedChange={() => handleToggleFeature(feature)}
                                 disabled={isTogglingThisFeature}
-                                className="flex-shrink-0 ml-2"
+                                className="flex-shrink-0"
                                 data-testid={`switch-feature-${feature.id}`}
                               />
                             </div>
