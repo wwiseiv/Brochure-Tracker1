@@ -48,6 +48,7 @@ import { HelpChatbot } from "@/components/HelpChatbot";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { AppLayout } from "@/components/AppLayout";
 
 import { useLocation } from "wouter";
 
@@ -133,47 +134,47 @@ function RMRoute() {
 
 function AuthenticatedRouter() {
   return (
-    <>
+    <AppLayout>
       <HelpChatbot />
       <Switch>
         <Route path="/" component={DashboardPage} />
-      <Route path="/admin" component={AdminRoute} />
-      <Route path="/admin/team" component={TeamManagementRoute} />
-      <Route path="/manager" component={RMRoute} />
-      <Route path="/scan" component={ScanPage} />
-      <Route path="/drops/new" component={NewDropPage} />
-      <Route path="/drops/:id" component={DropDetailPage} />
-      <Route path="/history" component={HistoryPage} />
-      <Route path="/merchants" component={MerchantsPage} />
-      <Route path="/merchants/:id" component={MerchantDetailPage} />
-      <Route path="/referrals" component={ReferralsPage} />
-      <Route path="/profile" component={ProfilePage} />
-      <Route path="/inventory" component={InventoryPage} />
-      <Route path="/activity" component={ActivityFeedPage} />
-      <Route path="/route" component={RoutePlannerPage} />
-      <Route path="/sequences" component={SequencesPage} />
-      <Route path="/coach" component={CoachPage} />
-      <Route path="/equipiq" component={EquipIQPage} />
-      <Route path="/presentation-training" component={PresentationTrainingPage} />
-      <Route path="/sales-process" component={SalesProcessPage} />
-      <Route path="/proposal-generator" component={ProposalGeneratorPage} />
-      <Route path="/statement-analyzer" component={StatementAnalyzerPage} />
-      <Route path="/my-work" component={MyWorkPage} />
-      <Route path="/prospects/search" component={ProspectFinderPage} />
-      <Route path="/prospects/pipeline" component={ProspectPipelinePage} />
-      <Route path="/team-pipeline" component={TeamPipelinePage} />
-      <Route path="/pipeline-analytics" component={PipelineAnalyticsPage} />
-      <Route path="/today" component={TodayPage} />
-      <Route path="/prospects/scan-card" component={BusinessCardScannerPage} />
-      <Route path="/esign" component={ESignDocumentLibraryPage} />
-      <Route path="/esign/:id" component={ESignRequestDetailPage} />
-      <Route path="/complete-profile" component={CompleteProfilePage} />
-      <Route path="/marketing" component={MarketingMaterialsPage} />
-      <Route path="/help" component={HelpPage} />
-      <Route path="/email" component={EmailDrafterPage} />
-      <Route component={NotFound} />
+        <Route path="/admin" component={AdminRoute} />
+        <Route path="/admin/team" component={TeamManagementRoute} />
+        <Route path="/manager" component={RMRoute} />
+        <Route path="/scan" component={ScanPage} />
+        <Route path="/drops/new" component={NewDropPage} />
+        <Route path="/drops/:id" component={DropDetailPage} />
+        <Route path="/history" component={HistoryPage} />
+        <Route path="/merchants" component={MerchantsPage} />
+        <Route path="/merchants/:id" component={MerchantDetailPage} />
+        <Route path="/referrals" component={ReferralsPage} />
+        <Route path="/profile" component={ProfilePage} />
+        <Route path="/inventory" component={InventoryPage} />
+        <Route path="/activity" component={ActivityFeedPage} />
+        <Route path="/route" component={RoutePlannerPage} />
+        <Route path="/sequences" component={SequencesPage} />
+        <Route path="/coach" component={CoachPage} />
+        <Route path="/equipiq" component={EquipIQPage} />
+        <Route path="/presentation-training" component={PresentationTrainingPage} />
+        <Route path="/sales-process" component={SalesProcessPage} />
+        <Route path="/proposal-generator" component={ProposalGeneratorPage} />
+        <Route path="/statement-analyzer" component={StatementAnalyzerPage} />
+        <Route path="/my-work" component={MyWorkPage} />
+        <Route path="/prospects/search" component={ProspectFinderPage} />
+        <Route path="/prospects/pipeline" component={ProspectPipelinePage} />
+        <Route path="/team-pipeline" component={TeamPipelinePage} />
+        <Route path="/pipeline-analytics" component={PipelineAnalyticsPage} />
+        <Route path="/today" component={TodayPage} />
+        <Route path="/prospects/scan-card" component={BusinessCardScannerPage} />
+        <Route path="/esign" component={ESignDocumentLibraryPage} />
+        <Route path="/esign/:id" component={ESignRequestDetailPage} />
+        <Route path="/complete-profile" component={CompleteProfilePage} />
+        <Route path="/marketing" component={MarketingMaterialsPage} />
+        <Route path="/help" component={HelpPage} />
+        <Route path="/email" component={EmailDrafterPage} />
+        <Route component={NotFound} />
       </Switch>
-    </>
+    </AppLayout>
   );
 }
 

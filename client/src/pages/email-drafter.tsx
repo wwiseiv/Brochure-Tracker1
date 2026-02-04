@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { DictationInput } from "@/components/DictationInput";
 import { ListenButton } from "@/components/ListenButton";
 import { useToast } from "@/hooks/use-toast";
@@ -166,7 +165,6 @@ export default function EmailDrafterPage() {
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center gap-3 p-4">
-          <HamburgerMenu />
           <Button
             variant="ghost"
             size="icon"
@@ -479,8 +477,6 @@ export default function EmailDrafterPage() {
           </TabsContent>
         </Tabs>
       </main>
-
-      <BottomNav />
     </div>
   );
 }

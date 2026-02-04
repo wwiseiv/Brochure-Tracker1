@@ -10,7 +10,6 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { EmptyState } from "@/components/EmptyState";
 import { 
   MapPin, 
@@ -244,7 +243,6 @@ export default function ActivityFeedPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <HamburgerMenu />
             <ActivityIcon className="w-5 h-5 text-primary" />
             <span className="font-semibold">Team Activity</span>
           </div>
@@ -352,8 +350,6 @@ export default function ActivityFeedPage() {
           </div>
         )}
       </main>
-
-      <BottomNav />
     </div>
   );
 }

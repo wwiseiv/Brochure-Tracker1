@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DictationInput } from "@/components/DictationInput";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RoleplayCoach } from "@/components/RoleplayCoach";
@@ -1195,7 +1194,6 @@ export default function DealPipelinePage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <HamburgerMenu />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/">

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QRScanner } from "@/components/QRScanner";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { QrCode, ArrowLeft, Camera, Keyboard, ArrowRight } from "lucide-react";
 
@@ -50,7 +49,6 @@ export default function ScanPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <HamburgerMenu />
           <span className="font-semibold">New Drop</span>
         </div>
       </header>
@@ -193,8 +191,6 @@ export default function ScanPage() {
           </div>
         )}
       </main>
-
-      <BottomNav />
     </div>
   );
 }

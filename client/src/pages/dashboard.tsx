@@ -8,7 +8,6 @@ import { DropCard } from "@/components/DropCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ProspectingAdviceCoach } from "@/components/ProspectingAdviceCoach";
 import { DashboardSkeleton } from "@/components/LoadingState";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { LocationReminder } from "@/components/LocationReminder";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationReminders } from "@/hooks/use-location-reminders";
@@ -144,7 +143,6 @@ export default function DashboardPage() {
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <HamburgerMenu />
               <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
             </div>
             <div className="w-8 h-8 rounded-full bg-muted" />
@@ -153,7 +151,6 @@ export default function DashboardPage() {
         <main className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 py-6">
           <DashboardSkeleton />
         </main>
-        <BottomNav />
       </div>
     );
   }
@@ -163,7 +160,6 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <HamburgerMenu />
             <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
           </div>
           <div className="flex items-center gap-2">

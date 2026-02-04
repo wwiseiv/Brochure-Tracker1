@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -192,7 +191,6 @@ export default function TodayPage() {
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3">
-          <HamburgerMenu />
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <CalendarCheck className="w-5 h-5 text-primary" />
@@ -589,8 +587,6 @@ export default function TodayPage() {
           </div>
         </section>
       </main>
-
-      <BottomNav />
     </div>
   );
 }

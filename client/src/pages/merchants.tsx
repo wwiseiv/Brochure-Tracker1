@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BusinessTypeIcon, businessTypeLabels } from "@/components/BusinessTypeIcon";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { ExportDialog } from "@/components/ExportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -153,7 +152,6 @@ export default function MerchantsPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <HamburgerMenu />
           <Store className="w-5 h-5 text-primary" />
           <span className="font-semibold">CRM / Merchants</span>
         </div>
@@ -245,8 +243,6 @@ export default function MerchantsPage() {
           </div>
         )}
       </main>
-
-      <BottomNav />
     </div>
   );
 }

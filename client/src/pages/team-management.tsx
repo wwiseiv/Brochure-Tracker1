@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { HamburgerMenu } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -660,7 +659,6 @@ export default function TeamManagementPage() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <HamburgerMenu />
             <Link href="/admin">
               <Button variant="ghost" size="icon" data-testid="button-back-admin">
                 <ArrowLeft className="h-5 w-5" />
@@ -1364,15 +1362,17 @@ export default function TeamManagementPage() {
 
       {/* User Permissions Sheet */}
       <Sheet open={isPermissionsSheetOpen} onOpenChange={setIsPermissionsSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-hidden flex flex-col">
-          <SheetHeader>
+        <SheetContent className="w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+          <SheetHeader className="flex-shrink-0">
             <SheetTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
               Feature Permissions
             </SheetTitle>
             <SheetDescription>
               {selectedMemberForPermissions && (
-                <span>Manage feature access for {selectedMemberForPermissions.userId.slice(0, 20)}...</span>
+                <span className="truncate block">
+                  Manage feature access for {selectedMemberForPermissions.firstName || selectedMemberForPermissions.email || selectedMemberForPermissions.userId.slice(0, 12)}
+                </span>
               )}
             </SheetDescription>
           </SheetHeader>
@@ -1474,7 +1474,7 @@ export default function TeamManagementPage() {
             </ScrollArea>
           )}
           
-          <div className="pt-4 border-t border-border">
+          <div className="pt-3 border-t border-border flex-shrink-0">
             <Button
               variant="outline"
               className="w-full"

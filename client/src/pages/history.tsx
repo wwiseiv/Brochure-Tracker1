@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropCard } from "@/components/DropCard";
 import { EmptyState } from "@/components/EmptyState";
 import { DropCardSkeleton } from "@/components/LoadingState";
-import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { ExportDialog } from "@/components/ExportDialog";
 import { isToday, isPast, isFuture, addDays } from "date-fns";
 import type { DropWithBrochure } from "@shared/schema";
@@ -69,7 +68,6 @@ export default function HistoryPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center gap-2">
-          <HamburgerMenu />
           <span className="font-semibold">All Drops</span>
         </div>
       </header>
@@ -143,8 +141,6 @@ export default function HistoryPage() {
           )}
         </Tabs>
       </main>
-
-      <BottomNav />
     </div>
   );
 }
