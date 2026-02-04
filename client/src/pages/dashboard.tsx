@@ -165,18 +165,20 @@ export default function DashboardPage() {
             <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
           </div>
           <div className="flex items-center gap-2">
-            <Tooltip delayDuration={700}>
-              <TooltipTrigger asChild>
-                <Link href="/activity">
-                  <Button variant="ghost" size="icon" data-testid="button-activity-feed">
-                    <Activity className="h-5 w-5 text-emerald-600" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>View team activity feed</p>
-              </TooltipContent>
-            </Tooltip>
+            {hasFeature("activity_feed") && (
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <Link href="/activity">
+                    <Button variant="ghost" size="icon" data-testid="button-activity-feed">
+                      <Activity className="h-5 w-5 text-emerald-600" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View team activity feed</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             {isAdmin && (
               <Tooltip delayDuration={700}>
                 <TooltipTrigger asChild>
@@ -381,32 +383,34 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href="/history?filter=upcoming">
-            <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-upcoming">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                <span className="font-semibold text-2xl">{upcomingPickups.length}</span>
-              </div>
-              <p className="text-sm text-muted-foreground">Upcoming (7 days)</p>
-            </Card>
-          </Link>
-          
-          <Link href="/history?filter=overdue">
-            <Card 
-              className={`p-4 hover-elevate cursor-pointer ${overduePickups.length > 0 ? "border-destructive/50" : ""}`}
-              data-testid="card-overdue"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className={`w-5 h-5 ${overduePickups.length > 0 ? "text-destructive" : "text-muted-foreground"}`} />
-                <span className={`font-semibold text-2xl ${overduePickups.length > 0 ? "text-destructive" : ""}`}>
-                  {overduePickups.length}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">Overdue</p>
-            </Card>
-          </Link>
-        </div>
+        {hasFeature("dashboard_stats") && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Link href="/history?filter=upcoming">
+              <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-upcoming">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <span className="font-semibold text-2xl">{upcomingPickups.length}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">Upcoming (7 days)</p>
+              </Card>
+            </Link>
+            
+            <Link href="/history?filter=overdue">
+              <Card 
+                className={`p-4 hover-elevate cursor-pointer ${overduePickups.length > 0 ? "border-destructive/50" : ""}`}
+                data-testid="card-overdue"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className={`w-5 h-5 ${overduePickups.length > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                  <span className={`font-semibold text-2xl ${overduePickups.length > 0 ? "text-destructive" : ""}`}>
+                    {overduePickups.length}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">Overdue</p>
+              </Card>
+            </Link>
+          </div>
+        )}
 
         {/* Deal Pipeline & CRM Section */}
         {hasFeature("deal_pipeline") && (

@@ -319,50 +319,54 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-4 text-center">
-            <Package className="w-6 h-6 mx-auto text-primary mb-2" />
-            <p className="text-2xl font-bold">{stats.total}</p>
-            <p className="text-xs text-muted-foreground">Total Drops</p>
-          </Card>
-          
-          <Card className="p-4 text-center">
-            <Clock className="w-6 h-6 mx-auto text-amber-500 mb-2" />
-            <p className="text-2xl font-bold">{stats.pending}</p>
-            <p className="text-xs text-muted-foreground">Pending</p>
-          </Card>
-          
-          <Card className="p-4 text-center">
-            <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-2" />
-            <p className="text-2xl font-bold">{stats.completed}</p>
-            <p className="text-xs text-muted-foreground">Completed</p>
-          </Card>
-          
-          <Card className="p-4 text-center">
-            <TrendingUp className="w-6 h-6 mx-auto text-blue-500 mb-2" />
-            <p className="text-2xl font-bold">{conversionRate}%</p>
-            <p className="text-xs text-muted-foreground">Conversion</p>
-          </Card>
-        </div>
+        {hasFeature("profile_stats") && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="p-4 text-center">
+                <Package className="w-6 h-6 mx-auto text-primary mb-2" />
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Drops</p>
+              </Card>
+              
+              <Card className="p-4 text-center">
+                <Clock className="w-6 h-6 mx-auto text-amber-500 mb-2" />
+                <p className="text-2xl font-bold">{stats.pending}</p>
+                <p className="text-xs text-muted-foreground">Pending</p>
+              </Card>
+              
+              <Card className="p-4 text-center">
+                <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 mb-2" />
+                <p className="text-2xl font-bold">{stats.completed}</p>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </Card>
+              
+              <Card className="p-4 text-center">
+                <TrendingUp className="w-6 h-6 mx-auto text-blue-500 mb-2" />
+                <p className="text-2xl font-bold">{conversionRate}%</p>
+                <p className="text-xs text-muted-foreground">Conversion</p>
+              </Card>
+            </div>
 
-        <Card className="p-4">
-          <h3 className="font-semibold mb-3">Performance</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Signed Deals</span>
-              <span className="font-semibold">{stats.converted}</span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-emerald-500 rounded-full transition-all"
-                style={{ width: `${stats.completed > 0 ? (stats.converted / stats.completed) * 100 : 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.converted} out of {stats.completed} completed pickups resulted in signed deals
-            </p>
-          </div>
-        </Card>
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3">Performance</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Signed Deals</span>
+                  <span className="font-semibold">{stats.converted}</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${stats.completed > 0 ? (stats.converted / stats.completed) * 100 : 0}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.converted} out of {stats.completed} completed pickups resulted in signed deals
+                </p>
+              </div>
+            </Card>
+          </>
+        )}
 
         <Collapsible open={notificationSettingsOpen} onOpenChange={setNotificationSettingsOpen}>
           <Card className="p-4">

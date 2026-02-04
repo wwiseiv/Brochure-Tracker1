@@ -188,7 +188,7 @@ export const FEATURES: FeatureDefinition[] = [
   {
     id: 'daily_edge',
     name: 'Daily Edge',
-    description: 'Daily mindset and motivation training',
+    description: 'Daily mindset and motivation training (includes header icon)',
     category: 'sales_training',
     routes: ['/daily-edge'],
     apiEndpoints: ['/api/daily-edge/*'],
@@ -346,6 +346,28 @@ export const FEATURES: FeatureDefinition[] = [
     roleDefaults: { admin: true, manager: true, agent: true },
     stageDefaults: { trainee: false, active: true, senior: true },
     icon: 'CalendarDays'
+  },
+  {
+    id: 'dashboard_stats',
+    name: 'Dashboard Stats Cards',
+    description: 'Upcoming/Overdue summary cards on dashboard',
+    category: 'brochure_management',
+    routes: [],
+    apiEndpoints: [],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
+    icon: 'LayoutGrid'
+  },
+  {
+    id: 'profile_stats',
+    name: 'Profile Stats',
+    description: 'Activity stats and performance metrics on profile page',
+    category: 'analytics',
+    routes: [],
+    apiEndpoints: [],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
+    icon: 'BarChart'
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
