@@ -170,6 +170,49 @@ function getAIIntegrationsClient(): OpenAI {
   return openaiAIIntegrations;
 }
 
+/**
+ * Get the effective user ID - returns the impersonated user ID if a valid
+ * impersonation session exists, otherwise returns the original user ID.
+ */
+async function getEffectiveUserId(req: any): Promise<string> {
+  const originalUserId = req.user?.claims?.sub;
+  if (!originalUserId) return originalUserId;
+  
+  const impersonationToken = req.headers["x-impersonation-token"] as string;
+  if (!impersonationToken) return originalUserId;
+  
+  try {
+    const session = await storage.getImpersonationSessionByToken(impersonationToken);
+    if (session && session.isActive && new Date(session.expiresAt) > new Date()) {
+      // Verify the original user is the one who started the impersonation
+      if (session.originalUserId === originalUserId) {
+        return session.impersonatedUserId;
+      }
+    }
+  } catch (error) {
+    console.error("Error checking impersonation session:", error);
+  }
+  
+  return originalUserId;
+}
+
+/**
+ * Get the original user ID (for audit purposes), bypassing impersonation.
+ */
+function getOriginalUserId(req: any): string {
+  return req.user?.claims?.sub;
+}
+
+/**
+ * Get the effective membership - returns the impersonated user's membership if 
+ * a valid impersonation session exists, otherwise returns the original membership.
+ */
+async function getEffectiveMembership(req: any): Promise<OrgMembershipInfo | null> {
+  const effectiveUserId = await getEffectiveUserId(req);
+  const membership = await storage.getUserMembership(effectiveUserId);
+  return membership || null;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -319,7 +362,7 @@ export async function registerRoutes(
   // Drops API
   app.get("/api/drops", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       let drops = await storage.getDropsByAgent(userId);
       
       // Seed demo data for new users with no drops
@@ -1534,7 +1577,7 @@ Format your response as JSON:
   // User Role API - Get current user's role and org info
   app.get("/api/me/role", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       let membership = await storage.getUserMembership(userId);
       
       if (!membership) {
@@ -1560,7 +1603,7 @@ Format your response as JSON:
   // Update current user's profile
   app.put("/api/me/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       let membership = await storage.getUserMembership(userId);
       
       if (!membership) {
@@ -2301,7 +2344,7 @@ Format your response as JSON:
   // Legacy: Get current user's permissions (old endpoint for backwards compatibility)
   app.get("/api/me/permissions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       let perms = await storage.getUserPermissions(userId);
       
       // Create default permissions if they don't exist
@@ -2647,7 +2690,7 @@ Format your response as JSON:
   // Get leaderboard - requires canViewLeaderboard permission
   app.get("/api/leaderboard", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       const membership = req.orgMembership as OrgMembershipInfo;
       
       // Check permission (admins always have access)
@@ -3881,7 +3924,7 @@ Format the response clearly with numbered action items. Be specific - instead of
   app.get("/api/merchants", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       const orgId = membership.organization.id;
       
       let merchants;
@@ -3911,7 +3954,7 @@ Format the response clearly with numbered action items. Be specific - instead of
   app.get("/api/merchants/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const membership = req.orgMembership as OrgMembershipInfo;
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       const orgId = membership.organization.id;
       const format = (req.query.format as ExportFormat) || "csv";
       
@@ -10877,8 +10920,8 @@ Generate the following content in JSON format:
   // GET /api/deals/paginated - Paginated deal list with cursor-based pagination
   app.get("/api/deals/paginated", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       const role = membership.role;
       const orgId = membership.organization.id;
       
@@ -10995,8 +11038,8 @@ Generate the following content in JSON format:
   // GET /api/deals/kanban - Paginated deals grouped by stage (for Kanban view)
   app.get("/api/deals/kanban", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       const role = membership.role;
       const orgId = membership.organization.id;
       
@@ -11188,8 +11231,8 @@ Generate the following content in JSON format:
   // GET /api/deals/stats - Get deal statistics
   app.get("/api/deals/stats", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       const role = membership.role;
       const orgId = membership.organization.id;
       
@@ -11247,8 +11290,8 @@ Generate the following content in JSON format:
   // GET /api/deals/today - Get today's action items (must be before /:id route)
   app.get("/api/deals/today", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership as OrgMembershipInfo;
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       const orgId = membership.organization.id;
       
       const [followUpsDue, staleDeals, checkInsDue] = await Promise.all([
