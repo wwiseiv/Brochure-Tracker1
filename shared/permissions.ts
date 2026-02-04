@@ -646,16 +646,17 @@ export function evaluatePermission(featureId: string, permissions: UserPermissio
   const feature = getFeatureById(featureId);
   if (!feature) return false;
 
-  // 1. Admin role => allow ALL
-  if (permissions.role === 'admin') return true;
-
-  // 2. Critical features => always allowed
+  // 1. Critical features => always allowed (cannot be disabled)
   if (feature.isCritical) return true;
 
-  // 3. Explicit per-user overrides
+  // 2. Explicit per-user overrides - ALWAYS respected (even for admins)
+  // This allows managers to explicitly disable features for any user
   if (featureId in permissions.overrides) {
     return permissions.overrides[featureId];
   }
+
+  // 3. Admin role => allow ALL (unless explicitly overridden above)
+  if (permissions.role === 'admin') return true;
 
   // 4. Agent stage defaults (only for agent role)
   if (permissions.role === 'agent' && permissions.agentStage) {

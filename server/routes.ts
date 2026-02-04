@@ -2237,7 +2237,11 @@ Format your response as JSON:
         newOverrides[featureId] = enabled;
       }
       
+      console.log(`[PermissionOverride] Saving override for ${targetUserId}: ${featureId} = ${enabled}`);
+      console.log(`[PermissionOverride] New overrides:`, JSON.stringify(newOverrides));
+      
       if (!perms) {
+        console.log(`[PermissionOverride] Creating new permissions for ${targetUserId}`);
         perms = await storage.createUserPermissions({
           userId: targetUserId,
           orgId: membership.orgId,
@@ -2246,11 +2250,16 @@ Format your response as JSON:
           featureOverrides: newOverrides
         });
       } else {
+        console.log(`[PermissionOverride] Updating permissions for ${targetUserId}`);
         await storage.updateUserPermissions(targetUserId, { 
           featureOverrides: newOverrides,
           setBy: changedBy 
         });
       }
+      
+      // Verify save
+      const verifyPerms = await storage.getUserPermissions(targetUserId);
+      console.log(`[PermissionOverride] Verified overrides:`, JSON.stringify(verifyPerms?.featureOverrides));
       
       // Audit log
       await storage.createPermissionAuditLog({
