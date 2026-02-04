@@ -13848,5 +13848,108 @@ Generate the following content in JSON format:
     }
   });
 
+  // ============================================
+  // Interactive Sales Roleplay API
+  // ============================================
+  
+  app.post("/api/sales-roleplay/message", isAuthenticated, async (req: any, res) => {
+    try {
+      const { message, stageId, conversationHistory } = req.body;
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      if (!stageId || typeof stageId !== "number" || stageId < 1 || stageId > 3) {
+        return res.status(400).json({ error: "Valid stage ID (1-3) is required" });
+      }
+
+      const trimmedMessage = message.trim();
+      if (trimmedMessage.length === 0) {
+        return res.status(400).json({ error: "Message cannot be empty" });
+      }
+
+      const client = getAIIntegrationsClient();
+
+      // Build system prompt based on stage
+      const stagePrompts: Record<number, string> = {
+        1: `You are playing the role of a busy restaurant owner named Tony. You are skeptical but open-minded.
+A sales rep has just walked in during your lunch rush. You're busy but willing to give them 30 seconds.
+Your goals in this conversation:
+- You want to brush them off initially but are curious about saving money
+- You've never heard of "Dual Pricing" before
+- You're paying about 3% in credit card fees and it bothers you
+- You're open to scheduling a meeting if they seem credible and not pushy
+
+IMPORTANT: Keep responses SHORT (1-3 sentences), like a real busy merchant would. Be realistic - interrupt, be distracted, mention customers. React naturally to what the sales rep says.`,
+        
+        2: `You are playing the role of a restaurant owner named Tony. The sales rep is back for a 15-minute scheduled appointment.
+You're sitting down with them at a table. You're more receptive now but still have questions.
+Your situation:
+- You process about $40,000/month in credit cards
+- Your current processor charges you about 3.2%
+- You've been with your current processor for 3 years
+- You're worried customers won't like seeing two prices
+- You've heard of surcharging but don't understand the difference
+
+IMPORTANT: Ask realistic questions about how Dual Pricing works. Express concern about customer reaction. You need to be convinced before giving up your processing statement. Keep responses conversational (2-4 sentences).`,
+        
+        3: `You are playing the role of a restaurant owner named Tony. The sales rep is presenting a custom proposal showing potential savings.
+You're interested but have final objections:
+- You're worried about the effort to switch
+- You have concerns about your current contract (possible ETF)
+- You want to know about equipment and training
+- You need your partner/spouse to agree before signing
+
+IMPORTANT: Present realistic closing objections. If the rep handles them well, gradually become more positive. Don't make it too easy - push back 2-3 times. Keep responses short (2-4 sentences).`
+      };
+
+      const systemPrompt = stagePrompts[stageId] + `
+
+Additional context:
+- You are training a new sales rep
+- React authentically to good and bad sales techniques
+- If they use pushy tactics, become more resistant
+- If they ask good questions and listen, become more open
+- Never break character or acknowledge you're an AI`;
+
+      const chatMessages: Array<{role: "system" | "user" | "assistant", content: string}> = [
+        { role: "system", content: systemPrompt }
+      ];
+
+      // Add conversation history
+      if (conversationHistory && Array.isArray(conversationHistory)) {
+        for (const msg of conversationHistory.slice(-10)) {
+          if (msg.role === "user" || msg.role === "assistant") {
+            chatMessages.push({
+              role: msg.role,
+              content: msg.content
+            });
+          }
+        }
+      }
+
+      // Add current message
+      chatMessages.push({ role: "user", content: trimmedMessage });
+
+      const response = await client.chat.completions.create({
+        model: "gemini-2.5-flash",
+        messages: chatMessages,
+        max_tokens: 300,
+        temperature: 0.8,
+      });
+
+      const aiResponse = response.choices[0]?.message?.content || "I'm sorry, could you repeat that?";
+
+      res.json({
+        response: aiResponse,
+        stageId
+      });
+    } catch (error) {
+      console.error('Error in sales roleplay:', error);
+      res.status(500).json({ error: 'Failed to process roleplay message' });
+    }
+  });
+
   return httpServer;
 }

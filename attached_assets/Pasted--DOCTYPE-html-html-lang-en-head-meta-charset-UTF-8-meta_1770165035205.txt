@@ -1,0 +1,2925 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PCBancard 2026 Sales Process | AI Role-Play Training</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+```
+    :root {
+        --primary: #7C3AED;
+        --primary-light: #A78BFA;
+        --primary-bg: #F3F0FF;
+        --success: #10B981;
+        --success-bg: #D1FAE5;
+        --warning: #F59E0B;
+        --warning-bg: #FEF3C7;
+        --danger: #EF4444;
+        --danger-bg: #FEE2E2;
+        --info: #3B82F6;
+        --info-bg: #DBEAFE;
+        --gray-50: #F9FAFB;
+        --gray-100: #F3F4F6;
+        --gray-200: #E5E7EB;
+        --gray-300: #D1D5DB;
+        --gray-400: #9CA3AF;
+        --gray-500: #6B7280;
+        --gray-600: #4B5563;
+        --gray-700: #374151;
+        --gray-800: #1F2937;
+        --gray-900: #111827;
+        --radius: 12px;
+        --radius-lg: 16px;
+        --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+        --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--gray-100);
+        color: var(--gray-800);
+        min-height: 100vh;
+        line-height: 1.5;
+    }
+
+    /* Header */
+    .header {
+        background: #fff;
+        border-bottom: 1px solid var(--gray-200);
+        padding: 12px 16px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .header-content {
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .back-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: none;
+        background: var(--gray-100);
+        color: var(--gray-600);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .header-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+    }
+
+    .header-icon {
+        width: 32px;
+        height: 32px;
+        background: var(--success);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 0.875rem;
+    }
+
+    .header-title h1 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+
+    /* Main Tabs */
+    .main-tabs {
+        background: #fff;
+        border-bottom: 1px solid var(--gray-200);
+        padding: 0 16px;
+        position: sticky;
+        top: 64px;
+        z-index: 99;
+    }
+
+    .main-tabs-content {
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .main-tabs-content::-webkit-scrollbar {
+        display: none;
+    }
+
+    .main-tab {
+        padding: 14px 20px;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        color: var(--gray-500);
+        background: none;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+        position: relative;
+        transition: color 0.2s;
+    }
+
+    .main-tab:hover {
+        color: var(--gray-700);
+    }
+
+    .main-tab.active {
+        color: var(--gray-900);
+    }
+
+    .main-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--gray-900);
+        border-radius: 2px 2px 0 0;
+    }
+
+    /* Main Content */
+    .main-content {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 16px;
+    }
+
+    .section {
+        display: none;
+    }
+
+    .section.active {
+        display: block;
+    }
+
+    /* Phase Navigation */
+    .phase-nav {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .phase-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 12px 16px;
+        min-width: 90px;
+        background: #fff;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .phase-btn:hover {
+        border-color: var(--gray-300);
+    }
+
+    .phase-btn.active {
+        border-color: var(--primary);
+        background: var(--primary-bg);
+    }
+
+    .phase-btn .icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.125rem;
+        background: var(--gray-100);
+        color: var(--gray-500);
+    }
+
+    .phase-btn.active .icon {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .phase-btn .label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--gray-500);
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        max-width: 70px;
+    }
+
+    .phase-btn.active .label {
+        color: var(--primary);
+    }
+
+    /* Cards */
+    .card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+    }
+
+    .card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .card-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .card-icon.purple {
+        background: var(--primary-bg);
+        color: var(--primary);
+    }
+
+    .card-icon.green {
+        background: var(--success-bg);
+        color: var(--success);
+    }
+
+    .card-icon.blue {
+        background: var(--info-bg);
+        color: var(--info);
+    }
+
+    .card-icon.amber {
+        background: var(--warning-bg);
+        color: var(--warning);
+    }
+
+    .card-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: 4px;
+    }
+
+    .card-subtitle {
+        font-size: 0.9375rem;
+        color: var(--gray-500);
+    }
+
+    /* Section Headers */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+
+    .section-header .icon {
+        color: var(--success);
+    }
+
+    /* Activity List */
+    .activity-list {
+        list-style: none;
+    }
+
+    .activity-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 8px 0;
+        font-size: 0.9375rem;
+        color: var(--gray-700);
+    }
+
+    .activity-list li::before {
+        content: '•';
+        color: var(--primary);
+        font-weight: bold;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+    /* Expandable Scripts */
+    .expandable {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+
+    .expandable-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .expandable-header:hover {
+        background: var(--gray-100);
+    }
+
+    .expandable-title {
+        font-size: 0.9375rem;
+        font-weight: 500;
+        color: var(--gray-700);
+    }
+
+    .expandable-toggle {
+        color: var(--gray-400);
+        transition: transform 0.2s;
+    }
+
+    .expandable.open .expandable-toggle {
+        transform: rotate(180deg);
+    }
+
+    .expandable-content {
+        display: none;
+        padding: 0 16px 16px;
+    }
+
+    .expandable.open .expandable-content {
+        display: block;
+    }
+
+    .script-text {
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 0.875rem;
+        color: var(--gray-600);
+        line-height: 1.7;
+        font-style: italic;
+    }
+
+    .script-tips {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .script-tips h5 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--primary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .script-tips ul {
+        list-style: none;
+    }
+
+    .script-tips li {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+        padding: 4px 0;
+        padding-left: 16px;
+        position: relative;
+    }
+
+    .script-tips li::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        color: var(--gray-400);
+    }
+
+    /* Pro Tips */
+    .pro-tips {
+        background: var(--warning-bg);
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-top: 16px;
+    }
+
+    .pro-tips-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--warning);
+        margin-bottom: 10px;
+    }
+
+    .pro-tips ul {
+        list-style: none;
+    }
+
+    .pro-tips li {
+        font-size: 0.875rem;
+        color: var(--gray-700);
+        padding: 6px 0;
+        padding-left: 16px;
+        position: relative;
+    }
+
+    .pro-tips li::before {
+        content: '•';
+        position: absolute;
+        left: 0;
+        color: var(--warning);
+        font-weight: bold;
+    }
+
+    /* ================================================
+       AI ROLE-PLAY TRAINING SYSTEM
+       ================================================ */
+
+    .roleplay-section {
+        padding-bottom: 100px;
+    }
+
+    /* Stage Selector */
+    .stage-selector {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+
+    .stage-card {
+        flex: 1;
+        min-width: 200px;
+        background: #fff;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .stage-card:hover {
+        border-color: var(--gray-300);
+        box-shadow: var(--shadow-md);
+    }
+
+    .stage-card.active {
+        border-color: var(--primary);
+        background: linear-gradient(135deg, var(--primary-bg), #fff);
+    }
+
+    .stage-card.completed {
+        border-color: var(--success);
+    }
+
+    .stage-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--gray-100);
+        color: var(--gray-500);
+        font-size: 0.875rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .stage-card.active .stage-number {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .stage-card.completed .stage-number {
+        background: var(--success);
+        color: #fff;
+    }
+
+    .stage-card.completed .stage-number::after {
+        content: '✓';
+    }
+
+    .stage-name {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 4px;
+    }
+
+    .stage-goal {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+    }
+
+    /* Merchant Persona Selector */
+    .persona-selector {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+    }
+
+    .persona-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .persona-header h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .randomize-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: var(--gray-100);
+        border: none;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .randomize-btn:hover {
+        background: var(--gray-200);
+    }
+
+    .persona-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .persona-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background: var(--gray-50);
+        border: 2px solid transparent;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .persona-option:hover {
+        background: var(--gray-100);
+    }
+
+    .persona-option.selected {
+        border-color: var(--primary);
+        background: var(--primary-bg);
+    }
+
+    .persona-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        background: var(--gray-200);
+    }
+
+    .persona-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .persona-name {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .persona-type {
+        font-size: 0.6875rem;
+        color: var(--gray-500);
+    }
+
+    /* Difficulty Selector */
+    .difficulty-selector {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .difficulty-btn {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid var(--gray-200);
+        border-radius: 8px;
+        background: #fff;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .difficulty-btn:hover {
+        border-color: var(--gray-300);
+    }
+
+    .difficulty-btn.selected {
+        border-color: var(--primary);
+        background: var(--primary-bg);
+        color: var(--primary);
+    }
+
+    .difficulty-btn.easy { border-color: var(--success); color: var(--success); background: var(--success-bg); }
+    .difficulty-btn.medium { border-color: var(--warning); color: var(--warning); background: var(--warning-bg); }
+    .difficulty-btn.hard { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+
+    /* Chat Container */
+    .chat-container {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+    }
+
+    .chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
+    }
+
+    .chat-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .chat-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: var(--primary-bg);
+    }
+
+    .chat-info h4 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .chat-info p {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+    }
+
+    .chat-header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chat-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: var(--gray-100);
+        border: none;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .chat-toggle:hover {
+        background: var(--gray-200);
+    }
+
+    .chat-toggle.active {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .chat-toggle .icon {
+        font-size: 1rem;
+    }
+
+    /* Messages */
+    .chat-messages {
+        height: 400px;
+        overflow-y: auto;
+        padding: 20px;
+        background: linear-gradient(180deg, var(--gray-50), #fff);
+    }
+
+    .message {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        animation: messageIn 0.3s ease-out;
+    }
+
+    @keyframes messageIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .message.user {
+        flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .message.merchant .message-avatar {
+        background: var(--primary-bg);
+    }
+
+    .message.user .message-avatar {
+        background: var(--success-bg);
+    }
+
+    .message.system .message-avatar {
+        background: var(--info-bg);
+    }
+
+    .message-content {
+        max-width: 75%;
+    }
+
+    .message-bubble {
+        padding: 12px 16px;
+        border-radius: 16px;
+        font-size: 0.9375rem;
+        line-height: 1.5;
+    }
+
+    .message.merchant .message-bubble {
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: 16px 16px 16px 4px;
+        color: var(--gray-700);
+    }
+
+    .message.user .message-bubble {
+        background: var(--primary);
+        color: #fff;
+        border-radius: 16px 16px 4px 16px;
+    }
+
+    .message.system .message-bubble {
+        background: var(--info-bg);
+        color: var(--info);
+        border-radius: 16px;
+        font-size: 0.8125rem;
+        text-align: center;
+    }
+
+    .message-time {
+        font-size: 0.6875rem;
+        color: var(--gray-400);
+        margin-top: 4px;
+        padding: 0 4px;
+    }
+
+    .message.user .message-time {
+        text-align: right;
+    }
+
+    /* Typing Indicator */
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 16px;
+    }
+
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gray-400);
+        animation: typingBounce 1.4s infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-6px); }
+    }
+
+    /* Input Area */
+    .chat-input-area {
+        padding: 16px 20px;
+        background: #fff;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .input-suggestions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+
+    .suggestion-chip {
+        padding: 8px 14px;
+        background: var(--gray-100);
+        border: none;
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        color: var(--gray-600);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .suggestion-chip:hover {
+        background: var(--primary-bg);
+        color: var(--primary);
+    }
+
+    .input-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+
+    .input-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    .chat-input {
+        width: 100%;
+        padding: 14px 16px;
+        padding-right: 50px;
+        background: var(--gray-50);
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius);
+        font-size: 0.9375rem;
+        color: var(--gray-800);
+        resize: none;
+        min-height: 52px;
+        max-height: 120px;
+        transition: border-color 0.2s;
+        font-family: inherit;
+    }
+
+    .chat-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: #fff;
+    }
+
+    .chat-input::placeholder {
+        color: var(--gray-400);
+    }
+
+    .mic-btn {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: var(--gray-200);
+        color: var(--gray-600);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.125rem;
+    }
+
+    .mic-btn:hover {
+        background: var(--gray-300);
+    }
+
+    .mic-btn.recording {
+        background: var(--danger);
+        color: #fff;
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    .send-btn {
+        width: 52px;
+        height: 52px;
+        border-radius: var(--radius);
+        border: none;
+        background: var(--primary);
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .send-btn:hover {
+        background: #6D28D9;
+    }
+
+    .send-btn:disabled {
+        background: var(--gray-300);
+        cursor: not-allowed;
+    }
+
+    /* Stage Progress */
+    .stage-progress {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+    }
+
+    .progress-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .progress-header h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .progress-percentage {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--primary);
+    }
+
+    .progress-bar {
+        height: 8px;
+        background: var(--gray-200);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        border-radius: 4px;
+        transition: width 0.5s ease-out;
+    }
+
+    .objectives-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .objective-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--gray-50);
+        border-radius: 8px;
+    }
+
+    .objective-check {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid var(--gray-300);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        color: transparent;
+        flex-shrink: 0;
+    }
+
+    .objective-item.completed .objective-check {
+        background: var(--success);
+        border-color: var(--success);
+        color: #fff;
+    }
+
+    .objective-text {
+        font-size: 0.875rem;
+        color: var(--gray-600);
+    }
+
+    .objective-item.completed .objective-text {
+        color: var(--gray-800);
+        text-decoration: line-through;
+        text-decoration-color: var(--success);
+    }
+
+    /* Coaching Panel */
+    .coaching-panel {
+        background: linear-gradient(135deg, var(--primary-bg), #fff);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+
+    .coaching-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .coaching-header .icon {
+        font-size: 1.25rem;
+    }
+
+    .coaching-header h3 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--primary);
+    }
+
+    .coaching-tip {
+        font-size: 0.875rem;
+        color: var(--gray-700);
+        line-height: 1.6;
+    }
+
+    .coaching-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .coaching-btn {
+        padding: 8px 14px;
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .coaching-btn:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-300);
+    }
+
+    .coaching-btn.primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    .coaching-btn.primary:hover {
+        background: #6D28D9;
+    }
+
+    /* Session Controls */
+    .session-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .control-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px;
+        border-radius: var(--radius);
+        font-size: 0.9375rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .control-btn.start {
+        background: var(--success);
+        border: none;
+        color: #fff;
+    }
+
+    .control-btn.start:hover {
+        background: #059669;
+    }
+
+    .control-btn.reset {
+        background: #fff;
+        border: 2px solid var(--gray-200);
+        color: var(--gray-600);
+    }
+
+    .control-btn.reset:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-300);
+    }
+
+    .control-btn.end {
+        background: var(--danger-bg);
+        border: none;
+        color: var(--danger);
+    }
+
+    .control-btn.end:hover {
+        background: #FECACA;
+    }
+
+    /* Floating AI Help Button */
+    .ai-help-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: none;
+        color: #fff;
+        font-size: 1.5rem;
+        cursor: pointer;
+        box-shadow: var(--shadow-lg);
+        z-index: 1000;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ai-help-btn:hover {
+        transform: scale(1.1);
+        background: #6D28D9;
+    }
+
+    /* Results Modal */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 20px;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: modalIn 0.3s ease-out;
+    }
+
+    @keyframes modalIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95) translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--gray-200);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .modal-header h2 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+
+    .modal-close {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: var(--gray-100);
+        color: var(--gray-600);
+        cursor: pointer;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .score-display {
+        text-align: center;
+        padding: 30px 0;
+    }
+
+    .score-circle {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--success-bg), #fff);
+        border: 4px solid var(--success);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .score-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--success);
+    }
+
+    .score-label {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        text-transform: uppercase;
+    }
+
+    .score-message {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 8px;
+    }
+
+    .score-detail {
+        font-size: 0.875rem;
+        color: var(--gray-500);
+    }
+
+    .feedback-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .feedback-section h4 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 12px;
+    }
+
+    .feedback-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 0;
+    }
+
+    .feedback-icon {
+        font-size: 1rem;
+    }
+
+    .feedback-icon.good { color: var(--success); }
+    .feedback-icon.improve { color: var(--warning); }
+
+    .feedback-text {
+        font-size: 0.875rem;
+        color: var(--gray-600);
+    }
+
+    .modal-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--gray-200);
+        display: flex;
+        gap: 10px;
+    }
+
+    .modal-btn {
+        flex: 1;
+        padding: 14px;
+        border-radius: var(--radius);
+        font-size: 0.9375rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .modal-btn.secondary {
+        background: var(--gray-100);
+        border: none;
+        color: var(--gray-700);
+    }
+
+    .modal-btn.primary {
+        background: var(--primary);
+        border: none;
+        color: #fff;
+    }
+
+    /* Contacts Grid */
+    .contacts-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .contact-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        background: #fff;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+
+    .contact-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--primary-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .contact-info h4 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .contact-info p {
+        font-size: 0.8125rem;
+        color: var(--gray-500);
+    }
+
+    .contact-info a {
+        font-size: 0.8125rem;
+        color: var(--primary);
+        text-decoration: none;
+    }
+
+    /* Industries Grid */
+    .industries-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+    }
+
+    .industry-card {
+        background: #fff;
+        border-radius: var(--radius);
+        padding: 16px;
+        box-shadow: var(--shadow);
+    }
+
+    .industry-card h4 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .industry-card ul {
+        list-style: none;
+    }
+
+    .industry-card li {
+        font-size: 0.8125rem;
+        color: var(--gray-600);
+        padding: 4px 0;
+        padding-left: 14px;
+        position: relative;
+    }
+
+    .industry-card li::before {
+        content: '•';
+        position: absolute;
+        left: 0;
+        color: var(--primary);
+    }
+
+    /* Objections Section */
+    .objection-card {
+        background: #fff;
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: var(--shadow);
+    }
+
+    .objection-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .objection-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: var(--danger-bg);
+        color: var(--danger);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .objection-text {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .objection-response {
+        background: var(--success-bg);
+        border-radius: 8px;
+        padding: 14px;
+    }
+
+    .objection-response h5 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--success);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .objection-response p {
+        font-size: 0.875rem;
+        color: var(--gray-700);
+        line-height: 1.6;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+        .stage-selector {
+            flex-direction: column;
+        }
+
+        .stage-card {
+            min-width: 100%;
+        }
+
+        .chat-messages {
+            height: 350px;
+        }
+
+        .message-content {
+            max-width: 85%;
+        }
+
+        .persona-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+</style>
+```
+
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <button class="back-btn">←</button>
+            <div class="header-title">
+                <div class="header-icon">◉</div>
+                <h1>2026 Sales Process</h1>
+            </div>
+        </div>
+    </header>
+
+```
+<!-- Main Tabs -->
+<nav class="main-tabs">
+    <div class="main-tabs-content">
+        <button class="main-tab active" onclick="showMainSection('phases')">Phases</button>
+        <button class="main-tab" onclick="showMainSection('roleplay')">AI Practice</button>
+        <button class="main-tab" onclick="showMainSection('objections')">Objections</button>
+        <button class="main-tab" onclick="showMainSection('industries')">Industries</button>
+        <button class="main-tab" onclick="showMainSection('contacts')">Contacts</button>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content">
+    <!-- ============================================
+         PHASES SECTION
+         ============================================ -->
+    <section class="section active" id="phases-section">
+        <!-- Phase Navigation -->
+        <div class="phase-nav">
+            <button class="phase-btn active" onclick="showPhase(0)">
+                <div class="icon">◎</div>
+                <span class="label">Prospect...</span>
+            </button>
+            <button class="phase-btn" onclick="showPhase(1)">
+                <div class="icon">🔍</div>
+                <span class="label">Discovery</span>
+            </button>
+            <button class="phase-btn" onclick="showPhase(2)">
+                <div class="icon">🤝</div>
+                <span class="label">Proposa...</span>
+            </button>
+            <button class="phase-btn" onclick="showPhase(3)">
+                <div class="icon">🚀</div>
+                <span class="label">Onboar...</span>
+            </button>
+        </div>
+
+        <!-- Phase 0: Prospecting -->
+        <div class="phase-content active" id="phase-0">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon purple">◎</div>
+                    <div>
+                        <h2 class="card-title">Prospect For the Appointment</h2>
+                        <p class="card-subtitle">Get the appointment scheduled</p>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <span class="icon">✓</span>
+                    Key Activities
+                </div>
+                <ul class="activity-list">
+                    <li>Drop in with Dual Pricing Flyer or Video Brochure</li>
+                    <li>Use Jason's drop-in-the-door pitch</li>
+                    <li>Set appointment for 15-minute presentation</li>
+                    <li>Enroll prospect in automated email series</li>
+                </ul>
+
+                <div style="margin-top: 20px;">
+                    <div class="section-header">
+                        <span class="icon">💬</span>
+                        Scripts
+                    </div>
+
+                    <div class="expandable" id="script-dropin">
+                        <div class="expandable-header" onclick="toggleExpandable('script-dropin')">
+                            <span class="expandable-title">Jason's Drop-In-The-Door Pitch</span>
+                            <span class="expandable-toggle">▼</span>
+                        </div>
+                        <div class="expandable-content">
+                            <div class="script-text">
+                                "Hi my name is ___. I'm sorry I don't have time to stay long. I'm working with local business owners, helping them eliminate one of their biggest expenses. I just wanted to drop in and see if I could schedule about 15 minutes of your time either ___ at ___ o'clock or ___ at ____ o'clock, which one would work better for you?"
+                            </div>
+                            <div class="script-tips">
+                                <h5>Pro Tips</h5>
+                                <ul>
+                                    <li>Use alternative choice close for appointment</li>
+                                    <li>Create urgency by mentioning other appointments</li>
+                                    <li>Keep it brief - 30 seconds max</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="expandable" id="script-video">
+                        <div class="expandable-header" onclick="toggleExpandable('script-video')">
+                            <span class="expandable-title">Video Brochure Script</span>
+                            <span class="expandable-toggle">▼</span>
+                        </div>
+                        <div class="expandable-content">
+                            <div class="script-text">
+                                "Hello, my name is ___. I have just been helping some [industry] business owners in the [area] area. I apologize, but I can't stay long. I have [business A] and [business B] waiting for me to help them. I also understand that you are probably pretty busy. So I can respect your time and see if I can put hundreds, if not thousands back into your bottom line, I would like to leave this Video Brochure with you. All I ask is that you take a quick look inside when you have 5 free minutes. Does that sound fair to you?"
+                            </div>
+                            <div class="script-tips">
+                                <h5>Pro Tips</h5>
+                                <ul>
+                                    <li>Leave video brochure with prospect</li>
+                                    <li>Set specific callback time</li>
+                                    <li>Create social proof with other businesses</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pro-tips">
+                    <div class="pro-tips-header">
+                        <span>💡</span>
+                        Pro Tips
+                    </div>
+                    <ul>
+                        <li>Get out there and talk to merchants in person - this is the most important thing</li>
+                        <li>Follow the 5-9-4-2-25 formula: 5 drop-ins/day, 9 contacts/week, 4 appointments, 2 closes, 25 weekly touches</li>
+                        <li>Enroll prospects in the 3-part email series between drop-in and presentation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 1: Discovery -->
+        <div class="phase-content" id="phase-1">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon blue">🔍</div>
+                    <div>
+                        <h2 class="card-title">Discovery & Presentation</h2>
+                        <p class="card-subtitle">Understand needs and collect statement</p>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <span class="icon">✓</span>
+                    Key Activities
+                </div>
+                <ul class="activity-list">
+                    <li>Ask discovery questions about equipment and pain points</li>
+                    <li>Walk through Pitch Book and Dual Pricing program</li>
+                    <li>Collect one-month processing statement</li>
+                    <li>Set appointment to return with proposal</li>
+                </ul>
+
+                <div class="expandable open" id="script-statement">
+                    <div class="expandable-header" onclick="toggleExpandable('script-statement')">
+                        <span class="expandable-title">Request Processing Statement Script</span>
+                        <span class="expandable-toggle">▼</span>
+                    </div>
+                    <div class="expandable-content">
+                        <div class="script-text">
+                            "What I would like to do is create a custom proposal for your business showing exactly how much money I can put back into your business each month. I'll do a side-by-side comparison of Traditional Processing, Surcharging and Dual Pricing, and I'll include any equipment costs as well. In order to do that I will need one-month processing statement."
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pro-tips">
+                    <div class="pro-tips-header">
+                        <span>💡</span>
+                        Pro Tips
+                    </div>
+                    <ul>
+                        <li>Use the Presentation Questionnaire to guide your discovery</li>
+                        <li>Take detailed notes on their pain points</li>
+                        <li>If they want to close now, call Jason or your mentor</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 2: Proposal & Close -->
+        <div class="phase-content" id="phase-2">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon green">🤝</div>
+                    <div>
+                        <h2 class="card-title">Proposal & Close</h2>
+                        <p class="card-subtitle">Present savings and close the deal</p>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <span class="icon">✓</span>
+                    Key Activities
+                </div>
+                <ul class="activity-list">
+                    <li>Walk through custom proposal showing savings</li>
+                    <li>Compare Traditional, Surcharging, and Dual Pricing</li>
+                    <li>Collect required documents</li>
+                    <li>Complete e-signature application</li>
+                </ul>
+
+                <div class="expandable open" id="script-close">
+                    <div class="expandable-header" onclick="toggleExpandable('script-close')">
+                        <span class="expandable-title">Closing Script</span>
+                        <span class="expandable-toggle">▼</span>
+                    </div>
+                    <div class="expandable-content">
+                        <div class="script-text">
+                            "To get you up and running today, I will need a copy of your driver's license, business license, voided check, and processing statements."
+                        </div>
+                        <div class="script-tips">
+                            <h5>Required Documents</h5>
+                            <ul>
+                                <li>Driver's License</li>
+                                <li>Business License</li>
+                                <li>Voided Check</li>
+                                <li>Processing Statements</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pro-tips">
+                    <div class="pro-tips-header">
+                        <span>💡</span>
+                        Pro Tips
+                    </div>
+                    <ul>
+                        <li>Text your mentor before the close for support</li>
+                        <li>Be direct and assumptive with the close</li>
+                        <li>Bonus paid when merchant processes $300</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 3: Onboarding -->
+        <div class="phase-content" id="phase-3">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon amber">🚀</div>
+                    <div>
+                        <h2 class="card-title">After the Sale</h2>
+                        <p class="card-subtitle">Merchant onboarding process</p>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <span class="icon">✓</span>
+                    Onboarding Steps
+                </div>
+                <ul class="activity-list">
+                    <li><strong>Step 1:</strong> Welcome email sent, equipment ships via 2-day FedEx</li>
+                    <li><strong>Step 2:</strong> IT calls merchant to run test transaction</li>
+                    <li><strong>Step 3:</strong> PCI compliance completed within 30 days</li>
+                </ul>
+
+                <div class="pro-tips">
+                    <div class="pro-tips-header">
+                        <span>💡</span>
+                        Key Details
+                    </div>
+                    <ul>
+                        <li>Monthly $64.95 Dual Pricing fee + $10 portal fee</li>
+                        <li>Terminal purchases billed 30 days after deployment</li>
+                        <li>Annual PCI fee: $99 (we handle compliance for them)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         AI ROLE-PLAY PRACTICE SECTION
+         ============================================ -->
+    <section class="section roleplay-section" id="roleplay-section">
+        <!-- Stage Selector -->
+        <div class="stage-selector">
+            <div class="stage-card active" onclick="selectStage(1)">
+                <div class="stage-number">1</div>
+                <div class="stage-name">Prospecting</div>
+                <div class="stage-goal">Get the appointment & statement</div>
+            </div>
+            <div class="stage-card" onclick="selectStage(2)">
+                <div class="stage-number">2</div>
+                <div class="stage-name">Discovery</div>
+                <div class="stage-goal">Present & gather information</div>
+            </div>
+            <div class="stage-card" onclick="selectStage(3)">
+                <div class="stage-number">3</div>
+                <div class="stage-name">Close & Follow-up</div>
+                <div class="stage-goal">Close the deal</div>
+            </div>
+        </div>
+
+        <!-- Merchant Persona Selector -->
+        <div class="persona-selector">
+            <div class="persona-header">
+                <h3>Select Merchant Persona</h3>
+                <button class="randomize-btn" onclick="randomizePersona()">
+                    <span>🎲</span> Randomize
+                </button>
+            </div>
+            <div class="persona-grid">
+                <div class="persona-option selected" data-persona="busy" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👨‍🔧</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Mike - Auto Shop</div>
+                        <div class="persona-type">Busy & Skeptical</div>
+                    </div>
+                </div>
+                <div class="persona-option" data-persona="friendly" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👩‍🍳</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Maria - Restaurant</div>
+                        <div class="persona-type">Friendly but Cautious</div>
+                    </div>
+                </div>
+                <div class="persona-option" data-persona="price" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👨‍⚕️</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Dr. Patel - Dentist</div>
+                        <div class="persona-type">Price Focused</div>
+                    </div>
+                </div>
+                <div class="persona-option" data-persona="loyal" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👩‍💼</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Sarah - Salon</div>
+                        <div class="persona-type">Loyal to Current</div>
+                    </div>
+                </div>
+                <div class="persona-option" data-persona="tech" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👨‍💻</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Jason - Tech Store</div>
+                        <div class="persona-type">Tech Savvy</div>
+                    </div>
+                </div>
+                <div class="persona-option" data-persona="time" onclick="selectPersona(this)">
+                    <div class="persona-avatar">👩‍🌾</div>
+                    <div class="persona-info">
+                        <div class="persona-name">Linda - Garden</div>
+                        <div class="persona-type">No Time to Talk</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-selector">
+                <button class="difficulty-btn selected easy" onclick="selectDifficulty(this, 'easy')">😊 Easy</button>
+                <button class="difficulty-btn medium" onclick="selectDifficulty(this, 'medium')">😐 Medium</button>
+                <button class="difficulty-btn hard" onclick="selectDifficulty(this, 'hard')">😤 Hard</button>
+            </div>
+        </div>
+
+        <!-- Session Controls -->
+        <div class="session-controls">
+            <button class="control-btn start" onclick="startSession()">
+                <span>▶</span> Start Practice
+            </button>
+            <button class="control-btn reset" onclick="resetSession()">
+                <span>↺</span> Reset
+            </button>
+        </div>
+
+        <!-- Stage Progress -->
+        <div class="stage-progress" id="stageProgress" style="display: none;">
+            <div class="progress-header">
+                <h3>Stage 1 Objectives</h3>
+                <span class="progress-percentage">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="objectives-list">
+                <div class="objective-item" data-obj="intro">
+                    <div class="objective-check">✓</div>
+                    <span class="objective-text">Introduce yourself professionally</span>
+                </div>
+                <div class="objective-item" data-obj="value">
+                    <div class="objective-check">✓</div>
+                    <span class="objective-text">Communicate value proposition</span>
+                </div>
+                <div class="objective-item" data-obj="appointment">
+                    <div class="objective-check">✓</div>
+                    <span class="objective-text">Request appointment with alternative choice</span>
+                </div>
+                <div class="objective-item" data-obj="statement">
+                    <div class="objective-check">✓</div>
+                    <span class="objective-text">Mention processing statement</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coaching Panel -->
+        <div class="coaching-panel" id="coachingPanel">
+            <div class="coaching-header">
+                <span class="icon">🎯</span>
+                <h3>AI Coach</h3>
+            </div>
+            <div class="coaching-tip" id="coachingTip">
+                Select a merchant persona and click "Start Practice" to begin. You'll practice the prospecting stage first - your goal is to schedule an appointment and eventually get their processing statement.
+            </div>
+            <div class="coaching-actions">
+                <button class="coaching-btn" onclick="getHint()">💡 Get Hint</button>
+                <button class="coaching-btn" onclick="showScript()">📜 See Script</button>
+                <button class="coaching-btn primary" onclick="skipToNext()">⏭ Skip Ahead</button>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chatContainer" style="display: none;">
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <div class="chat-avatar" id="chatAvatar">👨‍🔧</div>
+                    <div class="chat-info">
+                        <h4 id="chatName">Mike - Thompson Auto Repair</h4>
+                        <p id="chatStatus">In conversation...</p>
+                    </div>
+                </div>
+                <div class="chat-header-right">
+                    <button class="chat-toggle active" id="ttsToggle" onclick="toggleTTS()">
+                        <span class="icon">🔊</span>
+                        <span>Voice</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <!-- Messages will be inserted here -->
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-suggestions" id="suggestions">
+                    <button class="suggestion-chip" onclick="useSuggestion(this)">Hi, I'm here to help...</button>
+                    <button class="suggestion-chip" onclick="useSuggestion(this)">Do you have 15 minutes...</button>
+                    <button class="suggestion-chip" onclick="useSuggestion(this)">I work with business owners...</button>
+                </div>
+                <div class="input-row">
+                    <div class="input-wrapper">
+                        <textarea class="chat-input" id="chatInput" placeholder="Type your response or tap the mic..." rows="1" onkeydown="handleKeyDown(event)"></textarea>
+                        <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+                    </div>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         OBJECTIONS SECTION
+         ============================================ -->
+    <section class="section" id="objections-section">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon purple">🛡</div>
+                <div>
+                    <h2 class="card-title">Overcoming Objections</h2>
+                    <p class="card-subtitle">Common objections and how to respond</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="objection-card">
+            <div class="objection-header">
+                <div class="objection-icon">❌</div>
+                <div class="objection-text">"I'm happy with my current processor"</div>
+            </div>
+            <div class="objection-response">
+                <h5>Response</h5>
+                <p>"That's great to hear! Most of my best clients felt the same way before they saw how much they were actually paying. Would you be open to a free, no-obligation comparison? If I can't save you money, at least you'll have peace of mind that you're getting a fair deal."</p>
+            </div>
+        </div>
+
+        <div class="objection-card">
+            <div class="objection-header">
+                <div class="objection-icon">❌</div>
+                <div class="objection-text">"I don't have time right now"</div>
+            </div>
+            <div class="objection-response">
+                <h5>Response</h5>
+                <p>"I completely understand - you're busy running your business. That's exactly why I'm here. Let me leave this information with you and I'll come back [day] at [time] or [day] at [time]. Which works better for you?"</p>
+            </div>
+        </div>
+
+        <div class="objection-card">
+            <div class="objection-header">
+                <div class="objection-icon">❌</div>
+                <div class="objection-text">"I'm locked into a contract"</div>
+            </div>
+            <div class="objection-response">
+                <h5>Response</h5>
+                <p>"When does your contract end? Let's take a look at what you're paying now, and I can show you what you'd save when it's time to make a switch. Sometimes the savings are so significant that it makes sense to switch even with the cancellation fee."</p>
+            </div>
+        </div>
+
+        <div class="objection-card">
+            <div class="objection-header">
+                <div class="objection-icon">❌</div>
+                <div class="objection-text">"My customers won't like the card price"</div>
+            </div>
+            <div class="objection-response">
+                <h5>Response</h5>
+                <p>"I hear that a lot, but here's what we've found: customers appreciate transparency. Both prices are clearly displayed, and they have the choice. Most businesses report that 70-80% of customers don't even mention it. And the ones who do? They often pay cash, which saves you even more."</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         INDUSTRIES SECTION
+         ============================================ -->
+    <section class="section" id="industries-section">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon green">🏪</div>
+                <div>
+                    <h2 class="card-title">Target Industries</h2>
+                    <p class="card-subtitle">Best industries for P Series Terminal</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="industries-grid">
+            <div class="industry-card">
+                <h4>🚗 Automotive</h4>
+                <ul>
+                    <li>Auto repair/service</li>
+                    <li>Brakes/tires</li>
+                    <li>Used auto dealers</li>
+                    <li>Equipment rentals</li>
+                </ul>
+            </div>
+            <div class="industry-card">
+                <h4>🔧 Service-Based</h4>
+                <ul>
+                    <li>HVAC</li>
+                    <li>Plumbers</li>
+                    <li>Landscaping</li>
+                    <li>Painters</li>
+                </ul>
+            </div>
+            <div class="industry-card">
+                <h4>🏥 Healthcare</h4>
+                <ul>
+                    <li>Chiropractors</li>
+                    <li>Dentists</li>
+                    <li>Veterinarians</li>
+                    <li>Optometrists</li>
+                </ul>
+            </div>
+            <div class="industry-card">
+                <h4>💇 Personal Services</h4>
+                <ul>
+                    <li>Hair/nail salons</li>
+                    <li>Day spas</li>
+                    <li>Personal trainers</li>
+                    <li>Dog groomers</li>
+                </ul>
+            </div>
+            <div class="industry-card">
+                <h4>🍕 Food & Hospitality</h4>
+                <ul>
+                    <li>Pizza/delivery</li>
+                    <li>Food trucks</li>
+                    <li>Liquor stores</li>
+                    <li>Smoke shops</li>
+                </ul>
+            </div>
+            <div class="industry-card">
+                <h4>🏢 B2B & Professional</h4>
+                <ul>
+                    <li>Attorneys</li>
+                    <li>Daycares</li>
+                    <li>Funeral homes</li>
+                    <li>Government</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTACTS SECTION
+         ============================================ -->
+    <section class="section" id="contacts-section">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon blue">📞</div>
+                <div>
+                    <h2 class="card-title">Support Contacts</h2>
+                    <p class="card-subtitle">PCBancard team directory</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="contacts-grid">
+            <div class="contact-card">
+                <div class="contact-avatar">👔</div>
+                <div class="contact-info">
+                    <h4>Jason - Sales Manager</h4>
+                    <p>(317) 750-9108</p>
+                    <a href="mailto:avar@pcbancard.com">avar@pcbancard.com</a>
+                </div>
+            </div>
+            <div class="contact-card">
+                <div class="contact-avatar">👩‍💼</div>
+                <div class="contact-info">
+                    <h4>Emma - New Agent Support</h4>
+                    <p>(973) 768-2231</p>
+                    <a href="mailto:emma@pcbancard.com">emma@pcbancard.com</a>
+                </div>
+            </div>
+            <div class="contact-card">
+                <div class="contact-avatar">🔧</div>
+                <div class="contact-info">
+                    <h4>Kenny & Erik - IT</h4>
+                    <a href="mailto:itdept@pcbancard.com">itdept@pcbancard.com</a>
+                </div>
+            </div>
+            <div class="contact-card">
+                <div class="contact-avatar">📋</div>
+                <div class="contact-info">
+                    <h4>Kristen & Cori - Office</h4>
+                    <a href="mailto:office@pcbancard.com">office@pcbancard.com</a>
+                </div>
+            </div>
+            <div class="contact-card">
+                <div class="contact-avatar">📊</div>
+                <div class="contact-info">
+                    <h4>Proposals (24hr turnaround)</h4>
+                    <a href="mailto:proposals@pcbancard.com">proposals@pcbancard.com</a>
+                </div>
+            </div>
+            <div class="contact-card">
+                <div class="contact-avatar">🏢</div>
+                <div class="contact-info">
+                    <h4>Main Office</h4>
+                    <p>(973) 324-2251</p>
+                    <p>8:30 AM - 5:00 PM EST</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Floating AI Help Button -->
+<button class="ai-help-btn" onclick="openAIHelp()">💬</button>
+
+<!-- Results Modal -->
+<div class="modal-overlay" id="resultsModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Practice Complete!</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="score-display">
+                <div class="score-circle">
+                    <span class="score-number" id="finalScore">85</span>
+                    <span class="score-label">Score</span>
+                </div>
+                <div class="score-message" id="scoreMessage">Great Job!</div>
+                <div class="score-detail" id="scoreDetail">You completed 4 out of 4 objectives</div>
+            </div>
+
+            <div class="feedback-section">
+                <h4>Feedback</h4>
+                <div class="feedback-item">
+                    <span class="feedback-icon good">✓</span>
+                    <span class="feedback-text">Great introduction - professional and concise</span>
+                </div>
+                <div class="feedback-item">
+                    <span class="feedback-icon good">✓</span>
+                    <span class="feedback-text">Used alternative choice close for appointment</span>
+                </div>
+                <div class="feedback-item">
+                    <span class="feedback-icon improve">!</span>
+                    <span class="feedback-text">Consider mentioning specific savings earlier</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary" onclick="closeModal()">Review Chat</button>
+            <button class="modal-btn primary" onclick="nextStage()">Next Stage →</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // STATE MANAGEMENT
+    // ============================================
+    let state = {
+        currentMainSection: 'phases',
+        currentPhase: 0,
+        currentStage: 1,
+        selectedPersona: 'busy',
+        difficulty: 'easy',
+        sessionActive: false,
+        ttsEnabled: true,
+        isRecording: false,
+        messages: [],
+        objectives: {
+            intro: false,
+            value: false,
+            appointment: false,
+            statement: false
+        }
+    };
+
+    // Persona configurations
+    const personas = {
+        busy: {
+            name: 'Mike',
+            business: 'Thompson Auto Repair',
+            avatar: '👨‍🔧',
+            personality: 'Busy and skeptical, values time',
+            openingLines: {
+                1: "Yeah? Can I help you? I've got a transmission rebuild waiting.",
+                2: "Alright, I looked at your brochure. What exactly is this dual pricing thing?",
+                3: "Okay, you said you could save me money. Show me the numbers."
+            }
+        },
+        friendly: {
+            name: 'Maria',
+            business: "Maria's Kitchen",
+            avatar: '👩‍🍳',
+            personality: 'Friendly but cautious, asks lots of questions',
+            openingLines: {
+                1: "Hi there! Welcome! What can I do for you today?",
+                2: "Oh, you're back! I watched some of those videos. Pretty interesting!",
+                3: "So, I talked to my husband about this. He wants to know about the fees."
+            }
+        },
+        price: {
+            name: 'Dr. Patel',
+            business: 'Bright Smile Dental',
+            avatar: '👨‍⚕️',
+            personality: 'Very price focused, analytical',
+            openingLines: {
+                1: "I have exactly 5 minutes between patients. What's this about?",
+                2: "I've analyzed my current fees. Show me exactly how your program compares.",
+                3: "The numbers look interesting, but I need to understand all the hidden costs."
+            }
+        },
+        loyal: {
+            name: 'Sarah',
+            business: 'Style Studio Salon',
+            avatar: '👩‍💼',
+            personality: 'Loyal to current processor, resistant to change',
+            openingLines: {
+                1: "Oh, another processor rep? I've been with Square for 5 years.",
+                2: "I'll be honest, I'm still not sure why I should switch. Square is so easy.",
+                3: "Okay, but if I switch and something goes wrong, then what?"
+            }
+        },
+        tech: {
+            name: 'Jason',
+            business: 'TechHub Electronics',
+            avatar: '👨‍💻',
+            personality: 'Tech savvy, wants details about integrations',
+            openingLines: {
+                1: "Hey! Always interested in new tech. What's your solution?",
+                2: "Does your system integrate with my inventory management? I use Shopify.",
+                3: "I like the concept. Tell me about the API and reporting capabilities."
+            }
+        },
+        time: {
+            name: 'Linda',
+            business: 'Green Thumb Garden Center',
+            avatar: '👩‍🌾',
+            personality: 'Always busy, hard to pin down',
+            openingLines: {
+                1: "*looks up briefly from moving plants* Sorry, crazy busy today. What is it?",
+                2: "*on the phone* Hold on... okay, you have 2 minutes. Go.",
+                3: "*checking inventory* Make it quick, I've got a delivery coming."
+            }
+        }
+    };
+
+    // Stage objectives
+    const stageObjectives = {
+        1: {
+            name: 'Prospecting',
+            objectives: [
+                { id: 'intro', text: 'Introduce yourself professionally' },
+                { id: 'value', text: 'Communicate value proposition' },
+                { id: 'appointment', text: 'Request appointment with alternative choice' },
+                { id: 'leave', text: 'Leave materials or schedule follow-up' }
+            ]
+        },
+        2: {
+            name: 'Discovery & Presentation',
+            objectives: [
+                { id: 'rapport', text: 'Build rapport and thank them for their time' },
+                { id: 'questions', text: 'Ask discovery questions about their business' },
+                { id: 'present', text: 'Present Dual Pricing benefits' },
+                { id: 'statement', text: 'Request processing statement for proposal' }
+            ]
+        },
+        3: {
+            name: 'Close & Follow-up',
+            objectives: [
+                { id: 'review', text: 'Review the custom proposal' },
+                { id: 'savings', text: 'Highlight specific savings' },
+                { id: 'objections', text: 'Handle any final objections' },
+                { id: 'close', text: 'Ask for the business and collect documents' }
+            ]
+        }
+    };
+
+    // Coaching tips by stage
+    const coachingTips = {
+        1: [
+            "Remember: You're not selling yet, just getting the appointment!",
+            "Use the alternative choice close: 'Tuesday at 2 or Thursday at 10?'",
+            "Mention you help eliminate their biggest expense (processing fees)",
+            "If they're busy, leave materials and set a specific callback time"
+        ],
+        2: [
+            "Start with rapport - acknowledge their time is valuable",
+            "Use the discovery questions to understand their pain points",
+            "Walk through the Pitch Book and explain Dual Pricing benefits",
+            "Always leave with a statement to create their custom proposal"
+        ],
+        3: [
+            "Walk through the savings comparison side-by-side",
+            "Be assumptive with the close - not 'if' but 'when'",
+            "Have the document checklist ready: DL, business license, voided check",
+            "Text your mentor for support during the close"
+        ]
+    };
+
+    // ============================================
+    // NAVIGATION FUNCTIONS
+    // ============================================
+    function showMainSection(section) {
+        state.currentMainSection = section;
+        
+        // Update tabs
+        document.querySelectorAll('.main-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // Show section
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(`${section}-section`).classList.add('active');
+    }
+
+    function showPhase(phase) {
+        state.currentPhase = phase;
+
+        // Update phase buttons
+        document.querySelectorAll('.phase-btn').forEach((btn, i) => {
+            btn.classList.toggle('active', i === phase);
+        });
+
+        // Show phase content
+        document.querySelectorAll('.phase-content').forEach(p => p.classList.remove('active'));
+        document.getElementById(`phase-${phase}`).classList.add('active');
+    }
+
+    function toggleExpandable(id) {
+        document.getElementById(id).classList.toggle('open');
+    }
+
+    // ============================================
+    // ROLE-PLAY FUNCTIONS
+    // ============================================
+    function selectStage(stage) {
+        state.currentStage = stage;
+        
+        document.querySelectorAll('.stage-card').forEach((card, i) => {
+            card.classList.toggle('active', i === stage - 1);
+        });
+
+        updateObjectivesDisplay();
+        updateCoachingTip();
+    }
+
+    function selectPersona(element) {
+        document.querySelectorAll('.persona-option').forEach(p => p.classList.remove('selected'));
+        element.classList.add('selected');
+        state.selectedPersona = element.dataset.persona;
+    }
+
+    function randomizePersona() {
+        const personaKeys = Object.keys(personas);
+        const randomKey = personaKeys[Math.floor(Math.random() * personaKeys.length)];
+        
+        document.querySelectorAll('.persona-option').forEach(p => {
+            p.classList.toggle('selected', p.dataset.persona === randomKey);
+        });
+        state.selectedPersona = randomKey;
+    }
+
+    function selectDifficulty(element, level) {
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.classList.remove('selected', 'easy', 'medium', 'hard');
+        });
+        element.classList.add('selected', level);
+        state.difficulty = level;
+    }
+
+    function startSession() {
+        state.sessionActive = true;
+        state.messages = [];
+        
+        // Reset objectives
+        Object.keys(state.objectives).forEach(key => {
+            state.objectives[key] = false;
+        });
+
+        // Show chat and progress
+        document.getElementById('chatContainer').style.display = 'block';
+        document.getElementById('stageProgress').style.display = 'block';
+
+        // Update chat header
+        const persona = personas[state.selectedPersona];
+        document.getElementById('chatAvatar').textContent = persona.avatar;
+        document.getElementById('chatName').textContent = `${persona.name} - ${persona.business}`;
+
+        // Clear messages
+        document.getElementById('chatMessages').innerHTML = '';
+
+        // Add system message
+        addMessage('system', `Stage ${state.currentStage}: ${stageObjectives[state.currentStage].name}. Your goal is to ${getStageGoal()}.`);
+
+        // Add merchant opening
+        setTimeout(() => {
+            const opening = persona.openingLines[state.currentStage];
+            addMessage('merchant', opening);
+        }, 1000);
+
+        updateObjectivesDisplay();
+        updateCoachingTip();
+        updateSuggestions();
+    }
+
+    function resetSession() {
+        state.sessionActive = false;
+        state.messages = [];
+        
+        Object.keys(state.objectives).forEach(key => {
+            state.objectives[key] = false;
+        });
+
+        document.getElementById('chatContainer').style.display = 'none';
+        document.getElementById('stageProgress').style.display = 'none';
+        document.getElementById('chatMessages').innerHTML = '';
+
+        updateObjectivesDisplay();
+    }
+
+    function getStageGoal() {
+        const goals = {
+            1: 'schedule an appointment and leave materials',
+            2: 'present the program and collect their processing statement',
+            3: 'close the deal and collect the required documents'
+        };
+        return goals[state.currentStage];
+    }
+
+    // ============================================
+    // CHAT FUNCTIONS
+    // ============================================
+    function addMessage(type, text) {
+        const messagesDiv = document.getElementById('chatMessages');
+        const persona = personas[state.selectedPersona];
+        
+        const messageHtml = `
+            <div class="message ${type}">
+                <div class="message-avatar">${type === 'merchant' ? persona.avatar : type === 'user' ? '👤' : 'ℹ️'}</div>
+                <div class="message-content">
+                    <div class="message-bubble">${text}</div>
+                    <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                </div>
+            </div>
+        `;
+        
+        messagesDiv.insertAdjacentHTML('beforeend', messageHtml);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        state.messages.push({ type, text, time: new Date() });
+
+        // Text-to-speech for merchant messages
+        if (type === 'merchant' && state.ttsEnabled) {
+            speak(text);
+        }
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        
+        if (!text) return;
+
+        addMessage('user', text);
+        input.value = '';
+        
+        // Analyze message and update objectives
+        analyzeUserMessage(text);
+        
+        // Generate AI response
+        setTimeout(() => {
+            showTypingIndicator();
+            setTimeout(() => {
+                hideTypingIndicator();
+                const response = generateMerchantResponse(text);
+                addMessage('merchant', response);
+                checkStageCompletion();
+            }, 1500 + Math.random() * 1500);
+        }, 500);
+    }
+
+    function handleKeyDown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function showTypingIndicator() {
+        const messagesDiv = document.getElementById('chatMessages');
+        const persona = personas[state.selectedPersona];
+        
+        messagesDiv.insertAdjacentHTML('beforeend', `
+            <div class="message merchant" id="typingIndicator">
+                <div class="message-avatar">${persona.avatar}</div>
+                <div class="message-content">
+                    <div class="message-bubble">
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function hideTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) indicator.remove();
+    }
+
+    function analyzeUserMessage(text) {
+        const lowerText = text.toLowerCase();
+        
+        // Check for objective completion
+        if (lowerText.includes('my name is') || lowerText.includes("i'm ") || lowerText.includes('hello') || lowerText.includes('hi ')) {
+            completeObjective('intro');
+        }
+        
+        if (lowerText.includes('eliminate') || lowerText.includes('save') || lowerText.includes('fees') || lowerText.includes('processing')) {
+            completeObjective('value');
+        }
+        
+        if ((lowerText.includes('tuesday') || lowerText.includes('thursday') || lowerText.includes('monday') || 
+            lowerText.includes('o\'clock') || lowerText.includes('at ')) && 
+            (lowerText.includes('or') || lowerText.includes('which'))) {
+            completeObjective('appointment');
+        }
+        
+        if (lowerText.includes('statement') || lowerText.includes('proposal')) {
+            completeObjective('statement');
+        }
+    }
+
+    function completeObjective(id) {
+        if (!state.objectives[id]) {
+            state.objectives[id] = true;
+            updateObjectivesDisplay();
+            updateCoachingTip();
+        }
+    }
+
+    function updateObjectivesDisplay() {
+        const objectives = stageObjectives[state.currentStage].objectives;
+        const objectivesList = document.querySelector('.objectives-list');
+        
+        if (!objectivesList) return;
+
+        objectivesList.innerHTML = objectives.map(obj => `
+            <div class="objective-item ${state.objectives[obj.id] ? 'completed' : ''}" data-obj="${obj.id}">
+                <div class="objective-check">✓</div>
+                <span class="objective-text">${obj.text}</span>
+            </div>
+        `).join('');
+
+        // Update progress
+        const completed = Object.values(state.objectives).filter(v => v).length;
+        const total = objectives.length;
+        const percentage = Math.round((completed / total) * 100);
+
+        document.querySelector('.progress-percentage').textContent = `${percentage}%`;
+        document.querySelector('.progress-fill').style.width = `${percentage}%`;
+        document.querySelector('.progress-header h3').textContent = `Stage ${state.currentStage} Objectives`;
+    }
+
+    function generateMerchantResponse(userMessage) {
+        const persona = personas[state.selectedPersona];
+        const difficulty = state.difficulty;
+        
+        // Simple response generation based on context
+        const responses = {
+            easy: [
+                "Hmm, that's interesting. Tell me more about how this works.",
+                "Okay, I'm listening. What kind of savings are we talking about?",
+                "I do pay a lot in fees every month. What would you need from me?",
+                "Alright, you've got my attention. When can we meet?"
+            ],
+            medium: [
+                "I've heard this pitch before. What makes you different?",
+                "My current processor says they have the best rates. Can you beat them?",
+                "I don't have time for meetings. Can you just email me the info?",
+                "How do I know my customers won't complain about the card price?"
+            ],
+            hard: [
+                "Look, I'm really not interested. I've been burned by processors before.",
+                "My accountant handles all of this. You'll have to talk to them.",
+                "I don't give out my processing statements to strangers.",
+                "I'm locked into a 3-year contract. There's nothing you can do."
+            ]
+        };
+
+        return responses[difficulty][Math.floor(Math.random() * responses[difficulty].length)];
+    }
+
+    function checkStageCompletion() {
+        const completed = Object.values(state.objectives).filter(v => v).length;
+        const total = stageObjectives[state.currentStage].objectives.length;
+
+        if (completed >= total - 1) { // Allow completion with most objectives done
+            setTimeout(() => {
+                showResults();
+            }, 2000);
+        }
+    }
+
+    // ============================================
+    // COACHING FUNCTIONS
+    // ============================================
+    function updateCoachingTip() {
+        const tips = coachingTips[state.currentStage];
+        const completed = Object.values(state.objectives).filter(v => v).length;
+        const tipIndex = Math.min(completed, tips.length - 1);
+        
+        document.getElementById('coachingTip').textContent = tips[tipIndex];
+    }
+
+    function getHint() {
+        const objectives = stageObjectives[state.currentStage].objectives;
+        const nextObjective = objectives.find(obj => !state.objectives[obj.id]);
+        
+        if (nextObjective) {
+            const hints = {
+                intro: "Start with a friendly introduction. Say your name and mention you work with local business owners.",
+                value: "Mention that you help businesses eliminate their biggest expense - processing fees.",
+                appointment: "Use the alternative choice close: 'Would Tuesday at 2 or Thursday at 10 work better for you?'",
+                statement: "Ask for one month's processing statement to create a custom proposal.",
+                rapport: "Thank them for their time and reference your previous conversation.",
+                questions: "Ask about their current processor, what they like/dislike, and their monthly fees.",
+                present: "Walk through how Dual Pricing eliminates their processing fees completely.",
+                close: "Be assumptive: 'To get you started, I'll need your driver's license, business license, and a voided check.'"
+            };
+            
+            document.getElementById('coachingTip').textContent = `💡 Hint: ${hints[nextObjective.id] || 'Keep the conversation moving toward your goal!'}`;
+        }
+    }
+
+    function showScript() {
+        const scripts = {
+            1: `"Hi my name is ___. I'm sorry I don't have time to stay long. I'm working with local business owners, helping them eliminate one of their biggest expenses. I just wanted to drop in and see if I could schedule about 15 minutes of your time either Tuesday at 2 o'clock or Thursday at 10 o'clock, which one would work better for you?"`,
+            2: `"What I would like to do is create a custom proposal for your business showing exactly how much money I can put back into your business each month. I'll do a side-by-side comparison of Traditional Processing, Surcharging and Dual Pricing. In order to do that I will need one-month processing statement."`,
+            3: `"To get you up and running today, I will need a copy of your driver's license, business license, voided check, and processing statements."`
+        };
+        
+        document.getElementById('coachingTip').textContent = `📜 Script: ${scripts[state.currentStage]}`;
+    }
+
+    function skipToNext() {
+        if (state.currentStage < 3) {
+            selectStage(state.currentStage + 1);
+            if (state.sessionActive) {
+                resetSession();
+                startSession();
+            }
+        }
+    }
+
+    function updateSuggestions() {
+        const suggestions = {
+            1: [
+                "Hi, I'm [name] with PCBancard...",
+                "I help business owners eliminate processing fees...",
+                "Would Tuesday at 2 or Thursday at 10 work?"
+            ],
+            2: [
+                "Thanks for your time today...",
+                "What do you like about your current processor?",
+                "Let me show you how Dual Pricing works..."
+            ],
+            3: [
+                "Based on your statement, you'll save...",
+                "Let me address that concern...",
+                "To get you started, I'll need..."
+            ]
+        };
+
+        const suggestionsDiv = document.getElementById('suggestions');
+        suggestionsDiv.innerHTML = suggestions[state.currentStage].map(s => 
+            `<button class="suggestion-chip" onclick="useSuggestion(this)">${s}</button>`
+        ).join('');
+    }
+
+    function useSuggestion(element) {
+        document.getElementById('chatInput').value = element.textContent;
+        document.getElementById('chatInput').focus();
+    }
+
+    // ============================================
+    // VOICE FUNCTIONS
+    // ============================================
+    let recognition = null;
+
+    function initSpeechRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                document.getElementById('chatInput').value = transcript;
+            };
+
+            recognition.onend = () => {
+                state.isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                state.isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+            };
+        }
+    }
+
+    function toggleMic() {
+        if (!recognition) {
+            alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+            return;
+        }
+
+        if (state.isRecording) {
+            recognition.stop();
+            state.isRecording = false;
+            document.getElementById('micBtn').classList.remove('recording');
+        } else {
+            recognition.start();
+            state.isRecording = true;
+            document.getElementById('micBtn').classList.add('recording');
+        }
+    }
+
+    function toggleTTS() {
+        state.ttsEnabled = !state.ttsEnabled;
+        document.getElementById('ttsToggle').classList.toggle('active', state.ttsEnabled);
+    }
+
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            // Cancel any ongoing speech
+            speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            speechSynthesis.speak(utterance);
+        }
+    }
+
+    // ============================================
+    // RESULTS & MODAL
+    // ============================================
+    function showResults() {
+        const completed = Object.values(state.objectives).filter(v => v).length;
+        const total = stageObjectives[state.currentStage].objectives.length;
+        const score = Math.round((completed / total) * 100);
+
+        document.getElementById('finalScore').textContent = score;
+        
+        let message = '';
+        if (score >= 90) message = 'Excellent Work!';
+        else if (score >= 70) message = 'Great Job!';
+        else if (score >= 50) message = 'Good Progress!';
+        else message = 'Keep Practicing!';
+        
+        document.getElementById('scoreMessage').textContent = message;
+        document.getElementById('scoreDetail').textContent = `You completed ${completed} out of ${total} objectives`;
+
+        document.getElementById('resultsModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('resultsModal').classList.remove('active');
+    }
+
+    function nextStage() {
+        closeModal();
+        if (state.currentStage < 3) {
+            selectStage(state.currentStage + 1);
+            resetSession();
+        }
+    }
+
+    function openAIHelp() {
+        // This would open the AI help panel
+        alert('AI Help Panel - Coming Soon!\n\nFeatures:\n• Ask questions about the sales process\n• Get objection handling tips\n• Practice specific scenarios\n• Review your performance');
+    }
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+        initSpeechRecognition();
+        updateObjectivesDisplay();
+    });
+</script>
+```
+
+</body>
+</html>

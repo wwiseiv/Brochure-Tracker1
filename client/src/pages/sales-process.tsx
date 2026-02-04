@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/tooltip";
 import { HamburgerMenu } from "@/components/BottomNav";
 import { AdviceExportToolbar } from "@/components/AdviceExportToolbar";
+import { InteractiveSalesRoleplay } from "@/components/InteractiveSalesRoleplay";
 import {
   ArrowLeft,
   ArrowUp,
@@ -542,8 +543,9 @@ export default function SalesProcessPage() {
           <Breadcrumb currentPhase={activeTab === "phases" ? currentPhase : undefined} />
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4" role="tablist">
+            <TabsList className="grid w-full grid-cols-5 mb-4" role="tablist">
               <TabsTrigger value="phases" data-testid="tab-phases" role="tab" aria-selected={activeTab === "phases"}>Phases</TabsTrigger>
+              <TabsTrigger value="practice" data-testid="tab-practice" role="tab" aria-selected={activeTab === "practice"}>Practice</TabsTrigger>
               <TabsTrigger value="objections" data-testid="tab-objections" role="tab" aria-selected={activeTab === "objections"}>Objections</TabsTrigger>
               <TabsTrigger value="industries" data-testid="tab-industries" role="tab" aria-selected={activeTab === "industries"}>Industries</TabsTrigger>
               <TabsTrigger value="contacts" data-testid="tab-contacts" role="tab" aria-selected={activeTab === "contacts"}>Contacts</TabsTrigger>
@@ -786,6 +788,10 @@ export default function SalesProcessPage() {
                   )}
                 </Card>
               )}
+            </TabsContent>
+
+            <TabsContent value="practice" className="space-y-4" role="tabpanel">
+              <InteractiveSalesRoleplay />
             </TabsContent>
 
             <TabsContent value="objections" className="space-y-4" role="tabpanel">
