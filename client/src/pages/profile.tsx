@@ -128,9 +128,6 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const { hasFeature, hasRole } = usePermissions();
   
-  // Helper that allows admins to see all features
-  const canAccessFeature = (featureId: string) => hasRole('admin') || hasFeature(featureId);
-  
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [digestSettingsOpen, setDigestSettingsOpen] = useState(false);
   
@@ -145,6 +142,10 @@ export default function ProfilePage() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+  
+  // Helper that allows admins to see all features - check both userRole and permission context
+  const isAdmin = userRole?.role === 'master_admin' || userRole?.role === 'owner' || hasRole('admin');
+  const canAccessFeature = (featureId: string) => isAdmin || hasFeature(featureId);
 
   const { data: digestPrefs, isLoading: digestLoading } = useQuery<EmailDigestPreferences>({
     queryKey: ["/api/email-digest/preferences"],

@@ -47,9 +47,6 @@ export default function DashboardPage() {
   const { isOnline, syncStatus, pendingCount, syncPendingDrops } = useOfflineSync();
   const { hasFeature, hasRole } = usePermissions();
   
-  // Helper that allows admins to see all features
-  const canAccessFeature = (featureId: string) => hasRole('admin') || hasFeature(featureId);
-  
   const { data: drops, isLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
   });
@@ -57,6 +54,10 @@ export default function DashboardPage() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+  
+  // Helper that allows admins to see all features - check both userRole and permission context
+  const isAdmin = userRole?.role === 'master_admin' || userRole?.role === 'owner' || hasRole('admin');
+  const canAccessFeature = (featureId: string) => isAdmin || hasFeature(featureId);
 
   const { data: userPreferences } = useQuery<UserPreferences>({
     queryKey: ["/api/me/preferences"],
@@ -110,7 +111,6 @@ export default function DashboardPage() {
   const coldDeals = activeDeals.filter(d => d.temperature === "cold").length;
   const totalPipelineValue = activeDeals.reduce((sum, d) => sum + (d.estimatedCommission || 0), 0);
 
-  const isAdmin = userRole?.role === "master_admin";
   const isRM = userRole?.role === "relationship_manager";
   const isSyncing = syncStatus === 'syncing';
 
