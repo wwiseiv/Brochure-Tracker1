@@ -186,8 +186,15 @@ async function getEffectiveUserId(req: any): Promise<string> {
     if (session && session.isActive && new Date(session.expiresAt) > new Date()) {
       // Verify the original user is the one who started the impersonation
       if (session.originalUserId === originalUserId) {
+        console.log(`[Impersonation] Returning impersonated user: ${session.impersonatedUserId} (original: ${originalUserId})`);
         return session.impersonatedUserId;
+      } else {
+        console.log(`[Impersonation] Token mismatch: session original ${session.originalUserId} != request original ${originalUserId}`);
       }
+    } else if (session) {
+      console.log(`[Impersonation] Session invalid: isActive=${session.isActive}, expired=${new Date(session.expiresAt) <= new Date()}`);
+    } else {
+      console.log(`[Impersonation] No session found for token`);
     }
   } catch (error) {
     console.error("Error checking impersonation session:", error);
