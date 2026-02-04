@@ -1362,7 +1362,7 @@ export default function TeamManagementPage() {
 
       {/* User Permissions Sheet */}
       <Sheet open={isPermissionsSheetOpen} onOpenChange={setIsPermissionsSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+        <SheetContent className="w-full sm:max-w-lg flex flex-col max-h-[85vh]">
           <SheetHeader className="flex-shrink-0">
             <SheetTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
@@ -1408,8 +1408,8 @@ export default function TeamManagementPage() {
               </div>
             </div>
           ) : (
-            <ScrollArea className="flex-1">
-              <div className="space-y-6 py-4 pr-4">
+            <ScrollArea className="flex-1 -mx-6">
+              <div className="space-y-6 py-4 px-6">
                 {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
                   const features = featuresByCategory[category];
                   if (features.length === 0) return null;
