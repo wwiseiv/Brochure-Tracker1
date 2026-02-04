@@ -45,7 +45,10 @@ interface UserRole {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { isOnline, syncStatus, pendingCount, syncPendingDrops } = useOfflineSync();
-  const { hasFeature } = usePermissions();
+  const { hasFeature, hasRole } = usePermissions();
+  
+  // Helper that allows admins to see all features
+  const canAccessFeature = (featureId: string) => hasRole('admin') || hasFeature(featureId);
   
   const { data: drops, isLoading } = useQuery<DropWithBrochure[]>({
     queryKey: ["/api/drops"],
@@ -165,7 +168,7 @@ export default function DashboardPage() {
             <img src={pcbLogoFullColor} alt="PCBancard" className="h-7 w-auto" />
           </div>
           <div className="flex items-center gap-2">
-            {hasFeature("activity_feed") && (
+            {canAccessFeature("activity_feed") && (
               <Tooltip delayDuration={700}>
                 <TooltipTrigger asChild>
                   <Link href="/activity">
@@ -279,7 +282,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {hasFeature("drop_management") && (
+        {canAccessFeature("drop_management") && (
           <Tooltip delayDuration={700}>
             <TooltipTrigger asChild>
               <Link href="/scan">
@@ -298,9 +301,9 @@ export default function DashboardPage() {
           </Tooltip>
         )}
 
-        {(hasFeature("todays_pickups") || hasFeature("coming_up_section")) && (
+        {(canAccessFeature("todays_pickups") || canAccessFeature("coming_up_section")) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {hasFeature("todays_pickups") && (
+            {canAccessFeature("todays_pickups") && (
               <section>
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <h2 className="text-lg font-semibold">Today's Pickups</h2>
@@ -351,7 +354,7 @@ export default function DashboardPage() {
               </section>
             )}
 
-            {hasFeature("coming_up_section") && (
+            {canAccessFeature("coming_up_section") && (
               <section className="md:block hidden">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold">Coming Up</h2>
@@ -383,7 +386,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {hasFeature("dashboard_stats") && (
+        {canAccessFeature("dashboard_stats") && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/history?filter=upcoming">
               <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-upcoming">
@@ -413,7 +416,7 @@ export default function DashboardPage() {
         )}
 
         {/* Deal Pipeline & CRM Section */}
-        {hasFeature("deal_pipeline") && (
+        {canAccessFeature("deal_pipeline") && (
           <section>
             <div className="mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -497,7 +500,7 @@ export default function DashboardPage() {
 
           {/* CRM Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {hasFeature("today_dashboard") && (
+            {canAccessFeature("today_dashboard") && (
               <Link href="/today">
                 <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-today-view">
                   <div className="flex items-start justify-between">
@@ -516,7 +519,7 @@ export default function DashboardPage() {
               </Link>
             )}
 
-            {hasFeature("email_drafter") && (
+            {canAccessFeature("email_drafter") && (
               <Link href="/email">
                 <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-email-drafter">
                   <div className="flex items-start justify-between">
@@ -538,7 +541,7 @@ export default function DashboardPage() {
               </Link>
             )}
 
-            {hasFeature("esign_integration") && (
+            {canAccessFeature("esign_integration") && (
               <Link href="/esign">
                 <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-esign">
                   <div className="flex items-start justify-between">
@@ -580,7 +583,7 @@ export default function DashboardPage() {
         )}
 
         {/* AI-Powered Prospecting Section */}
-        {(hasFeature("ai_prospect_finder") || hasFeature("deal_pipeline") || hasFeature("business_card_scanner")) && (
+        {(canAccessFeature("ai_prospect_finder") || canAccessFeature("deal_pipeline") || canAccessFeature("business_card_scanner")) && (
           <section>
             <div className="mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -593,7 +596,7 @@ export default function DashboardPage() {
             </div>
             
             <div className="space-y-3">
-              {hasFeature("ai_prospect_finder") && (
+              {canAccessFeature("ai_prospect_finder") && (
                 <Link href="/prospects/search">
                   <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-prospect-finder">
                     <div className="flex items-start justify-between">
@@ -619,7 +622,7 @@ export default function DashboardPage() {
                 </Link>
               )}
 
-              {hasFeature("deal_pipeline") && (
+              {canAccessFeature("deal_pipeline") && (
                 <Link href="/prospects/pipeline">
                   <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-my-pipeline">
                     <div className="flex items-start justify-between">
@@ -642,7 +645,7 @@ export default function DashboardPage() {
                 </Link>
               )}
 
-              {hasFeature("business_card_scanner") && (
+              {canAccessFeature("business_card_scanner") && (
                 <Link href="/prospects/scan-card">
                   <Card className="p-4 hover-elevate cursor-pointer" data-testid="card-scan-business-card">
                     <div className="flex items-start justify-between">
@@ -674,7 +677,7 @@ export default function DashboardPage() {
         )}
 
         {/* AI-Powered Marketing Section */}
-        {hasFeature("marketing_materials") && (
+        {canAccessFeature("marketing_materials") && (
           <section>
             <div className="mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -765,7 +768,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {hasFeature("coming_up_section") && upcomingPickups.length > 0 && (
+        {canAccessFeature("coming_up_section") && upcomingPickups.length > 0 && (
           <section className="md:hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Coming Up</h2>

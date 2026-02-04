@@ -126,7 +126,10 @@ interface EmailDigestPreferences {
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
   const { toast } = useToast();
-  const { hasFeature } = usePermissions();
+  const { hasFeature, hasRole } = usePermissions();
+  
+  // Helper that allows admins to see all features
+  const canAccessFeature = (featureId: string) => hasRole('admin') || hasFeature(featureId);
   
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [digestSettingsOpen, setDigestSettingsOpen] = useState(false);
@@ -319,7 +322,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        {hasFeature("profile_stats") && (
+        {canAccessFeature("profile_stats") && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="p-4 text-center">
@@ -818,7 +821,7 @@ export default function ProfilePage() {
               </Button>
             </Link>
             
-            {hasFeature("brochure_inventory") && (
+            {canAccessFeature("brochure_inventory") && (
               <Link href="/inventory">
                 <Button 
                   variant="ghost" 
@@ -834,7 +837,7 @@ export default function ProfilePage() {
               </Link>
             )}
             
-            {hasFeature("referral_tracking") && (
+            {canAccessFeature("referral_tracking") && (
               <Link href="/referrals">
                 <Button 
                   variant="ghost" 
