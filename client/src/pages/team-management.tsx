@@ -1409,7 +1409,7 @@ export default function TeamManagementPage() {
             </div>
           ) : (
             <ScrollArea className="flex-1">
-              <div className="space-y-6 py-4">
+              <div className="space-y-6 py-4 pr-4">
                 {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
                   const features = featuresByCategory[category];
                   if (features.length === 0) return null;
