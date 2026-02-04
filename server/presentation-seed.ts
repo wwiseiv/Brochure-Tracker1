@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { and, eq } from "drizzle-orm";
 import { presentationModules, presentationLessons, presentationQuizzes } from "@shared/schema";
 import type { InsertPresentationModule, InsertPresentationLesson, InsertPresentationQuiz } from "@shared/schema";
 
@@ -2202,10 +2203,8 @@ export async function seedPresentationData() {
           lessonId: insertedLesson.id,
           question: quiz.question,
           options: quiz.options || [],
-          correctAnswer: typeof quiz.correctAnswer === 'number' ? quiz.correctAnswer : 0,
+          correctIndex: typeof quiz.correctAnswer === 'number' ? quiz.correctAnswer : 0,
           explanation: quiz.explanation,
-          quizType: quiz.type === 'scenario' ? 'scenario' : quiz.type === 'short_answer' ? 'short_answer' : 'multiple_choice',
-          order: index + 1,
         }));
 
         await db.insert(presentationQuizzes).values(quizzesToInsert);
@@ -2222,9 +2221,9 @@ export async function seedPresentationData() {
 
       const firstLessonNumber = moduleLessons[0].lesson.lessonNumber;
       const [firstLesson] = await db.select().from(presentationLessons)
-        .where((fields, { and, eq }) => and(
-          eq(fields.moduleId, moduleId),
-          eq(fields.lessonNumber, firstLessonNumber)
+        .where(and(
+          eq(presentationLessons.moduleId, moduleId),
+          eq(presentationLessons.lessonNumber, firstLessonNumber)
         ))
         .limit(1);
 
@@ -2233,10 +2232,8 @@ export async function seedPresentationData() {
           lessonId: firstLesson.id,
           question: `[MASTERY] ${quiz.question}`,
           options: quiz.options || [],
-          correctAnswer: typeof quiz.correctAnswer === 'number' ? quiz.correctAnswer : 0,
+          correctIndex: typeof quiz.correctAnswer === 'number' ? quiz.correctAnswer : 0,
           explanation: quiz.explanation,
-          quizType: 'multiple_choice',
-          order: 100 + index,
         }));
 
         await db.insert(presentationQuizzes).values(masteryQuizzesToInsert);

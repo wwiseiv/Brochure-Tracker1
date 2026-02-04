@@ -86,7 +86,7 @@ import {
 } from "./google-drive";
 import { seedDailyEdgeContent } from "./daily-edge-seed";
 import { seedEquipIQData } from "./equipiq-seed";
-import { seedPresentationContent } from "./presentation-seed";
+import { seedPresentationData } from "./presentation-seed";
 import { seedRoleplayPersonas } from "./seed-roleplay-personas";
 import { getMerchantCache, formatDuration, CacheCategory } from "./services/cache-service";
 import { paginate, paginateByStage, normalizeDealParams, decodeCursor, DealPaginationParams, KanbanPaginationParams } from "./services/pagination";
@@ -233,7 +233,7 @@ export async function registerRoutes(
   });
 
   // Seed Presentation Training content if not already present
-  seedPresentationContent().catch((error) => {
+  seedPresentationData().catch((error) => {
     console.error("Failed to seed Presentation Training content:", error);
   });
 

@@ -38,6 +38,12 @@ import {
   Send,
   Play,
   Sparkles,
+  HelpCircle,
+  Target,
+  ThumbsUp,
+  ThumbsDown,
+  Lightbulb,
+  Users,
 } from "lucide-react";
 import type {
   PresentationModule,
@@ -512,7 +518,12 @@ export default function PresentationTrainingPage() {
                   <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold">The Script</h3>
+                      <h3 className="font-semibold">Talk Track</h3>
+                      {currentLesson.psychologyTag && (
+                        <Badge variant="outline" className="text-xs" data-testid="badge-psychology-tag">
+                          {currentLesson.psychologyTag}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <ListenButton text={currentLesson.scriptText} />
@@ -534,7 +545,29 @@ export default function PresentationTrainingPage() {
                 </Card>
               )}
 
-              {currentLesson.psychology && (
+              {currentLesson.keyQuestions && currentLesson.keyQuestions.length > 0 && (
+                <Card className="p-4" data-testid="section-key-questions">
+                  <div className="flex items-center gap-2 mb-3">
+                    <HelpCircle className="w-5 h-5 text-cyan-500" />
+                    <h3 className="font-semibold flex-1">Key Questions to Ask</h3>
+                    <ListenButton text={currentLesson.keyQuestions.join(". ")} data-testid="button-listen-key-questions" />
+                  </div>
+                  <ul className="space-y-2" data-testid="list-key-questions">
+                    {currentLesson.keyQuestions.map((question: string, idx: number) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg"
+                        data-testid={`item-key-question-${idx}`}
+                      >
+                        <span className="text-cyan-500 font-bold shrink-0">{idx + 1}.</span>
+                        <span className="italic">&ldquo;{question}&rdquo;</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
+
+              {(currentLesson.whyItWorksEnhanced || currentLesson.psychology) && (
                 <Card className="p-4" data-testid="section-psychology">
                   <div className="flex items-center gap-2 mb-3">
                     <Brain className="w-5 h-5 text-purple-500" />
@@ -544,11 +577,63 @@ export default function PresentationTrainingPage() {
                         {currentLesson.mechanism}
                       </Badge>
                     )}
-                    <ListenButton text={currentLesson.psychology} />
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {currentLesson.psychology}
-                  </p>
+                  
+                  {currentLesson.whyItWorksEnhanced && typeof currentLesson.whyItWorksEnhanced === 'object' ? (
+                    <div className="space-y-4" data-testid="content-why-it-works-enhanced">
+                      {(currentLesson.whyItWorksEnhanced as any).merchantMindset && (
+                        <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg" data-testid="card-merchant-mindset">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Users className="w-4 h-4 text-purple-500" />
+                            <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300">Merchant Mindset</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(currentLesson.whyItWorksEnhanced as any).merchantMindset}
+                          </p>
+                        </div>
+                      )}
+                      {(currentLesson.whyItWorksEnhanced as any).commonMistake && (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg" data-testid="card-common-mistake">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                            <h4 className="text-sm font-medium text-amber-700 dark:text-amber-300">Common Mistake</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(currentLesson.whyItWorksEnhanced as any).commonMistake}
+                          </p>
+                        </div>
+                      )}
+                      {(currentLesson.whyItWorksEnhanced as any).howPhrasingPreventsResistance && (
+                        <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg" data-testid="card-phrasing-resistance">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Lightbulb className="w-4 h-4 text-green-500" />
+                            <h4 className="text-sm font-medium text-green-700 dark:text-green-300">How Phrasing Prevents Resistance</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(currentLesson.whyItWorksEnhanced as any).howPhrasingPreventsResistance}
+                          </p>
+                        </div>
+                      )}
+                      {(currentLesson.whyItWorksEnhanced as any).skipConsequence && (
+                        <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg" data-testid="card-skip-consequence">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Target className="w-4 h-4 text-red-500" />
+                            <h4 className="text-sm font-medium text-red-700 dark:text-red-300">If You Skip This</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(currentLesson.whyItWorksEnhanced as any).skipConsequence}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : currentLesson.psychology ? (
+                    <>
+                      <ListenButton text={currentLesson.psychology} data-testid="button-listen-psychology" />
+                      <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                        {currentLesson.psychology}
+                      </p>
+                    </>
+                  ) : null}
                 </Card>
               )}
 
@@ -586,14 +671,98 @@ export default function PresentationTrainingPage() {
                 </Card>
               )}
 
-              {currentLesson.practicePrompt && (
+              {(currentLesson.practicePrompt || currentLesson.practiceDrill) && (
                 <Card className="p-4" data-testid="section-practice">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="w-5 h-5 text-green-500" />
-                    <h3 className="font-semibold flex-1">Practice This</h3>
-                    <ListenButton text={currentLesson.practicePrompt} />
+                    <h3 className="font-semibold flex-1">Practice Drill</h3>
+                    {currentLesson.practiceDrill && (currentLesson.practiceDrill as any).duration && (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <Clock className="w-3 h-3" />
+                        {(currentLesson.practiceDrill as any).duration}
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-sm mb-4 font-medium">{currentLesson.practicePrompt}</p>
+                  
+                  {currentLesson.practiceDrill && typeof currentLesson.practiceDrill === 'object' && (
+                    <div className="space-y-4 mb-6" data-testid="content-practice-drill">
+                      {(currentLesson.practiceDrill as any).title && (
+                        <p className="text-sm font-medium" data-testid="text-drill-title">{(currentLesson.practiceDrill as any).title}</p>
+                      )}
+                      
+                      {(currentLesson.practiceDrill as any).steps && (currentLesson.practiceDrill as any).steps.length > 0 && (
+                        <div className="bg-muted/50 p-3 rounded-lg" data-testid="card-drill-steps">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Steps</h4>
+                          <ol className="space-y-1.5" data-testid="list-drill-steps">
+                            {(currentLesson.practiceDrill as any).steps.map((step: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm" data-testid={`item-drill-step-${idx}`}>
+                                <span className="text-primary font-bold shrink-0">{idx + 1}.</span>
+                                <span>{step}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                      
+                      {(currentLesson.practiceDrill as any).roleplayPrompt && (
+                        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg" data-testid="card-roleplay-scenario">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Users className="w-4 h-4 text-blue-500" />
+                            <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300">Roleplay Scenario</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground italic">
+                            {(currentLesson.practiceDrill as any).roleplayPrompt}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="grid gap-3 sm:grid-cols-2" data-testid="grid-examples">
+                        {(currentLesson.practiceDrill as any).badExample && (
+                          <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg" data-testid="card-bad-example">
+                            <div className="flex items-center gap-2 mb-2">
+                              <ThumbsDown className="w-4 h-4 text-red-500" />
+                              <h4 className="text-sm font-medium text-red-700 dark:text-red-300">Avoid This</h4>
+                            </div>
+                            <p className="text-sm text-muted-foreground italic">
+                              &ldquo;{(currentLesson.practiceDrill as any).badExample}&rdquo;
+                            </p>
+                          </div>
+                        )}
+                        
+                        {(currentLesson.practiceDrill as any).goodExample && (
+                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg" data-testid="card-good-example">
+                            <div className="flex items-center gap-2 mb-2">
+                              <ThumbsUp className="w-4 h-4 text-green-500" />
+                              <h4 className="text-sm font-medium text-green-700 dark:text-green-300">Do This</h4>
+                            </div>
+                            <p className="text-sm text-muted-foreground italic">
+                              &ldquo;{(currentLesson.practiceDrill as any).goodExample}&rdquo;
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {(currentLesson.practiceDrill as any).aiCoachingPrompt && (
+                        <div className="bg-primary/5 border border-primary/20 p-3 rounded-lg" data-testid="card-ai-coaching-prompt">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            <h4 className="text-sm font-medium text-primary">AI Coaching Prompt</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(currentLesson.practiceDrill as any).aiCoachingPrompt}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {currentLesson.practicePrompt && !currentLesson.practiceDrill && (
+                    <>
+                      <ListenButton text={currentLesson.practicePrompt} />
+                      <p className="text-sm mb-4 font-medium mt-2">{currentLesson.practicePrompt}</p>
+                    </>
+                  )}
+                  
                   <DictationInput
                     value={practiceResponse}
                     onChange={setPracticeResponse}
