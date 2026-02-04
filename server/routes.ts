@@ -1897,8 +1897,9 @@ Format your response as JSON:
   // Get current user's permissions with effective features
   app.get("/api/permissions/me", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership as OrgMembershipInfo;
+      // Use effective user ID to support impersonation
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       
       let perms = await storage.getUserPermissions(userId);
       
