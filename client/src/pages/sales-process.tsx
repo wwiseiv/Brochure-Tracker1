@@ -41,7 +41,6 @@ import {
   Lightbulb,
   Building2,
   Users,
-  HelpCircle,
   Bot,
   Check,
 } from "lucide-react";
@@ -432,26 +431,6 @@ function AIHelpButton({ context, className = "" }: { context?: string; className
   );
 }
 
-function FloatingAIButton() {
-  const handleOpenAIHelp = useCallback(() => {
-    const chatButton = document.querySelector('[data-testid="button-help-chatbot-open"]') as HTMLButtonElement;
-    if (chatButton) {
-      chatButton.click();
-    }
-  }, []);
-
-  return (
-    <Button
-      onClick={handleOpenAIHelp}
-      size="icon"
-      className="fixed bottom-20 left-4 z-40 shadow-lg rounded-full w-12 h-12"
-      aria-label="Ask AI for help"
-      data-testid="button-floating-ai-help"
-    >
-      <HelpCircle className="w-5 h-5" aria-hidden="true" />
-    </Button>
-  );
-}
 
 function BackToTopButton() {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -956,7 +935,6 @@ export default function SalesProcessPage() {
           </Tabs>
         </main>
 
-        <FloatingAIButton />
         <BackToTopButton />
       </div>
     </TooltipProvider>
