@@ -197,6 +197,17 @@ export const FEATURES: FeatureDefinition[] = [
     icon: 'Sun'
   },
   {
+    id: 'sales_process_2026',
+    name: '2026 Sales Process',
+    description: 'Prospecting to Close training with scripts and objections',
+    category: 'sales_training',
+    routes: ['/sales-process'],
+    apiEndpoints: ['/api/sales-process/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Target'
+  },
+  {
     id: 'ai_help_assistant',
     name: 'AI Help Assistant',
     description: 'Claude-powered floating help chatbot',

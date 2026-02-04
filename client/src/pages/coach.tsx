@@ -1570,9 +1570,10 @@ export default function CoachPage() {
                 </Link>
               )}
 
-              {/* 2026 Sales Process Guide */}
-              <Link href="/sales-process" className="block">
-                <Card className="p-4 hover-elevate cursor-pointer border-green-500/30 bg-green-500/5" data-testid="card-sales-process">
+              {/* 2026 Sales Process Guide - only show if user has permission */}
+              {hasFeature("sales_process_2026") && (
+                <Link href="/sales-process" className="block">
+                  <Card className="p-4 hover-elevate cursor-pointer border-green-500/30 bg-green-500/5" data-testid="card-sales-process">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
@@ -1585,8 +1586,9 @@ export default function CoachPage() {
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
-                </Card>
-              </Link>
+                  </Card>
+                </Link>
+              )}
 
               <div>
                 <label className="text-sm font-medium mb-2 block">What would you like to do?</label>
