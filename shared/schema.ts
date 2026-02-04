@@ -1274,6 +1274,11 @@ export const presentationLessons = pgTable("presentation_lessons", {
   videoId: varchar("video_id", { length: 10 }),
   paragraphId: varchar("paragraph_id", { length: 20 }),
   mechanism: varchar("mechanism", { length: 100 }),
+  psychologyTag: varchar("psychology_tag", { length: 100 }),
+  whenToUse: text("when_to_use"),
+  keyQuestions: text("key_questions").array(),
+  whyItWorksEnhanced: jsonb("why_it_works_enhanced"),
+  practiceDrill: jsonb("practice_drill"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
