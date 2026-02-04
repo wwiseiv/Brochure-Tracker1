@@ -1428,11 +1428,11 @@ export default function TeamManagementPage() {
                           return (
                             <div
                               key={feature.id}
-                              className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30"
+                              className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/30"
                               data-testid={`feature-row-${feature.id}`}
                             >
-                              <div className="flex-1 min-w-0 pr-3">
-                                <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <Label className="font-medium text-sm">{feature.name}</Label>
                                   {state.isDefault && state.enabled && (
                                     <Badge 
