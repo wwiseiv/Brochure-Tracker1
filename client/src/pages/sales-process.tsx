@@ -539,9 +539,7 @@ export default function SalesProcessPage() {
           </div>
         </header>
 
-        <main className="p-4 pb-24 max-w-4xl mx-auto space-y-6" role="main">
-          <Breadcrumb currentPhase={activeTab === "phases" ? currentPhase : undefined} />
-          
+        <main className="p-4 pb-24 max-w-4xl mx-auto space-y-4" role="main">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5 mb-4" role="tablist">
               <TabsTrigger value="phases" data-testid="tab-phases" role="tab" aria-selected={activeTab === "phases"}>Phases</TabsTrigger>
@@ -553,38 +551,6 @@ export default function SalesProcessPage() {
 
             <TabsContent value="phases" className="space-y-4" role="tabpanel">
               <PhaseProgressIndicator activePhase={activePhase} onPhaseClick={handlePhaseClick} />
-              
-              <div className="grid grid-cols-4 gap-2">
-                {salesProcessData.phases.map((phase) => {
-                  const Icon = phaseIcons[phase.name as keyof typeof phaseIcons] || Target;
-                  const color = phaseColors[phase.name as keyof typeof phaseColors] || "bg-primary";
-                  return (
-                    <button
-                      key={phase.id}
-                      onClick={() => setActivePhase(phase.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setActivePhase(phase.id);
-                        }
-                      }}
-                      className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                        activePhase === phase.id
-                          ? `border-current ${color.replace('bg-', 'text-')} bg-opacity-10`
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      data-testid={`phase-button-${phase.id}`}
-                      aria-label={`Select phase ${phase.id}: ${phase.name}`}
-                      aria-pressed={activePhase === phase.id}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <Icon className={`w-5 h-5 mx-auto mb-1 ${activePhase === phase.id ? color.replace('bg-', 'text-') : 'text-muted-foreground'}`} aria-hidden="true" />
-                      <div className="text-xs font-medium truncate">{phase.name}</div>
-                    </button>
-                  );
-                })}
-              </div>
 
               {currentPhase && (
                 <Card className="p-4 space-y-4">
