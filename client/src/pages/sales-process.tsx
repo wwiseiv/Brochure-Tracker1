@@ -123,7 +123,7 @@ const salesProcessData = {
     it: { names: ["Kenny", "Erik"], email: "itdept@pcbancard.com", role: "IT and Equipment" },
     office: { names: ["Kristen", "Cori"], email: "office@pcbancard.com", role: "Office Manager/Applications" },
     proposals: { email: "proposals@pcbancard.com", turnaround: "24 hours" },
-    mainOffice: { phone: "(973) 324-2251", hours: "8:30 AM - 5:00 PM EST" }
+    mainOffice: { name: "PCBancard Corporate", phone: "(973) 324-2251", hours: "8:30 AM - 5:00 PM EST" }
   },
   phases: [
     {
