@@ -60,7 +60,13 @@ import {
   Info,
   Eye,
   Trash2,
+  Star,
+  CreditCard,
+  ShoppingCart,
+  MapPinned,
+  ExternalLink,
 } from "lucide-react";
+import { SiYelp, SiFacebook, SiInstagram } from "react-icons/si";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MCCCategory {
@@ -94,6 +100,19 @@ interface DiscoveredBusiness {
   ownerName: string | null;
   yearEstablished: string | null;
   description: string | null;
+  // Enhanced fields
+  yelpUrl: string | null;
+  googleMapsUrl: string | null;
+  facebookUrl: string | null;
+  instagramHandle: string | null;
+  reviewRating: number | null;
+  reviewCount: number | null;
+  priceRange: string | null;
+  acceptsCreditCards: boolean | null;
+  hasOnlineOrdering: boolean | null;
+  categories: string[] | null;
+  neighborhood: string | null;
+  source: string | null;
 }
 
 interface SearchResult {
@@ -954,7 +973,49 @@ export default function ProspectFinderPage() {
                           Est. {business.yearEstablished}
                         </Badge>
                       )}
+                      {business.priceRange && (
+                        <Badge variant="secondary" className="text-xs" data-testid={`price-range-${business.name.replace(/\s+/g, "-")}`}>
+                          {business.priceRange}
+                        </Badge>
+                      )}
+                      {business.source && (
+                        <Badge variant="outline" className="text-xs capitalize" data-testid={`source-${business.name.replace(/\s+/g, "-")}`}>
+                          via {business.source}
+                        </Badge>
+                      )}
                     </div>
+
+                    {(business.reviewRating || business.acceptsCreditCards === true || business.hasOnlineOrdering === true || business.neighborhood) && (
+                      <div className="flex flex-wrap items-center gap-3 text-sm mb-2" data-testid={`enhanced-info-${business.name.replace(/\s+/g, "-")}`}>
+                        {business.reviewRating && (
+                          <div className="flex items-center gap-1" data-testid={`review-rating-${business.name.replace(/\s+/g, "-")}`}>
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                            <span className="font-medium">{business.reviewRating.toFixed(1)}</span>
+                            {business.reviewCount && (
+                              <span className="text-muted-foreground text-xs">({business.reviewCount} reviews)</span>
+                            )}
+                          </div>
+                        )}
+                        {business.acceptsCreditCards === true && (
+                          <div className="flex items-center gap-1 text-muted-foreground" data-testid={`accepts-cards-${business.name.replace(/\s+/g, "-")}`}>
+                            <CreditCard className="w-3 h-3" />
+                            <span className="text-xs">Accepts cards</span>
+                          </div>
+                        )}
+                        {business.hasOnlineOrdering === true && (
+                          <div className="flex items-center gap-1 text-muted-foreground" data-testid={`online-ordering-${business.name.replace(/\s+/g, "-")}`}>
+                            <ShoppingCart className="w-3 h-3" />
+                            <span className="text-xs">Online ordering</span>
+                          </div>
+                        )}
+                        {business.neighborhood && (
+                          <div className="flex items-center gap-1 text-muted-foreground" data-testid={`neighborhood-${business.name.replace(/\s+/g, "-")}`}>
+                            <MapPinned className="w-3 h-3" />
+                            <span className="text-xs">{business.neighborhood}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-1 text-sm mb-3">
                       {business.ownerName && (
@@ -1021,6 +1082,57 @@ export default function ProspectFinderPage() {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>Visit website</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {business.yelpUrl && (
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(business.yelpUrl!, "_blank", "noopener,noreferrer")}
+                              data-testid={`button-yelp-${business.name.replace(/\s+/g, "-")}`}
+                            >
+                              <SiYelp className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View on Yelp</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {business.facebookUrl && (
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(business.facebookUrl!, "_blank", "noopener,noreferrer")}
+                              data-testid={`button-facebook-${business.name.replace(/\s+/g, "-")}`}
+                            >
+                              <SiFacebook className="w-4 h-4 text-blue-600" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View on Facebook</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {business.instagramHandle && (
+                        <Tooltip delayDuration={700}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`https://instagram.com/${business.instagramHandle!.replace('@', '')}`, "_blank", "noopener,noreferrer")}
+                              data-testid={`button-instagram-${business.name.replace(/\s+/g, "-")}`}
+                            >
+                              <SiInstagram className="w-4 h-4 text-pink-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View on Instagram</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
