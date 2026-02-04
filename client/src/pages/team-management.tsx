@@ -1408,7 +1408,7 @@ export default function TeamManagementPage() {
               </div>
             </div>
           ) : (
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1">
               <div className="space-y-6 py-4">
                 {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
                   const features = featuresByCategory[category];
@@ -1461,6 +1461,7 @@ export default function TeamManagementPage() {
                                 checked={state.enabled}
                                 onCheckedChange={() => handleToggleFeature(feature)}
                                 disabled={isTogglingThisFeature}
+                                className="flex-shrink-0"
                                 data-testid={`switch-feature-${feature.id}`}
                               />
                             </div>
