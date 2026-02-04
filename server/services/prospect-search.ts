@@ -299,15 +299,53 @@ SEARCH PARAMETERS:
 - Business Types: ${businessTypeNames}
 - Number of Results Needed: ${maxResults}
 
+IMPORTANT: Include businesses that may NOT have websites! Many small local businesses only have:
+- Yelp pages
+- Google Business profiles  
+- Facebook pages
+- Directory listings
+These are still valid businesses. Generate a realistic mix.
+
 REQUIREMENTS:
 1. Generate realistic business names and addresses for the ${zipCode} area
 2. Include COMPLETE address information (street address, city, state, zip)
 3. Focus on independent local businesses typical for this area
-4. Include realistic phone numbers and websites when plausible
-5. Base your response on businesses that would typically exist near: ${primarySearchTerms.join(", ")} in the ${zipCode} area
+4. Include realistic phone numbers (essential for sales outreach)
+5. Website can be null for businesses without one
+6. Include Yelp/Google/Facebook URLs where realistic
+7. Include review ratings and counts for businesses that would typically have them
+8. Base your response on businesses that would typically exist near: ${primarySearchTerms.join(", ")} in the ${zipCode} area
 
-Return ONLY a valid JSON array with this format (no markdown code blocks, no explanation):
-[{"name":"Business Name","address":"123 Main St","city":"City","state":"IN","zipCode":"${zipCode}","phone":"(555) 123-4567","website":"https://example.com","email":null,"hoursOfOperation":"Mon-Fri 9am-5pm","description":"Brief description","businessType":"${primarySearchTerms[0] || 'Business'}","mccCode":"0000","confidence":0.7}]`;
+Return ONLY a valid JSON array with this comprehensive format (no markdown code blocks, no explanation):
+[{
+  "name": "Business Name",
+  "address": "123 Main St",
+  "city": "City",
+  "state": "IN",
+  "zipCode": "${zipCode}",
+  "phone": "(555) 123-4567",
+  "website": null,
+  "email": null,
+  "hoursOfOperation": "Mon-Fri 9am-5pm",
+  "description": "Brief description",
+  "businessType": "${primarySearchTerms[0] || 'Business'}",
+  "mccCode": "0000",
+  "confidence": 0.7,
+  "ownerName": "Owner name or null",
+  "yearEstablished": "2015 or null",
+  "yelpUrl": "https://yelp.com/biz/... or null",
+  "googleMapsUrl": null,
+  "facebookUrl": "https://facebook.com/... or null",
+  "instagramHandle": null,
+  "reviewRating": 4.2,
+  "reviewCount": 45,
+  "priceRange": "$$",
+  "acceptsCreditCards": true,
+  "hasOnlineOrdering": false,
+  "categories": ["Category1", "Category2"],
+  "neighborhood": "Downtown",
+  "source": "yelp/google/facebook/directory"
+}]`;
 
   const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
@@ -389,6 +427,19 @@ function parseBusinessResults(
       businessType: b.businessType || businessTypes[0]?.name || "Unknown",
       mccCode: b.mccCode || businessTypes[0]?.code || "0000",
       confidence: typeof b.confidence === "number" ? b.confidence : 0.8,
+      // Enhanced fields
+      yelpUrl: b.yelpUrl ? String(b.yelpUrl).trim() : null,
+      googleMapsUrl: b.googleMapsUrl ? String(b.googleMapsUrl).trim() : null,
+      facebookUrl: b.facebookUrl ? String(b.facebookUrl).trim() : null,
+      instagramHandle: b.instagramHandle ? String(b.instagramHandle).trim() : null,
+      reviewRating: typeof b.reviewRating === "number" ? b.reviewRating : null,
+      reviewCount: typeof b.reviewCount === "number" ? b.reviewCount : null,
+      priceRange: b.priceRange ? String(b.priceRange).trim() : null,
+      acceptsCreditCards: typeof b.acceptsCreditCards === "boolean" ? b.acceptsCreditCards : null,
+      hasOnlineOrdering: typeof b.hasOnlineOrdering === "boolean" ? b.hasOnlineOrdering : null,
+      categories: Array.isArray(b.categories) ? b.categories.map((c: string) => String(c).trim()) : null,
+      neighborhood: b.neighborhood ? String(b.neighborhood).trim() : null,
+      source: b.source ? String(b.source).trim() : null,
     }));
 }
 
