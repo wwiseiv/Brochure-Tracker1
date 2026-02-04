@@ -2,7 +2,7 @@
 // This script provides context about the PCBancard Dual Pricing program
 // for crafting personalized follow-up emails to merchants
 
-export const SIGNAPAY_SALES_SCRIPT = `
+export const PCBANCARD_SALES_SCRIPT = `
 ## PCBancard Dual Pricing Overview
 
 PCBancard Dual Pricing is a program that helps business owners stop losing 3-4% of every card transaction to processing fees.
@@ -141,7 +141,7 @@ export function getEmailPrompt(
   return `You are a professional sales email writer for PCBancard, a payment processing company. 
 Your job is to write a personalized follow-up email to a merchant based on the agent's visit notes.
 
-${SIGNAPAY_SALES_SCRIPT}
+${PCBANCARD_SALES_SCRIPT}
 
 ## Business Context
 ${businessContext}

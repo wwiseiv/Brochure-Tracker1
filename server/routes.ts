@@ -41,7 +41,7 @@ import {
   generateAgentSuggestions,
   checkProhibitedBusiness,
 } from "./underwriting";
-import { getEmailPrompt, SIGNAPAY_SALES_SCRIPT } from "./sales-script";
+import { getEmailPrompt, PCBANCARD_SALES_SCRIPT } from "./sales-script";
 import {
   SALES_TRAINING_KNOWLEDGE,
   getBusinessContextPrompt,
@@ -7825,7 +7825,7 @@ Return ONLY valid JSON in this exact format:
 ## Your Knowledge Base
 
 ### Master Sales Script Overview
-${SIGNAPAY_SALES_SCRIPT}
+${PCBANCARD_SALES_SCRIPT}
 
 ### Key Persuasion Principles
 The PCBancard presentation uses proven psychological principles:
