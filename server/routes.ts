@@ -281,8 +281,8 @@ export async function registerRoutes(
   // Get my brochures (for current user)
   app.get("/api/brochures/my-inventory", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const membership = req.orgMembership;
+      const userId = await getEffectiveUserId(req);
+      const membership = await getEffectiveMembership(req) || req.orgMembership as OrgMembershipInfo;
       const role = membership.role;
       
       const holderType = role === "relationship_manager" ? "relationship_manager" : "agent";
@@ -385,7 +385,7 @@ export async function registerRoutes(
   // Export drops - MUST be before /api/drops/:id to avoid route conflict
   app.get("/api/drops/export", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       const format = (req.query.format as ExportFormat) || "csv";
       const status = req.query.status as string | undefined;
       const scope = req.query.scope as string | undefined; // company, rm, agent
@@ -479,7 +479,7 @@ export async function registerRoutes(
       }
       
       // Ensure user owns this drop
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       if (drop.agentId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
@@ -493,7 +493,7 @@ export async function registerRoutes(
 
   app.post("/api/drops", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = await getEffectiveUserId(req);
       
       // Get orgId from middleware
       const orgId = req.orgMembership?.organization?.id || null;
