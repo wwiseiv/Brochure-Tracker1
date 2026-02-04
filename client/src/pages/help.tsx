@@ -169,7 +169,7 @@ export default function HelpPage() {
 
   const askAIMutation = useMutation({
     mutationFn: async (question: string) => {
-      const res = await apiRequest("POST", "/api/help-chat", { message: question });
+      const res = await apiRequest("POST", "/api/help/chat", { message: question });
       const data = await res.json();
       return data.response;
     },
