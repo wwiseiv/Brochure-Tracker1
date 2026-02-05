@@ -235,7 +235,20 @@ export function requireRole(...allowedRoles: OrgMemberRole[]): RequestHandler {
 
       req.orgMembership = membership;
 
-      if (!allowedRoles.includes(membership.role as OrgMemberRole)) {
+      // Check if effective user's role is allowed
+      const effectiveRoleAllowed = allowedRoles.includes(membership.role as OrgMemberRole);
+      
+      // Also check original user's role when impersonating (admins retain admin access)
+      let originalRoleAllowed = false;
+      if (impersonating && !effectiveRoleAllowed) {
+        const originalUserId = user.claims.sub;
+        const originalMembership = await storage.getUserMembership(originalUserId);
+        if (originalMembership && allowedRoles.includes(originalMembership.role as OrgMemberRole)) {
+          originalRoleAllowed = true;
+        }
+      }
+
+      if (!effectiveRoleAllowed && !originalRoleAllowed) {
         return res.status(403).json({ 
           error: "Forbidden", 
           message: `Access denied. Required role(s): ${allowedRoles.join(", ")}` 
