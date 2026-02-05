@@ -3259,3 +3259,26 @@ export const insertImpersonationAuditLogSchema = createInsertSchema(impersonatio
 });
 export type InsertImpersonationAuditLog = z.infer<typeof insertImpersonationAuditLogSchema>;
 export type ImpersonationAuditLog = typeof impersonationAuditLog.$inferSelect;
+
+// Marketing Imported Flyers - For RAG learning from existing marketing materials
+export const marketingImportedFlyers = pgTable("marketing_imported_flyers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sourceType: varchar("source_type", { length: 50 }).notNull(), // 'drive_import', 'upload', 'url'
+  sourceUrl: text("source_url").notNull(), // Local or remote URL
+  originalFileName: text("original_file_name").notNull(),
+  fileType: varchar("file_type", { length: 20 }), // 'pdf', 'png', 'jpg', 'jpeg'
+  industry: varchar("industry", { length: 50 }),
+  extractedContent: jsonb("extracted_content"), // AI-extracted content from the flyer
+  isProcessed: boolean("is_processed").default(false).notNull(),
+  processingError: text("processing_error"),
+  importedBy: varchar("imported_by", { length: 255 }),
+  importedAt: timestamp("imported_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertMarketingImportedFlyerSchema = createInsertSchema(marketingImportedFlyers).omit({
+  id: true,
+  importedAt: true,
+});
+export type InsertMarketingImportedFlyer = z.infer<typeof insertMarketingImportedFlyerSchema>;
+export type MarketingImportedFlyer = typeof marketingImportedFlyers.$inferSelect;

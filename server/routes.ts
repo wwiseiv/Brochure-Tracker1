@@ -13974,6 +13974,350 @@ Generate the following content in JSON format:
     }
   });
 
+  // List flyers from Google Drive folder for RAG learning
+  app.get("/api/marketing/drive-flyers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const { listFilesInFolder, listAllFilesRecursively } = await import('./services/googleDriveService');
+      
+      const FLYER_FOLDER_ID = '10_8f4xHULXoJF5gauoYtqQ6Qlytr9Ufl';
+      
+      const files = await listAllFilesRecursively(FLYER_FOLDER_ID);
+      
+      const supportedFormats = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+      const flyerFiles = files.filter(f => supportedFormats.includes(f.mimeType));
+      
+      res.json({ files: flyerFiles, totalCount: flyerFiles.length });
+    } catch (error) {
+      console.error('Error listing drive flyers:', error);
+      res.status(500).json({ error: 'Failed to list flyers from Google Drive' });
+    }
+  });
+
+  // Download and import a flyer from Google Drive for RAG learning
+  app.post("/api/marketing/import-drive-flyer", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const { fileId, fileName, industry } = req.body;
+      
+      if (!fileId || !fileName) {
+        return res.status(400).json({ error: 'File ID and name required' });
+      }
+
+      const { downloadFileAsBuffer } = await import('./services/googleDriveService');
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const buffer = await downloadFileAsBuffer(fileId);
+      
+      const extension = fileName.split('.').pop()?.toLowerCase() || 'pdf';
+      const timestamp = Date.now();
+      const localFilename = `imported_${timestamp}.${extension}`;
+      const outputDir = path.join(process.cwd(), 'client', 'public', 'marketing', 'rag-imports');
+      
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      const localPath = path.join(outputDir, localFilename);
+      fs.writeFileSync(localPath, buffer);
+      
+      const publicUrl = `/marketing/rag-imports/${localFilename}`;
+      
+      const { marketingImportedFlyers } = await import('@shared/schema');
+      
+      const [imported] = await db.insert(marketingImportedFlyers).values({
+        sourceType: 'drive_import',
+        sourceUrl: publicUrl,
+        originalFileName: fileName,
+        fileType: extension,
+        industry: industry || 'general',
+        isProcessed: false,
+        importedBy: userId,
+      }).returning();
+      
+      console.log('[Marketing RAG] Imported flyer from Drive:', fileName);
+      
+      res.json({
+        success: true,
+        importId: imported.id,
+        localUrl: publicUrl,
+        message: `Imported: ${fileName}`,
+      });
+    } catch (error) {
+      console.error('Error importing drive flyer:', error);
+      res.status(500).json({ error: 'Failed to import flyer from Google Drive' });
+    }
+  });
+
+  // List all imported flyers
+  app.get("/api/marketing/imported-flyers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const { marketingImportedFlyers } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const flyers = await db.select()
+        .from(marketingImportedFlyers)
+        .orderBy(desc(marketingImportedFlyers.importedAt));
+      
+      res.json({ flyers, totalCount: flyers.length });
+    } catch (error) {
+      console.error('Error listing imported flyers:', error);
+      res.status(500).json({ error: 'Failed to list imported flyers' });
+    }
+  });
+
+  // Process an imported flyer with AI to extract content for RAG
+  app.post("/api/marketing/imported-flyers/:id/process", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const flyerId = parseInt(req.params.id);
+      if (isNaN(flyerId)) {
+        return res.status(400).json({ error: 'Invalid flyer ID' });
+      }
+
+      const { marketingImportedFlyers, marketingRagContent } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const [flyer] = await db.select().from(marketingImportedFlyers).where(eq(marketingImportedFlyers.id, flyerId));
+      
+      if (!flyer) {
+        return res.status(404).json({ error: 'Imported flyer not found' });
+      }
+
+      if (flyer.isProcessed) {
+        return res.json({ success: true, message: 'Already processed', extractedContent: flyer.extractedContent });
+      }
+
+      const { GoogleGenAI } = await import('@google/genai');
+      const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+      
+      if (!geminiApiKey) {
+        throw new Error('Gemini API not configured');
+      }
+
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const localPath = path.join(process.cwd(), 'client', 'public', flyer.sourceUrl);
+      
+      if (!fs.existsSync(localPath)) {
+        throw new Error('Imported file not found on disk');
+      }
+
+      const fileBuffer = fs.readFileSync(localPath);
+      const base64Data = fileBuffer.toString('base64');
+      
+      let mimeType = 'image/png';
+      if (flyer.fileType === 'pdf') mimeType = 'application/pdf';
+      else if (flyer.fileType === 'jpg' || flyer.fileType === 'jpeg') mimeType = 'image/jpeg';
+
+      const extractionPrompt = `You are analyzing a marketing flyer for PCBancard, a payment processing company.
+
+Extract the following information from this flyer in JSON format:
+{
+  "headline": "The main headline/title of the flyer",
+  "subhead": "Any subheadline or supporting text",
+  "bullets": ["Array of benefit bullet points or key messaging points"],
+  "ctaText": "The main call-to-action text",
+  "ctaSubtext": "Any supporting CTA text",
+  "industry": "The target industry if identifiable (e.g., restaurant, retail, liquor_stores)",
+  "colorScheme": "Description of the color scheme used",
+  "layout": "Description of the overall layout/design approach",
+  "effectiveTechniques": ["Array of effective marketing techniques observed"]
+}
+
+Return ONLY valid JSON, no markdown or explanation.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: extractionPrompt }
+            ]
+          }
+        ]
+      });
+
+      const rawText = response.text || '';
+      const cleanedText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      let extractedContent;
+      try {
+        extractedContent = JSON.parse(cleanedText);
+      } catch {
+        extractedContent = { rawText: cleanedText, parseError: true };
+      }
+
+      await db.update(marketingImportedFlyers)
+        .set({
+          isProcessed: true,
+          extractedContent: extractedContent as any,
+          processedAt: new Date(),
+        })
+        .where(eq(marketingImportedFlyers.id, flyerId));
+
+      if (!extractedContent.parseError) {
+        const ragEntries = [];
+        
+        if (extractedContent.headline) {
+          ragEntries.push({
+            contentType: 'headline',
+            content: extractedContent.headline,
+            industry: flyer.industry || extractedContent.industry || 'general',
+            metadata: { sourceFlyer: flyer.originalFileName } as any,
+          });
+        }
+        
+        if (extractedContent.subhead) {
+          ragEntries.push({
+            contentType: 'subhead',
+            content: extractedContent.subhead,
+            industry: flyer.industry || extractedContent.industry || 'general',
+            metadata: { sourceFlyer: flyer.originalFileName } as any,
+          });
+        }
+        
+        if (extractedContent.bullets && Array.isArray(extractedContent.bullets)) {
+          for (const bullet of extractedContent.bullets) {
+            ragEntries.push({
+              contentType: 'bullet',
+              content: bullet,
+              industry: flyer.industry || extractedContent.industry || 'general',
+              metadata: { sourceFlyer: flyer.originalFileName } as any,
+            });
+          }
+        }
+        
+        if (extractedContent.ctaText) {
+          ragEntries.push({
+            contentType: 'cta',
+            content: extractedContent.ctaText,
+            industry: flyer.industry || extractedContent.industry || 'general',
+            metadata: { sourceFlyer: flyer.originalFileName } as any,
+          });
+        }
+
+        if (ragEntries.length > 0) {
+          await db.insert(marketingRagContent).values(ragEntries);
+        }
+      }
+
+      console.log('[Marketing RAG] Processed flyer:', flyer.originalFileName);
+      
+      res.json({
+        success: true,
+        extractedContent,
+        message: 'Flyer processed and content extracted for RAG learning',
+      });
+    } catch (error) {
+      console.error('Error processing imported flyer:', error);
+      res.status(500).json({ error: 'Failed to process imported flyer' });
+    }
+  });
+
+  // Batch import all flyers from Google Drive
+  app.post("/api/marketing/batch-import-drive-flyers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const membership = await storage.getUserMembership(userId);
+      
+      if (membership?.role !== 'master_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const { listAllFilesRecursively, downloadFileAsBuffer } = await import('./services/googleDriveService');
+      const { marketingImportedFlyers } = await import('@shared/schema');
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const FLYER_FOLDER_ID = '10_8f4xHULXoJF5gauoYtqQ6Qlytr9Ufl';
+      
+      const files = await listAllFilesRecursively(FLYER_FOLDER_ID);
+      const supportedFormats = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+      const flyerFiles = files.filter(f => supportedFormats.includes(f.mimeType));
+      
+      const outputDir = path.join(process.cwd(), 'client', 'public', 'marketing', 'rag-imports');
+      
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+
+      const results = [];
+      
+      for (const file of flyerFiles) {
+        try {
+          const buffer = await downloadFileAsBuffer(file.id);
+          
+          const extension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+          const timestamp = Date.now();
+          const localFilename = `imported_${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+          
+          const localPath = path.join(outputDir, localFilename);
+          fs.writeFileSync(localPath, buffer);
+          
+          const publicUrl = `/marketing/rag-imports/${localFilename}`;
+          
+          const [imported] = await db.insert(marketingImportedFlyers).values({
+            sourceType: 'drive_import',
+            sourceUrl: publicUrl,
+            originalFileName: file.name,
+            fileType: extension,
+            industry: 'general',
+            isProcessed: false,
+            importedBy: userId,
+          }).returning();
+          
+          results.push({ success: true, fileName: file.name, importId: imported.id });
+          
+          console.log('[Marketing RAG] Batch imported:', file.name);
+        } catch (fileError) {
+          results.push({ success: false, fileName: file.name, error: (fileError as Error).message });
+        }
+      }
+      
+      res.json({
+        success: true,
+        totalFiles: flyerFiles.length,
+        imported: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length,
+        results,
+      });
+    } catch (error) {
+      console.error('Error batch importing drive flyers:', error);
+      res.status(500).json({ error: 'Failed to batch import flyers' });
+    }
+  });
+
   // ============================================
   // Interactive Sales Roleplay API
   // ============================================
