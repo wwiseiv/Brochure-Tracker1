@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { User, Upload, Building2, MapPin, Camera, ImageIcon } from "lucide-react";
+import { User, Upload, Building2, MapPin, Camera } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
 const profileSchema = z.object({
@@ -32,7 +32,6 @@ const profileSchema = z.object({
   company: z.string().optional(),
   territory: z.string().optional(),
   profilePhotoUrl: z.string().optional(),
-  companyLogoUrl: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -48,11 +47,8 @@ export default function CompleteProfilePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
-  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
-  const companyLogoRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -64,7 +60,6 @@ export default function CompleteProfilePage() {
       company: "",
       territory: "",
       profilePhotoUrl: "",
-      companyLogoUrl: "",
     },
   });
 
@@ -112,25 +107,6 @@ export default function CompleteProfilePage() {
     
     if (url) {
       form.setValue("profilePhotoUrl", url);
-    }
-  };
-
-  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCompanyLogoPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    
-    setUploadingLogo(true);
-    const url = await uploadFile(file, "logo");
-    setUploadingLogo(false);
-    
-    if (url) {
-      form.setValue("companyLogoUrl", url);
     }
   };
 
@@ -323,83 +299,47 @@ export default function CompleteProfilePage() {
                 </div>
 
                 <div className="border-t pt-6">
-                  <p className="text-sm text-muted-foreground mb-4">Profile Images (Optional)</p>
+                  <p className="text-sm text-muted-foreground mb-4">Profile Photo (Optional)</p>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1">
-                        <Camera className="w-4 h-4" />
-                        Profile Photo
-                      </Label>
-                      <div 
-                        className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover-elevate transition-colors"
-                        onClick={() => profilePhotoRef.current?.click()}
-                        data-testid="upload-profile-photo"
-                      >
-                        {profilePhotoPreview ? (
-                          <img 
-                            src={profilePhotoPreview} 
-                            alt="Profile preview" 
-                            className="w-16 h-16 rounded-full object-cover"
-                          />
-                        ) : (
-                          <>
-                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                            <p className="text-xs text-muted-foreground text-center">
-                              {uploadingPhoto ? "Uploading..." : "Click to upload"}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        ref={profilePhotoRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePhotoSelect}
-                      />
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1">
+                      <Camera className="w-4 h-4" />
+                      Your Photo
+                    </Label>
+                    <div 
+                      className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover-elevate transition-colors"
+                      onClick={() => profilePhotoRef.current?.click()}
+                      data-testid="upload-profile-photo"
+                    >
+                      {profilePhotoPreview ? (
+                        <img 
+                          src={profilePhotoPreview} 
+                          alt="Profile preview" 
+                          className="w-16 h-16 rounded-full object-cover"
+                        />
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                          <p className="text-xs text-muted-foreground text-center">
+                            {uploadingPhoto ? "Uploading..." : "Click to upload your photo"}
+                          </p>
+                        </>
+                      )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1">
-                        <ImageIcon className="w-4 h-4" />
-                        Company Logo
-                      </Label>
-                      <div 
-                        className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover-elevate transition-colors"
-                        onClick={() => companyLogoRef.current?.click()}
-                        data-testid="upload-company-logo"
-                      >
-                        {companyLogoPreview ? (
-                          <img 
-                            src={companyLogoPreview} 
-                            alt="Logo preview" 
-                            className="max-w-full max-h-16 object-contain"
-                          />
-                        ) : (
-                          <>
-                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                            <p className="text-xs text-muted-foreground text-center">
-                              {uploadingLogo ? "Uploading..." : "Click to upload"}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        ref={companyLogoRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleLogoSelect}
-                      />
-                    </div>
+                    <input
+                      ref={profilePhotoRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoSelect}
+                    />
                   </div>
                 </div>
 
                 <Button
                   type="submit"
                   className="w-full min-h-[48px] text-base font-semibold"
-                  disabled={updateProfile.isPending || uploadingPhoto || uploadingLogo}
+                  disabled={updateProfile.isPending || uploadingPhoto}
                   data-testid="button-submit-profile"
                 >
                   {updateProfile.isPending ? "Saving..." : "Complete Profile"}

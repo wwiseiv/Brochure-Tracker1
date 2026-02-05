@@ -38,6 +38,17 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import type { OrganizationMember, DropWithBrochure, DropStatus } from "@shared/schema";
 
+interface UserRole {
+  role: string;
+  memberId: number;
+  organization: {
+    id: number;
+    name: string;
+  };
+  managerId: number | null;
+  profilePhotoUrl: string | null;
+}
+
 interface RMStats {
   organization: {
     id: number;
@@ -93,6 +104,10 @@ export default function RMDashboardPage() {
   const { user } = useAuth();
   const [selectedAgent, setSelectedAgent] = useState<AgentWithStats | null>(null);
   const [, navigate] = useLocation();
+
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery<RMStats>({
     queryKey: ["/api/rm/stats"],
@@ -169,7 +184,7 @@ export default function RMDashboardPage() {
             </span>
             <Link href="/profile">
               <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-rm">
-                <AvatarImage src={user?.profileImageUrl || undefined} />
+                <AvatarImage src={userRole?.profilePhotoUrl || user?.profileImageUrl || undefined} />
                 <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
               </Avatar>
             </Link>

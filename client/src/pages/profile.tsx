@@ -61,6 +61,7 @@ interface UserRole {
     name: string;
   };
   managerId: number | null;
+  profilePhotoUrl: string | null;
 }
 
 const REMINDER_OPTIONS = [
@@ -307,7 +308,7 @@ export default function ProfilePage() {
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <Avatar className="w-16 h-16" data-testid="avatar-profile">
-              <AvatarImage src={user?.profileImageUrl || undefined} />
+              <AvatarImage src={userRole?.profilePhotoUrl || user?.profileImageUrl || undefined} />
               <AvatarFallback className="text-xl">{userInitials}</AvatarFallback>
             </Avatar>
             <div className="flex-1">

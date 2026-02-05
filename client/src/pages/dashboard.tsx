@@ -39,6 +39,7 @@ interface UserRole {
     name: string;
   };
   managerId: number | null;
+  profilePhotoUrl: string | null;
 }
 
 export default function DashboardPage() {
@@ -202,7 +203,7 @@ export default function DashboardPage() {
               <TooltipTrigger asChild>
                 <Link href="/profile">
                   <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-user">
-                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarImage src={userRole?.profilePhotoUrl || user?.profileImageUrl || undefined} />
                     <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
                   </Avatar>
                 </Link>

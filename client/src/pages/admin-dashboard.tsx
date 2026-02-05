@@ -165,6 +165,17 @@ interface DriveStatus {
   lastSynced: string | null;
 }
 
+interface UserRole {
+  role: string;
+  memberId: number;
+  organization: {
+    id: number;
+    name: string;
+  };
+  managerId: number | null;
+  profilePhotoUrl: string | null;
+}
+
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -173,6 +184,10 @@ export default function AdminDashboardPage() {
   const [editingMember, setEditingMember] = useState<OrganizationMember | null>(null);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
+
+  const { data: userRole } = useQuery<UserRole>({
+    queryKey: ["/api/me/role"],
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
@@ -419,7 +434,7 @@ export default function AdminDashboardPage() {
             </span>
             <Link href="/profile">
               <Avatar className="w-8 h-8 cursor-pointer" data-testid="avatar-admin">
-                <AvatarImage src={user?.profileImageUrl || undefined} />
+                <AvatarImage src={userRole?.profilePhotoUrl || user?.profileImageUrl || undefined} />
                 <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
               </Avatar>
             </Link>

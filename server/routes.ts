@@ -1601,6 +1601,7 @@ Format your response as JSON:
         },
         managerId: membership.managerId,
         profileComplete: membership.profileComplete,
+        profilePhotoUrl: membership.profilePhotoUrl || null,
       });
     } catch (error) {
       console.error("Error fetching user role:", error);
