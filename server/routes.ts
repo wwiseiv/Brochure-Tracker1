@@ -98,6 +98,7 @@ import { generateProposalImages, type ProposalImages } from "./proposal-images";
 import { createProposalJob, executeProposalJob, getProposalJobStatus } from "./proposal-builder";
 import { scrapeMerchantWebsite, fetchLogoAsBase64 } from "./merchant-scrape";
 import proposalIntelligenceRouter from "./proposal-intelligence/api";
+import { textToSpeech, speechToText } from "./elevenlabs";
 import { searchLocalBusinesses } from "./services/prospect-search";
 import { analyzeStatement, type StatementData } from "./proposal-intelligence/services/statement-analysis";
 import { generateTalkingPoints } from "./proposal-intelligence/services/talking-points";
@@ -6742,7 +6743,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
     }
   });
 
-  // Standalone TTS endpoint for listen buttons (ElevenLabs)
+  // Standalone TTS endpoint for listen buttons (ElevenLabs via Replit Connector)
   app.post("/api/tts", isAuthenticated, async (req: any, res) => {
     console.log("[TTS] Request received, text length:", req.body?.text?.length || 0);
     try {
@@ -6753,77 +6754,36 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         return res.status(400).json({ error: "Text is required" });
       }
 
-      const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-      if (!elevenLabsKey) {
-        console.error("[TTS] ELEVENLABS_API_KEY is not configured");
-        return res.status(500).json({ error: "ElevenLabs not configured" });
-      }
-      console.log("[TTS] API key present, calling ElevenLabs...");
+      const result = await textToSpeech(text);
+      console.log("[TTS] Success, audio size:", result.audio.length);
 
-      // Rachel voice - clear, professional female voice
-      const voiceId = "21m00Tcm4TlvDq8ikWAM";
-
-      // Clean markdown formatting from text for natural TTS
-      const cleanTextForTTS = (input: string): string => {
-        return input
-          .replace(/\*\*([^*]+)\*\*/g, '$1')
-          .replace(/\*([^*]+)\*/g, '$1')
-          .replace(/__([^_]+)__/g, '$1')
-          .replace(/_([^_]+)_/g, '$1')
-          .replace(/`([^`]+)`/g, '$1')
-          .replace(/#{1,6}\s*/g, '')
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-          .replace(/\n{3,}/g, '. ')
-          .replace(/\n/g, '. ')
-          .replace(/\s+/g, ' ')
-          .trim();
-      };
-
-      const cleanedText = cleanTextForTTS(text);
-      
-      // Limit text length to avoid excessive API costs
-      const maxLength = 5000;
-      const truncatedText = cleanedText.length > maxLength 
-        ? cleanedText.substring(0, maxLength) + "..."
-        : cleanedText;
-
-      const ttsResponse = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-        {
-          method: "POST",
-          headers: {
-            "Accept": "audio/mpeg",
-            "Content-Type": "application/json",
-            "xi-api-key": elevenLabsKey,
-          },
-          body: JSON.stringify({
-            text: truncatedText,
-            model_id: "eleven_monolingual_v1",
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
-            },
-          }),
-        }
-      );
-
-      if (!ttsResponse.ok) {
-        const errorText = await ttsResponse.text();
-        console.error("ElevenLabs API error:", ttsResponse.status, errorText);
-        return res.status(500).json({ error: "Failed to generate speech" });
-      }
-
-      const audioBuffer = await ttsResponse.arrayBuffer();
-      const base64Audio = Buffer.from(audioBuffer).toString("base64");
-      console.log("[TTS] Success, audio size:", base64Audio.length);
-
-      res.json({
-        audio: base64Audio,
-        format: "audio/mpeg",
-      });
+      res.json(result);
     } catch (error: any) {
       console.error("[TTS] Error:", error?.message || error);
       res.status(500).json({ error: "Failed to generate speech" });
+    }
+  });
+
+  // Speech-to-text endpoint for dictation (ElevenLabs via Replit Connector)
+  app.post("/api/stt", isAuthenticated, multer({ storage: multer.memoryStorage() }).single("audio"), async (req: any, res) => {
+    console.log("[STT] Request received");
+    try {
+      if (!req.file) {
+        console.log("[STT] Error: No audio file provided");
+        return res.status(400).json({ error: "Audio file is required" });
+      }
+
+      const audioBuffer = req.file.buffer;
+      const filename = req.file.originalname || "audio.webm";
+      console.log("[STT] Transcribing audio file:", filename, "size:", audioBuffer.length);
+
+      const text = await speechToText(audioBuffer, filename);
+      console.log("[STT] Success, transcribed text length:", text.length);
+
+      res.json({ text });
+    } catch (error: any) {
+      console.error("[STT] Error:", error?.message || error);
+      res.status(500).json({ error: "Failed to transcribe audio" });
     }
   });
 
