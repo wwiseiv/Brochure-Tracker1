@@ -183,7 +183,8 @@ async function getEffectiveUserId(req: any): Promise<string> {
   
   try {
     const session = await storage.getImpersonationSessionByToken(impersonationToken);
-    if (session && session.isActive && new Date(session.expiresAt) > new Date()) {
+    // Check session exists, is active (status === "active"), and not expired
+    if (session && session.status === "active" && new Date(session.expiresAt) > new Date()) {
       // Verify the original user is the one who started the impersonation
       if (session.originalUserId === originalUserId) {
         console.log(`[Impersonation] Returning impersonated user: ${session.impersonatedUserId} (original: ${originalUserId})`);
@@ -192,7 +193,7 @@ async function getEffectiveUserId(req: any): Promise<string> {
         console.log(`[Impersonation] Token mismatch: session original ${session.originalUserId} != request original ${originalUserId}`);
       }
     } else if (session) {
-      console.log(`[Impersonation] Session invalid: isActive=${session.isActive}, expired=${new Date(session.expiresAt) <= new Date()}`);
+      console.log(`[Impersonation] Session invalid: status=${session.status}, expired=${new Date(session.expiresAt) <= new Date()}`);
     } else {
       console.log(`[Impersonation] No session found for token`);
     }

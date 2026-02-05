@@ -9,6 +9,61 @@ const ADMIN_EMAILS = [
   "emma@pcbancard.com"
 ];
 
+/**
+ * Gets the effective user ID for RBAC purposes.
+ * When impersonating, returns the impersonated user's ID so that permissions
+ * are correctly applied as if the admin is seeing what the impersonated user sees.
+ */
+async function getEffectiveUserIdForRBAC(req: Request): Promise<string | null> {
+  const user = req.user as any;
+  const originalUserId = user?.claims?.sub;
+  if (!originalUserId) return null;
+  
+  const impersonationToken = req.headers["x-impersonation-token"] as string;
+  if (!impersonationToken) return originalUserId;
+  
+  try {
+    const session = await storage.getImpersonationSessionByToken(impersonationToken);
+    // Check session exists, is active (status === "active"), and not expired
+    if (session && session.status === "active" && new Date(session.expiresAt) > new Date()) {
+      // Verify the original user is the one who started the impersonation
+      if (session.originalUserId === originalUserId) {
+        console.log(`[RBAC Impersonation] Using impersonated user: ${session.impersonatedUserId} (original: ${originalUserId})`);
+        return session.impersonatedUserId;
+      }
+    }
+  } catch (error) {
+    console.error("[RBAC] Error checking impersonation session:", error);
+  }
+  
+  return originalUserId;
+}
+
+/**
+ * Check if the current request is an active impersonation session.
+ * Returns true if admin is impersonating another user.
+ */
+async function isImpersonating(req: Request): Promise<boolean> {
+  const user = req.user as any;
+  const originalUserId = user?.claims?.sub;
+  if (!originalUserId) return false;
+  
+  const impersonationToken = req.headers["x-impersonation-token"] as string;
+  if (!impersonationToken) return false;
+  
+  try {
+    const session = await storage.getImpersonationSessionByToken(impersonationToken);
+    // Check session exists, is active (status === "active"), and not expired
+    if (session && session.status === "active" && new Date(session.expiresAt) > new Date()) {
+      return session.originalUserId === originalUserId;
+    }
+  } catch (error) {
+    console.error("[RBAC] Error checking impersonation status:", error);
+  }
+  
+  return false;
+}
+
 export function isAdminEmail(email: string | undefined | null): boolean {
   if (!email) return false;
   const lowerEmail = email.toLowerCase();
@@ -160,15 +215,23 @@ export function requireRole(...allowedRoles: OrgMemberRole[]): RequestHandler {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const userId = user.claims.sub;
-      let membership = await storage.getUserMembership(userId);
+      // Use effective user ID (impersonated user if impersonating)
+      const effectiveUserId = await getEffectiveUserIdForRBAC(req);
+      if (!effectiveUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      let membership = await storage.getUserMembership(effectiveUserId);
       
       if (!membership) {
-        membership = await bootstrapUserOrganization(userId);
+        membership = await bootstrapUserOrganization(effectiveUserId);
       }
       
-      // Auto-upgrade admin users
-      membership = await autoUpgradeAdminIfNeeded(userId, membership);
+      // Only auto-upgrade if NOT impersonating (don't auto-upgrade impersonated users)
+      const impersonating = await isImpersonating(req);
+      if (!impersonating) {
+        membership = await autoUpgradeAdminIfNeeded(effectiveUserId, membership);
+      }
 
       req.orgMembership = membership;
 
@@ -195,15 +258,23 @@ export function requireOrgAccess(): RequestHandler {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const userId = user.claims.sub;
-      let membership = await storage.getUserMembership(userId);
+      // Use effective user ID (impersonated user if impersonating)
+      const effectiveUserId = await getEffectiveUserIdForRBAC(req);
+      if (!effectiveUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      let membership = await storage.getUserMembership(effectiveUserId);
       
       if (!membership) {
-        membership = await bootstrapUserOrganization(userId);
+        membership = await bootstrapUserOrganization(effectiveUserId);
       }
       
-      // Auto-upgrade admin users
-      membership = await autoUpgradeAdminIfNeeded(userId, membership);
+      // Only auto-upgrade if NOT impersonating
+      const impersonating = await isImpersonating(req);
+      if (!impersonating) {
+        membership = await autoUpgradeAdminIfNeeded(effectiveUserId, membership);
+      }
 
       req.orgMembership = membership;
       next();
@@ -222,15 +293,23 @@ export function ensureOrgMembership(): RequestHandler {
         return next();
       }
 
-      const userId = user.claims.sub;
-      let membership = await storage.getUserMembership(userId);
+      // Use effective user ID (impersonated user if impersonating)
+      const effectiveUserId = await getEffectiveUserIdForRBAC(req);
+      if (!effectiveUserId) {
+        return next();
+      }
+
+      let membership = await storage.getUserMembership(effectiveUserId);
       
       if (!membership) {
-        membership = await bootstrapUserOrganization(userId);
+        membership = await bootstrapUserOrganization(effectiveUserId);
       }
       
-      // Auto-upgrade admin users
-      membership = await autoUpgradeAdminIfNeeded(userId, membership);
+      // Only auto-upgrade if NOT impersonating
+      const impersonating = await isImpersonating(req);
+      if (!impersonating) {
+        membership = await autoUpgradeAdminIfNeeded(effectiveUserId, membership);
+      }
       
       req.orgMembership = membership;
 
