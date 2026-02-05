@@ -1388,20 +1388,22 @@ export default function DealPipelinePage() {
         )}
       </main>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            className="fixed right-4 h-14 w-14 rounded-full shadow-lg z-30"
-            style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
-            size="icon"
-            onClick={() => setShowCreateDealSheet(true)}
-            data-testid="add-deal-fab"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="left">Create new deal</TooltipContent>
-      </Tooltip>
+      <div 
+        className="fixed z-30"
+        style={{ 
+          bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))',
+          right: '1rem'
+        }}
+      >
+        <Button
+          className="h-14 w-14 rounded-full shadow-lg"
+          size="icon"
+          onClick={() => setShowCreateDealSheet(true)}
+          data-testid="add-deal-fab"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      </div>
 
       <Sheet open={!!selectedDeal} onOpenChange={(open) => {
         if (!open) {
