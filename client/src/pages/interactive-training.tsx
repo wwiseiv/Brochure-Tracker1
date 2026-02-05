@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ListenButton } from "@/components/ListenButton";
+import { DictationInput } from "@/components/DictationInput";
 import {
   ChevronLeft,
   Send,
@@ -476,9 +477,12 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
                     : 'bg-muted'
                 }`}>
                   {msg.role === 'merchant' && (
-                    <div className="flex items-center gap-2 mb-1">
-                      <PersonaIcon icon={persona.icon} className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">{persona.name}</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <PersonaIcon icon={persona.icon} className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">{persona.name}</span>
+                      </div>
+                      <ListenButton text={msg.content} data-testid={`button-listen-message-${idx}`} />
                     </div>
                   )}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
