@@ -226,92 +226,82 @@ export async function buildFlyerPDF(options: FlyerBuildOptions): Promise<string>
            align: 'left',
          });
 
-      const benefitsY = 235;
+      const benefitsY = 240;
       
       doc.font('Helvetica-Bold')
-         .fontSize(14)
+         .fontSize(16)
          .fillColor(BRAND_COLORS.dark)
          .text('WHY MERCHANTS CHOOSE US', margin, benefitsY);
       
-      doc.rect(margin, benefitsY + 20, 80, 3).fill(BRAND_COLORS.secondary);
+      doc.rect(margin, benefitsY + 22, 100, 4).fill(BRAND_COLORS.secondary);
 
-      const benefitsStartY = benefitsY + 40;
-      const columnWidth = (contentWidth - 30) / 2;
-      const benefitHeight = 45;
+      const benefitsStartY = benefitsY + 45;
+      const columnWidth = (contentWidth - 40) / 2;
+      const benefitHeight = 55;
       
       content.bullets.slice(0, 6).forEach((bullet, index) => {
         const column = index % 2;
         const row = Math.floor(index / 2);
-        const xPos = margin + (column * (columnWidth + 30));
+        const xPos = margin + (column * (columnWidth + 40));
         const yPos = benefitsStartY + (row * benefitHeight);
 
-        doc.circle(xPos + 12, yPos + 12, 12).fill(BRAND_COLORS.primary);
+        doc.circle(xPos + 14, yPos + 14, 14).fill(BRAND_COLORS.primary);
         
         doc.font('Helvetica-Bold')
-           .fontSize(11)
+           .fontSize(12)
            .fillColor(BRAND_COLORS.white)
-           .text(String(index + 1), xPos + 8, yPos + 7);
+           .text(String(index + 1), xPos + 9.5, yPos + 8);
 
         doc.font('Helvetica')
-           .fontSize(11)
+           .fontSize(12)
            .fillColor(BRAND_COLORS.dark)
-           .text(bullet, xPos + 32, yPos + 5, {
-             width: columnWidth - 40,
-             lineGap: 2,
+           .text(bullet, xPos + 36, yPos + 5, {
+             width: columnWidth - 50,
+             lineGap: 3,
            });
       });
 
-      const ctaY = 530;
-      drawGradientRect(doc, 0, ctaY, pageWidth, 80, BRAND_COLORS.primary, '#3730A3', 40, 'horizontal');
+      const ctaY = 510;
+      const repFullName = getRepFullName(repInfo);
+      
+      drawGradientRect(doc, 0, ctaY, pageWidth, 90, BRAND_COLORS.primary, '#3730A3', 40, 'horizontal');
 
       doc.font('Helvetica-Bold')
-         .fontSize(22)
+         .fontSize(24)
          .fillColor(BRAND_COLORS.white)
-         .text(content.ctaText, margin, ctaY + 20, {
-           width: contentWidth * 0.55,
+         .text(content.ctaText, margin, ctaY + 18, {
+           width: repFullName ? contentWidth * 0.52 : contentWidth,
          });
 
       if (content.ctaSubtext) {
         doc.font('Helvetica')
-           .fontSize(12)
+           .fontSize(13)
            .fillColor('#C7D2FE')
-           .text(content.ctaSubtext, margin, ctaY + 48, {
-             width: contentWidth * 0.55,
+           .text(content.ctaSubtext, margin, ctaY + 52, {
+             width: repFullName ? contentWidth * 0.52 : contentWidth,
            });
       }
 
-      const repFullName = getRepFullName(repInfo);
       if (repFullName) {
-        const cardWidth = 200;
-        const cardHeight = 130;
-        const cardX = pageWidth - margin - cardWidth;
-        const cardY = 620;
+        const cardWidth = 190;
+        const cardHeight = 110;
+        const cardX = pageWidth - margin - cardWidth - 10;
+        const cardY = ctaY + 15;
 
         doc.save();
-        doc.rect(cardX + 3, cardY + 3, cardWidth, cardHeight)
-           .fillOpacity(0.15)
+        doc.rect(cardX + 2, cardY + 2, cardWidth, cardHeight)
+           .fillOpacity(0.2)
            .fill('#000000');
         doc.restore();
         doc.fillOpacity(1);
 
         doc.rect(cardX, cardY, cardWidth, cardHeight)
            .fill(BRAND_COLORS.white);
-        doc.rect(cardX, cardY, cardWidth, cardHeight)
-           .strokeColor('#E5E7EB')
-           .lineWidth(1)
-           .stroke();
-
-        drawGradientRect(doc, cardX, cardY, cardWidth, 28, BRAND_COLORS.primary, '#3730A3', 30, 'horizontal');
-        
-        doc.font('Helvetica-Bold')
-           .fontSize(11)
-           .fillColor(BRAND_COLORS.white)
-           .text('PCBancard', cardX + 12, cardY + 8);
 
         doc.font('Helvetica-Bold')
-           .fontSize(16)
+           .fontSize(14)
            .fillColor(BRAND_COLORS.dark)
-           .text(repFullName, cardX + 12, cardY + 40, {
+           .text(repFullName, cardX + 12, cardY + 12, {
              width: cardWidth - 24,
            });
 
@@ -319,35 +309,68 @@ export async function buildFlyerPDF(options: FlyerBuildOptions): Promise<string>
         doc.font('Helvetica')
            .fontSize(10)
            .fillColor(BRAND_COLORS.gray)
-           .text(repTitle, cardX + 12, cardY + 60);
+           .text(repTitle, cardX + 12, cardY + 30);
 
-        doc.rect(cardX + 12, cardY + 75, cardWidth - 24, 1).fill('#E5E7EB');
+        doc.rect(cardX + 12, cardY + 48, cardWidth - 24, 1).fill('#E5E7EB');
 
-        let contactY = cardY + 85;
+        let contactY = cardY + 58;
         if (repInfo?.phone) {
           doc.font('Helvetica')
-             .fontSize(10)
+             .fontSize(11)
              .fillColor(BRAND_COLORS.dark)
              .text(formatPhoneNumber(repInfo.phone), cardX + 12, contactY);
-          contactY += 14;
+          contactY += 16;
         }
         if (repInfo?.email) {
           doc.font('Helvetica')
-             .fontSize(10)
+             .fontSize(11)
              .fillColor(BRAND_COLORS.primary)
-             .text(repInfo.email, cardX + 12, contactY);
+             .text(repInfo.email, cardX + 12, contactY, {
+               width: cardWidth - 24,
+             });
         }
       }
+      
+      const infoY = 615;
+      doc.rect(0, infoY, pageWidth, 115)
+         .fill(BRAND_COLORS.light);
+         
+      doc.font('Helvetica-Bold')
+         .fontSize(13)
+         .fillColor(BRAND_COLORS.dark)
+         .text('How It Works', margin, infoY + 15);
+         
+      const steps = [
+        'We analyze your current processing statement',
+        'Create a custom savings proposal for your business',
+        'Seamless transition with full support'
+      ];
+      
+      steps.forEach((step, index) => {
+        const stepX = margin + (index * (contentWidth / 3));
+        doc.circle(stepX + 10, infoY + 50, 10).fill(BRAND_COLORS.secondary);
+        doc.font('Helvetica-Bold')
+           .fontSize(10)
+           .fillColor(BRAND_COLORS.dark)
+           .text(String(index + 1), stepX + 6.5, infoY + 45);
+        doc.font('Helvetica')
+           .fontSize(10)
+           .fillColor(BRAND_COLORS.gray)
+           .text(step, stepX + 28, infoY + 42, {
+             width: (contentWidth / 3) - 45,
+             lineGap: 2,
+           });
+      });
 
-      const footerY = 742;
+      const footerY = 730;
       
-      drawGradientRect(doc, 0, footerY, pageWidth, 3, BRAND_COLORS.secondary, BRAND_COLORS.primary, 60, 'horizontal');
+      drawGradientRect(doc, 0, footerY, pageWidth, 4, BRAND_COLORS.secondary, BRAND_COLORS.primary, 60, 'horizontal');
       
-      doc.rect(0, footerY + 3, pageWidth, pageHeight - footerY - 3)
+      doc.rect(0, footerY + 4, pageWidth, pageHeight - footerY - 4)
          .fill(BRAND_COLORS.dark);
 
       doc.font('Helvetica-Bold')
-         .fontSize(12)
+         .fontSize(11)
          .fillColor(BRAND_COLORS.white)
          .text('PCBancard', margin, footerY + 18);
 
@@ -362,10 +385,10 @@ export async function buildFlyerPDF(options: FlyerBuildOptions): Promise<string>
       if (industry) {
         const industryLabel = industry.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         doc.font('Helvetica')
-           .fontSize(8)
+           .fontSize(9)
            .fillColor('#9CA3AF')
-           .text(industryLabel, pageWidth - margin - 120, footerY + 20, {
-             width: 120,
+           .text(industryLabel, pageWidth - margin - 140, footerY + 18, {
+             width: 140,
              align: 'right',
            });
       }
