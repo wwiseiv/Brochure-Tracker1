@@ -1494,11 +1494,11 @@ export default function CoachPage() {
               <div className="p-4 space-y-3">
               {/* Presentation Training Link */}
               <Link href="/presentation-training" className="block">
-                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-presentation-training">
+                <Card className="p-4 hover-elevate cursor-pointer border-pink-500/30 bg-pink-500/5 dark:border-pink-400/30 dark:bg-pink-400/5" data-testid="card-presentation-training">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <GraduationCap className="w-5 h-5 text-primary" />
+                      <div className="w-10 h-10 rounded-lg bg-pink-500/10 dark:bg-pink-400/10 flex items-center justify-center">
+                        <GraduationCap className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                       </div>
                       <div>
                         <div className="font-semibold">Teach Me the Presentation</div>
@@ -1512,11 +1512,11 @@ export default function CoachPage() {
 
               {/* Interactive AI Training Link */}
               <Link href="/interactive-training" className="block">
-                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-interactive-training">
+                <Card className="p-4 hover-elevate cursor-pointer border-blue-500/30 bg-blue-500/5 dark:border-blue-400/30 dark:bg-blue-400/5" data-testid="card-interactive-training">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-primary" />
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div>
                         <div className="font-semibold">Interactive AI Training</div>
@@ -1531,11 +1531,11 @@ export default function CoachPage() {
               {/* Proposal Generator Link - only show if user has permission */}
               {hasFeature("proposal_generator") && (
                 <Link href="/proposal-generator" className="block">
-                  <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-proposal-generator">
+                  <Card className="p-4 hover-elevate cursor-pointer border-violet-500/30 bg-violet-500/5 dark:border-violet-400/30 dark:bg-violet-400/5" data-testid="card-proposal-generator">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Sparkles className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 rounded-lg bg-violet-500/10 dark:bg-violet-400/10 flex items-center justify-center">
+                          <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                         </div>
                         <div>
                           <div className="font-semibold">Proposal Generator</div>
@@ -1551,11 +1551,11 @@ export default function CoachPage() {
               {/* Statement Analyzer Link - only show if user has permission */}
               {hasFeature("statement_analyzer") && (
                 <Link href="/statement-analyzer" className="block">
-                  <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-statement-analyzer">
+                  <Card className="p-4 hover-elevate cursor-pointer border-amber-500/30 bg-amber-500/5 dark:border-amber-400/30 dark:bg-amber-400/5" data-testid="card-statement-analyzer">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <FileText className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 rounded-lg bg-amber-500/10 dark:bg-amber-400/10 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
                           <div className="font-semibold">Statement Analyzer</div>
@@ -1571,11 +1571,11 @@ export default function CoachPage() {
               {/* EquipIQ Link - only show if user has permission */}
               {hasFeature("equipiq") && (
                 <Link href="/equipiq" className="block">
-                  <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-equipiq">
+                  <Card className="p-4 hover-elevate cursor-pointer border-cyan-500/30 bg-cyan-500/5 dark:border-cyan-400/30 dark:bg-cyan-400/5" data-testid="card-equipiq">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Cpu className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 rounded-lg bg-cyan-500/10 dark:bg-cyan-400/10 flex items-center justify-center">
+                          <Cpu className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                         </div>
                         <div>
                           <div className="font-semibold">EquipIQ</div>
