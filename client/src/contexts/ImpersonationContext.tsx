@@ -35,6 +35,7 @@ interface OriginalUser {
   userId: string;
   firstName: string;
   lastName: string;
+  role?: string;
 }
 
 interface ImpersonationSession {
@@ -73,6 +74,7 @@ interface StartImpersonationResponse {
   sessionId: number;
   sessionToken: string;
   impersonatedUser: ImpersonatedUser;
+  originalUser?: OriginalUser;
   expiresAt: string;
 }
 
@@ -145,11 +147,11 @@ export function ImpersonationProvider({ children }: ImpersonationProviderProps) 
       setSessionToken(data.sessionToken);
       sessionStorage.setItem(IMPERSONATION_TOKEN_KEY, data.sessionToken);
       
-      // Store session info
+      // Store session info with original user's role for permission checks
       const session: ImpersonationSession = {
         id: data.sessionId,
         impersonatedUser: data.impersonatedUser,
-        originalUser: { userId: '', firstName: '', lastName: '' }, // Will be filled by validation
+        originalUser: data.originalUser || { userId: '', firstName: '', lastName: '' },
         startedAt: new Date().toISOString(),
         expiresAt: data.expiresAt,
       };

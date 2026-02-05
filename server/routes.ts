@@ -2542,6 +2542,12 @@ Format your response as JSON:
           email: targetUser?.email || null,
           role: targetMembership?.role || "agent",
         },
+        originalUser: {
+          userId: originalUserId,
+          firstName: req.user.claims.name?.split(' ')[0] || "Admin",
+          lastName: req.user.claims.name?.split(' ').slice(1).join(' ') || "",
+          role: membership.role,
+        },
         expiresAt: session.expiresAt,
       });
     } catch (error) {
@@ -2608,9 +2614,14 @@ Format your response as JSON:
         return res.json({ valid: false, session: null, reason: "expired" });
       }
       
-      // Get user details
+      // Get user details including original user's membership role
       const impersonatedUser = await authStorage.getUser(session.impersonatedUserId);
       const originalUser = await authStorage.getUser(session.originalUserId);
+      const originalMembership = await storage.getUserMembership(session.originalUserId);
+      const impersonatedMembership = await storage.getOrganizationMember(
+        session.organizationId,
+        session.impersonatedUserId
+      );
       
       res.json({
         valid: true,
@@ -2621,11 +2632,13 @@ Format your response as JSON:
             firstName: impersonatedUser?.firstName || "Unknown",
             lastName: impersonatedUser?.lastName || "User",
             email: impersonatedUser?.email || null,
+            role: impersonatedMembership?.role || "agent",
           },
           originalUser: {
             userId: session.originalUserId,
             firstName: originalUser?.firstName || "Unknown",
             lastName: originalUser?.lastName || "User",
+            role: originalMembership?.role || "agent",
           },
           startedAt: session.startedAt,
           expiresAt: session.expiresAt,

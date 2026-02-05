@@ -47,7 +47,7 @@ import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
 import { PermissionProvider } from "@/contexts/PermissionContext";
-import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
+import { ImpersonationProvider, useImpersonation } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -91,6 +91,7 @@ function TeamManagementRoute() {
   const { data: userRole, isLoading } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+  const { isImpersonating, originalUser } = useImpersonation();
 
   if (isLoading) {
     return (
@@ -103,7 +104,11 @@ function TeamManagementRoute() {
     );
   }
 
-  if (userRole?.role !== "master_admin") {
+  // Allow access if the current user is admin OR if impersonating and original user is admin
+  const isAdmin = userRole?.role === "master_admin";
+  const originalUserIsAdmin = isImpersonating && originalUser?.role === "master_admin";
+  
+  if (!isAdmin && !originalUserIsAdmin) {
     return <AccessDenied feature="Team Management" />;
   }
 
