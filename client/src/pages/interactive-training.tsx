@@ -24,6 +24,7 @@ import {
   X,
   Check,
   AlertTriangle,
+  AlertCircle,
   Lightbulb,
   RefreshCw,
   Coffee,
@@ -44,6 +45,10 @@ import {
   Landmark,
   Building,
   BadgeDollarSign,
+  TrendingUp,
+  ThumbsUp,
+  ArrowRight,
+  Zap,
 } from "lucide-react";
 import {
   MERCHANT_PERSONAS,
@@ -900,14 +905,40 @@ interface DeliveryAnalyzerProps {
   onBack: () => void;
 }
 
+interface StageAnalysis {
+  id: number;
+  name: string;
+  found: boolean;
+  excerpts: string[];
+  strength?: 'missing' | 'weak' | 'adequate' | 'strong' | 'exceptional';
+  improvement?: string;
+}
+
+interface AnalysisResult {
+  detectedStages: StageAnalysis[];
+  feedback: string;
+  score: number;
+  psychographicAnalysis?: {
+    primaryAppeal: string;
+    missingAppeals?: string[];
+    recommendation?: string;
+  };
+  emotionalArc?: {
+    problemAgitation: number;
+    hopeInjection: number;
+    proofStacking: number;
+    safetyNet: number;
+    overallFlow?: string;
+  };
+  topStrengths?: string[];
+  criticalGaps?: string[];
+  nextStepDrill?: string;
+}
+
 function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
   const { toast } = useToast();
   const [presentationText, setPresentationText] = useState('');
-  const [analysis, setAnalysis] = useState<{
-    detectedStages: { id: number; name: string; found: boolean; excerpts: string[] }[];
-    feedback: string;
-    score: number;
-  } | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const analysisMutation = useMutation({
@@ -915,8 +946,27 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
       const res = await apiRequest("POST", "/api/training/analyze-delivery", { text });
       return res.json();
     },
-    onSuccess: (data) => {
-      setAnalysis(data);
+    onSuccess: (data: AnalysisResult) => {
+      // Merge AI feedback with local stage detection (don't overwrite)
+      setAnalysis(prev => {
+        if (!prev) return data;
+        
+        // Merge AI-detected stages with strength/improvement data
+        const mergedStages = (data.detectedStages && data.detectedStages.length > 0)
+          ? data.detectedStages
+          : prev.detectedStages.map(stage => {
+              const aiStage = data.detectedStages?.find(s => s.id === stage.id);
+              return aiStage ? { ...stage, ...aiStage } : stage;
+            });
+
+        return {
+          ...prev,
+          ...data,
+          detectedStages: mergedStages,
+          feedback: data.feedback || prev.feedback,
+          score: data.score !== undefined ? data.score : prev.score,
+        };
+      });
       setIsAnalyzing(false);
     },
     onError: (error: Error) => {
@@ -1030,47 +1080,179 @@ Example: 'Ever close the month—staring at the deposit screen, adding it up twi
 
         {analysis && (
           <div className="border-t border-border p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">Stage Detection Results</h3>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h3 className="text-xl font-bold">Comprehensive Analysis</h3>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Coverage Score</p>
-                <p className="text-2xl font-bold text-purple-500">{analysis.score}%</p>
+                <p className="text-sm text-muted-foreground">Overall Score</p>
+                <p className={`text-2xl font-bold ${
+                  analysis.score >= 80 ? 'text-green-500' : 
+                  analysis.score >= 60 ? 'text-yellow-500' : 
+                  analysis.score >= 40 ? 'text-orange-500' : 'text-red-500'
+                }`}>{analysis.score}%</p>
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-3">
-              {analysis.detectedStages.map(stage => (
-                <Card
-                  key={stage.id}
-                  className={`p-3 ${stage.found ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {stage.found ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <X className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className="font-medium">Stage {stage.id}: {stage.name}</span>
-                  </div>
-                  {stage.found && stage.excerpts.length > 0 && (
-                    <p className="text-xs text-muted-foreground italic">
-                      {stage.excerpts[0]}
-                    </p>
-                  )}
-                </Card>
-              ))}
+            {/* Psychographic Analysis */}
+            {analysis.psychographicAnalysis && (
+              <Card className="p-4 bg-blue-500/10 border-blue-500/30">
+                <h4 className="font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Psychographic Appeal
+                </h4>
+                <p className="text-sm mb-2">
+                  <span className="font-medium">Primary Target:</span> {analysis.psychographicAnalysis.primaryAppeal} personalities
+                </p>
+                {analysis.psychographicAnalysis.missingAppeals && analysis.psychographicAnalysis.missingAppeals.length > 0 && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    <span className="font-medium">Consider adding appeal for:</span> {analysis.psychographicAnalysis.missingAppeals.join(', ')}
+                  </p>
+                )}
+                {analysis.psychographicAnalysis.recommendation && (
+                  <p className="text-sm italic">{analysis.psychographicAnalysis.recommendation}</p>
+                )}
+              </Card>
+            )}
+
+            {/* Emotional Arc */}
+            {analysis.emotionalArc && (
+              <Card className="p-4 bg-amber-500/10 border-amber-500/30">
+                <h4 className="font-bold text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Emotional Arc Analysis
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                  {[
+                    { label: 'Problem Agitation', value: analysis.emotionalArc.problemAgitation },
+                    { label: 'Hope Injection', value: analysis.emotionalArc.hopeInjection },
+                    { label: 'Proof Stacking', value: analysis.emotionalArc.proofStacking },
+                    { label: 'Safety Net', value: analysis.emotionalArc.safetyNet },
+                  ].map(item => (
+                    <div key={item.label} className="text-center">
+                      <div className="text-lg font-bold">{item.value}/5</div>
+                      <div className="text-xs text-muted-foreground">{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {analysis.emotionalArc.overallFlow && (
+                  <p className="text-sm italic">{analysis.emotionalArc.overallFlow}</p>
+                )}
+              </Card>
+            )}
+
+            {/* Stage Detection with Strength Indicators */}
+            <div>
+              <h4 className="font-bold mb-3 flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Stage Coverage ({analysis.detectedStages.filter(s => s.found).length}/{analysis.detectedStages.length})
+              </h4>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {analysis.detectedStages.map(stage => {
+                  const strengthColors: Record<string, string> = {
+                    exceptional: 'border-green-500 bg-green-500/10',
+                    strong: 'border-green-400/70 bg-green-500/5',
+                    adequate: 'border-yellow-500/70 bg-yellow-500/5',
+                    weak: 'border-orange-500/70 bg-orange-500/5',
+                    missing: 'border-red-500/50 bg-red-500/5',
+                  };
+                  const strengthClass = stage.strength 
+                    ? strengthColors[stage.strength] 
+                    : (stage.found ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5');
+                  
+                  return (
+                    <Card key={stage.id} className={`p-3 ${strengthClass}`}>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          {stage.found ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <X className="w-4 h-4 text-red-500" />
+                          )}
+                          <span className="font-medium text-sm">Stage {stage.id}: {stage.name}</span>
+                        </div>
+                        {stage.strength && stage.strength !== 'missing' && (
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {stage.strength}
+                          </Badge>
+                        )}
+                      </div>
+                      {stage.excerpts && stage.excerpts.length > 0 && (
+                        <p className="text-xs text-muted-foreground italic mb-1">
+                          "{stage.excerpts[0]}"
+                        </p>
+                      )}
+                      {stage.improvement && (
+                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                          Tip: {stage.improvement}
+                        </p>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* Strengths & Gaps */}
+            {(analysis.topStrengths?.length || analysis.criticalGaps?.length) && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {analysis.topStrengths && analysis.topStrengths.length > 0 && (
+                  <Card className="p-4 bg-green-500/10 border-green-500/30">
+                    <h4 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center gap-2">
+                      <ThumbsUp className="w-4 h-4" />
+                      Your Strengths
+                    </h4>
+                    <ul className="text-sm space-y-1">
+                      {analysis.topStrengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Check className="w-3 h-3 text-green-500 mt-1 flex-shrink-0" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+                {analysis.criticalGaps && analysis.criticalGaps.length > 0 && (
+                  <Card className="p-4 bg-orange-500/10 border-orange-500/30">
+                    <h4 className="font-bold text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      Areas to Develop
+                    </h4>
+                    <ul className="text-sm space-y-1">
+                      {analysis.criticalGaps.map((g, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <ArrowRight className="w-3 h-3 text-orange-500 mt-1 flex-shrink-0" />
+                          {g}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Next Step Drill */}
+            {analysis.nextStepDrill && (
+              <Card className="p-4 bg-indigo-500/10 border-indigo-500/30">
+                <h4 className="font-bold text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Your Next Practice Drill
+                </h4>
+                <p className="text-sm">{analysis.nextStepDrill}</p>
+              </Card>
+            )}
+
+            {/* AI Coaching Narrative */}
             {analysis.feedback && (
               <Card className="p-4 bg-purple-500/10 border-purple-500/30">
                 <h4 className="font-bold text-purple-600 dark:text-purple-400 mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4" />
-                    AI Feedback
+                    AI Coach Feedback
                   </span>
                   <ListenButton text={analysis.feedback} data-testid="button-listen-feedback" />
                 </h4>
-                <p className="text-sm whitespace-pre-wrap">{analysis.feedback}</p>
+                <div className="text-sm whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
+                  {analysis.feedback}
+                </div>
               </Card>
             )}
           </div>
