@@ -129,7 +129,7 @@ export default function InteractiveTrainingPage() {
           </div>
         </header>
 
-        <main className="container max-w-6xl mx-auto px-4 py-6">
+        <main className={`container mx-auto px-4 py-6 ${mode === 'menu' ? 'max-w-6xl' : 'max-w-5xl lg:max-w-[90%] xl:max-w-[85%]'}`}>
         {mode === 'menu' && (
           <TrainingMenu 
             onSelectMode={setMode} 
