@@ -34,7 +34,8 @@ Preferred communication style: Simple, everyday language.
     - **Meeting Analysis**: Recording, transcription, and analysis of sales conversations.
     - **AI Email Drafter & Marketing Materials**: AI-powered email composition and industry-specific flyer generation.
     - **EquipIQ**: AI-powered equipment recommendation system.
-    - **Presentation Training**: Interactive modules for sales presentations.
+    - **Presentation Training**: Interactive modules for sales presentations (8 modules, 24 lessons, 80 quizzes).
+    - **Interactive AI Training**: AI-powered sales training with 4 modes: Live Roleplay Simulator (20 merchant personas), Objection Gauntlet (12 rapid-fire objections), Scenario Trainer (situational decision-making), and Delivery Analyzer (AI-powered presentation analysis). All modes feature voice input (Web Speech API dictation) and ElevenLabs TTS playback. Feature-gated via team management permissions.
     - **Proposal Generator**: Generates professional proposals (PDF/Word) by parsing merchant data using AI, with background processing and push notifications.
     - **Statement Analyzer**: Analyzes merchant processing statements using AI vision for savings identification, cost analysis, and script generation, with PII redaction.
     - **AI-Powered Prospecting**: Local business discovery using AI with web search, MCC code filtering, pipeline integration, background processing, and push notifications.

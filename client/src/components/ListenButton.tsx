@@ -72,6 +72,11 @@ export function ListenButton({ text, size = "icon", className = "", "data-testid
         audio.onerror = () => {
           setIsLoading(false);
           setIsPlaying(false);
+          audioRef.current = null;
+          if (globalAudioElement === audio) {
+            globalAudioElement = null;
+            globalStopCallback = null;
+          }
           console.error("Audio playback error");
         };
 

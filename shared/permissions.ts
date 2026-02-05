@@ -218,6 +218,17 @@ export const FEATURES: FeatureDefinition[] = [
     stageDefaults: { trainee: true, active: true, senior: true },
     icon: 'Bot'
   },
+  {
+    id: 'interactive_ai_training',
+    name: 'Interactive AI Training',
+    description: 'AI-powered training with live roleplay, objection gauntlet, scenario trainer, and delivery analyzer with voice I/O',
+    category: 'sales_training',
+    routes: ['/interactive-training', '/training/interactive'],
+    apiEndpoints: ['/api/training/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Sparkles'
+  },
 
   // ─────────────────────────────────────────────────────────────────────────────
   // CORE CRM FEATURES (Available to ALL agents including trainees)

@@ -1,49 +1,27 @@
-// ElevenLabs integration using Replit Connector
-// Reference: connection:conn_elevenlabs_01KGNSX3YMDY45BZRT4XYNJNE1
+// ElevenLabs integration using ELEVENLABS_API_KEY secret
+// Note: Using direct API key instead of connector (user preference)
 
 import { ElevenLabsClient } from 'elevenlabs';
 
-let connectionSettings: any;
-
-async function getCredentials(): Promise<string> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+function getApiKey(): string {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    throw new Error('ELEVENLABS_API_KEY is not configured');
   }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=elevenlabs',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || !connectionSettings.settings.api_key) {
-    throw new Error('ElevenLabs not connected');
-  }
-  return connectionSettings.settings.api_key;
+  return apiKey;
 }
 
-export async function getElevenLabsClient(): Promise<ElevenLabsClient> {
-  const apiKey = await getCredentials();
+export function getElevenLabsClient(): ElevenLabsClient {
+  const apiKey = getApiKey();
   return new ElevenLabsClient({ apiKey });
 }
 
-export async function getElevenLabsApiKey(): Promise<string> {
-  return await getCredentials();
+export function getElevenLabsApiKeyValue(): string {
+  return getApiKey();
 }
 
 export async function textToSpeech(text: string, voiceId: string = "21m00Tcm4TlvDq8ikWAM"): Promise<{ audio: string; format: string }> {
-  const apiKey = await getCredentials();
+  const apiKey = getApiKey();
   
   const cleanTextForTTS = (input: string): string => {
     return input
@@ -102,7 +80,7 @@ export async function textToSpeech(text: string, voiceId: string = "21m00Tcm4Tlv
 }
 
 export async function speechToText(audioBuffer: Buffer, filename: string = "audio.webm"): Promise<string> {
-  const apiKey = await getCredentials();
+  const apiKey = getApiKey();
   
   const formData = new FormData();
   formData.append('file', new Blob([audioBuffer]), filename);

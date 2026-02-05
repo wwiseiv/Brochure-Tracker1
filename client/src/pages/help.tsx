@@ -1057,6 +1057,39 @@ export default function HelpPage() {
     },
   ];
 
+  const interactiveTrainingFeatures: HelpItem[] = [
+    {
+      title: "Live Roleplay Simulator",
+      description: "Practice with 20 AI merchant personas. Each has unique personalities, objection styles, and weak points to discover.",
+      link: "/interactive-training",
+      icon: <Users className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Objection Gauntlet",
+      description: "Handle 12 rapid-fire objections back-to-back. Learn the best responses and key principles for each challenge.",
+      link: "/interactive-training",
+      icon: <Target className="w-5 h-5 text-orange-600" />,
+    },
+    {
+      title: "Scenario Trainer",
+      description: '"What would you do?" situational training. Make decisions and get immediate feedback on your choices.',
+      link: "/interactive-training",
+      icon: <MessageSquare className="w-5 h-5 text-cyan-600" />,
+    },
+    {
+      title: "Delivery Analyzer",
+      description: "Practice your full presentation. AI detects which stages you hit and coaches your delivery in real-time.",
+      link: "/interactive-training",
+      icon: <BarChart3 className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Voice Input & Playback",
+      description: "Speak your responses with the microphone and listen to AI feedback with ElevenLabs text-to-speech.",
+      link: "/interactive-training",
+      icon: <Mic className="w-5 h-5 text-primary" />,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
@@ -1250,6 +1283,7 @@ export default function HelpPage() {
             { title: "Statement Analyzer", description: "Upload merchant statements, extract data with AI, identify savings opportunities, and generate sales scripts.", items: statementAnalyzerFeatures, badge: "Sales Tool", requiredFeature: "statement_analyzer" },
             { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users", requiredFeature: "proposal_generator" },
             { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users", requiredFeature: "presentation_training" },
+            { title: "Interactive AI Training", description: "AI-powered sales training with live roleplay, objection handling, scenario decisions, and delivery analysis with voice I/O.", items: interactiveTrainingFeatures, badge: "AI Powered", requiredFeature: "interactive_ai_training" },
             { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users", requiredFeature: "merchant_profiles" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users", requiredFeature: "brochure_inventory" },

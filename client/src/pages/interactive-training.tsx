@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ListenButton } from "@/components/ListenButton";
 import { DictationInput } from "@/components/DictationInput";
+import { RequireFeature } from "@/contexts/PermissionContext";
 import {
   ChevronLeft,
   Send,
@@ -112,22 +113,23 @@ export default function InteractiveTrainingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
-        <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/coach">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <Sparkles className="w-5 h-5 text-primary" />
-          <h1 className="font-semibold text-lg" data-testid="text-page-title">
-            Interactive AI Training
-          </h1>
-        </div>
-      </header>
+    <RequireFeature feature="interactive_ai_training" showLocked>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-40 bg-card border-b border-border">
+          <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+            <Link href="/coach">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h1 className="font-semibold text-lg" data-testid="text-page-title">
+              Interactive AI Training
+            </h1>
+          </div>
+        </header>
 
-      <main className="container max-w-6xl mx-auto px-4 py-6">
+        <main className="container max-w-6xl mx-auto px-4 py-6">
         {mode === 'menu' && (
           <TrainingMenu 
             onSelectMode={setMode} 
@@ -150,7 +152,8 @@ export default function InteractiveTrainingPage() {
           <DeliveryAnalyzer onBack={handleBack} />
         )}
       </main>
-    </div>
+      </div>
+    </RequireFeature>
   );
 }
 
@@ -523,6 +526,10 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
               </div>
             ) : coachingFeedback ? (
               <div className="space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Coach Feedback</span>
+                  <ListenButton text={coachingFeedback} data-testid="button-listen-coaching" />
+                </div>
                 <div className="prose prose-sm dark:prose-invert">
                   <div className="whitespace-pre-wrap text-sm">{coachingFeedback}</div>
                 </div>
@@ -545,17 +552,13 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
       </div>
 
       <div className="mt-4 flex gap-2">
-        <Textarea
+        <DictationInput
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-          placeholder="Type your response..."
-          className="min-h-[60px] resize-none"
+          onChange={setInput}
+          placeholder="Type or speak your response..."
+          multiline
+          rows={2}
+          className="flex-1"
           data-testid="input-message"
         />
         <Button
@@ -669,12 +672,14 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
 
         <div className="p-6">
           <label className="block text-sm text-muted-foreground mb-2">Your Response:</label>
-          <Textarea
+          <DictationInput
             value={userResponse}
-            onChange={(e) => setUserResponse(e.target.value)}
+            onChange={setUserResponse}
             disabled={showFeedback}
-            placeholder="How would you respond to this objection?"
-            className="min-h-[100px] resize-none mb-4"
+            placeholder="How would you respond to this objection? (Speak or type)"
+            multiline
+            rows={4}
+            className="mb-4"
             data-testid="input-objection-response"
           />
 
@@ -693,9 +698,12 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
         {showFeedback && (
           <div className="border-t border-border p-6 space-y-4">
             <Card className="p-4 bg-green-500/10 border-green-500/30">
-              <h3 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center gap-2">
-                <Check className="w-4 h-4" />
-                Best Response Approach:
+              <h3 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  Best Response Approach:
+                </span>
+                <ListenButton text={currentObjection.bestResponse} data-testid="button-listen-best-response" />
               </h3>
               <p className="text-sm">{currentObjection.bestResponse}</p>
             </Card>
@@ -980,13 +988,14 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
         </div>
 
         <div className="p-6">
-          <Textarea
+          <DictationInput
             value={presentationText}
-            onChange={(e) => setPresentationText(e.target.value)}
-            placeholder="Enter your presentation script here... 
+            onChange={setPresentationText}
+            placeholder="Enter your presentation script here... (Speak or type)
 
 Example: 'Ever close the month—staring at the deposit screen, adding it up twice—and still feel that quiet knot in your stomach?'"
-            className="min-h-[200px] resize-none mb-4"
+            multiline
+            rows={8}
             disabled={isAnalyzing}
             data-testid="input-presentation"
           />
@@ -1054,9 +1063,12 @@ Example: 'Ever close the month—staring at the deposit screen, adding it up twi
 
             {analysis.feedback && (
               <Card className="p-4 bg-purple-500/10 border-purple-500/30">
-                <h4 className="font-bold text-purple-600 dark:text-purple-400 mb-2 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  AI Feedback
+                <h4 className="font-bold text-purple-600 dark:text-purple-400 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    AI Feedback
+                  </span>
+                  <ListenButton text={analysis.feedback} data-testid="button-listen-feedback" />
                 </h4>
                 <p className="text-sm whitespace-pre-wrap">{analysis.feedback}</p>
               </Card>
