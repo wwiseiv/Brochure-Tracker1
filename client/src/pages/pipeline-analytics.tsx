@@ -99,6 +99,13 @@ export default function PipelineAnalyticsPage() {
 
   const { data: analytics, isLoading: loadingAnalytics } = useQuery<AnalyticsData>({
     queryKey: ["/api/deals/analytics", dateRange],
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/analytics?range=${dateRange}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      return res.json();
+    },
     enabled: userRole?.role === "master_admin" || userRole?.role === "relationship_manager",
   });
 
