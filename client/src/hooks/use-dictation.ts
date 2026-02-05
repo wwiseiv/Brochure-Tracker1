@@ -140,6 +140,10 @@ export function useDictation(options: UseDictationOptions = {}): UseDictationRet
           setError("No microphone found. Please check your audio settings.");
         } else if (event.error === "not-allowed") {
           setError("Microphone access denied. Please allow microphone access.");
+        } else if (event.error === "network") {
+          setError("Network error. Please check your internet connection and try again.");
+        } else if (event.error === "service-not-allowed") {
+          setError("Speech service unavailable. Please try again later.");
         } else if (event.error !== "aborted") {
           setError(`Speech recognition error: ${event.error}`);
         }
