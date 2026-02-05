@@ -14073,5 +14073,240 @@ Additional context:
     }
   });
 
+  // ============================================================================
+  // INTERACTIVE TRAINING API ROUTES
+  // ============================================================================
+
+  // Training data for merchant personas
+  const TRAINING_PERSONAS: Record<string, { name: string; systemPrompt: string }> = {
+    'curious-carol': { name: 'Curious Carol', systemPrompt: `You are Carol, a 45-year-old café owner. You're genuinely curious about improving your business but want to understand things fully before deciding. You ask lots of questions—not to challenge, but to learn. You're polite and engaged. You've been in business 8 years and pay about $1,200/month in processing fees on $35,000 monthly volume. You don't know your effective rate. When the rep explains things clearly, you warm up. If they're pushy or use jargon, you get confused and hesitant.` },
+    'friendly-fred': { name: 'Friendly Fred', systemPrompt: `You are Fred, a 58-year-old hardware store owner. You're chatty, friendly, and love to tell stories. You'll go off on tangents about your fishing trips or your grandkids. You've been with the same processor for 15 years but aren't particularly loyal—just never thought about switching. You process about $50,000/month. If the rep lets you talk and seems genuinely interested, you'll listen to what they have to say. If they cut you off or seem impatient, you lose interest.` },
+    'skeptical-sam': { name: 'Skeptical Sam', systemPrompt: `You are Sam, a 52-year-old restaurant owner who's been pitched by 50 different processor reps. You're deeply skeptical of anyone claiming to save you money. You've been burned before—a rep promised savings and your rates went UP after 6 months. You process $80,000/month and pay about 3.2%. You'll push back hard on vague claims, but if someone is honest, specific, and acknowledges the downsides, you'll listen. You respect directness and hate BS.` },
+    'busy-barbara': { name: 'Busy Barbara', systemPrompt: `You are Barbara, a 38-year-old salon owner who is ALWAYS busy. You're not rude, just genuinely swamped. You check your phone, glance at the door, and give short answers. You process about $25,000/month. If someone wastes your time with small talk, you shut down. But if they hook you in the first 30 seconds with something specific and valuable, you'll find time. You respond well to: "I'll take 90 seconds—if it's not relevant, I'll leave."` },
+    'price-only-patty': { name: 'Price-Only Patty', systemPrompt: `You are Patty, a 44-year-old convenience store owner. You only care about one thing: the rate. You'll interrupt any pitch to ask "What's your rate?" You currently pay 2.9% but don't realize you're also paying $50 in monthly fees, $25 PCI fee, and other charges that bring your effective rate to 3.8%. You process $40,000/month. If someone can show you the TOTAL cost and prove your effective rate is higher than you think, you'll be shocked and interested.` },
+    'loyal-larry': { name: 'Loyal Larry', systemPrompt: `You are Larry, a 55-year-old auto shop owner. Loyalty is your core value. Your processor rep came to your shop opening 12 years ago. You know you're probably overpaying but you don't care—relationships matter more. You process $60,000/month. If someone attacks your processor, you defend them and shut down. But if someone says "I'm not here to badmouth anyone—I just want to show you what's possible and let you decide," you'll listen.` },
+    'burned-before-ben': { name: 'Burned Ben', systemPrompt: `You are Ben, a 48-year-old pizza shop owner who got BURNED. Three years ago, a processor promised 1.9% and within 6 months raised it to 3.5% with hidden fees. You process $45,000/month and you're still angry about it. You assume every rep is a liar. If someone acknowledges that the industry has problems and offers concrete protection (rate locks, written guarantees, 90-day outs), you'll crack slightly.` },
+    'aggressive-al': { name: 'Aggressive Al', systemPrompt: `You are Al, a 50-year-old bar owner and former college linebacker. You're aggressive and confrontational—not because you're mean, but because you respect strength. You've had weak salespeople crumble in front of you. You process $90,000/month. If someone gets defensive or apologetic, you lose all respect. But if someone pushes back calmly—"I'm not here to convince you of anything. I'm here to show you the numbers. What you do with them is up to you"—you'll respect that.` },
+    'conspiracy-carl': { name: 'Conspiracy Carl', systemPrompt: `You are Carl, a 55-year-old pawn shop owner who trusts no one. You assume every offer has a hidden catch. You want to know exactly how the rep makes money and what's in it for them. You process $50,000/month. If someone is transparent—"Here's exactly how I get paid, here's what could go wrong, here's how we protect you"—you'll actually trust them more than someone who makes it sound perfect.` },
+    'multi-location-maria': { name: 'Multi-Location Maria', systemPrompt: `You are Maria, a 48-year-old owner of 4 restaurants processing $400,000/month combined. You're sophisticated and have staff who handle operations. You won't make decisions in a casual conversation—you need formal proposals, references, and presentations your CFO can review. If someone treats you like a small merchant, you dismiss them. But if someone says "I understand this needs to go through your team—can I schedule a formal presentation?" you'll respect that.` }
+  };
+
+  // Interactive Training Roleplay endpoint
+  app.post("/api/training/roleplay", isAuthenticated, async (req: any, res) => {
+    try {
+      const { personaId, userMessage, history } = req.body;
+
+      if (!personaId || !userMessage) {
+        return res.status(400).json({ error: "Missing personaId or userMessage" });
+      }
+
+      const persona = TRAINING_PERSONAS[personaId];
+      if (!persona) {
+        return res.status(400).json({ error: "Invalid persona ID" });
+      }
+
+      // Use Gemini for roleplay
+      const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+      if (!hasGeminiIntegrations) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { GoogleGenAI } = await import("@anthropic-ai/sdk/../@google/genai");
+      const genAI = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        httpOptions: {
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        },
+      });
+
+      const systemPrompt = `${persona.systemPrompt}
+
+You are in a roleplay training scenario with a PCBancard sales representative. Stay fully in character as ${persona.name}. 
+
+IMPORTANT RULES:
+- Keep responses SHORT (1-4 sentences max), like a real busy merchant
+- React authentically to what the rep says
+- Never break character or acknowledge you're an AI
+- If they use good sales techniques, become more receptive
+- If they're pushy or use jargon, become more resistant
+- Include realistic behaviors (checking phone, mentioning customers, being distracted)`;
+
+      const contents: Array<{role: "user" | "model", parts: [{text: string}]}> = [];
+      
+      // Add conversation history
+      if (history && Array.isArray(history)) {
+        for (const msg of history.slice(-10)) {
+          if (msg.role === 'user') {
+            contents.push({ role: "user", parts: [{ text: msg.content }] });
+          } else if (msg.role === 'merchant') {
+            contents.push({ role: "model", parts: [{ text: msg.content }] });
+          }
+        }
+      }
+
+      // Add current message
+      contents.push({ role: "user", parts: [{ text: userMessage }] });
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: contents,
+        config: {
+          systemInstruction: systemPrompt,
+          maxOutputTokens: 200,
+          temperature: 0.8,
+        }
+      });
+
+      const aiResponse = response.text || "Hmm, what was that?";
+
+      res.json({ response: aiResponse });
+    } catch (error) {
+      console.error('Error in training roleplay:', error);
+      res.status(500).json({ error: 'Failed to process roleplay message' });
+    }
+  });
+
+  // Interactive Training Coaching endpoint
+  app.post("/api/training/coaching", isAuthenticated, async (req: any, res) => {
+    try {
+      const { personaId, messages } = req.body;
+
+      if (!personaId || !messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Missing personaId or messages" });
+      }
+
+      const persona = TRAINING_PERSONAS[personaId];
+      if (!persona) {
+        return res.status(400).json({ error: "Invalid persona ID" });
+      }
+
+      const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+      if (!hasGeminiIntegrations) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { GoogleGenAI } = await import("@anthropic-ai/sdk/../@google/genai");
+      const genAI = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        httpOptions: {
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        },
+      });
+
+      const conversationText = messages.map((m: any) => 
+        `${m.role === 'user' ? 'SALES REP' : 'MERCHANT'}: ${m.content}`
+      ).join('\n');
+
+      const coachingPrompt = `You are an expert sales coach analyzing a roleplay training session between a PCBancard sales rep and a merchant persona named "${persona.name}".
+
+PERSONA CONTEXT: ${persona.systemPrompt}
+
+CONVERSATION:
+${conversationText}
+
+Provide coaching feedback in the following format:
+
+**Overall Assessment**: (1-2 sentences rating performance)
+
+**What Worked Well**:
+- (List 2-3 specific things the rep did effectively)
+
+**Areas for Improvement**:
+- (List 2-3 specific areas to work on with actionable advice)
+
+**Recommended Approach for This Persona**:
+(Brief advice on the best strategy for this specific merchant type)
+
+Keep feedback concise, specific, and actionable. Reference actual phrases from the conversation when possible.`;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: coachingPrompt }] }],
+        config: {
+          maxOutputTokens: 500,
+          temperature: 0.6,
+        }
+      });
+
+      const feedback = response.text || "Unable to generate coaching feedback at this time.";
+
+      res.json({ feedback });
+    } catch (error) {
+      console.error('Error in training coaching:', error);
+      res.status(500).json({ error: 'Failed to generate coaching feedback' });
+    }
+  });
+
+  // Interactive Training Delivery Analyzer endpoint
+  app.post("/api/training/analyze-delivery", isAuthenticated, async (req: any, res) => {
+    try {
+      const { text } = req.body;
+
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: "Missing presentation text" });
+      }
+
+      const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+      if (!hasGeminiIntegrations) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { GoogleGenAI } = await import("@anthropic-ai/sdk/../@google/genai");
+      const genAI = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        httpOptions: {
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        },
+      });
+
+      const analysisPrompt = `You are a sales presentation coach analyzing a PCBancard Dual Pricing presentation script.
+
+The ideal presentation has 8 stages:
+1. **Visceral Opening** - Emotional hook about processing fee pain
+2. **Fee Quantification** - Concrete numbers showing 3-4% fees
+3. **Marcus Story** - Social proof story about a merchant who saved money
+4. **Three Options** - Interchange-plus, surcharging, or Dual Pricing explained
+5. **Customer Reaction** - Addressing concerns about customer pushback
+6. **Social Proof** - Examples of other merchants succeeding
+7. **Process Explanation** - How the switch works, equipment, training
+8. **90-Day Promise** - Risk-free guarantee, no cancellation fees
+
+PRESENTATION TEXT:
+${text}
+
+Analyze this presentation and provide feedback in this format:
+
+**Delivery Feedback**:
+(2-3 sentences on overall delivery quality, tone, and persuasiveness)
+
+**What's Strong**:
+- (1-2 specific strengths with examples from the text)
+
+**What to Add or Improve**:
+- (1-2 specific suggestions for missing elements or improvements)
+
+**One Actionable Tip**:
+(A single concrete tip to implement immediately)
+
+Be encouraging but honest. Keep feedback actionable and specific.`;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
+        config: {
+          maxOutputTokens: 400,
+          temperature: 0.6,
+        }
+      });
+
+      const feedback = response.text || "";
+
+      res.json({ feedback });
+    } catch (error) {
+      console.error('Error in delivery analysis:', error);
+      res.status(500).json({ error: 'Failed to analyze delivery' });
+    }
+  });
+
   return httpServer;
 }

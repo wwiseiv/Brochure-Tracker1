@@ -1510,6 +1510,24 @@ export default function CoachPage() {
                 </Card>
               </Link>
 
+              {/* Interactive AI Training Link */}
+              <Link href="/interactive-training" className="block">
+                <Card className="p-4 hover-elevate cursor-pointer border-primary/30 bg-primary/5" data-testid="card-interactive-training">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Interactive AI Training</div>
+                        <div className="text-sm text-muted-foreground">Practice roleplay, objections, and scenarios with AI</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+
               {/* Proposal Generator Link - only show if user has permission */}
               {hasFeature("proposal_generator") && (
                 <Link href="/proposal-generator" className="block">

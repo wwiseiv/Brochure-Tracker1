@@ -28,6 +28,7 @@ import AcceptInvitePage from "@/pages/accept-invite";
 import CoachPage from "@/pages/coach";
 import EquipIQPage from "@/pages/equipiq";
 import PresentationTrainingPage from "@/pages/presentation-training";
+import InteractiveTrainingPage from "@/pages/interactive-training";
 import SalesProcessPage from "@/pages/sales-process";
 import ProposalGeneratorPage from "@/pages/proposal-generator";
 import StatementAnalyzerPage from "@/pages/statement-analyzer";
@@ -156,6 +157,7 @@ function AuthenticatedRouter() {
         <Route path="/coach" component={CoachPage} />
         <Route path="/equipiq" component={EquipIQPage} />
         <Route path="/presentation-training" component={PresentationTrainingPage} />
+        <Route path="/interactive-training" component={InteractiveTrainingPage} />
         <Route path="/sales-process" component={SalesProcessPage} />
         <Route path="/proposal-generator" component={ProposalGeneratorPage} />
         <Route path="/statement-analyzer" component={StatementAnalyzerPage} />
