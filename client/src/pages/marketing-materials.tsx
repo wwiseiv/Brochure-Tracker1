@@ -866,7 +866,7 @@ ${repEmail}`;
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center w-full">
                         <Button
                           size="lg"
                           className="flex-1 gap-2 min-h-12"
@@ -879,34 +879,26 @@ ${repEmail}`;
                         <Button
                           variant={job.savedToLibrary ? "secondary" : "outline"}
                           size="lg"
-                          className="gap-2 min-h-12 px-3"
+                          className="gap-2 min-h-12"
                           onClick={() => saveToLibraryMutation.mutate(job.jobId)}
                           disabled={job.savedToLibrary || savingJobId === job.jobId}
                           data-testid={`button-save-library-${job.jobId}`}
                         >
                           {job.savedToLibrary ? (
-                            <>
-                              <BookmarkCheck className="w-4 h-4" />
-                              Saved
-                            </>
+                            <BookmarkCheck className="w-4 h-4" />
                           ) : savingJobId === job.jobId ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Saving
-                            </>
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <>
-                              <BookmarkPlus className="w-4 h-4" />
-                              Save
-                            </>
+                            <BookmarkPlus className="w-4 h-4" />
                           )}
+                          Save
                         </Button>
                         <Tooltip delayDuration={700}>
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              className="shrink-0 text-muted-foreground hover:text-destructive min-h-12"
                               onClick={() => handleDeleteClick(job.jobId)}
                               disabled={deleteMutation.isPending && deletingJobId === job.jobId}
                               data-testid={`button-delete-job-${job.jobId}`}
