@@ -14624,202 +14624,209 @@ Keep feedback concise, specific, and actionable. Reference actual phrases from t
         },
       });
 
-      // Comprehensive analysis prompt using advanced sales psychology
-      const analysisPrompt = `You are an elite sales presentation coach with expertise in NEPQ (Neuro-Emotional Persuasion Questioning), psychographic analysis, and the PCBancard Dual Pricing sales methodology.
+      // Two-phase analysis for reliability: structured markers first, then narrative feedback
+      const stageNames = [
+        "Visceral Opening",
+        "Fee Quantification", 
+        "Marcus Story",
+        "Three Options",
+        "Customer Reaction",
+        "Social Proof",
+        "Process Explanation",
+        "90-Day Promise"
+      ];
+      
+      // Phase 1: Structured analysis with simple format
+      const structuredPrompt = `Analyze this PCBancard Dual Pricing sales presentation.
 
-## THE 8 CRITICAL PRESENTATION STAGES
-
-Analyze how well the presentation covers each stage:
-
-1. **Visceral Opening** - Emotional hook that creates immediate resonance with processing fee pain. Uses sensory language, pauses, and relatability. Should trigger "that's exactly how I feel" response.
-
-2. **Fee Quantification** - Concrete, specific numbers (3-4% fees, monthly losses). Should include math that makes the pain tangible. Example: "$3,000/month in fees = $36,000/year = a new truck"
-
-3. **Marcus Story** - Social proof narrative about a real merchant success. Named example with specific results. Creates aspiration and belief through storytelling.
-
-4. **Three Options Framework** - Clear explanation of interchange-plus, surcharging, and Dual Pricing. Positions Dual Pricing as the smart middle ground. Uses contrast to make choice obvious.
-
-5. **Customer Reaction Handling** - Proactively addresses "won't my customers hate this?" concern. Uses data, psychology, and reframing. Turns objection into a non-issue.
-
-6. **Social Proof Stack** - Multiple examples of other merchants succeeding. Industry-specific references. Creates FOMO and normalization.
-
-7. **Process Explanation** - Clear, simple explanation of the switch process. Addresses equipment, training, timeline. Removes friction and uncertainty.
-
-8. **90-Day Promise Close** - Risk-reversal guarantee. No cancellation fees, no long-term contracts. Creates safety for decision-making.
-
-## ADVANCED ANALYSIS CRITERIA
-
-Beyond stage detection, evaluate:
-
-**Psychographic Targeting:**
-- Does it appeal to Driver personalities (results, efficiency, control)?
-- Does it connect with Expressive types (relationships, recognition)?
-- Does it satisfy Analytical minds (data, proof, process)?
-- Does it comfort Amiable personalities (safety, support, stability)?
-
-**Emotional Arc:**
-- Problem agitation (making pain real)
-- Hope injection (there's a solution)
-- Proof stacking (others have succeeded)
-- Safety net (risk-free decision)
-
-**NEPQ Techniques:**
-- Situation questions establishing context
-- Problem questions surfacing pain
-- Implication questions deepening urgency
-- Need-payoff questions leading to solution
-
-**Tonality & Delivery Markers:**
-- Conversational vs. salesy language
-- Pause indicators (ellipses, sentence breaks)
-- Curiosity loops and open loops
-- Assumptive language patterns
-
-## PRESENTATION TO ANALYZE:
-
+PRESENTATION:
 ${text}
 
-## REQUIRED OUTPUT FORMAT (JSON):
+THE 8 STAGES TO CHECK:
+1. Visceral Opening - Emotional hook about processing fee pain
+2. Fee Quantification - Concrete numbers (3-4% fees, dollar amounts)
+3. Marcus Story - Named merchant success story
+4. Three Options - Interchange-plus vs surcharging vs Dual Pricing
+5. Customer Reaction - Addressing "will customers complain?"
+6. Social Proof - Other merchants succeeding
+7. Process Explanation - How the switch works
+8. 90-Day Promise - Risk-free guarantee
 
-Respond with a valid JSON object containing:
+RESPOND WITH EXACTLY THIS FORMAT (one line per field):
+SCORE: [number 0-100]
+STAGE1: [FOUND/MISSING] [brief reason]
+STAGE2: [FOUND/MISSING] [brief reason]
+STAGE3: [FOUND/MISSING] [brief reason]
+STAGE4: [FOUND/MISSING] [brief reason]
+STAGE5: [FOUND/MISSING] [brief reason]
+STAGE6: [FOUND/MISSING] [brief reason]
+STAGE7: [FOUND/MISSING] [brief reason]
+STAGE8: [FOUND/MISSING] [brief reason]
+PRIMARY_APPEAL: [Driver/Expressive/Analytical/Amiable]
+EMOTIONAL_PROBLEM: [1-5]
+EMOTIONAL_HOPE: [1-5]
+EMOTIONAL_PROOF: [1-5]
+EMOTIONAL_SAFETY: [1-5]
+STRENGTH1: [first key strength]
+STRENGTH2: [second key strength]
+GAP1: [first area to improve]
+GAP2: [second area to improve]
+NEXT_DRILL: [specific practice exercise]`;
 
-{
-  "overallScore": <number 0-100>,
-  "detectedStages": [
-    {
-      "id": 1,
-      "name": "Visceral Opening",
-      "found": <boolean>,
-      "strength": <"missing"|"weak"|"adequate"|"strong"|"exceptional">,
-      "excerpts": ["<relevant quote from text>"],
-      "improvement": "<specific suggestion if not exceptional>"
-    },
-    // ... stages 2-8 with same structure
-  ],
-  "psychographicAnalysis": {
-    "primaryAppeal": "<Driver|Expressive|Analytical|Amiable>",
-    "missingAppeals": ["<personality types not addressed>"],
-    "recommendation": "<how to broaden appeal>"
-  },
-  "emotionalArc": {
-    "problemAgitation": <1-5>,
-    "hopeInjection": <1-5>,
-    "proofStacking": <1-5>,
-    "safetyNet": <1-5>,
-    "overallFlow": "<assessment of emotional journey>"
-  },
-  "nepqScore": {
-    "situationQuestions": <boolean>,
-    "problemQuestions": <boolean>,
-    "implicationQuestions": <boolean>,
-    "needPayoffQuestions": <boolean>,
-    "recommendation": "<how to improve questioning technique>"
-  },
-  "tonalityAnalysis": {
-    "conversationalScore": <1-10>,
-    "salesyIndicators": ["<phrases that sound too salesy>"],
-    "pauseUsage": "<assessment>",
-    "curiosityLoops": <number detected>
-  },
-  "topStrengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "criticalGaps": ["<gap 1>", "<gap 2>"],
-  "nextStepDrill": "<specific practice exercise to do next>",
-  "coachingNarrative": "<3-4 paragraph encouraging but honest coaching feedback written in second person>"
-}
-
-Respond ONLY with valid JSON. No markdown code blocks, no extra text.`;
-
-      console.log('[DeliveryAnalyzer] Starting comprehensive analysis...');
+      console.log('[DeliveryAnalyzer] Starting structured analysis...');
       
-      const response = await genAI.models.generateContent({
+      const structuredResponse = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
-        config: {
-          maxOutputTokens: 2000,
-          temperature: 0.4,
-        }
+        contents: [{ role: "user", parts: [{ text: structuredPrompt }] }],
+        config: { maxOutputTokens: 800, temperature: 0.2 }
       });
-
-      const rawResponse = response.text || "";
-      console.log('[DeliveryAnalyzer] Raw response length:', rawResponse.length);
       
-      // Parse JSON response
-      let analysisData;
-      try {
-        // Clean the response - remove any markdown code blocks if present
-        let cleanedResponse = rawResponse.trim();
-        if (cleanedResponse.startsWith('```json')) {
-          cleanedResponse = cleanedResponse.slice(7);
-        }
-        if (cleanedResponse.startsWith('```')) {
-          cleanedResponse = cleanedResponse.slice(3);
-        }
-        if (cleanedResponse.endsWith('```')) {
-          cleanedResponse = cleanedResponse.slice(0, -3);
-        }
-        cleanedResponse = cleanedResponse.trim();
-        
-        analysisData = JSON.parse(cleanedResponse);
-        console.log('[DeliveryAnalyzer] Successfully parsed JSON analysis');
-      } catch (parseError) {
-        console.error('[DeliveryAnalyzer] JSON parse error, returning raw feedback:', parseError);
-        // Fallback to simple feedback if JSON parsing fails
-        return res.json({ 
-          feedback: rawResponse,
-          score: 50,
-          detectedStages: []
+      let structuredText = structuredResponse.text || "";
+      console.log('[DeliveryAnalyzer] Structured response length:', structuredText.length);
+      
+      // Parse structured response
+      const parseField = (responseText: string, field: string): string => {
+        const match = responseText.match(new RegExp(`${field}:\\s*(.+)`, 'i'));
+        return match ? match[1].trim() : '';
+      };
+      
+      const parseNumber = (responseText: string, field: string, defaultVal = 0): number => {
+        const val = parseField(responseText, field);
+        const num = parseInt(val);
+        return isNaN(num) ? defaultVal : num;
+      };
+      
+      // Validate parsing - check if we got key required fields
+      const hasRequiredFields = (responseText: string): boolean => {
+        const scoreVal = parseField(responseText, 'SCORE');
+        const stage1Val = parseField(responseText, 'STAGE1');
+        return !!scoreVal && !!stage1Val;
+      };
+      
+      // Retry once with stricter prompt if initial parse fails
+      if (!hasRequiredFields(structuredText)) {
+        console.log('[DeliveryAnalyzer] Initial parse failed, retrying with stricter prompt...');
+        const retryPrompt = `Analyze this sales presentation and respond ONLY in this exact format (nothing else):
+
+PRESENTATION: ${text.substring(0, 500)}
+
+YOUR RESPONSE MUST BE EXACTLY:
+SCORE: [write a number 0-100]
+STAGE1: [FOUND or MISSING]
+STAGE2: [FOUND or MISSING]
+STAGE3: [FOUND or MISSING]
+STAGE4: [FOUND or MISSING]
+STAGE5: [FOUND or MISSING]
+STAGE6: [FOUND or MISSING]
+STAGE7: [FOUND or MISSING]
+STAGE8: [FOUND or MISSING]
+STRENGTH1: [one strength]
+GAP1: [one weakness]`;
+
+        const retryResponse = await genAI.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: retryPrompt }] }],
+          config: { maxOutputTokens: 400, temperature: 0.1 }
         });
+        
+        structuredText = retryResponse.text || structuredText;
+        console.log('[DeliveryAnalyzer] Retry response length:', structuredText.length);
       }
+      
+      const score = parseNumber(structuredText, 'SCORE', 50);
+      
+      // Parse stages
+      const detectedStages = stageNames.map((name, idx) => {
+        const stageNum = idx + 1;
+        const stageData = parseField(structuredText, `STAGE${stageNum}`);
+        const found = stageData.toUpperCase().includes('FOUND');
+        const reason = stageData.replace(/^(FOUND|MISSING)\s*/i, '').trim();
+        
+        return {
+          id: stageNum,
+          name,
+          found,
+          excerpts: [],
+          strength: found ? 'adequate' as const : 'missing' as const,
+          improvement: found ? undefined : reason || `Add content covering ${name}`
+        };
+      });
+      
+      // Parse psychographic and emotional data
+      const primaryAppeal = parseField(structuredText, 'PRIMARY_APPEAL') || 'Driver';
+      const emotionalArc = {
+        problemAgitation: parseNumber(structuredText, 'EMOTIONAL_PROBLEM', 3),
+        hopeInjection: parseNumber(structuredText, 'EMOTIONAL_HOPE', 3),
+        proofStacking: parseNumber(structuredText, 'EMOTIONAL_PROOF', 3),
+        safetyNet: parseNumber(structuredText, 'EMOTIONAL_SAFETY', 3),
+        overallFlow: ''
+      };
+      
+      const topStrengths = [parseField(structuredText, 'STRENGTH1'), parseField(structuredText, 'STRENGTH2')].filter(s => s);
+      const criticalGaps = [parseField(structuredText, 'GAP1'), parseField(structuredText, 'GAP2')].filter(s => s);
+      const nextStepDrill = parseField(structuredText, 'NEXT_DRILL');
+      
+      // Phase 2: Generate narrative coaching feedback
+      console.log('[DeliveryAnalyzer] Generating coaching narrative...');
+      
+      const narrativePrompt = `You are an encouraging sales coach. Write 3-4 paragraphs of feedback for this sales presentation.
 
-      // Transform the analysis into the expected format
-      const detectedStages = (analysisData.detectedStages || []).map((stage: any) => ({
-        id: stage.id,
-        name: stage.name,
-        found: stage.found || stage.strength !== 'missing',
-        excerpts: stage.excerpts || [],
-        strength: stage.strength,
-        improvement: stage.improvement
-      }));
+PRESENTATION:
+${text}
 
-      // Build comprehensive feedback narrative
-      let feedback = analysisData.coachingNarrative || '';
+ANALYSIS SUMMARY:
+- Score: ${score}%
+- Stages covered: ${detectedStages.filter(s => s.found).length}/8
+- Strengths: ${topStrengths.join(', ') || 'Shows effort'}
+- Areas to improve: ${criticalGaps.join(', ') || 'Keep practicing'}
+
+Write encouraging but honest feedback in second person ("You did X well..."). Include:
+1. What they're doing well with specific examples
+2. What's missing or could be stronger
+3. One concrete tip to practice next
+
+Be specific, actionable, and supportive. No headers or bullet points - just flowing paragraphs.`;
+
+      const narrativeResponse = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: narrativePrompt }] }],
+        config: { maxOutputTokens: 600, temperature: 0.6 }
+      });
       
-      // Add psychographic insight
-      if (analysisData.psychographicAnalysis) {
-        feedback += `\n\n**Psychographic Insight:** Your presentation primarily appeals to ${analysisData.psychographicAnalysis.primaryAppeal} personalities. ${analysisData.psychographicAnalysis.recommendation || ''}`;
-      }
+      const feedback = narrativeResponse.text || "Analysis complete. Keep practicing your presentation!";
+      console.log('[DeliveryAnalyzer] Coaching narrative generated:', feedback.length, 'chars');
       
-      // Add emotional arc assessment
-      if (analysisData.emotionalArc) {
-        feedback += `\n\n**Emotional Journey:** ${analysisData.emotionalArc.overallFlow || 'Your presentation creates an emotional arc that guides prospects through the decision process.'}`;
-      }
+      // Build complete response
+      const psychographicAnalysis = {
+        primaryAppeal,
+        missingAppeals: ['Driver', 'Expressive', 'Analytical', 'Amiable'].filter(t => 
+          t.toLowerCase() !== primaryAppeal.toLowerCase()
+        ).slice(0, 2),
+        recommendation: `Consider adding elements that appeal to ${['Driver', 'Expressive', 'Analytical', 'Amiable'].find(t => t.toLowerCase() !== primaryAppeal.toLowerCase())} personalities.`
+      };
       
-      // Add top strengths
-      if (analysisData.topStrengths && analysisData.topStrengths.length > 0) {
-        feedback += `\n\n**Your Strengths:**\n${analysisData.topStrengths.map((s: string) => `• ${s}`).join('\n')}`;
-      }
+      emotionalArc.overallFlow = `Your presentation scores ${Math.round((emotionalArc.problemAgitation + emotionalArc.hopeInjection + emotionalArc.proofStacking + emotionalArc.safetyNet) / 4 * 20)}% on emotional engagement.`;
       
-      // Add critical gaps
-      if (analysisData.criticalGaps && analysisData.criticalGaps.length > 0) {
-        feedback += `\n\n**Areas to Develop:**\n${analysisData.criticalGaps.map((g: string) => `• ${g}`).join('\n')}`;
-      }
+      // Check if we have meaningful results
+      const stagesFound = detectedStages.filter(s => s.found).length;
+      const isPartialResult = !hasRequiredFields(structuredText) || stagesFound === 0;
       
-      // Add next step
-      if (analysisData.nextStepDrill) {
-        feedback += `\n\n**Your Next Practice Drill:** ${analysisData.nextStepDrill}`;
+      if (isPartialResult) {
+        console.log('[DeliveryAnalyzer] WARN: Partial result - parse may have failed. Score:', score, 'Stages:', stagesFound);
+      } else {
+        console.log('[DeliveryAnalyzer] Analysis complete. Score:', score, 'Stages found:', stagesFound);
       }
 
       res.json({ 
         feedback,
-        score: analysisData.overallScore || 0,
+        score,
         detectedStages,
-        psychographicAnalysis: analysisData.psychographicAnalysis,
-        emotionalArc: analysisData.emotionalArc,
-        nepqScore: analysisData.nepqScore,
-        tonalityAnalysis: analysisData.tonalityAnalysis,
-        topStrengths: analysisData.topStrengths,
-        criticalGaps: analysisData.criticalGaps,
-        nextStepDrill: analysisData.nextStepDrill
+        psychographicAnalysis,
+        emotionalArc,
+        topStrengths: topStrengths.length > 0 ? topStrengths : ['Good effort on your presentation'],
+        criticalGaps: criticalGaps.length > 0 ? criticalGaps : ['Continue practicing all 8 stages'],
+        nextStepDrill: nextStepDrill || 'Practice delivering your presentation out loud',
+        isPartialResult
       });
     } catch (error) {
       console.error('[DeliveryAnalyzer] Error in delivery analysis:', error);

@@ -933,6 +933,7 @@ interface AnalysisResult {
   topStrengths?: string[];
   criticalGaps?: string[];
   nextStepDrill?: string;
+  isPartialResult?: boolean;
 }
 
 function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
@@ -968,6 +969,14 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
         };
       });
       setIsAnalyzing(false);
+      
+      // Notify user if partial results
+      if (data.isPartialResult) {
+        toast({
+          title: "Partial Analysis",
+          description: "Some analysis features may be limited. Try a longer presentation for more detailed feedback.",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
