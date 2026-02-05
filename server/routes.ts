@@ -1666,6 +1666,35 @@ Format your response as JSON:
     }
   });
 
+  // Get current user's full member info (including contact details for marketing)
+  app.get("/api/me/member", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      let membership = await storage.getUserMembership(userId);
+      
+      if (!membership) {
+        membership = await bootstrapUserOrganization(userId);
+      }
+      
+      res.json({
+        id: membership.id,
+        firstName: membership.firstName,
+        lastName: membership.lastName,
+        email: membership.email,
+        phone: membership.phone,
+        company: membership.company,
+        territory: membership.territory,
+        role: membership.role,
+        profileComplete: membership.profileComplete,
+        profilePhotoUrl: membership.profilePhotoUrl,
+        companyLogoUrl: membership.companyLogoUrl,
+      });
+    } catch (error) {
+      console.error("Error fetching member info:", error);
+      res.status(500).json({ error: "Failed to fetch member info" });
+    }
+  });
+
   // Organization API - Get current user's organization info
   app.get("/api/organization", isAuthenticated, requireOrgAccess(), async (req: any, res) => {
     try {

@@ -121,7 +121,9 @@ export default function CompleteProfilePage() {
         description: "Welcome to PCBancard! Your profile has been saved.",
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/me/role"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/me/member"] });
       await queryClient.refetchQueries({ queryKey: ["/api/me/role"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/me/member"] });
       setLocation("/");
     },
     onError: (error: Error) => {

@@ -582,6 +582,123 @@ export async function deleteGenerationJob(jobId: number): Promise<void> {
   await db.delete(marketingGenerationJobs).where(eq(marketingGenerationJobs.id, jobId));
 }
 
+// Use AI vision to detect optimal contact info placement on a flyer
+async function detectContactPlacement(templateUrl: string): Promise<{
+  position: 'bottom-right' | 'bottom-left' | 'bottom-center' | 'top-right';
+  verticalOffset: number;
+  horizontalOffset: number;
+  useCompactStyle: boolean;
+  backgroundColor: string;
+  textColor: string;
+}> {
+  const defaultPlacement = {
+    position: 'bottom-right' as const,
+    verticalOffset: 80,
+    horizontalOffset: 40,
+    useCompactStyle: false,
+    backgroundColor: 'rgba(124, 92, 252, 0.95)',
+    textColor: 'white'
+  };
+  
+  try {
+    // Try using Gemini for vision analysis
+    const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+    const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+    
+    if (!geminiApiKey || !geminiBaseUrl) {
+      console.log('[MarketingGenerator] Gemini not configured, using default placement');
+      return defaultPlacement;
+    }
+    
+    const { GoogleGenAI } = await import('@google/genai');
+    const genAI = new GoogleGenAI({
+      apiKey: geminiApiKey,
+      httpOptions: {
+        apiVersion: "",
+        baseUrl: geminiBaseUrl
+      }
+    });
+    
+    // Fetch the template image and convert to base64
+    const response = await fetch(templateUrl);
+    if (!response.ok) {
+      console.log('[MarketingGenerator] Failed to fetch template image');
+      return defaultPlacement;
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const base64Image = Buffer.from(arrayBuffer).toString('base64');
+    const mimeType = response.headers.get('content-type') || 'image/png';
+    
+    const prompt = `Analyze this marketing flyer and find the best spot to place contact info (name, phone, email).
+
+RESPOND WITH ONLY THIS JSON - NO OTHER TEXT:
+{"position":"bottom-right","verticalOffset":80,"horizontalOffset":40,"useCompactStyle":false,"suggestedBgColor":"purple"}
+
+Rules:
+- position: one of "bottom-right", "bottom-left", "bottom-center", "top-right"
+- verticalOffset: number between 40 and 150
+- horizontalOffset: number between 20 and 60
+- useCompactStyle: true if space is tight, false otherwise
+- suggestedBgColor: one of "purple", "white", "dark", "transparent"
+
+Choose a position with empty space that won't cover logos, text, or key images.`;
+    
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType, data: base64Image } },
+          { text: prompt }
+        ]
+      }]
+    });
+    
+    const responseText = (result.text || '').trim();
+    console.log('[MarketingGenerator] AI raw response:', responseText.substring(0, 200));
+    
+    // Parse the JSON response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log('[MarketingGenerator] FALLBACK: No valid JSON in AI response');
+      return defaultPlacement;
+    }
+    
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log('[MarketingGenerator] AI SUCCESS: detected placement:', parsed);
+    
+    // Validate that parsed values are of expected types
+    const validPositions = ['bottom-right', 'bottom-left', 'bottom-center', 'top-right'];
+    const position = validPositions.includes(parsed.position) ? parsed.position : 'bottom-right';
+    const verticalOffset = typeof parsed.verticalOffset === 'number' ? parsed.verticalOffset : 80;
+    const horizontalOffset = typeof parsed.horizontalOffset === 'number' ? parsed.horizontalOffset : 40;
+    const useCompactStyle = typeof parsed.useCompactStyle === 'boolean' ? parsed.useCompactStyle : false;
+    
+    // Map suggested color to actual CSS values
+    const colorMap: Record<string, { bg: string; text: string }> = {
+      'purple': { bg: 'rgba(124, 92, 252, 0.95)', text: 'white' },
+      'white': { bg: 'rgba(255, 255, 255, 0.95)', text: '#1a1a1a' },
+      'dark': { bg: 'rgba(30, 30, 30, 0.95)', text: 'white' },
+      'transparent': { bg: 'rgba(255, 255, 255, 0.85)', text: '#1a1a1a' }
+    };
+    
+    const colors = colorMap[parsed.suggestedBgColor] || colorMap['purple'];
+    
+    return {
+      position,
+      verticalOffset: Math.min(Math.max(verticalOffset, 40), 150),
+      horizontalOffset: Math.min(Math.max(horizontalOffset, 20), 60),
+      useCompactStyle,
+      backgroundColor: colors.bg,
+      textColor: colors.text
+    };
+  } catch (error) {
+    console.error('[MarketingGenerator] AI placement detection failed:', error);
+    return defaultPlacement;
+  }
+}
+
 // Personalize a static template with rep contact info
 export async function personalizeStaticTemplate(
   templateUrl: string,
@@ -593,6 +710,30 @@ export async function personalizeStaticTemplate(
   if (!fs.existsSync(publicDir)) {
     fs.mkdirSync(publicDir, { recursive: true });
   }
+  
+  // Use AI to detect optimal placement
+  console.log('[MarketingGenerator] Analyzing flyer for optimal contact placement...');
+  const placement = await detectContactPlacement(templateUrl);
+  console.log('[MarketingGenerator] Using placement:', placement);
+  
+  // Build CSS positioning based on AI analysis
+  const positionStyles = (() => {
+    switch (placement.position) {
+      case 'bottom-left':
+        return `bottom: ${placement.verticalOffset}px; left: ${placement.horizontalOffset}px; text-align: left;`;
+      case 'bottom-center':
+        return `bottom: ${placement.verticalOffset}px; left: 50%; transform: translateX(-50%); text-align: center;`;
+      case 'top-right':
+        return `top: ${placement.verticalOffset}px; right: ${placement.horizontalOffset}px; text-align: right;`;
+      case 'bottom-right':
+      default:
+        return `bottom: ${placement.verticalOffset}px; right: ${placement.horizontalOffset}px; text-align: right;`;
+    }
+  })();
+  
+  const compactStyles = placement.useCompactStyle 
+    ? 'padding: 10px 16px; font-size: 12px;'
+    : 'padding: 16px 24px;';
 
   // Generate HTML that overlays contact info on template
   const html = `<!DOCTYPE html>
@@ -621,33 +762,22 @@ export async function personalizeStaticTemplate(
     }
     .contact-overlay {
       position: absolute;
-      bottom: 80px;
-      right: 40px;
-      background: rgba(124, 92, 252, 0.95);
-      padding: 16px 24px;
+      ${positionStyles}
+      background: ${placement.backgroundColor};
+      ${compactStyles}
       border-radius: 12px;
-      color: white;
-      text-align: right;
+      color: ${placement.textColor};
       box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
     .contact-name {
-      font-size: 20px;
+      font-size: ${placement.useCompactStyle ? '16px' : '20px'};
       font-weight: 700;
       margin-bottom: 4px;
     }
     .contact-details {
-      font-size: 14px;
+      font-size: ${placement.useCompactStyle ? '12px' : '14px'};
       line-height: 1.5;
       opacity: 0.95;
-    }
-    .contact-badge {
-      position: absolute;
-      bottom: 80px;
-      left: 40px;
-      background: white;
-      padding: 8px 16px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     .contact-badge img {
       height: 30px;
