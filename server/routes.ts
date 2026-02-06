@@ -16044,5 +16044,66 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
     }
   });
 
+  // ─── One-Page Proposal: PDF Text Extraction ──────────────────────────
+  const onePageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+  app.post("/api/one-page-proposal/extract-pdf-text", isAuthenticated, onePageUpload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const pdfParse = (await import("pdf-parse")).default;
+      const parsed = await pdfParse(req.file.buffer);
+      const text = parsed.text || "";
+
+      const { extractSavingsFromText } = await import("./one-page-pdf-service");
+      const savings = extractSavingsFromText(text);
+
+      res.json({
+        ...savings,
+        rawText: text.substring(0, 2000),
+      });
+    } catch (error) {
+      console.error("[OnePageProposal] PDF extraction error:", error);
+      res.status(500).json({ error: "Failed to extract PDF text" });
+    }
+  });
+
+  // ─── One-Page Proposal: PDF Generation ──────────────────────────────
+  app.post("/api/one-page-proposal/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { templateId, merchantName, agentName, agentTitle, agentPhone, agentEmail, equipment, savings, merchantStatementUploaded } = req.body;
+
+      if (!templateId || !merchantName || !agentName) {
+        return res.status(400).json({ error: "templateId, merchantName, and agentName are required" });
+      }
+
+      const { generateOnePagePdf } = await import("./one-page-pdf-service");
+      const pdfBuffer = await generateOnePagePdf({
+        templateId,
+        merchantName,
+        agentName,
+        agentTitle,
+        agentPhone,
+        agentEmail,
+        equipment: equipment || null,
+        savings: savings || null,
+        merchantStatementUploaded: !!merchantStatementUploaded,
+      });
+
+      const safeName = merchantName.replace(/[^a-zA-Z0-9]/g, "_");
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename = `OnePageProposal_${safeName}_${dateStr}_${templateId}.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("[OnePageProposal] Generation error:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
   return httpServer;
 }

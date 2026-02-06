@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,8 +21,11 @@ import {
   Sparkles,
   FileText,
   AlertTriangle,
-  Lock,
-  Clock,
+  X,
+  Loader2,
+  Download,
+  Search,
+  Eye,
 } from "lucide-react";
 
 interface TemplateMetadata {
@@ -30,6 +35,29 @@ interface TemplateMetadata {
   description: string;
   thumbnailUrl: string;
   pdfPath: string;
+}
+
+interface ExtractedSavings {
+  programType: string;
+  annualSavings: string;
+  monthlySavings?: string;
+  monthlyVolume?: string;
+  effectiveRate?: string;
+}
+
+interface EquipmentSearchResult {
+  id: number;
+  vendorId: string;
+  category: string;
+  type: string;
+  name: string;
+  model?: string;
+  description?: string;
+  features?: string[];
+  bestFor?: string[];
+  priceRange?: string;
+  url?: string;
+  imageUrl?: string;
 }
 
 const TEMPLATES: TemplateMetadata[] = [
@@ -109,6 +137,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function OnePageProposal() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
@@ -122,6 +151,27 @@ export function OnePageProposal() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactInitialized, setContactInitialized] = useState(false);
 
+  const [merchantStatementFile, setMerchantStatementFile] = useState<File | null>(null);
+  const [dualPricingFile, setDualPricingFile] = useState<File | null>(null);
+  const [interchangePlusFile, setInterchangePlusFile] = useState<File | null>(null);
+  const [dualPricingSavings, setDualPricingSavings] = useState<ExtractedSavings | null>(null);
+  const [interchangePlusSavings, setInterchangePlusSavings] = useState<ExtractedSavings | null>(null);
+  const [extracting, setExtracting] = useState(false);
+
+  const [selectedEquipment, setSelectedEquipment] = useState<{ name: string; price: string } | null>(null);
+  const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("");
+  const [manualEquipmentName, setManualEquipmentName] = useState("");
+  const [manualEquipmentPrice, setManualEquipmentPrice] = useState("");
+  const [showManualEquipment, setShowManualEquipment] = useState(false);
+
+  const [generating, setGenerating] = useState(false);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  const [generatedPdfBlob, setGeneratedPdfBlob] = useState<Blob | null>(null);
+
+  const merchantStatementRef = useRef<HTMLInputElement>(null);
+  const dualPricingRef = useRef<HTMLInputElement>(null);
+  const interchangePlusRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (user && !contactInitialized) {
       const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
@@ -130,6 +180,19 @@ export function OnePageProposal() {
       setContactInitialized(true);
     }
   }, [user, contactInitialized]);
+
+  useEffect(() => {
+    return () => {
+      if (generatedPdfUrl) {
+        URL.revokeObjectURL(generatedPdfUrl);
+      }
+    };
+  }, [generatedPdfUrl]);
+
+  const { data: equipmentResults = [], isLoading: equipmentLoading } = useQuery<EquipmentSearchResult[]>({
+    queryKey: [`/api/equipiq/products/search?q=${encodeURIComponent(equipmentSearchQuery)}`],
+    enabled: equipmentSearchQuery.length >= 2,
+  });
 
   const selectedTemplate = TEMPLATES.find((t) => t.templateId === selectedTemplateId);
 
@@ -161,6 +224,147 @@ export function OnePageProposal() {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  const extractPdfText = async (file: File): Promise<ExtractedSavings | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/one-page-proposal/extract-pdf-text", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        programType: data.programType,
+        annualSavings: data.annualSavings,
+        monthlySavings: data.monthlySavings,
+        monthlyVolume: data.monthlyVolume,
+        effectiveRate: data.effectiveRate,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const handleFileUpload = async (
+    file: File,
+    type: "statement" | "dualPricing" | "interchangePlus"
+  ) => {
+    if (type === "statement") {
+      setMerchantStatementFile(file);
+    } else if (type === "dualPricing") {
+      setDualPricingFile(file);
+      setExtracting(true);
+      const savings = await extractPdfText(file);
+      if (savings) {
+        setDualPricingSavings(savings);
+        toast({ title: "Savings Extracted", description: `Found ${savings.annualSavings} annual savings (${savings.programType})` });
+      } else {
+        toast({ title: "No savings data found", description: "Could not extract savings numbers from this PDF.", variant: "destructive" });
+      }
+      setExtracting(false);
+    } else {
+      setInterchangePlusFile(file);
+      setExtracting(true);
+      const savings = await extractPdfText(file);
+      if (savings) {
+        setInterchangePlusSavings(savings);
+        toast({ title: "Savings Extracted", description: `Found ${savings.annualSavings} annual savings (${savings.programType})` });
+      } else {
+        toast({ title: "No savings data found", description: "Could not extract savings numbers from this PDF.", variant: "destructive" });
+      }
+      setExtracting(false);
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent, type: "statement" | "dualPricing" | "interchangePlus") => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Invalid file type", description: "Please upload a PDF file only.", variant: "destructive" });
+      return;
+    }
+    handleFileUpload(file, type);
+  }, [toast]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleGenerate = async () => {
+    if (!selectedTemplateId || !merchantName || !contactName) return;
+    setGenerating(true);
+    if (generatedPdfUrl) {
+      URL.revokeObjectURL(generatedPdfUrl);
+      setGeneratedPdfUrl(null);
+      setGeneratedPdfBlob(null);
+    }
+
+    try {
+      const equipment = selectedEquipment
+        || (manualEquipmentName.trim()
+          ? { name: manualEquipmentName.trim(), price: manualEquipmentPrice.trim() || "Contact for pricing" }
+          : null);
+
+      const savings: Record<string, any> = {};
+      if (dualPricingSavings) {
+        savings.dualPricing = dualPricingSavings;
+      }
+      if (interchangePlusSavings) {
+        savings.interchangePlus = interchangePlusSavings;
+      }
+
+      const body = {
+        templateId: selectedTemplateId,
+        merchantName,
+        agentName: contactName,
+        agentTitle: contactTitle || undefined,
+        agentPhone: contactPhone || undefined,
+        agentEmail: contactEmail || undefined,
+        equipment: equipment || undefined,
+        savings: Object.keys(savings).length > 0 ? savings : undefined,
+        merchantStatementUploaded: !!merchantStatementFile,
+      };
+
+      const res = await fetch("/api/one-page-proposal/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Generation failed" }));
+        throw new Error(err.error || "Generation failed");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setGeneratedPdfBlob(blob);
+      setGeneratedPdfUrl(url);
+      toast({ title: "PDF Generated", description: "Your one-page proposal is ready to download." });
+    } catch (error: any) {
+      toast({ title: "Generation Failed", description: error.message || "Something went wrong. Please try again.", variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!generatedPdfBlob || !selectedTemplateId) return;
+    const safeName = merchantName.replace(/[^a-zA-Z0-9]/g, "_");
+    const dateStr = new Date().toISOString().split("T")[0];
+    const filename = `OnePageProposal_${safeName}_${dateStr}_${selectedTemplateId}.pdf`;
+    const link = document.createElement("a");
+    link.href = generatedPdfUrl!;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const contactWarnings: string[] = [];
@@ -368,37 +572,265 @@ export function OnePageProposal() {
     </div>
   );
 
+  const renderUploadSlot = (
+    label: string,
+    file: File | null,
+    savings: ExtractedSavings | null,
+    inputRef: React.RefObject<HTMLInputElement>,
+    type: "statement" | "dualPricing" | "interchangePlus",
+    onRemove: () => void
+  ) => (
+    <div
+      className="space-y-2"
+      onDrop={(e) => handleDrop(e, type)}
+      onDragOver={handleDragOver}
+    >
+      <Label className="text-sm">{label}</Label>
+      {file ? (
+        <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
+          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-sm truncate flex-1" data-testid={`text-file-${type}`}>{file.name}</span>
+          {savings && (
+            <Badge variant="secondary" className="text-[10px] shrink-0" data-testid={`badge-savings-${type}`}>
+              {savings.annualSavings}
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            data-testid={`button-remove-${type}`}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ) : (
+        <div
+          className="flex flex-col items-center justify-center py-6 gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 cursor-pointer transition-colors hover:border-primary/50"
+          onClick={() => inputRef.current?.click()}
+          data-testid={`dropzone-${type}`}
+        >
+          <Upload className="w-5 h-5 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">
+            Click or drag PDF here
+          </p>
+        </div>
+      )}
+      <input
+        ref={inputRef as any}
+        type="file"
+        accept=".pdf,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) {
+              toast({ title: "Invalid file type", description: "Please upload a PDF file only.", variant: "destructive" });
+            } else {
+              handleFileUpload(f, type);
+            }
+          }
+          e.target.value = "";
+        }}
+        data-testid={`input-file-${type}`}
+      />
+    </div>
+  );
+
   const renderStep2_UploadDocs = () => (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Upload analysis documents to include real savings numbers on the proposal.
+        Upload analysis documents to include real savings numbers on the proposal. All uploads are optional.
       </p>
-      <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25">
-        <div className="p-3 rounded-full bg-muted">
-          <Clock className="w-6 h-6 text-muted-foreground" />
+
+      {extracting && (
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription>Extracting savings data from PDF...</AlertDescription>
+        </Alert>
+      )}
+
+      {renderUploadSlot(
+        "Merchant Statement (Optional)",
+        merchantStatementFile,
+        null,
+        merchantStatementRef,
+        "statement",
+        () => setMerchantStatementFile(null)
+      )}
+
+      {renderUploadSlot(
+        "Dual Pricing Analysis (Optional)",
+        dualPricingFile,
+        dualPricingSavings,
+        dualPricingRef,
+        "dualPricing",
+        () => { setDualPricingFile(null); setDualPricingSavings(null); }
+      )}
+
+      {renderUploadSlot(
+        "Interchange Plus Analysis (Optional)",
+        interchangePlusFile,
+        interchangePlusSavings,
+        interchangePlusRef,
+        "interchangePlus",
+        () => { setInterchangePlusFile(null); setInterchangePlusSavings(null); }
+      )}
+
+      {(dualPricingSavings || interchangePlusSavings) && (
+        <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="extracted-summary">
+          <p className="text-xs font-medium text-muted-foreground">Extracted Savings</p>
+          {dualPricingSavings && (
+            <p className="text-sm" data-testid="text-dp-savings">
+              Dual Pricing: <span className="font-semibold">{dualPricingSavings.annualSavings}</span> annual savings
+            </p>
+          )}
+          {interchangePlusSavings && (
+            <p className="text-sm" data-testid="text-ip-savings">
+              Interchange Plus: <span className="font-semibold">{interchangePlusSavings.annualSavings}</span> annual savings
+            </p>
+          )}
         </div>
-        <p className="text-sm font-medium text-muted-foreground">Coming in Phase 2</p>
-        <p className="text-xs text-muted-foreground text-center max-w-xs">
-          Upload merchant statements, dual pricing analysis, and interchange plus analysis PDFs to include specific savings numbers.
-        </p>
-      </div>
+      )}
     </div>
   );
 
   const renderStep3_Equipment = () => (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Select equipment to recommend on the proposal.
+        Select equipment to recommend on the proposal, or skip this step.
       </p>
-      <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25">
-        <div className="p-3 rounded-full bg-muted">
-          <Clock className="w-6 h-6 text-muted-foreground" />
+
+      {selectedEquipment && (
+        <div className="flex items-center gap-2 p-3 rounded-lg border border-primary/50 bg-primary/5">
+          <Package className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate" data-testid="text-selected-equipment">{selectedEquipment.name}</p>
+            <p className="text-xs text-muted-foreground">{selectedEquipment.price}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedEquipment(null)}
+            data-testid="button-remove-equipment"
+          >
+            <X className="w-4 h-4" />
+          </Button>
         </div>
-        <p className="text-sm font-medium text-muted-foreground">Coming in Phase 2</p>
-        <p className="text-xs text-muted-foreground text-center max-w-xs">
-          Equipment IQ integration will let you pick equipment recommendations to feature on the proposal.
-        </p>
-      </div>
+      )}
+
+      {!selectedEquipment && (
+        <>
+          <div className="space-y-2">
+            <Label>Search EquipIQ</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search terminals, POS systems..."
+                value={equipmentSearchQuery}
+                onChange={(e) => setEquipmentSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="input-equipment-search"
+              />
+            </div>
+          </div>
+
+          {equipmentLoading && equipmentSearchQuery.length >= 2 && (
+            <div className="flex items-center justify-center py-4 gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Searching...</span>
+            </div>
+          )}
+
+          {equipmentResults.length > 0 && (
+            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+              {equipmentResults.slice(0, 8).map((product) => (
+                <Card
+                  key={product.id}
+                  className="cursor-pointer hover-elevate overflow-visible"
+                  onClick={() => {
+                    setSelectedEquipment({ name: product.name, price: product.priceRange || "Contact for pricing" });
+                    setEquipmentSearchQuery("");
+                  }}
+                  data-testid={`equipment-card-${product.id}`}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    {product.imageUrl && (
+                      <img src={product.imageUrl} alt={product.name} className="w-10 h-10 object-contain rounded" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{product.name}</p>
+                      {product.priceRange && (
+                        <p className="text-xs text-muted-foreground">{product.priceRange}</p>
+                      )}
+                      {product.description && (
+                        <p className="text-[10px] text-muted-foreground truncate">{product.description}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {equipmentSearchQuery.length >= 2 && !equipmentLoading && equipmentResults.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              No results found. Use manual entry below.
+            </p>
+          )}
+
+          <div className="pt-2">
+            <button
+              className="text-sm text-primary underline-offset-2 underline cursor-pointer"
+              onClick={() => setShowManualEquipment(!showManualEquipment)}
+              data-testid="button-toggle-manual-equipment"
+            >
+              {showManualEquipment ? "Hide manual entry" : "Or enter manually"}
+            </button>
+
+            {showManualEquipment && (
+              <div className="space-y-3 mt-3">
+                <div className="space-y-2">
+                  <Label htmlFor="manual-eq-name">Equipment Name</Label>
+                  <Input
+                    id="manual-eq-name"
+                    placeholder="e.g. Dejavoo P1"
+                    value={manualEquipmentName}
+                    onChange={(e) => setManualEquipmentName(e.target.value)}
+                    data-testid="input-manual-equipment-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="manual-eq-price">Price</Label>
+                  <Input
+                    id="manual-eq-price"
+                    placeholder="e.g. $295 or Free terminal program"
+                    value={manualEquipmentPrice}
+                    onChange={(e) => setManualEquipmentPrice(e.target.value)}
+                    data-testid="input-manual-equipment-price"
+                  />
+                </div>
+                {manualEquipmentName.trim() && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedEquipment({
+                        name: manualEquipmentName.trim(),
+                        price: manualEquipmentPrice.trim() || "Contact for pricing",
+                      });
+                      setShowManualEquipment(false);
+                    }}
+                    data-testid="button-set-manual-equipment"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Set Equipment
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -464,53 +896,137 @@ export function OnePageProposal() {
     </div>
   );
 
-  const renderStep5_Generate = () => (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Review your selections and generate the one-page proposal PDF.
-      </p>
+  const renderStep5_Generate = () => {
+    const equipment = selectedEquipment
+      || (manualEquipmentName.trim()
+        ? { name: manualEquipmentName.trim(), price: manualEquipmentPrice.trim() || "Contact for pricing" }
+        : null);
 
-      <div className="space-y-3">
-        <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-template">
-          <p className="text-xs text-muted-foreground">Template</p>
-          <p className="text-sm font-medium" data-testid="text-summary-template">{selectedTemplate?.displayName || "—"}</p>
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Review your selections and generate the one-page proposal PDF.
+        </p>
+
+        <div className="space-y-3">
+          <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-template">
+            <p className="text-xs text-muted-foreground">Template</p>
+            <p className="text-sm font-medium" data-testid="text-summary-template">{selectedTemplate?.displayName || "—"}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-merchant">
+            <p className="text-xs text-muted-foreground">Merchant</p>
+            <p className="text-sm font-medium" data-testid="text-summary-merchant">{merchantName || "—"}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-mode">
+            <p className="text-xs text-muted-foreground">Mode</p>
+            <p className="text-sm font-medium flex items-center gap-2" data-testid="text-summary-mode">
+              {generationMode === "ai-custom" ? (
+                <>
+                  <Sparkles className="w-4 h-4" /> AI-Custom
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" /> Template-Fill
+                </>
+              )}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-agent">
+            <p className="text-xs text-muted-foreground">Agent</p>
+            <p className="text-sm font-medium" data-testid="text-summary-agent">{contactName || "—"}</p>
+            {contactTitle && <p className="text-xs text-muted-foreground">{contactTitle}</p>}
+          </div>
+
+          {(merchantStatementFile || dualPricingFile || interchangePlusFile) && (
+            <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-docs">
+              <p className="text-xs text-muted-foreground">Uploaded Documents</p>
+              {merchantStatementFile && (
+                <p className="text-sm">{merchantStatementFile.name}</p>
+              )}
+              {dualPricingFile && (
+                <p className="text-sm">
+                  {dualPricingFile.name}
+                  {dualPricingSavings && (
+                    <span className="text-xs text-muted-foreground ml-2">({dualPricingSavings.annualSavings} savings)</span>
+                  )}
+                </p>
+              )}
+              {interchangePlusFile && (
+                <p className="text-sm">
+                  {interchangePlusFile.name}
+                  {interchangePlusSavings && (
+                    <span className="text-xs text-muted-foreground ml-2">({interchangePlusSavings.annualSavings} savings)</span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
+          {equipment && (
+            <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-equipment">
+              <p className="text-xs text-muted-foreground">Equipment</p>
+              <p className="text-sm font-medium">{equipment.name}</p>
+              <p className="text-xs text-muted-foreground">{equipment.price}</p>
+            </div>
+          )}
         </div>
-        <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-merchant">
-          <p className="text-xs text-muted-foreground">Merchant</p>
-          <p className="text-sm font-medium" data-testid="text-summary-merchant">{merchantName || "—"}</p>
-        </div>
-        <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-mode">
-          <p className="text-xs text-muted-foreground">Mode</p>
-          <p className="text-sm font-medium flex items-center gap-2" data-testid="text-summary-mode">
-            {generationMode === "ai-custom" ? (
+
+        {generatedPdfUrl ? (
+          <div className="space-y-3" data-testid="pdf-preview-section">
+            <div className="rounded-lg border overflow-hidden" style={{ height: "400px" }}>
+              <object
+                data={generatedPdfUrl}
+                type="application/pdf"
+                className="w-full h-full"
+                data-testid="pdf-preview"
+              >
+                <div className="flex flex-col items-center justify-center h-full gap-2 p-4">
+                  <Eye className="w-6 h-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    PDF preview not supported in this browser. Click Download to view.
+                  </p>
+                </div>
+              </object>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button onClick={handleDownload} data-testid="button-download-pdf">
+                <Download className="w-4 h-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleGenerate}
+                disabled={generating}
+                data-testid="button-regenerate-pdf"
+              >
+                {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileOutput className="w-4 h-4 mr-2" />}
+                Regenerate
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            onClick={handleGenerate}
+            disabled={generating || !selectedTemplateId || !merchantName.trim() || !contactName.trim()}
+            className="w-full"
+            data-testid="button-generate-proposal"
+          >
+            {generating ? (
               <>
-                <Sparkles className="w-4 h-4" /> AI-Custom
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating PDF...
               </>
             ) : (
               <>
-                <FileText className="w-4 h-4" /> Template-Fill
+                <FileOutput className="w-4 h-4 mr-2" />
+                Generate PDF
               </>
             )}
-          </p>
-        </div>
-        <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-agent">
-          <p className="text-xs text-muted-foreground">Agent</p>
-          <p className="text-sm font-medium" data-testid="text-summary-agent">{contactName || "—"}</p>
-          {contactTitle && <p className="text-xs text-muted-foreground">{contactTitle}</p>}
-        </div>
+          </Button>
+        )}
       </div>
-
-      <div className="flex flex-col items-center justify-center py-8 gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25">
-        <div className="p-3 rounded-full bg-muted">
-          <Lock className="w-6 h-6 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-medium text-muted-foreground">PDF Generation Coming in Phase 2</p>
-        <p className="text-xs text-muted-foreground text-center max-w-xs">
-          The generate button will create a professional one-page PDF with your data overlaid on the selected template.
-        </p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -549,15 +1065,7 @@ export function OnePageProposal() {
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
-        ) : (
-          <Button
-            disabled
-            data-testid="button-generate-proposal"
-          >
-            <FileOutput className="w-4 h-4 mr-2" />
-            Generate PDF
-          </Button>
-        )}
+        ) : null}
       </div>
     </div>
   );
