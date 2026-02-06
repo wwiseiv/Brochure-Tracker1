@@ -63,6 +63,16 @@ import type { RoleplayScenario, RoleplaySession, UserPermissions } from "@shared
 import { format } from "date-fns";
 import { ListenButton } from "@/components/ListenButton";
 import { AdviceExportToolbar } from "@/components/AdviceExportToolbar";
+import { MERCHANT_PERSONAS, type MerchantPersona } from "@/data/interactive-training-data";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   id: number;
@@ -969,6 +979,7 @@ export default function CoachPage() {
   const objectionsMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const objectionsAudioChunksRef = useRef<Blob[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
+  const [selectedMerchantCharacter, setSelectedMerchantCharacter] = useState<string | null>(null);
 
   const { data: myPermissions } = useQuery<UserPermissions>({
     queryKey: ["/api/me/permissions"],
@@ -1007,24 +1018,45 @@ export default function CoachPage() {
 
   const startSessionMutation = useMutation({
     mutationFn: async () => {
+      const selectedCharacter = selectedMerchantCharacter
+        ? MERCHANT_PERSONAS.find(p => p.id === selectedMerchantCharacter)
+        : null;
+
       const res = await apiRequest("POST", "/api/roleplay/sessions", {
         scenario,
         mode,
         customObjections: customObjections.trim() || undefined,
         difficulty: mode === "roleplay" ? difficulty : undefined,
         personaId: mode === "roleplay" && selectedPersonaId ? selectedPersonaId : undefined,
+        merchantCharacter: selectedCharacter ? {
+          name: selectedCharacter.name,
+          title: selectedCharacter.title,
+          businessType: selectedCharacter.businessType,
+          difficulty: selectedCharacter.difficulty,
+          personality: selectedCharacter.personality,
+          openingLine: selectedCharacter.openingLine,
+          systemPrompt: selectedCharacter.systemPrompt,
+          objectionStyle: selectedCharacter.objectionStyle,
+          weakPoints: selectedCharacter.weakPoints,
+          triggerPhrases: selectedCharacter.triggerPhrases,
+        } : undefined,
       });
       return res.json();
     },
     onSuccess: (data) => {
+      const selectedCharacter = selectedMerchantCharacter
+        ? MERCHANT_PERSONAS.find(p => p.id === selectedMerchantCharacter)
+        : null;
       setSessionId(data.sessionId);
       setMessages([]);
       setCoachingHint(null);
       toast({
         title: mode === "coaching" ? "Coaching session started" : "Role-play started",
-        description: mode === "coaching" 
-          ? "Ask me anything about sales techniques or what to say!"
-          : `Begin your approach! (${difficulty} difficulty)`,
+        description: selectedCharacter
+          ? `Practicing with ${selectedCharacter.name} (${selectedCharacter.businessType})`
+          : mode === "coaching"
+            ? "Ask me anything about sales techniques or what to say!"
+            : `Begin your approach! (${difficulty} difficulty)`,
       });
     },
     onError: (error: Error) => {
@@ -1669,6 +1701,57 @@ export default function CoachPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Choose a Merchant Character
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Optionally choose a specific merchant to practice with
+                </p>
+                <Select
+                  value={selectedMerchantCharacter ?? "none"}
+                  onValueChange={(value) => setSelectedMerchantCharacter(value === "none" ? null : value)}
+                >
+                  <SelectTrigger data-testid="select-merchant-character">
+                    <SelectValue placeholder="No specific character" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[300px]">
+                    <SelectItem value="none" data-testid="merchant-character-none">No specific character</SelectItem>
+                    {(["Easy", "Medium", "Hard", "Expert"] as const).map((diff) => {
+                      const personas = MERCHANT_PERSONAS.filter(p => p.difficulty === diff);
+                      if (personas.length === 0) return null;
+                      return (
+                        <SelectGroup key={diff}>
+                          <SelectLabel>{diff}</SelectLabel>
+                          {personas.map((persona) => (
+                            <SelectItem
+                              key={persona.id}
+                              value={persona.id}
+                              data-testid={`merchant-character-${persona.id}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                {persona.name} - {persona.businessType}
+                                <Badge
+                                  variant={
+                                    diff === "Easy" ? "outline" :
+                                    diff === "Medium" ? "secondary" :
+                                    diff === "Hard" ? "destructive" : "default"
+                                  }
+                                  className="text-[10px] px-1 py-0"
+                                >
+                                  {diff}
+                                </Badge>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {mode === "roleplay" && (

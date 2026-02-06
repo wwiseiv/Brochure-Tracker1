@@ -6180,7 +6180,7 @@ Respond in JSON format:
   app.post("/api/roleplay/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { dropId, dealId, merchantId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona, personaId } = req.body;
+      const { dropId, dealId, merchantId, scenario, customObjections, mode = "roleplay", difficulty = "intermediate", persona, personaId, merchantCharacter } = req.body;
 
       if (!scenario || !ROLEPLAY_SCENARIOS.includes(scenario)) {
         return res.status(400).json({ 
@@ -6241,6 +6241,12 @@ Respond in JSON format:
         }
       }
 
+      if (merchantCharacter) {
+        businessContext += `\nMerchant Character: ${merchantCharacter.name} (${merchantCharacter.title} - ${merchantCharacter.businessType})`;
+        businessContext += `\nPersonality: ${merchantCharacter.personality}`;
+        businessContext += `\nDifficulty: ${merchantCharacter.difficulty}`;
+      }
+
       if (customObjections) {
         businessContext += `\n\nThe agent wants to practice handling these specific objections: ${customObjections}`;
       }
@@ -6257,7 +6263,7 @@ Respond in JSON format:
         personaId: personaId ? parseInt(personaId) : null,
         scenario,
         mode: mode || "roleplay",
-        businessContext: `${businessContext}\nDifficulty: ${selectedDifficulty}${dbPersona ? `\nPersona: ${dbPersona.name}` : (persona ? `\nPersona: ${persona}` : '')}`,
+        businessContext: `${businessContext}\nDifficulty: ${selectedDifficulty}${merchantCharacter ? `\nMerchant: ${merchantCharacter.name} (${merchantCharacter.businessType})` : (dbPersona ? `\nPersona: ${dbPersona.name}` : (persona ? `\nPersona: ${persona}` : ''))}`,
         status: "active",
       });
 
@@ -6298,6 +6304,15 @@ ${dailyEdgeContext}
 BUSINESS CONTEXT:
 ${businessContext}
 ${merchantIntelligenceContext ? `\n${merchantIntelligenceContext}` : ''}
+${merchantCharacter ? `\nMERCHANT CHARACTER CONTEXT:
+The agent is preparing to meet a specific type of merchant:
+- Name: ${merchantCharacter.name}
+- Business: ${merchantCharacter.title} - ${merchantCharacter.businessType}
+- Personality: ${merchantCharacter.personality}
+- Objection Style: ${merchantCharacter.objectionStyle}
+- Trigger Phrases: ${merchantCharacter.triggerPhrases?.join(', ')}
+- Weak Points: ${merchantCharacter.weakPoints?.join(', ')}
+Tailor your coaching advice specifically to help the agent succeed with this type of merchant.` : ''}
 
 YOUR ROLE AS COACH:
 - Answer the agent's questions about what to say, how to approach situations, and how to handle objections
@@ -6317,10 +6332,10 @@ You're their personal sales coach. Help them succeed!`;
         let roleplaySystemPrompt: string;
         
         if (dbPersona && dbPersona.systemPrompt) {
-          // Use the rich persona systemPrompt from database
           roleplaySystemPrompt = dbPersona.systemPrompt;
+        } else if (merchantCharacter && merchantCharacter.systemPrompt) {
+          roleplaySystemPrompt = merchantCharacter.systemPrompt;
         } else {
-          // Fall back to legacy persona handling
           const scenarioPrompt = getScenarioPrompt(scenario, selectedDifficulty as 'beginner' | 'intermediate' | 'advanced', persona);
           roleplaySystemPrompt = scenarioPrompt;
         }
