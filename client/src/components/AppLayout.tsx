@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, HamburgerMenu } from "@/components/BottomNav";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +48,8 @@ import {
   Trophy,
   PlayCircle,
   MessageSquarePlus,
+  BookOpen,
+  Swords,
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
@@ -84,6 +86,8 @@ const pathToFeatureMap: Record<string, string> = {
   "/help": "help_center",
   "/gamification": "gamification_dashboard",
   "/training/sales-videos": "video_hello",
+  "/presentation-training": "presentation_training",
+  "/interactive-training": "interactive_training",
 };
 
 const menuCategories = [
@@ -114,12 +118,14 @@ const menuCategories = [
     ],
   },
   {
-    title: "AI Tools",
+    title: "AI Tools & Training",
     items: [
       { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
+      { path: "/interactive-training", icon: Swords, label: "Interactive Training" },
+      { path: "/presentation-training", icon: BookOpen, label: "Presentation Training" },
+      { path: "/training/sales-videos", icon: PlayCircle, label: "Sales Videos" },
       { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
-      { path: "/training/sales-videos", icon: PlayCircle, label: "Sales Videos" },
       { path: "/gamification", icon: Trophy, label: "Gamification" },
     ],
   },
@@ -250,9 +256,6 @@ function DesktopHeader() {
   );
 }
 
-function MobileHeader() {
-  return null;
-}
 
 interface AppLayoutProps {
   children: ReactNode;

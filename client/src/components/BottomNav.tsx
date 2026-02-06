@@ -6,7 +6,8 @@ import {
   Home, QrCode, User, FileSignature, HelpCircle, CalendarCheck, Users, 
   GraduationCap, Building2, Menu, X, Briefcase, MapPin, FileText, 
   BarChart3, MessageSquare, Settings, Users2, Sparkles, Package,
-  Target, Megaphone, History, PenTool, Shield, ChevronRight, Trophy, MessageSquarePlus
+  Target, Megaphone, History, PenTool, Shield, ChevronRight, Trophy, MessageSquarePlus,
+  PlayCircle, BookOpen, Swords, Flame
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -46,6 +47,9 @@ const pathToFeatureMap: Record<string, string> = {
   "/activity": "activity_feed",
   "/help": "help_center",
   "/gamification": "gamification_dashboard",
+  "/training/sales-videos": "video_hello",
+  "/presentation-training": "presentation_training",
+  "/interactive-training": "interactive_training",
 };
 
 // Bottom nav items - most used features
@@ -93,9 +97,12 @@ const menuCategories = [
     ]
   },
   {
-    title: "AI Tools",
+    title: "AI Tools & Training",
     items: [
       { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
+      { path: "/interactive-training", icon: Swords, label: "Interactive Training" },
+      { path: "/presentation-training", icon: BookOpen, label: "Presentation Training" },
+      { path: "/training/sales-videos", icon: PlayCircle, label: "Sales Videos" },
       { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
       { path: "/gamification", icon: Trophy, label: "Gamification" },
@@ -225,6 +232,7 @@ export function BottomNav() {
               </Tooltip>
             );
           })}
+          <MoreMenuButton />
         </div>
       </div>
     </nav>
@@ -238,9 +246,7 @@ export function BottomNav() {
   return navContent;
 }
 
-export function HamburgerMenu() {
-  const [location] = useLocation();
-  const [open, setOpen] = useState(false);
+function useMenuCategories() {
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
@@ -250,14 +256,12 @@ export function HamburgerMenu() {
   const isAdmin = userRole?.role === "master_admin";
   
   const canAccessPath = (path: string): boolean => {
-    // Show all items while loading, on error, or if no role data (not authenticated)
     if (permLoading || permError || !role) return true;
     const featureId = pathToFeatureMap[path];
     if (!featureId) return true;
     return hasFeature(featureId);
   };
 
-  // Combine all menu categories and filter by permissions
   let allCategories = [...menuCategories];
   if (isManager) {
     allCategories = [...allCategories.slice(0, 1), ...managerMenuItems, ...allCategories.slice(1)];
@@ -266,10 +270,79 @@ export function HamburgerMenu() {
     allCategories = [...allCategories, ...adminMenuItems];
   }
   
-  const filteredCategories = allCategories.map(category => ({
+  return allCategories.map(category => ({
     ...category,
     items: category.items.filter(item => canAccessPath(item.path))
   })).filter(category => category.items.length > 0);
+}
+
+function MenuSheetContent({ onNavigate }: { onNavigate: () => void }) {
+  const [location] = useLocation();
+  const filteredCategories = useMenuCategories();
+
+  return (
+    <SheetContent side="left" className="w-[280px] p-0 flex flex-col" style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-bottom, 0px))' }}>
+      <SheetHeader className="p-4 border-b flex-shrink-0">
+        <SheetTitle className="text-left">Menu</SheetTitle>
+      </SheetHeader>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="py-2" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
+          {filteredCategories.map((category) => (
+            <div key={category.title} className="mb-2">
+              <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {category.title}
+              </div>
+              {category.items.map((item) => {
+                const isActive = location === item.path;
+                const Icon = item.icon;
+                return (
+                  <Link 
+                    key={item.path} 
+                    href={item.path}
+                    onClick={onNavigate}
+                    data-testid={`menu-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors no-underline ${
+                      isActive
+                        ? "bg-primary/10 text-primary border-l-2 border-primary"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                    <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground" />
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </SheetContent>
+  );
+}
+
+function MoreMenuButton() {
+  const [open, setOpen] = useState(false);
+  
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          data-testid="nav-more"
+          className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] py-2 px-2 rounded-lg transition-colors text-muted-foreground hover-elevate"
+          style={{ scrollSnapAlign: 'center' }}
+        >
+          <Menu className="w-5 h-5" />
+          <span className="text-[10px] font-medium whitespace-nowrap">More</span>
+        </button>
+      </SheetTrigger>
+      <MenuSheetContent onNavigate={() => setOpen(false)} />
+    </Sheet>
+  );
+}
+
+export function HamburgerMenu() {
+  const [open, setOpen] = useState(false);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -283,43 +356,7 @@ export function HamburgerMenu() {
           <Menu className="w-5 h-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[280px] p-0 flex flex-col" style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-bottom, 0px))' }}>
-        <SheetHeader className="p-4 border-b flex-shrink-0">
-          <SheetTitle className="text-left">Menu</SheetTitle>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="py-2" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
-            {filteredCategories.map((category) => (
-              <div key={category.title} className="mb-2">
-                <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {category.title}
-                </div>
-                {category.items.map((item) => {
-                  const isActive = location === item.path;
-                  const Icon = item.icon;
-                  return (
-                    <Link 
-                      key={item.path} 
-                      href={item.path}
-                      onClick={() => setOpen(false)}
-                      data-testid={`menu-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors no-underline ${
-                        isActive
-                          ? "bg-primary/10 text-primary border-l-2 border-primary"
-                          : "text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      <span className="text-sm font-medium">{item.label}</span>
-                      <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground" />
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </SheetContent>
+      <MenuSheetContent onNavigate={() => setOpen(false)} />
     </Sheet>
   );
 }
