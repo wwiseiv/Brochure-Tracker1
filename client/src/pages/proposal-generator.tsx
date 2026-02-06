@@ -60,6 +60,7 @@ import {
   Eye
 } from "lucide-react";
 import PricingConfiguration, { PricingConfig, DEFAULT_PRICING_CONFIG } from "@/components/PricingConfiguration";
+import { OnePageProposal } from "@/components/OnePageProposal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ParsedProposal {
@@ -363,7 +364,7 @@ export default function ProposalGeneratorPage() {
   const [extractionWarnings, setExtractionWarnings] = useState<string[]>([]);
 
   // Agentic workflow state
-  const [workflowMode, setWorkflowMode] = useState<"manual" | "agentic">("manual");
+  const [workflowMode, setWorkflowMode] = useState<"manual" | "agentic" | "one-page">("manual");
   const [agenticStep, setAgenticStep] = useState<"input" | "progress" | "complete">("input");
   const [dualPricingFile, setDualPricingFile] = useState<File | null>(null);
   const [interchangePlusFile, setInterchangePlusFile] = useState<File | null>(null);
@@ -3756,8 +3757,8 @@ export default function ProposalGeneratorPage() {
       </header>
 
       <main className="container px-4 py-6 max-w-2xl mx-auto">
-        <Tabs value={workflowMode} onValueChange={(v) => setWorkflowMode(v as "manual" | "agentic")} className="mb-6">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={workflowMode} onValueChange={(v) => setWorkflowMode(v as "manual" | "agentic" | "one-page")} className="mb-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="agentic" data-testid="tab-agentic">
               <Sparkles className="w-4 h-4 mr-2" />
               AI Workflow
@@ -3765,6 +3766,10 @@ export default function ProposalGeneratorPage() {
             <TabsTrigger value="manual" data-testid="tab-manual">
               <FileText className="w-4 h-4 mr-2" />
               Manual Upload
+            </TabsTrigger>
+            <TabsTrigger value="one-page" data-testid="tab-one-page">
+              <FileOutput className="w-4 h-4 mr-2" />
+              One-Page Proposal
             </TabsTrigger>
           </TabsList>
           
@@ -3806,6 +3811,10 @@ export default function ProposalGeneratorPage() {
             {step === "review" && renderReviewStep()}
             {step === "equipment" && renderEquipmentStep()}
             {step === "generated" && renderGeneratedStep()}
+          </TabsContent>
+
+          <TabsContent value="one-page" className="mt-6">
+            <OnePageProposal />
           </TabsContent>
         </Tabs>
       </main>
