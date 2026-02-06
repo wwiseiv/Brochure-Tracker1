@@ -65,6 +65,8 @@ interface UserRole {
   };
   managerId: number | null;
   profilePhotoUrl: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 const REMINDER_OPTIONS = [
@@ -299,13 +301,17 @@ export default function ProfilePage() {
     ? Math.round((stats.converted / stats.completed) * 100) 
     : 0;
 
-  const userInitials = user 
-    ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
-    : "U";
+  const firstInitial = userRole?.firstName?.[0] || user?.firstName?.[0] || "";
+  const lastInitial = userRole?.lastName?.[0] || user?.lastName?.[0] || "";
+  const userInitials = `${firstInitial}${lastInitial}`.toUpperCase() || "U";
 
-  const userName = user 
-    ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User"
-    : "User";
+  const memberName = userRole
+    ? `${userRole.firstName || ""} ${userRole.lastName || ""}`.trim()
+    : "";
+  const authName = user
+    ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
+    : "";
+  const userName = memberName || authName || "User";
 
   return (
     <div className="min-h-screen bg-background pb-20">
