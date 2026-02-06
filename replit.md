@@ -41,13 +41,18 @@ Preferred communication style: Simple, everyday language.
     - **AI-Powered Prospecting**: Local business discovery using AI with web search, MCC code filtering, pipeline integration, background processing, and push notifications.
     - **AI Help Chatbot**: In-app Claude AI assistant.
     - **Email Digest System**: Personalized, AI-powered daily/weekly email summaries with customizable content and timezone-aware scheduling.
-- **Gamification System**: Comprehensive training gamification with XP tracking, 10-level progression (Rookie to Grand Master), 6-category badge system (Bronze through Diamond), daily XP caps (300/day), streak tracking, leaderboard, and PDF certificates. Admin-controllable via 5 separate feature toggles (XP Tracking, Badges, Certificates, Leaderboard, Progress Dashboard).
-    - **Database Tables**: `gamification_profiles`, `xp_ledger`, `badges_earned`, `certificates`, `gamification_daily_log`
-    - **Engine**: `server/gamification-engine.ts` (XP awards, badge progression, level calculation, streak management)
-    - **Certificates**: `server/certificate-generator.ts` (PDF generation via pdf-lib, 4 certificate types, eligibility checking)
-    - **Event Hooks**: XP automatically awarded on presentation lesson completion, quiz passing, EquipIQ quizzes, roleplay session completion, Daily Edge views/challenges
-    - **API Routes**: `/api/gamification/profile`, `/api/gamification/leaderboard`, `/api/gamification/badges`, `/api/gamification/xp-history`, `/api/gamification/certificates/*`, `/api/gamification/admin/*`
-    - **Frontend**: `/gamification` dashboard page, profile page summary card, team management training column
+- **Gamification System**: Comprehensive training gamification with dual badge structures, weighted Skill Score, 10-level XP progression (Rookie to Grand Master), and 5-level career ladder (Field Scout to Residual Architect). Daily XP cap 400/day, streak bonuses (25/100/250/500 XP at 3/7/14/30 days), leaderboard, and PDF certificates (9 types: 4 training + 5 ladder). Admin-controllable via 5 separate feature toggles.
+    - **Database Tables**: `gamification_profiles` (incl. `skill_score`), `xp_ledger`, `badges_earned`, `certificates`, `gamification_daily_log`, `training_sessions`, `training_messages`, `gauntlet_responses`
+    - **Engine**: `server/gamification-engine.ts` (XP awards with updated values, badge progression, Skill Score calculation with weighted components, 5-level progression ladder, streak bonuses, level calculation)
+    - **Skill Score**: Weighted 0-100 composite: Roleplay 25%, Objection Handling 25%, Presentation Mastery 30%, Scenario Decision-Making 10%, Consistency 10%. Recalculated on every training session completion.
+    - **Progression Ladder**: 5 levels requiring both XP and Skill Score thresholds. Badges immutable once earned, amber warning if Skill Score drops below requirement.
+    - **XP Values**: Roleplay 60 base (+0-40 bonus), Gauntlet 15/objection (+50 perfect), Scenario 40 (+20 best), Delivery 80 (+20 all stages), Module 150, EquipIQ 50. Anti-gaming: roleplay requires 6+ turns or 3+ min.
+    - **Training Knowledge Base**: `server/training-knowledge-context.ts` — compact PCBancard knowledge extraction (NEPQ framework, dual pricing, objection handling) injected into all AI training prompts.
+    - **Session Persistence**: All 4 Interactive Training modes create/complete sessions in `training_sessions`. Roleplay saves messages to `training_messages`, gauntlet saves per-objection responses to `gauntlet_responses`. AI final evaluation on roleplay session end.
+    - **Certificates**: `server/certificate-generator.ts` (PDF generation via pdf-lib, 9 certificate types: 4 training + 5 ladder with indigo styling)
+    - **Event Hooks**: XP automatically awarded on training session completion (all 4 modes), presentation lesson/quiz, EquipIQ quizzes, Daily Edge views/challenges, streak milestones
+    - **API Routes**: `/api/gamification/profile`, `/api/gamification/leaderboard`, `/api/gamification/badges`, `/api/gamification/xp-history`, `/api/gamification/certificates/*`, `/api/gamification/admin/*`, `/api/gamification/skill-score`, `/api/gamification/progression-ladder`, `/api/training/sessions`, `/api/training/sessions/:id/complete`, `/api/training/sessions/:id/messages`, `/api/training/sessions/:id/gauntlet-response`, `/api/training/gauntlet/score`, `/api/training/scenario/feedback`
+    - **Frontend**: `/gamification` dashboard (level ring, progression ladder, Skill Score breakdown, badge collection, training history, leaderboard, certificates), profile page summary card, team management training column (XP, level, Skill Score, streak)
     - **Permission Keys**: `gamification_xp_tracking`, `gamification_badges`, `gamification_certificates`, `gamification_leaderboard`, `gamification_dashboard`
 - **Offline Capabilities**: PWA with service worker and IndexedDB for offline data sync.
 - **Data Export**: CSV/Excel export for key data.

@@ -3294,6 +3294,7 @@ export const gamificationProfiles = pgTable("gamification_profiles", {
   lastActivityDate: date("last_activity_date"),
   badgesEarned: integer("badges_earned").default(0).notNull(),
   certificatesEarned: integer("certificates_earned").default(0).notNull(),
+  skillScore: integer("skill_score").default(0).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -3380,3 +3381,69 @@ export const insertGamificationDailyLogSchema = createInsertSchema(gamificationD
 });
 export type InsertGamificationDailyLog = z.infer<typeof insertGamificationDailyLogSchema>;
 export type GamificationDailyLog = typeof gamificationDailyLog.$inferSelect;
+
+// Interactive Training Sessions - stores session results for all 4 modes
+export const trainingSessions = pgTable("training_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  mode: varchar("mode", { length: 50 }).notNull(), // 'roleplay', 'gauntlet', 'scenario', 'delivery_analyzer'
+  personaId: varchar("persona_id", { length: 100 }),
+  difficulty: varchar("difficulty", { length: 20 }),
+  scenarioId: varchar("scenario_id", { length: 100 }),
+  scorePercent: integer("score_percent"),
+  scoreDetails: jsonb("score_details"),
+  aiFeedback: jsonb("ai_feedback"),
+  turnCount: integer("turn_count"),
+  durationSeconds: integer("duration_seconds"),
+  objectionsAttempted: integer("objections_attempted"),
+  objectionsPassed: integer("objections_passed"),
+  perfectRun: boolean("perfect_run").default(false),
+  stagesDetected: jsonb("stages_detected"),
+  coveragePercent: integer("coverage_percent"),
+  xpAwarded: integer("xp_awarded").default(0),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const insertTrainingSessionSchema = createInsertSchema(trainingSessions).omit({
+  id: true,
+  startedAt: true,
+});
+export type InsertTrainingSession = z.infer<typeof insertTrainingSessionSchema>;
+export type TrainingSession = typeof trainingSessions.$inferSelect;
+
+// Interactive Training Messages - conversation history for roleplay sessions
+export const trainingMessages = pgTable("training_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // 'user', 'assistant', 'system', 'coach'
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTrainingMessageSchema = createInsertSchema(trainingMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTrainingMessage = z.infer<typeof insertTrainingMessageSchema>;
+export type TrainingMessage = typeof trainingMessages.$inferSelect;
+
+// Gauntlet Responses - per-objection detail for tracking
+export const gauntletResponses = pgTable("gauntlet_responses", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull(),
+  objectionId: varchar("objection_id", { length: 100 }).notNull(),
+  objectionText: text("objection_text"),
+  userResponse: text("user_response"),
+  keywordScore: integer("keyword_score"),
+  aiScore: integer("ai_score"),
+  aiFeedback: text("ai_feedback"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGauntletResponseSchema = createInsertSchema(gauntletResponses).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertGauntletResponse = z.infer<typeof insertGauntletResponseSchema>;
+export type GauntletResponse = typeof gauntletResponses.$inferSelect;

@@ -49,6 +49,7 @@ import {
   ThumbsUp,
   ArrowRight,
   Zap,
+  StopCircle,
 } from "lucide-react";
 import {
   MERCHANT_PERSONAS,
@@ -331,11 +332,29 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
   const [showCoaching, setShowCoaching] = useState(false);
   const [coachingFeedback, setCoachingFeedback] = useState<string | null>(null);
   const [isGettingCoaching, setIsGettingCoaching] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionCompleted, setSessionCompleted] = useState(false);
+  const [sessionSummary, setSessionSummary] = useState<any>(null);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    apiRequest("POST", "/api/training/sessions", {
+      mode: 'roleplay',
+      personaId: persona.id,
+      difficulty: persona.difficulty,
+    }).then(res => res.json()).then(data => {
+      setSessionId(data.id);
+      apiRequest("POST", `/api/training/sessions/${data.id}/messages`, {
+        role: 'assistant',
+        content: persona.openingLine,
+      }).catch(() => {});
+    }).catch(err => console.log('Failed to create session:', err));
+  }, []);
 
   const roleplayMutation = useMutation({
     mutationFn: async (data: { personaId: string; userMessage: string; history: Message[] }) => {
@@ -349,6 +368,11 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, merchantResponse]);
+      if (sessionId) {
+        apiRequest("POST", `/api/training/sessions/${sessionId}/messages`, {
+          role: 'assistant', content: data.response,
+        }).catch(() => {});
+      }
       setSessionStats(prev => ({ ...prev, exchanges: prev.exchanges + 1 }));
       setIsLoading(false);
     },
@@ -391,6 +415,11 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    if (sessionId) {
+      apiRequest("POST", `/api/training/sessions/${sessionId}/messages`, {
+        role: 'user', content: input.trim(),
+      }).catch(() => {});
+    }
     setInput('');
     setIsLoading(true);
 
@@ -417,6 +446,52 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
     const seconds = diff % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  const endSession = async () => {
+    if (!sessionId || sessionCompleted || isEndingSession) return;
+    setIsEndingSession(true);
+
+    const elapsed = Math.floor((new Date().getTime() - sessionStats.startTime.getTime()) / 1000);
+
+    try {
+      const res = await apiRequest("POST", `/api/training/sessions/${sessionId}/complete`, {
+        turnCount: sessionStats.exchanges,
+        durationSeconds: elapsed,
+      });
+      const data = await res.json();
+      setSessionSummary(data);
+
+      if (data.xpResult?.xpAwarded > 0) {
+        toast({
+          title: `+${data.xpResult.xpAwarded} XP earned!`,
+          description: data.xpResult.leveledUp
+            ? `Level up! You're now Level ${data.xpResult.newLevel}!`
+            : data.xpResult.dailyCapped
+              ? 'Daily XP cap reached'
+              : `${data.xpResult.newTotal.toLocaleString()} total XP`,
+        });
+      }
+
+      if (data.xpResult?.ladderTitle && data.xpResult?.ladderLevel > 0) {
+        toast({
+          title: `${data.xpResult.ladderTitle}`,
+          description: `Progression Level ${data.xpResult.ladderLevel} achieved!`,
+        });
+      }
+
+      setSessionCompleted(true);
+    } catch (err) {
+      console.log('Failed to complete session');
+    } finally {
+      setIsEndingSession(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionStats.exchanges >= 15 && !sessionCompleted && sessionId) {
+      endSession();
+    }
+  }, [sessionStats.exchanges]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -455,6 +530,18 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
             <Sparkles className="w-4 h-4 mr-2" />
             Get Coaching
           </Button>
+          <Button
+            variant="default"
+            onClick={endSession}
+            disabled={isEndingSession || sessionCompleted || sessionStats.exchanges < 2}
+            data-testid="button-end-session"
+          >
+            {isEndingSession ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ending...</>
+            ) : (
+              <><StopCircle className="w-4 h-4 mr-2" />End Session</>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -471,6 +558,100 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
         </div>
       </Card>
 
+      {sessionCompleted && sessionSummary ? (
+        <Card className="flex-1 overflow-auto p-6 space-y-6" data-testid="card-session-summary">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold mb-2">Session Complete</h2>
+            <p className="text-muted-foreground">
+              {sessionStats.exchanges} exchanges with {persona.name}
+            </p>
+          </div>
+
+          {sessionSummary.aiFeedback?.overallScore !== undefined && (
+            <div className="text-center">
+              <div className={`text-5xl font-bold mb-2 ${
+                sessionSummary.aiFeedback.overallScore >= 80 ? 'text-green-500' :
+                sessionSummary.aiFeedback.overallScore >= 60 ? 'text-yellow-500' :
+                sessionSummary.aiFeedback.overallScore >= 40 ? 'text-orange-500' : 'text-red-500'
+              }`}>{sessionSummary.aiFeedback.overallScore}%</div>
+              <p className="text-sm text-muted-foreground">Performance Score</p>
+              {sessionSummary.xpResult?.xpAwarded > 0 && (
+                <Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400" data-testid="badge-xp-earned">
+                  +{sessionSummary.xpResult.xpAwarded} XP
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {sessionSummary.aiFeedback?.techniqueScores && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {Object.entries(sessionSummary.aiFeedback.techniqueScores).map(([key, value]: [string, any]) => (
+                <Card key={key} className="p-3 text-center">
+                  <div className="text-xl font-bold">{value}/10</div>
+                  <div className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {sessionSummary.aiFeedback?.strengths?.length > 0 && (
+            <Card className="p-4 bg-green-500/10 border-green-500/30">
+              <h4 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center gap-2">
+                <ThumbsUp className="w-4 h-4" />
+                Strengths
+              </h4>
+              <ul className="text-sm space-y-1">
+                {sessionSummary.aiFeedback.strengths.map((s: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Check className="w-3 h-3 text-green-500 mt-1 flex-shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {sessionSummary.aiFeedback?.improvements?.length > 0 && (
+            <Card className="p-4 bg-orange-500/10 border-orange-500/30">
+              <h4 className="font-bold text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Areas to Improve
+              </h4>
+              <ul className="text-sm space-y-1">
+                {sessionSummary.aiFeedback.improvements.map((s: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <ArrowRight className="w-3 h-3 text-orange-500 mt-1 flex-shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {sessionSummary.aiFeedback?.summary && (
+            <Card className="p-4 bg-primary/5 border-primary/20">
+              <h4 className="font-bold mb-2 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Coach Summary
+              </h4>
+              <p className="text-sm">{sessionSummary.aiFeedback.summary}</p>
+            </Card>
+          )}
+
+          {sessionSummary.aiFeedback?.nextStep && (
+            <p className="text-sm text-muted-foreground text-center italic">
+              Recommended next: {sessionSummary.aiFeedback.nextStep}
+            </p>
+          )}
+
+          <div className="flex gap-3 justify-center">
+            <Button onClick={onBack} data-testid="button-back-to-menu">
+              Back to Menu
+            </Button>
+          </div>
+        </Card>
+      ) : (
+      <>
       <div className="flex gap-4 flex-1 min-h-0">
         <ScrollArea className="flex-1 pr-4">
           <div className="space-y-4 pb-4">
@@ -575,6 +756,8 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
           <Send className="w-4 h-4" />
         </Button>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -589,6 +772,17 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [score, setScore] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
+  const [aiScoring, setAiScoring] = useState<{[key: string]: any}>({});
+  const [scoringInProgress, setScoringInProgress] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiRequest("POST", "/api/training/sessions", {
+      mode: 'gauntlet',
+    }).then(res => res.json()).then(data => {
+      setSessionId(data.id);
+    }).catch(err => console.log('Failed to create gauntlet session'));
+  }, []);
 
   const [objections] = useState(() =>
     [...OBJECTION_BANK].sort(() => Math.random() - 0.5)
@@ -615,8 +809,46 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
       }
     });
 
-    setScore(prev => prev + Math.max(1, Math.min(10, responseScore)));
+    const keywordScore = Math.max(1, Math.min(10, responseScore));
+    setScore(prev => prev + keywordScore);
     setCompleted(prev => [...prev, currentObjection.id]);
+
+    const objectionId = currentObjection.id;
+    setScoringInProgress(true);
+    apiRequest("POST", "/api/training/gauntlet/score", {
+      objectionId: objectionId,
+      objectionText: currentObjection.objection,
+      userResponse: userResponse,
+      bestResponse: currentObjection.bestResponse,
+      keyPrinciples: currentObjection.keyPrinciples,
+    }).then(res => res.json()).then(data => {
+      setAiScoring(prev => ({ ...prev, [objectionId]: data }));
+      if (data.aiScore !== null) {
+        setScore(prev => prev - keywordScore + data.aiScore);
+      }
+      if (sessionId) {
+        apiRequest("POST", `/api/training/sessions/${sessionId}/gauntlet-response`, {
+          objectionId: objectionId,
+          objectionText: currentObjection.objection,
+          userResponse: userResponse,
+          keywordScore: keywordScore,
+          aiScore: data.aiScore,
+          aiFeedback: data.aiFeedback,
+        }).catch(() => {});
+      }
+    }).catch(() => {
+      console.log('AI scoring unavailable, using keyword score');
+      if (sessionId) {
+        apiRequest("POST", `/api/training/sessions/${sessionId}/gauntlet-response`, {
+          objectionId: objectionId,
+          objectionText: currentObjection.objection,
+          userResponse: userResponse,
+          keywordScore: keywordScore,
+        }).catch(() => {});
+      }
+    }).finally(() => {
+      setScoringInProgress(false);
+    });
   };
 
   const nextObjection = () => {
@@ -633,9 +865,27 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
     setShowFeedback(false);
     setScore(0);
     setCompleted([]);
+    setAiScoring({});
+    setScoringInProgress(false);
+    apiRequest("POST", "/api/training/sessions", { mode: 'gauntlet' })
+      .then(res => res.json())
+      .then(data => setSessionId(data.id))
+      .catch(() => {});
   };
 
   const isComplete = currentIndex === objections.length - 1 && showFeedback;
+
+  useEffect(() => {
+    if (isComplete && sessionId) {
+      const avgScore = completed.length > 0 ? Math.round((score / (completed.length * 10)) * 100) : 0;
+      apiRequest("POST", `/api/training/sessions/${sessionId}/complete`, {
+        scorePercent: avgScore,
+        objectionsAttempted: completed.length,
+        objectionsPassed: completed.length,
+        perfectRun: avgScore >= 90,
+      }).catch(() => {});
+    }
+  }, [isComplete]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -736,6 +986,52 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
               </Card>
             </div>
 
+            {aiScoring[currentObjection.id] && (
+              <Card className="p-4 bg-blue-500/10 border-blue-500/30" data-testid="card-ai-coach-analysis">
+                <h3 className="font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2 flex-wrap">
+                  <Sparkles className="w-4 h-4" />
+                  AI Coach Analysis
+                  <Badge variant="secondary" className="ml-auto" data-testid="badge-ai-score">
+                    {aiScoring[currentObjection.id].aiScore}/10
+                  </Badge>
+                </h3>
+
+                {aiScoring[currentObjection.id].aiScores && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3" data-testid="grid-ai-criteria-scores">
+                    {[
+                      { label: 'Acknowledge', key: 'acknowledge' },
+                      { label: 'Question', key: 'question' },
+                      { label: 'Reframe', key: 'reframe' },
+                      { label: 'Next Step', key: 'nextStep' },
+                    ].map(item => (
+                      <div key={item.key} className="text-center p-2 rounded bg-muted/50" data-testid={`score-criteria-${item.key}`}>
+                        <div className="text-lg font-bold">{aiScoring[currentObjection.id].aiScores[item.key]}/10</div>
+                        <div className="text-xs text-muted-foreground">{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {aiScoring[currentObjection.id].aiFeedback && (
+                  <p className="text-sm mb-2" data-testid="text-ai-feedback">{aiScoring[currentObjection.id].aiFeedback}</p>
+                )}
+
+                {aiScoring[currentObjection.id].aiImproved && (
+                  <div className="mt-2 p-2 rounded bg-blue-500/5 border border-blue-500/20" data-testid="card-ai-improved">
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Improved approach:</p>
+                    <p className="text-sm italic">{aiScoring[currentObjection.id].aiImproved}</p>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {scoringInProgress && !aiScoring[currentObjection.id] && (
+              <Card className="p-4 bg-blue-500/5 border-blue-500/20 flex items-center gap-3" data-testid="card-ai-scoring-loading">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                <span className="text-sm text-muted-foreground">AI analyzing your response...</span>
+              </Card>
+            )}
+
             {!isComplete ? (
               <Button
                 onClick={nextObjection}
@@ -748,6 +1044,7 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
               <div className="text-center py-4">
                 <h3 className="text-2xl font-bold mb-2">Gauntlet Complete!</h3>
                 <p className="text-muted-foreground mb-4">Final Score: {score} points</p>
+                {/* XP earned will show via toast notification */}
                 <Button onClick={resetGauntlet} className="bg-orange-500 hover:bg-orange-600">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
@@ -770,21 +1067,62 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [totalScore, setTotalScore] = useState(0);
   const [completed, setCompleted] = useState(0);
+  const [aiFeedback, setAiFeedback] = useState<{[key: string]: string}>({});
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiRequest("POST", "/api/training/sessions", {
+      mode: 'scenario',
+    }).then(res => res.json()).then(data => {
+      setSessionId(data.id);
+    }).catch(err => console.log('Failed to create scenario session'));
+  }, []);
 
   const currentScenario = SCENARIOS[currentIndex];
   const isComplete = currentIndex === SCENARIOS.length - 1 && selectedOption !== null;
+
+  useEffect(() => {
+    if (isComplete && sessionId) {
+      const maxScore = SCENARIOS.length * 10;
+      const scorePercent = Math.round((totalScore / maxScore) * 100);
+      apiRequest("POST", `/api/training/sessions/${sessionId}/complete`, {
+        scorePercent,
+        scoreDetails: { totalScore, maxScore, scenariosCompleted: completed },
+      }).catch(() => {});
+    }
+  }, [isComplete]);
 
   const handleSelect = (optionIndex: number) => {
     if (selectedOption !== null) return;
     setSelectedOption(optionIndex);
     setTotalScore(prev => prev + currentScenario.options[optionIndex].points);
     setCompleted(prev => prev + 1);
+
+    setFeedbackLoading(true);
+    apiRequest("POST", "/api/training/scenario/feedback", {
+      scenarioTitle: currentScenario.title,
+      scenarioSetup: currentScenario.setup,
+      question: currentScenario.question,
+      selectedOption: currentScenario.options[optionIndex].text,
+      allOptions: currentScenario.options,
+      stage: currentScenario.stage,
+    }).then(res => res.json()).then(data => {
+      if (data.aiFeedback) {
+        setAiFeedback(prev => ({ ...prev, [currentScenario.id]: data.aiFeedback }));
+      }
+    }).catch(err => {
+      console.log('AI feedback unavailable');
+    }).finally(() => {
+      setFeedbackLoading(false);
+    });
   };
 
   const nextScenario = () => {
     if (currentIndex < SCENARIOS.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setSelectedOption(null);
+      setFeedbackLoading(false);
     }
   };
 
@@ -793,6 +1131,12 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
     setSelectedOption(null);
     setTotalScore(0);
     setCompleted(0);
+    setAiFeedback({});
+    setFeedbackLoading(false);
+    apiRequest("POST", "/api/training/sessions", { mode: 'scenario' })
+      .then(res => res.json())
+      .then(data => setSessionId(data.id))
+      .catch(() => {});
   };
 
   return (
@@ -872,6 +1216,23 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
           })}
         </div>
 
+        {selectedOption !== null && aiFeedback[currentScenario.id] && (
+          <Card className="p-4 bg-blue-500/10 border-blue-500/30 mx-6 mb-4" data-testid="scenario-ai-feedback">
+            <h4 className="font-medium text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              AI Coach Insight
+            </h4>
+            <p className="text-sm">{aiFeedback[currentScenario.id]}</p>
+          </Card>
+        )}
+
+        {selectedOption !== null && feedbackLoading && !aiFeedback[currentScenario.id] && (
+          <Card className="p-4 bg-blue-500/5 border-blue-500/20 mx-6 mb-4 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+            <span className="text-sm text-muted-foreground">AI analyzing your choice...</span>
+          </Card>
+        )}
+
         {selectedOption !== null && (
           <div className="border-t border-border p-6">
             {!isComplete ? (
@@ -941,6 +1302,7 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
   const [presentationText, setPresentationText] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const sessionIdRef = useRef<number | null>(null);
 
   const analysisMutation = useMutation({
     mutationFn: async (text: string) => {
@@ -969,6 +1331,17 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
         };
       });
       setIsAnalyzing(false);
+
+      if (sessionIdRef.current) {
+        const stagesHit = (data.detectedStages || []).filter((s: any) => s.found).length;
+        const totalStages = (data.detectedStages || []).length || 8;
+        apiRequest("POST", `/api/training/sessions/${sessionIdRef.current}/complete`, {
+          scorePercent: data.score || Math.round((stagesHit / totalStages) * 100),
+          stagesDetected: data.detectedStages,
+          coveragePercent: Math.round((stagesHit / totalStages) * 100),
+          aiFeedback: { feedback: data.feedback, psychographic: data.psychographicAnalysis, emotionalArc: data.emotionalArc },
+        }).catch(() => {});
+      }
       
       // Notify user if partial results
       if (data.isPartialResult) {
@@ -992,6 +1365,11 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
     if (!presentationText.trim()) return;
     setIsAnalyzing(true);
     setAnalysis(null);
+
+    apiRequest("POST", "/api/training/sessions", { mode: 'delivery_analyzer' })
+      .then(res => res.json())
+      .then(data => { sessionIdRef.current = data.id; })
+      .catch(() => {});
 
     const detectedStages = PRESENTATION_STAGES.map(stage => {
       const lowerText = presentationText.toLowerCase();
@@ -1027,6 +1405,7 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
   const reset = () => {
     setPresentationText('');
     setAnalysis(null);
+    sessionIdRef.current = null;
   };
 
   return (

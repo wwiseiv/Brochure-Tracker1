@@ -109,6 +109,7 @@ import path from "path";
 import { validateAndSanitize, getDefaultSanitizedData } from "./services/statement-validator";
 import { awardXP, getGamificationProfile, getLeaderboard, checkBadgeProgression, XP_CONFIG, LEVEL_THRESHOLDS, BADGE_DEFINITIONS, BADGE_LEVELS, getLevelInfo, generateVerificationCode } from "./gamification-engine";
 import { generateCertificatePDF, checkCertificateEligibility, CERTIFICATE_TYPES } from "./certificate-generator";
+import { getTrainingKnowledgeForRoleplay } from "./training-knowledge-context";
 
 // Internal secret for background job processing
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'prospect-job-internal-key-' + Date.now();
@@ -14556,17 +14557,30 @@ Additional context:
         },
       });
 
+      let trainingContext = '';
+      try {
+        trainingContext = await getTrainingKnowledgeForRoleplay(personaId);
+      } catch (err) {
+        console.log('[InteractiveTraining] Training context unavailable, using persona only');
+      }
+
       const systemPrompt = `${persona.systemPrompt}
 
 You are in a roleplay training scenario with a PCBancard sales representative. Stay fully in character as ${persona.name}. 
+
+PCBANCARD PRODUCT & SALES CONTEXT (use this to create realistic, informed responses):
+${trainingContext}
 
 IMPORTANT RULES:
 - Keep responses SHORT (1-4 sentences max), like a real busy merchant
 - React authentically to what the rep says
 - Never break character or acknowledge you're an AI
-- If they use good sales techniques, become more receptive
-- If they're pushy or use jargon, become more resistant
-- Include realistic behaviors (checking phone, mentioning customers, being distracted)`;
+- If they use good NEPQ questioning techniques (asking about your situation, problems, consequences), become more receptive
+- If they're pushy, use jargon, or pitch too hard, become more resistant
+- Include realistic behaviors (checking phone, mentioning customers, being distracted)
+- Raise realistic objections based on your persona and the training context
+- If the rep handles an objection well using the Clarify-Discuss-Diffuse pattern, acknowledge it naturally (e.g., "Hmm, I hadn't thought about it that way...")
+- The knowledge context is for YOU to use when evaluating the rep's approach - do NOT lecture or dump product info on them`;
 
       const contents: Array<{role: "user" | "model", parts: [{text: string}]}> = [];
       
@@ -14635,7 +14649,17 @@ IMPORTANT RULES:
         `${m.role === 'user' ? 'SALES REP' : 'MERCHANT'}: ${m.content}`
       ).join('\n');
 
-      const coachingPrompt = `You are an expert sales coach analyzing a roleplay training session between a PCBancard sales rep and a merchant persona named "${persona.name}".
+      let trainingContext = '';
+      try {
+        trainingContext = await getTrainingKnowledgeForRoleplay(personaId);
+      } catch (err) {
+        console.log('[InteractiveTraining] Training context unavailable for coaching');
+      }
+
+      const coachingPrompt = `You are an expert PCBancard sales coach analyzing a roleplay training session between a sales rep and a merchant persona named "${persona.name}".
+
+PCBANCARD SALES METHODOLOGY:
+${trainingContext}
 
 PERSONA CONTEXT: ${persona.systemPrompt}
 
@@ -14655,13 +14679,17 @@ Provide coaching feedback in the following format:
 **Recommended Approach for This Persona**:
 (Brief advice on the best strategy for this specific merchant type)
 
-Keep feedback concise, specific, and actionable. Reference actual phrases from the conversation when possible.`;
+Keep feedback concise, specific, and actionable. Reference actual phrases from the conversation when possible.
+- Reference specific NEPQ techniques when applicable
+- Note whether the rep used the Clarify-Discuss-Diffuse objection handling pattern
+- Assess whether the rep created curiosity or just pitched
+- Recommend specific techniques from the PCBancard training that would have been effective`;
 
       const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: coachingPrompt }] }],
         config: {
-          maxOutputTokens: 500,
+          maxOutputTokens: 600,
           temperature: 0.6,
         }
       });
@@ -14672,6 +14700,607 @@ Keep feedback concise, specific, and actionable. Reference actual phrases from t
     } catch (error) {
       console.error('Error in training coaching:', error);
       res.status(500).json({ error: 'Failed to generate coaching feedback' });
+    }
+  });
+
+  // Interactive Training Gauntlet AI Scoring endpoint
+  app.post("/api/training/gauntlet/score", isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectionId, objectionText, userResponse, bestResponse, keyPrinciples } = req.body;
+
+      if (!objectionText || !userResponse) {
+        return res.status(400).json({ error: "Missing objection or user response" });
+      }
+
+      let trainingContext = '';
+      try {
+        const { getTrainingKnowledgeForGauntlet } = await import("./training-knowledge-context");
+        trainingContext = await getTrainingKnowledgeForGauntlet();
+      } catch (err) {
+        console.log('[Gauntlet] Training context unavailable');
+      }
+
+      const scoringPrompt = `You are an expert PCBancard sales coach evaluating a trainee's response to a merchant objection.
+
+PCBANCARD OBJECTION HANDLING METHODOLOGY:
+${trainingContext}
+
+THE OBJECTION:
+"${objectionText}"
+
+IDEAL RESPONSE APPROACH:
+${bestResponse}
+
+KEY PRINCIPLES FOR THIS OBJECTION:
+${keyPrinciples?.join('\n') || 'Use NEPQ questioning and Clarify-Discuss-Diffuse pattern'}
+
+TRAINEE'S ACTUAL RESPONSE:
+"${userResponse}"
+
+Score this response on a scale of 1-10 and evaluate on these criteria:
+1. ACKNOWLEDGE (1-10): Did they acknowledge the concern without dismissing it?
+2. QUESTION (1-10): Did they use a question-based approach (NEPQ style) rather than arguing?
+3. REFRAME (1-10): Did they reframe the objection rather than argue against it?
+4. NEXT_STEP (1-10): Did they move toward a next step or keep the conversation going?
+
+RESPOND IN EXACTLY THIS FORMAT:
+OVERALL: [number 1-10]
+ACKNOWLEDGE: [number 1-10]
+QUESTION: [number 1-10]
+REFRAME: [number 1-10]
+NEXT_STEP: [number 1-10]
+FEEDBACK: [2-3 sentences of specific, actionable coaching feedback. Reference PCBancard methodology. Be encouraging but honest.]
+IMPROVED: [A brief example of how to improve their response using NEPQ techniques]`;
+
+      let aiScore: number | null = null;
+      let aiFeedback: string = '';
+      let aiImproved: string = '';
+      let aiScores: Record<string, number> = {};
+
+      try {
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({
+          baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+          apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+        });
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: scoringPrompt }],
+        });
+
+        const textBlock = response.content[0];
+        if (textBlock.type === 'text') {
+          const responseText = textBlock.text;
+
+          const parseField = (text: string, field: string): string => {
+            const match = text.match(new RegExp(`${field}:\\s*(.+)`, 'i'));
+            return match ? match[1].trim() : '';
+          };
+
+          const overallStr = parseField(responseText, 'OVERALL');
+          aiScore = parseInt(overallStr);
+          if (isNaN(aiScore)) aiScore = null;
+
+          aiScores = {
+            acknowledge: parseInt(parseField(responseText, 'ACKNOWLEDGE')) || 5,
+            question: parseInt(parseField(responseText, 'QUESTION')) || 5,
+            reframe: parseInt(parseField(responseText, 'REFRAME')) || 5,
+            nextStep: parseInt(parseField(responseText, 'NEXT_STEP')) || 5,
+          };
+
+          aiFeedback = parseField(responseText, 'FEEDBACK');
+          aiImproved = parseField(responseText, 'IMPROVED');
+
+          console.log('[Gauntlet] Claude scoring successful, score:', aiScore);
+        }
+      } catch (claudeError: any) {
+        console.log('[Gauntlet] Claude unavailable, trying Gemini:', claudeError?.message);
+
+        try {
+          const hasGemini = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+          if (hasGemini) {
+            const { GoogleGenAI } = await import("@google/genai");
+            const genAI = new GoogleGenAI({
+              apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+              httpOptions: {
+                apiVersion: "",
+                baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+              },
+            });
+
+            const geminiResponse = await genAI.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{ role: "user", parts: [{ text: scoringPrompt }] }],
+              config: { maxOutputTokens: 400, temperature: 0.3 }
+            });
+
+            const responseText = geminiResponse.text || '';
+
+            const parseField = (text: string, field: string): string => {
+              const match = text.match(new RegExp(`${field}:\\s*(.+)`, 'i'));
+              return match ? match[1].trim() : '';
+            };
+
+            const overallStr = parseField(responseText, 'OVERALL');
+            aiScore = parseInt(overallStr);
+            if (isNaN(aiScore)) aiScore = null;
+
+            aiScores = {
+              acknowledge: parseInt(parseField(responseText, 'ACKNOWLEDGE')) || 5,
+              question: parseInt(parseField(responseText, 'QUESTION')) || 5,
+              reframe: parseInt(parseField(responseText, 'REFRAME')) || 5,
+              nextStep: parseInt(parseField(responseText, 'NEXT_STEP')) || 5,
+            };
+
+            aiFeedback = parseField(responseText, 'FEEDBACK');
+            aiImproved = parseField(responseText, 'IMPROVED');
+
+            console.log('[Gauntlet] Gemini fallback scoring successful, score:', aiScore);
+          }
+        } catch (geminiError: any) {
+          console.log('[Gauntlet] Gemini also unavailable:', geminiError?.message);
+        }
+      }
+
+      res.json({
+        aiScore,
+        aiScores,
+        aiFeedback,
+        aiImproved,
+        provider: aiScore !== null ? 'ai' : 'keyword_only'
+      });
+    } catch (error) {
+      console.error('Error in gauntlet scoring:', error);
+      res.status(500).json({ error: 'Failed to score response' });
+    }
+  });
+
+  // Interactive Training Scenario AI Feedback endpoint
+  app.post("/api/training/scenario/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scenarioTitle, scenarioSetup, question, selectedOption, allOptions, stage } = req.body;
+
+      if (!scenarioTitle || !selectedOption) {
+        return res.status(400).json({ error: "Missing scenario data" });
+      }
+
+      let trainingContext = '';
+      try {
+        const { getTrainingKnowledgeForRoleplay } = await import("./training-knowledge-context");
+        trainingContext = await getTrainingKnowledgeForRoleplay('');
+      } catch (err) {
+        console.log('[ScenarioTrainer] Training context unavailable');
+      }
+
+      const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+      if (!hasGeminiIntegrations) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const genAI = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        },
+      });
+
+      const optionsText = allOptions.map((opt: any, i: number) => 
+        `${String.fromCharCode(65 + i)}) ${opt.text} (${opt.points} pts) - ${opt.feedback}`
+      ).join('\n');
+
+      const feedbackPrompt = `You are an expert PCBancard sales coach. A sales trainee just completed a scenario exercise.
+
+PCBANCARD SALES METHODOLOGY:
+${trainingContext.substring(0, 2000)}
+
+SCENARIO: ${scenarioTitle}
+STAGE: ${stage}
+SETUP: ${scenarioSetup}
+QUESTION: ${question}
+
+ALL OPTIONS:
+${optionsText}
+
+THE TRAINEE CHOSE: "${selectedOption}"
+
+Write 2-3 sentences explaining WHY this choice is good or could be improved, based on NEPQ principles and PCBancard methodology. Be specific about which sales technique applies. If they chose the best option, reinforce why it works. If not, explain what the better approach achieves. Keep it conversational and encouraging.`;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: feedbackPrompt }] }],
+        config: { maxOutputTokens: 250, temperature: 0.5 }
+      });
+
+      const feedback = response.text || "";
+      res.json({ aiFeedback: feedback });
+    } catch (error) {
+      console.error('Error in scenario feedback:', error);
+      res.status(500).json({ error: 'Failed to generate feedback' });
+    }
+  });
+
+  // Create a new training session
+  app.post("/api/training/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { mode, personaId, difficulty, scenarioId } = req.body;
+
+      if (!mode || !['roleplay', 'gauntlet', 'scenario', 'delivery_analyzer'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode" });
+      }
+
+      const session = await storage.createTrainingSession({
+        userId,
+        mode,
+        personaId: personaId || null,
+        difficulty: difficulty || null,
+        scenarioId: scenarioId || null,
+      });
+
+      res.json(session);
+    } catch (error) {
+      console.error('Error creating training session:', error);
+      res.status(500).json({ error: 'Failed to create session' });
+    }
+  });
+
+  // Save a message in a training session
+  app.post("/api/training/sessions/:sessionId/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const sessionId = parseInt(req.params.sessionId);
+      if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+      const session = await storage.getTrainingSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      const { role, content } = req.body;
+      if (!role || !content) {
+        return res.status(400).json({ error: "Missing role or content" });
+      }
+
+      const message = await storage.createTrainingMessage({
+        sessionId,
+        role,
+        content,
+      });
+
+      res.json(message);
+    } catch (error) {
+      console.error('Error saving training message:', error);
+      res.status(500).json({ error: 'Failed to save message' });
+    }
+  });
+
+  // Complete a training session
+  app.post("/api/training/sessions/:sessionId/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const sessionId = parseInt(req.params.sessionId);
+      if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+      const session = await storage.getTrainingSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.endedAt) {
+        return res.json(session);
+      }
+
+      const {
+        scorePercent,
+        scoreDetails,
+        aiFeedback,
+        turnCount,
+        durationSeconds,
+        objectionsAttempted,
+        objectionsPassed,
+        perfectRun,
+        stagesDetected,
+        coveragePercent,
+      } = req.body;
+
+      let finalAiFeedback = aiFeedback;
+      if (session.mode === 'roleplay' && !aiFeedback) {
+        try {
+          const messages = await storage.getTrainingMessages(sessionId);
+          if (messages.length >= 4) {
+            const persona = TRAINING_PERSONAS[session.personaId || ''];
+
+            let trainingContext = '';
+            try {
+              const { getTrainingKnowledgeForRoleplay } = await import("./training-knowledge-context");
+              trainingContext = await getTrainingKnowledgeForRoleplay(session.personaId || '');
+            } catch (err) {}
+
+            const conversationText = messages.map(m =>
+              `${m.role === 'user' ? 'SALES REP' : 'MERCHANT'}: ${m.content}`
+            ).join('\n');
+
+            const hasGemini = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+            if (hasGemini) {
+              const { GoogleGenAI } = await import("@google/genai");
+              const genAI = new GoogleGenAI({
+                apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+                httpOptions: { apiVersion: "", baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL! },
+              });
+
+              const evalPrompt = `You are an expert PCBancard sales coach evaluating a complete roleplay training session.
+
+PCBANCARD SALES METHODOLOGY:
+${trainingContext.substring(0, 3000)}
+
+PERSONA: ${persona?.name || 'Unknown'} - ${persona?.systemPrompt?.substring(0, 200) || ''}
+
+FULL CONVERSATION:
+${conversationText}
+
+Evaluate this session and respond in EXACTLY this format:
+SCORE: [number 0-100]
+TECHNIQUE_RAPPORT: [1-10 score for rapport building]
+TECHNIQUE_QUESTIONING: [1-10 score for NEPQ questioning technique]
+TECHNIQUE_OBJECTION: [1-10 score for objection handling]
+TECHNIQUE_CLOSING: [1-10 score for moving toward next steps]
+STRENGTH1: [first key strength observed]
+STRENGTH2: [second key strength observed]
+STRENGTH3: [third key strength observed]
+IMPROVE1: [first area to improve with specific advice]
+IMPROVE2: [second area to improve with specific advice]
+IMPROVE3: [third area to improve with specific advice]
+NEXT_STEP: [recommended next training activity]
+SUMMARY: [2-3 sentence overall assessment]`;
+
+              const response = await genAI.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [{ role: "user", parts: [{ text: evalPrompt }] }],
+                config: { maxOutputTokens: 600, temperature: 0.3 }
+              });
+
+              const responseText = response.text || '';
+              const parseField = (text: string, field: string): string => {
+                const match = text.match(new RegExp(`${field}:\\s*(.+)`, 'i'));
+                return match ? match[1].trim() : '';
+              };
+              const parseNumber = (text: string, field: string, def = 0): number => {
+                const v = parseInt(parseField(text, field));
+                return isNaN(v) ? def : v;
+              };
+
+              finalAiFeedback = {
+                overallScore: parseNumber(responseText, 'SCORE', 50),
+                techniqueScores: {
+                  rapport: parseNumber(responseText, 'TECHNIQUE_RAPPORT', 5),
+                  questioning: parseNumber(responseText, 'TECHNIQUE_QUESTIONING', 5),
+                  objectionHandling: parseNumber(responseText, 'TECHNIQUE_OBJECTION', 5),
+                  closing: parseNumber(responseText, 'TECHNIQUE_CLOSING', 5),
+                },
+                strengths: [parseField(responseText, 'STRENGTH1'), parseField(responseText, 'STRENGTH2'), parseField(responseText, 'STRENGTH3')].filter(s => s),
+                improvements: [parseField(responseText, 'IMPROVE1'), parseField(responseText, 'IMPROVE2'), parseField(responseText, 'IMPROVE3')].filter(s => s),
+                nextStep: parseField(responseText, 'NEXT_STEP'),
+                summary: parseField(responseText, 'SUMMARY'),
+              };
+            }
+          }
+        } catch (evalError) {
+          console.log('[TrainingSession] AI evaluation failed:', evalError);
+        }
+      }
+
+      const aiScore = finalAiFeedback?.overallScore || scorePercent || 0;
+
+      const updatedSession = await storage.updateTrainingSession(sessionId, {
+        scorePercent: aiScore,
+        scoreDetails: scoreDetails || null,
+        aiFeedback: finalAiFeedback || null,
+        turnCount: turnCount || null,
+        durationSeconds: durationSeconds || null,
+        objectionsAttempted: objectionsAttempted || null,
+        objectionsPassed: objectionsPassed || null,
+        perfectRun: perfectRun || false,
+        stagesDetected: stagesDetected || null,
+        coveragePercent: coveragePercent || null,
+        endedAt: new Date(),
+      });
+
+      let xpResult = null;
+      try {
+        const { awardXP } = await import("./gamification-engine");
+
+        let xpAmount = 0;
+        let xpSource = 'interactive_training';
+        let xpDescription = '';
+
+        if (session.mode === 'roleplay') {
+          const turns = turnCount || 0;
+          const duration = durationSeconds || 0;
+          if (turns >= 6 || duration >= 180) {
+            xpAmount = 60;
+            const performanceScore = finalAiFeedback?.overallScore || scorePercent || 0;
+            const bonus = Math.floor((performanceScore / 100) * 40);
+            xpAmount += bonus;
+            xpDescription = `Roleplay session with ${session.personaId || 'unknown'} persona (Score: ${performanceScore}%, ${turns} turns)`;
+          } else {
+            xpDescription = `Roleplay session too short for XP (${turns} turns, ${duration}s)`;
+          }
+          xpSource = 'roleplay_session';
+        } else if (session.mode === 'gauntlet') {
+          const attempted = objectionsAttempted || 0;
+          xpAmount = attempted * 15;
+          const avgScore = attempted > 0 ? Math.round(((scorePercent || 0))) : 0;
+          if (perfectRun || avgScore >= 90) {
+            xpAmount += 50;
+            xpDescription = `Gauntlet perfect run! ${attempted} objections (${avgScore}% avg)`;
+          } else {
+            xpDescription = `Gauntlet completed: ${attempted} objections (${avgScore}% avg)`;
+          }
+          xpSource = 'gauntlet_session';
+        } else if (session.mode === 'scenario') {
+          xpAmount = 40;
+          const pct = scorePercent || 0;
+          if (pct >= 80) {
+            xpAmount += 20;
+            xpDescription = `Scenario training excellent (${pct}%)`;
+          } else {
+            xpDescription = `Scenario training completed (${pct}%)`;
+          }
+          xpSource = 'scenario_session';
+        } else if (session.mode === 'delivery_analyzer') {
+          xpAmount = 80;
+          const coverage = coveragePercent || 0;
+          if (coverage >= 100) {
+            xpAmount += 20;
+            xpDescription = `Delivery analysis perfect coverage (${coverage}%)`;
+          } else {
+            xpDescription = `Delivery analysis completed (${coverage}% coverage)`;
+          }
+          xpSource = 'delivery_analysis';
+        }
+
+        if (xpAmount > 0) {
+          xpResult = await awardXP(userId, xpAmount, xpSource, `session_${sessionId}`, xpDescription);
+
+          await storage.updateTrainingSession(sessionId, { xpAwarded: xpResult.xpAwarded });
+
+          if (session.mode === 'roleplay' || session.mode === 'gauntlet') {
+            const { checkBadgeProgression } = await import("./gamification-engine");
+            const sessions = await storage.getTrainingSessions(userId, session.mode, 1000);
+            const completedCount = sessions.filter(s => s.endedAt).length;
+            const badge = await checkBadgeProgression(userId, 'roleplay', completedCount);
+            if (badge) {
+              xpResult.newBadges = [...(xpResult.newBadges || []), badge];
+            }
+          }
+
+          console.log(`[Training] Awarded ${xpResult.xpAwarded} XP to user ${userId} for ${session.mode} (${xpDescription})`);
+        }
+
+        // Recalculate skill score
+        try {
+          const { calculateSkillScore } = await import("./gamification-engine");
+          const skillResult = await calculateSkillScore(userId);
+          await storage.upsertGamificationProfile(userId, { skillScore: skillResult.overallScore });
+        } catch (ssErr) {
+          console.log('[Training] Skill score recalculation failed:', ssErr);
+        }
+
+        // Check progression ladder
+        try {
+          const { checkProgressionLadder } = await import("./gamification-engine");
+          const ladderResult = await checkProgressionLadder(userId);
+          if (xpResult) {
+            (xpResult as any).ladderLevel = ladderResult.currentLevel;
+            (xpResult as any).ladderTitle = ladderResult.currentTitle;
+            (xpResult as any).skillScoreWarning = ladderResult.skillScoreWarning;
+            (xpResult as any).warningMessage = ladderResult.warningMessage;
+          }
+        } catch (ladderErr) {
+          console.log('[Training] Ladder check failed:', ladderErr);
+        }
+      } catch (xpError) {
+        console.log('[Training] XP award failed:', xpError);
+      }
+
+      res.json({
+        ...updatedSession,
+        xpResult: xpResult || null,
+      });
+    } catch (error) {
+      console.error('Error completing training session:', error);
+      res.status(500).json({ error: 'Failed to complete session' });
+    }
+  });
+
+  // Save a gauntlet objection response
+  app.post("/api/training/sessions/:sessionId/gauntlet-response", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const sessionId = parseInt(req.params.sessionId);
+      if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+      const session = await storage.getTrainingSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      const { objectionId, objectionText, userResponse, keywordScore, aiScore, aiFeedback } = req.body;
+
+      const response = await storage.createGauntletResponse({
+        sessionId,
+        objectionId: objectionId || '',
+        objectionText: objectionText || null,
+        userResponse: userResponse || null,
+        keywordScore: keywordScore || null,
+        aiScore: aiScore || null,
+        aiFeedback: aiFeedback || null,
+      });
+
+      res.json(response);
+    } catch (error) {
+      console.error('Error saving gauntlet response:', error);
+      res.status(500).json({ error: 'Failed to save response' });
+    }
+  });
+
+  // Get training session history for the current user
+  app.get("/api/training/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const mode = req.query.mode as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const sessions = await storage.getTrainingSessions(userId, mode, limit);
+      res.json(sessions);
+    } catch (error) {
+      console.error('Error fetching training sessions:', error);
+      res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+  });
+
+  // Get a specific training session with messages
+  app.get("/api/training/sessions/:sessionId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const sessionId = parseInt(req.params.sessionId);
+      if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+      const session = await storage.getTrainingSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      let messages: any[] = [];
+      let gauntletResponseList: any[] = [];
+
+      if (session.mode === 'roleplay') {
+        messages = await storage.getTrainingMessages(sessionId);
+      }
+      if (session.mode === 'gauntlet') {
+        gauntletResponseList = await storage.getGauntletResponses(sessionId);
+      }
+
+      res.json({ ...session, messages, gauntletResponses: gauntletResponseList });
+    } catch (error) {
+      console.error('Error fetching training session:', error);
+      res.status(500).json({ error: 'Failed to fetch session' });
     }
   });
 
@@ -14686,6 +15315,14 @@ Keep feedback concise, specific, and actionable. Reference actual phrases from t
 
       if (text.trim().length < 50) {
         return res.status(400).json({ error: "Please provide a longer presentation script (at least 50 characters)" });
+      }
+
+      let trainingContext = '';
+      try {
+        const { getTrainingKnowledgeForDelivery } = await import("./training-knowledge-context");
+        trainingContext = await getTrainingKnowledgeForDelivery();
+      } catch (err) {
+        console.log('[DeliveryAnalyzer] Training context unavailable');
       }
 
       const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
@@ -14720,15 +15357,18 @@ Keep feedback concise, specific, and actionable. Reference actual phrases from t
 PRESENTATION:
 ${text}
 
-THE 8 STAGES TO CHECK:
-1. Visceral Opening - Emotional hook about processing fee pain
-2. Fee Quantification - Concrete numbers (3-4% fees, dollar amounts)
-3. Marcus Story - Named merchant success story
-4. Three Options - Interchange-plus vs surcharging vs Dual Pricing
-5. Customer Reaction - Addressing "will customers complain?"
-6. Social Proof - Other merchants succeeding
-7. Process Explanation - How the switch works
-8. 90-Day Promise - Risk-free guarantee
+PCBANCARD PRESENTATION METHODOLOGY:
+${trainingContext}
+
+THE 8 PRESENTATION STAGES TO CHECK:
+1. Visceral Opening (Psychology Foundation) - Emotional hook about processing fee pain. Should create a knowledge gap and agitate the cost of inaction. Example: "Ever close the month and feel that quiet knot in your stomach?"
+2. Fee Quantification (Problem Awareness) - Concrete numbers showing 3-4% fees, dollar amounts lost per transaction ($1.20-$1.60 on a $40 ticket), annual losses ($10K-$25K+). Should make the abstract concrete.
+3. Marcus/Mike Story (Story Proof) - Named merchant success story showing transformation. The training uses "Mike's tire shop" - was losing $13,440/year, reinvested savings, hired 2 techs, opened Saturdays. Hero journey structure.
+4. Three Options (Solution Positioning) - Present Interchange-Plus vs Surcharging vs Dual Pricing. Key: surcharging can't cover debit (30-40% of transactions), only dual pricing eliminates ALL fees.
+5. Customer Reaction (Objection Prevention) - Address "will customers complain?" with data: only about 1 in 100 customers care. Gas station comparison. "By week three, most owners stop thinking about it."
+6. Social Proof (Story Proof & Transformation) - Other merchants succeeding with the program. Community proof, reference offers, Darren Waller Foundation partnership.
+7. Process Explanation (Friction Removal) - How the switch works: simple terminal swap, training provided, support available. Remove fear of hassle.
+8. 90-Day Promise (Risk Reversal) - Risk-free guarantee. "If this program negatively impacts your business in any way, I will drive out here the same day." Month-to-month, no ETFs.
 
 RESPOND WITH EXACTLY THIS FORMAT (one line per field):
 SCORE: [number 0-100]
@@ -14847,7 +15487,10 @@ GAP1: [one weakness]`;
       // Phase 2: Generate narrative coaching feedback
       console.log('[DeliveryAnalyzer] Generating coaching narrative...');
       
-      const narrativePrompt = `You are an encouraging sales coach. Write 3-4 paragraphs of feedback for this sales presentation.
+      const narrativePrompt = `You are an encouraging PCBancard sales coach trained in NEPQ methodology. Write 3-4 paragraphs of feedback for this sales presentation.
+
+PCBANCARD METHODOLOGY CONTEXT:
+${trainingContext.substring(0, 2000)}
 
 PRESENTATION:
 ${text}
@@ -14862,6 +15505,10 @@ Write encouraging but honest feedback in second person ("You did X well..."). In
 1. What they're doing well with specific examples
 2. What's missing or could be stronger
 3. One concrete tip to practice next
+- Reference specific PCBancard techniques and NEPQ principles in your feedback
+- If they used the Mike/Marcus story, note that. If they missed it, suggest adding it.
+- Assess whether they positioned the three options correctly (interchange-plus, surcharging, dual pricing)
+- Check if they addressed the customer reaction fear with real data (1 in 100)
 
 Be specific, actionable, and supportive. No headers or bullet points - just flowing paragraphs.`;
 
@@ -14922,6 +15569,38 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
     } catch (error) {
       console.error("Error fetching gamification profile:", error);
       res.status(500).json({ error: "Failed to fetch gamification profile" });
+    }
+  });
+
+  app.get("/api/gamification/skill-score", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { calculateSkillScore } = await import("./gamification-engine");
+      const result = await calculateSkillScore(userId);
+
+      await storage.upsertGamificationProfile(userId, { skillScore: result.overallScore });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error calculating skill score:', error);
+      res.status(500).json({ error: 'Failed to calculate skill score' });
+    }
+  });
+
+  app.get("/api/gamification/progression-ladder", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { checkProgressionLadder } = await import("./gamification-engine");
+      const result = await checkProgressionLadder(userId);
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error checking progression ladder:', error);
+      res.status(500).json({ error: 'Failed to check progression ladder' });
     }
   });
 
@@ -15107,12 +15786,60 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
           currentLevel: profile.currentLevel,
           currentStreak: profile.currentStreak,
           badgesEarned: profile.badgesEarned,
+          skillScore: profile.skillScore || 0,
         };
       }
       res.json({ profiles: profileMap });
     } catch (error) {
       console.error("Error fetching org gamification profiles:", error);
       res.status(500).json({ error: "Failed to fetch org gamification profiles" });
+    }
+  });
+
+  app.get("/api/gamification/admin/agent/:userId/training", isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user?.claims?.sub;
+      if (!requestingUserId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { isAdmin } = await import("./rbac");
+      const requestingMember = await storage.getUserMembership(requestingUserId);
+      if (!requestingMember || !isAdmin(requestingMember.role)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const targetUserId = req.params.userId;
+
+      const { getGamificationProfile, calculateSkillScore, checkProgressionLadder } = await import("./gamification-engine");
+
+      const profile = await getGamificationProfile(targetUserId);
+      const skillScore = await calculateSkillScore(targetUserId);
+      const ladder = await checkProgressionLadder(targetUserId);
+
+      const sessions = await storage.getTrainingSessions(targetUserId, undefined, 50);
+
+      const modeStats: Record<string, { count: number; avgScore: number; totalXp: number; lastDate: string | null }> = {};
+      for (const mode of ['roleplay', 'gauntlet', 'scenario', 'delivery_analyzer']) {
+        const modeSessions = sessions.filter(s => s.mode === mode && s.endedAt);
+        modeStats[mode] = {
+          count: modeSessions.length,
+          avgScore: modeSessions.length > 0
+            ? Math.round(modeSessions.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / modeSessions.length)
+            : 0,
+          totalXp: modeSessions.reduce((sum, s) => sum + (s.xpAwarded || 0), 0),
+          lastDate: modeSessions[0]?.startedAt?.toISOString() || null,
+        };
+      }
+
+      res.json({
+        profile,
+        skillScore,
+        ladder,
+        modeStats,
+        recentSessions: sessions.slice(0, 20),
+      });
+    } catch (error) {
+      console.error('Error fetching agent training details:', error);
+      res.status(500).json({ error: 'Failed to fetch training details' });
     }
   });
 

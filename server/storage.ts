@@ -199,6 +199,15 @@ import {
   type InsertCertificate,
   type GamificationDailyLog,
   type InsertGamificationDailyLog,
+  trainingSessions,
+  trainingMessages,
+  gauntletResponses,
+  type TrainingSession,
+  type InsertTrainingSession,
+  type TrainingMessage,
+  type InsertTrainingMessage,
+  type GauntletResponse,
+  type InsertGauntletResponse,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -459,6 +468,20 @@ export interface IStorage {
   getDailyLog(userId: string, date: string): Promise<GamificationDailyLog | undefined>;
   upsertDailyLog(userId: string, date: string, xpToAdd: number): Promise<GamificationDailyLog>;
   getOrgGamificationProfiles(userIds: string[]): Promise<GamificationProfile[]>;
+
+  // Training Session methods
+  createTrainingSession(data: InsertTrainingSession): Promise<TrainingSession>;
+  updateTrainingSession(id: number, data: Partial<InsertTrainingSession>): Promise<TrainingSession | undefined>;
+  getTrainingSession(id: number): Promise<TrainingSession | undefined>;
+  getTrainingSessions(userId: string, mode?: string, limit?: number): Promise<TrainingSession[]>;
+
+  // Training Message methods
+  createTrainingMessage(data: InsertTrainingMessage): Promise<TrainingMessage>;
+  getTrainingMessages(sessionId: number): Promise<TrainingMessage[]>;
+
+  // Gauntlet Response methods
+  createGauntletResponse(data: InsertGauntletResponse): Promise<GauntletResponse>;
+  getGauntletResponses(sessionId: number): Promise<GauntletResponse[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2929,6 +2952,62 @@ export class DatabaseStorage implements IStorage {
   async getOrgGamificationProfiles(userIds: string[]): Promise<GamificationProfile[]> {
     if (userIds.length === 0) return [];
     return db.select().from(gamificationProfiles).where(inArray(gamificationProfiles.userId, userIds));
+  }
+
+  // Training Sessions
+  async createTrainingSession(data: InsertTrainingSession): Promise<TrainingSession> {
+    const [session] = await db.insert(trainingSessions).values(data).returning();
+    return session;
+  }
+
+  async updateTrainingSession(id: number, data: Partial<InsertTrainingSession>): Promise<TrainingSession | undefined> {
+    const [session] = await db.update(trainingSessions)
+      .set(data)
+      .where(eq(trainingSessions.id, id))
+      .returning();
+    return session;
+  }
+
+  async getTrainingSession(id: number): Promise<TrainingSession | undefined> {
+    const [session] = await db.select()
+      .from(trainingSessions)
+      .where(eq(trainingSessions.id, id));
+    return session;
+  }
+
+  async getTrainingSessions(userId: string, mode?: string, limit: number = 20): Promise<TrainingSession[]> {
+    return db.select()
+      .from(trainingSessions)
+      .where(mode
+        ? and(eq(trainingSessions.userId, userId), eq(trainingSessions.mode, mode))
+        : eq(trainingSessions.userId, userId)
+      )
+      .orderBy(desc(trainingSessions.startedAt))
+      .limit(limit);
+  }
+
+  async createTrainingMessage(data: InsertTrainingMessage): Promise<TrainingMessage> {
+    const [msg] = await db.insert(trainingMessages).values(data).returning();
+    return msg;
+  }
+
+  async getTrainingMessages(sessionId: number): Promise<TrainingMessage[]> {
+    return db.select()
+      .from(trainingMessages)
+      .where(eq(trainingMessages.sessionId, sessionId))
+      .orderBy(trainingMessages.createdAt);
+  }
+
+  async createGauntletResponse(data: InsertGauntletResponse): Promise<GauntletResponse> {
+    const [resp] = await db.insert(gauntletResponses).values(data).returning();
+    return resp;
+  }
+
+  async getGauntletResponses(sessionId: number): Promise<GauntletResponse[]> {
+    return db.select()
+      .from(gauntletResponses)
+      .where(eq(gauntletResponses.sessionId, sessionId))
+      .orderBy(gauntletResponses.createdAt);
   }
 }
 

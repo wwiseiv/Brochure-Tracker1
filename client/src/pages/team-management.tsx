@@ -1013,14 +1013,27 @@ export default function TeamManagementPage() {
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {gamificationData?.profiles?.[member.userId] ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1 text-sm" data-testid={`text-training-xp-${member.id}`}>
-                                    <Zap className="h-3 w-3 text-amber-500" />
-                                    <span>{gamificationData.profiles[member.userId].totalXp || 0}</span>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium" data-testid={`text-training-xp-${member.id}`}>
+                                      {(gamificationData.profiles[member.userId].totalXp || 0).toLocaleString()} XP
+                                    </span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      Lv{gamificationData.profiles[member.userId].currentLevel || 1}
+                                    </Badge>
                                   </div>
-                                  <Badge variant="secondary" className="text-xs">
-                                    Lv{gamificationData.profiles[member.userId].currentLevel || 1}
-                                  </Badge>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {gamificationData.profiles[member.userId].skillScore > 0 && (
+                                      <span className="text-xs text-muted-foreground" data-testid={`text-skill-score-${member.id}`}>
+                                        Skill: {gamificationData.profiles[member.userId].skillScore}
+                                      </span>
+                                    )}
+                                    {gamificationData.profiles[member.userId].currentStreak > 0 && (
+                                      <span className="text-xs text-orange-500" data-testid={`text-streak-${member.id}`}>
+                                        {gamificationData.profiles[member.userId].currentStreak}d streak
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground" data-testid={`text-no-data-${member.id}`}>No data</span>

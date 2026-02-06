@@ -31,7 +31,44 @@ export const CERTIFICATE_TYPES = {
     description: "Has achieved the highest level of sales training proficiency across all PCBancard training programs, demonstrating mastery in presentations, equipment knowledge, and sales conversations.",
     requirement: "Earn Gold badge or higher in 3+ categories",
   },
+  ladder_field_scout: {
+    title: "Certificate of Achievement: Field Scout",
+    description: "Has earned the Field Scout progression level, demonstrating foundational sales skills and commitment to the PCBancard training program.",
+    requirement: "Earned Field Scout badge",
+  },
+  ladder_pipeline_builder: {
+    title: "Certificate of Achievement: Pipeline Builder",
+    description: "Has earned the Pipeline Builder progression level, demonstrating growing expertise in building and managing a sales pipeline.",
+    requirement: "Earned Pipeline Builder badge",
+  },
+  ladder_deal_closer: {
+    title: "Certificate of Achievement: Deal Closer",
+    description: "Has earned the Deal Closer progression level, demonstrating proven ability to close deals and deliver results.",
+    requirement: "Earned Deal Closer badge",
+  },
+  ladder_revenue_generator: {
+    title: "Certificate of Achievement: Revenue Generator",
+    description: "Has earned the Revenue Generator progression level, demonstrating consistent revenue generation and advanced sales proficiency.",
+    requirement: "Earned Revenue Generator badge",
+  },
+  ladder_residual_architect: {
+    title: "Certificate of Mastery: Residual Architect",
+    description: "Has achieved the highest progression level — Residual Architect — demonstrating mastery across all PCBancard sales disciplines and the ability to build lasting residual income.",
+    requirement: "Earned Residual Architect badge",
+  },
 };
+
+const LADDER_CERT_TYPES = new Set([
+  'ladder_field_scout',
+  'ladder_pipeline_builder',
+  'ladder_deal_closer',
+  'ladder_revenue_generator',
+  'ladder_residual_architect',
+]);
+
+function isLadderCertificate(certType: string): boolean {
+  return LADDER_CERT_TYPES.has(certType);
+}
 
 export async function generateCertificatePDF(data: CertificateData): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
@@ -42,9 +79,13 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const timesRomanItalic = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
 
+  const isLadder = isLadderCertificate(data.certificateType);
+  const accentColor = isLadder ? rgb(0.29, 0.27, 0.63) : rgb(0.18, 0.33, 0.59);
+  const ornamentColor = isLadder ? rgb(0.55, 0.48, 0.78) : rgb(0.72, 0.65, 0.45);
+
   page.drawRectangle({
     x: 0, y: 0, width, height,
-    color: rgb(0.98, 0.97, 0.94),
+    color: isLadder ? rgb(0.96, 0.95, 0.98) : rgb(0.98, 0.97, 0.94),
   });
 
   const borderWidth = 3;
@@ -53,7 +94,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     x: margin, y: margin,
     width: width - 2 * margin,
     height: height - 2 * margin,
-    borderColor: rgb(0.18, 0.33, 0.59),
+    borderColor: accentColor,
     borderWidth,
   });
 
@@ -61,7 +102,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     x: margin + 8, y: margin + 8,
     width: width - 2 * (margin + 8),
     height: height - 2 * (margin + 8),
-    borderColor: rgb(0.72, 0.65, 0.45),
+    borderColor: ornamentColor,
     borderWidth: 1.5,
   });
 
@@ -73,10 +114,14 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     y: height - 80,
     size: headerSize,
     font: helveticaBold,
-    color: rgb(0.18, 0.33, 0.59),
+    color: accentColor,
   });
 
-  const certTitle = "Certificate of Achievement";
+  const certTitle = data.certificateType === 'ladder_residual_architect'
+    ? "Certificate of Mastery"
+    : isLadder
+      ? "Certificate of Achievement"
+      : "Certificate of Achievement";
   const certTitleSize = 28;
   const certTitleWidth = helveticaBold.widthOfTextAtSize(certTitle, certTitleSize);
   page.drawText(certTitle, {
@@ -84,14 +129,14 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     y: height - 125,
     size: certTitleSize,
     font: helveticaBold,
-    color: rgb(0.18, 0.33, 0.59),
+    color: accentColor,
   });
 
   page.drawLine({
     start: { x: 150, y: height - 140 },
     end: { x: width - 150, y: height - 140 },
     thickness: 1.5,
-    color: rgb(0.72, 0.65, 0.45),
+    color: ornamentColor,
   });
 
   const certifiesText = "This certifies that";
@@ -129,7 +174,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     y: height - 280,
     size: awardTitleSize,
     font: helveticaBold,
-    color: rgb(0.18, 0.33, 0.59),
+    color: accentColor,
   });
 
   const descSize = 11;
@@ -239,6 +284,28 @@ export async function checkCertificateEligibility(userId: string): Promise<strin
       }
     } catch (e) { /* ignore */ }
   }
+
+  const LADDER_CERT_MAP = [
+    { badgeId: 'ladder_level_1', certType: 'ladder_field_scout' },
+    { badgeId: 'ladder_level_2', certType: 'ladder_pipeline_builder' },
+    { badgeId: 'ladder_level_3', certType: 'ladder_deal_closer' },
+    { badgeId: 'ladder_level_4', certType: 'ladder_revenue_generator' },
+    { badgeId: 'ladder_level_5', certType: 'ladder_residual_architect' },
+  ];
+
+  try {
+    const ladderBadges = await storage.getBadgesForUser(userId);
+    const ladderLevelBadges = ladderBadges.filter((b: any) => b.category === 'progression_ladder');
+
+    for (const mapping of LADDER_CERT_MAP) {
+      if (!existingTypes.has(mapping.certType)) {
+        const hasBadge = ladderLevelBadges.some((b: any) => b.badgeId === mapping.badgeId);
+        if (hasBadge) {
+          eligible.push(mapping.certType);
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
 
   return eligible;
 }

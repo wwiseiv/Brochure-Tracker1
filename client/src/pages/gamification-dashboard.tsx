@@ -23,6 +23,9 @@ import {
   Download,
   Loader2,
   Lock,
+  Shield,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
 
 interface GamificationProfile {
@@ -87,6 +90,31 @@ interface EligibilityData {
   }[];
 }
 
+interface ProgressionLevel {
+  level: number;
+  title: string;
+  xpRequired: number;
+  skillScoreRequired: number;
+  description: string;
+  earned: boolean;
+  earnedAt?: string;
+}
+
+interface LadderData {
+  currentLevel: number;
+  currentTitle: string;
+  nextLevel: ProgressionLevel | null;
+  progress: { xpPercent: number; skillScorePercent: number };
+  allLevels: ProgressionLevel[];
+  skillScoreWarning: boolean;
+  warningMessage?: string;
+}
+
+interface SkillScoreData {
+  overallScore: number;
+  components: Record<string, { score: number; weight: number; weighted: number; details: string }>;
+}
+
 const BADGE_CATEGORIES: Record<string, { name: string; color: string }> = {
   presentation: { name: "Presentation", color: "#7C5CFC" },
   equipiq: { name: "Equipment", color: "#10B981" },
@@ -98,13 +126,18 @@ const BADGE_CATEGORIES: Record<string, { name: string; color: string }> = {
 
 const BADGE_LEVELS = ["Bronze", "Silver", "Gold", "Platinum", "Diamond"];
 
-const DAILY_XP_CAP = 300;
+const DAILY_XP_CAP = 400;
 
 const CERTIFICATE_TYPES = {
   presentation_mastery: "Presentation Mastery",
   equipiq_expert: "Equipment Expert",
   roleplay_champion: "Roleplay Champion",
   sales_excellence: "Sales Excellence",
+  ladder_field_scout: "Field Scout Achievement",
+  ladder_pipeline_builder: "Pipeline Builder Achievement",
+  ladder_deal_closer: "Deal Closer Achievement",
+  ladder_revenue_generator: "Revenue Generator Achievement",
+  ladder_residual_architect: "Residual Architect Mastery",
 };
 
 const SOURCE_ICONS: Record<string, typeof Zap> = {
@@ -190,6 +223,18 @@ export default function GamificationDashboardPage() {
 
   const { data: eligibilityData } = useQuery<EligibilityData>({
     queryKey: ["/api/gamification/certificates/check-eligibility"],
+  });
+
+  const { data: ladderData } = useQuery<LadderData>({
+    queryKey: ["/api/gamification/progression-ladder"],
+  });
+
+  const { data: skillScoreData } = useQuery<SkillScoreData>({
+    queryKey: ["/api/gamification/skill-score"],
+  });
+
+  const { data: trainingHistory } = useQuery<any[]>({
+    queryKey: ["/api/training/sessions"],
   });
 
   const generateCertMutation = useMutation({
@@ -289,6 +334,123 @@ export default function GamificationDashboardPage() {
             </div>
           </div>
         </Card>
+
+        <Card className="p-4" data-testid="card-progression-ladder">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-500" />
+            Progression Ladder
+            {ladderData?.currentTitle && ladderData.currentTitle !== "Unranked" && (
+              <Badge variant="secondary" className="ml-auto" data-testid="badge-ladder-current">
+                {ladderData.currentTitle}
+              </Badge>
+            )}
+          </h3>
+
+          {ladderData?.skillScoreWarning && (
+            <div className="mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-start gap-2" data-testid="alert-skill-score-warning">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-600 dark:text-amber-400">{ladderData.warningMessage}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {(ladderData?.allLevels || []).map((level) => {
+              const isCurrent = ladderData?.currentLevel === level.level;
+              const isNext = ladderData?.nextLevel?.level === level.level;
+
+              return (
+                <div
+                  key={level.level}
+                  className={`flex items-center gap-3 p-3 rounded-md border ${
+                    level.earned
+                      ? isCurrent
+                        ? 'border-indigo-500 bg-indigo-500/10'
+                        : 'border-green-500/50 bg-green-500/5'
+                      : isNext
+                        ? 'border-border bg-muted/30'
+                        : 'border-border opacity-50'
+                  }`}
+                  data-testid={`ladder-level-${level.level}`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${
+                    level.earned
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {level.level}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${level.earned ? '' : 'text-muted-foreground'}`}>
+                      {level.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {level.earned
+                        ? level.earnedAt
+                          ? `Earned ${new Date(level.earnedAt).toLocaleDateString()}`
+                          : 'Earned'
+                        : `${level.xpRequired.toLocaleString()} XP + ${level.skillScoreRequired} Skill Score`
+                      }
+                    </p>
+                    {isNext && ladderData?.progress && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-16">XP</span>
+                          <Progress value={ladderData.progress.xpPercent} className="h-1.5 flex-1" />
+                          <span className="text-xs text-muted-foreground">{ladderData.progress.xpPercent}%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-16">Skill</span>
+                          <Progress value={ladderData.progress.skillScorePercent} className="h-1.5 flex-1" />
+                          <span className="text-xs text-muted-foreground">{ladderData.progress.skillScorePercent}%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {level.earned && (
+                    <Star className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {skillScoreData && (
+          <Card className="p-4" data-testid="card-skill-score">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-500" />
+              Skill Score
+              <Badge variant="secondary" className="ml-auto" data-testid="badge-skill-score">
+                {skillScoreData.overallScore}/100
+              </Badge>
+            </h3>
+
+            <div className="space-y-3">
+              {Object.entries(skillScoreData.components).map(([key, comp]) => {
+                const labels: Record<string, string> = {
+                  roleplayPerformance: 'Roleplay',
+                  objectionHandling: 'Objections',
+                  presentationMastery: 'Presentation',
+                  scenarioDecisionMaking: 'Scenarios',
+                  consistency: 'Consistency',
+                };
+
+                return (
+                  <div key={key} data-testid={`skill-component-${key}`}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">{labels[key] || key}</span>
+                      <span className="font-medium">
+                        {comp.score}% <span className="text-xs text-muted-foreground">({Math.round(comp.weight * 100)}%)</span>
+                      </span>
+                    </div>
+                    <Progress value={comp.score} className="h-1.5" />
+                    <p className="text-xs text-muted-foreground mt-0.5">{comp.details}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         <Card className="p-4">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -549,6 +711,64 @@ export default function GamificationDashboardPage() {
             )}
           </Card>
         )}
+
+        <Card className="p-4" data-testid="card-training-history">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Target className="w-4 h-4 text-cyan-500" />
+            Recent Training Sessions
+          </h3>
+          {trainingHistory && trainingHistory.length > 0 ? (
+            <div className="space-y-2">
+              {trainingHistory.slice(0, 10).map((session: any) => {
+                const modeLabels: Record<string, string> = {
+                  roleplay: 'Roleplay',
+                  gauntlet: 'Objection Gauntlet',
+                  scenario: 'Scenario Trainer',
+                  delivery_analyzer: 'Delivery Analyzer',
+                };
+                const modeColors: Record<string, string> = {
+                  roleplay: 'text-primary',
+                  gauntlet: 'text-orange-500',
+                  scenario: 'text-cyan-500',
+                  delivery_analyzer: 'text-purple-500',
+                };
+
+                return (
+                  <div key={session.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0" data-testid={`training-session-${session.id}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${modeColors[session.mode] || ''}`}>
+                        {modeLabels[session.mode] || session.mode}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {session.startedAt ? new Date(session.startedAt).toLocaleDateString() : 'Unknown date'}
+                        {session.scorePercent !== null && ` · Score: ${session.scorePercent}%`}
+                        {session.turnCount && ` · ${session.turnCount} turns`}
+                      </p>
+                    </div>
+                    {session.xpAwarded > 0 && (
+                      <Badge variant="secondary" className="flex-shrink-0">
+                        +{session.xpAwarded} XP
+                      </Badge>
+                    )}
+                    {session.scorePercent !== null && (
+                      <div className={`text-sm font-bold ${
+                        session.scorePercent >= 80 ? 'text-green-500' :
+                        session.scorePercent >= 60 ? 'text-yellow-500' :
+                        session.scorePercent >= 40 ? 'text-orange-500' : 'text-red-500'
+                      }`}>
+                        {session.scorePercent}%
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No training sessions yet. Start practicing to see your history!
+            </p>
+          )}
+        </Card>
       </main>
     </div>
   );

@@ -13,18 +13,28 @@ import {
 export const XP_CONFIG = {
   PRESENTATION_LESSON_COMPLETE: 25,
   PRESENTATION_QUIZ_PASS: 15,
-  PRESENTATION_MODULE_COMPLETE: 100,
-  EQUIPIQ_QUIZ_COMPLETE: 20,
+  PRESENTATION_MODULE_COMPLETE: 150,
+  EQUIPIQ_QUIZ_COMPLETE: 50,
   EQUIPIQ_QUIZ_PERFECT: 50,
-  ROLEPLAY_SESSION_COMPLETE: 30,
-  ROLEPLAY_HIGH_SCORE: 50,
+  ROLEPLAY_SESSION_COMPLETE: 60,
+  ROLEPLAY_HIGH_SCORE: 40,
   DAILY_EDGE_VIEW: 5,
   DAILY_EDGE_CHALLENGE: 15,
   SALES_PROCESS_PHASE_VIEW: 10,
-  GAUNTLET_COMPLETE: 35,
-  SCENARIO_COMPLETE: 25,
-  DELIVERY_ANALYSIS: 30,
-  DAILY_CAP: 300,
+  GAUNTLET_PER_OBJECTION: 15,
+  GAUNTLET_PERFECT_BONUS: 50,
+  SCENARIO_COMPLETE: 40,
+  SCENARIO_BEST_BONUS: 20,
+  DELIVERY_ANALYSIS: 80,
+  DELIVERY_ALL_STAGES_BONUS: 20,
+  DAILY_CAP: 400,
+  STREAK_BONUS_3_DAYS: 25,
+  STREAK_BONUS_7_DAYS: 100,
+  STREAK_BONUS_14_DAYS: 250,
+  STREAK_BONUS_30_DAYS: 500,
+  LESSON_QUICK_CHECK_BONUS_80: 10,
+  LESSON_QUICK_CHECK_BONUS_90: 25,
+  ALL_MODULES_MILESTONE: 500,
 };
 
 export const LEVEL_THRESHOLDS = [
@@ -185,6 +195,43 @@ export async function awardXP(
 
   await storage.upsertGamificationProfile(userId, streakData);
 
+  // Award streak bonuses (direct, no recursion - bypasses daily cap)
+  const currentStreak = streakData.currentStreak || existingProfile?.currentStreak || 0;
+  const streakMilestones = [
+    { days: 30, xp: XP_CONFIG.STREAK_BONUS_30_DAYS },
+    { days: 14, xp: XP_CONFIG.STREAK_BONUS_14_DAYS },
+    { days: 7, xp: XP_CONFIG.STREAK_BONUS_7_DAYS },
+    { days: 3, xp: XP_CONFIG.STREAK_BONUS_3_DAYS },
+  ];
+
+  for (const milestone of streakMilestones) {
+    if (currentStreak === milestone.days) {
+      const existingEntries = await storage.getXpLedger(userId, 200);
+      const alreadyAwarded = existingEntries.some((e: any) =>
+        e.source === 'streak_bonus' && e.sourceId === `streak_${milestone.days}_${getTodayDate()}`
+      );
+
+      if (!alreadyAwarded) {
+        await storage.createXpEntry({
+          userId,
+          amount: milestone.xp,
+          source: 'streak_bonus',
+          sourceId: `streak_${milestone.days}_${getTodayDate()}`,
+          description: `${milestone.days}-day streak bonus!`,
+        });
+
+        const updatedProfile = await storage.getGamificationProfile(userId);
+        if (updatedProfile) {
+          const streakNewTotal = updatedProfile.totalXp + milestone.xp;
+          await storage.upsertGamificationProfile(userId, { totalXp: streakNewTotal, currentLevel: calculateLevel(streakNewTotal) });
+        }
+
+        console.log(`[Gamification] Streak bonus: ${milestone.xp} XP for ${milestone.days}-day streak`);
+      }
+      break;
+    }
+  }
+
   const newBadges: any[] = [];
   const overallBadge = await checkBadgeProgression(userId, "overall", newTotalXp);
   if (overallBadge) {
@@ -198,6 +245,184 @@ export async function awardXP(
     newLevel,
     dailyCapped,
     newBadges,
+  };
+}
+
+// ========== SKILL SCORE SYSTEM ==========
+// Weighted composite score 0-100 based on training performance
+
+export const SKILL_SCORE_WEIGHTS = {
+  roleplayPerformance: 0.25,
+  objectionHandling: 0.25,
+  presentationMastery: 0.30,
+  scenarioDecisionMaking: 0.10,
+  consistency: 0.10,
+};
+
+export async function calculateSkillScore(userId: string): Promise<{
+  overallScore: number;
+  components: Record<string, { score: number; weight: number; weighted: number; details: string }>;
+}> {
+  const roleplaySessions = await storage.getTrainingSessions(userId, 'roleplay', 30);
+  const gauntletSessions = await storage.getTrainingSessions(userId, 'gauntlet', 30);
+  const scenarioSessions = await storage.getTrainingSessions(userId, 'scenario', 30);
+  const deliverySessions = await storage.getTrainingSessions(userId, 'delivery_analyzer', 30);
+
+  const completedRoleplays = roleplaySessions.filter(s => s.endedAt && s.scorePercent !== null);
+  const roleplayScore = completedRoleplays.length > 0
+    ? Math.round(completedRoleplays.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / completedRoleplays.length)
+    : 0;
+
+  const completedGauntlets = gauntletSessions.filter(s => s.endedAt && s.scorePercent !== null);
+  const gauntletScore = completedGauntlets.length > 0
+    ? Math.round(completedGauntlets.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / completedGauntlets.length)
+    : 0;
+
+  const completedDelivery = deliverySessions.filter(s => s.endedAt && s.scorePercent !== null);
+  const deliveryAvg = completedDelivery.length > 0
+    ? Math.round(completedDelivery.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / completedDelivery.length)
+    : 0;
+  const presentationScore = deliveryAvg;
+
+  const completedScenarios = scenarioSessions.filter(s => s.endedAt && s.scorePercent !== null);
+  const scenarioScore = completedScenarios.length > 0
+    ? Math.round(completedScenarios.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / completedScenarios.length)
+    : 0;
+
+  const profile = await storage.getGamificationProfile(userId);
+  const streak = profile?.currentStreak || 0;
+  const consistencyScore = Math.min(100, Math.round((streak / 7) * 100));
+
+  const components: Record<string, { score: number; weight: number; weighted: number; details: string }> = {
+    roleplayPerformance: {
+      score: roleplayScore,
+      weight: SKILL_SCORE_WEIGHTS.roleplayPerformance,
+      weighted: Math.round(roleplayScore * SKILL_SCORE_WEIGHTS.roleplayPerformance),
+      details: `${completedRoleplays.length} sessions, avg ${roleplayScore}%`,
+    },
+    objectionHandling: {
+      score: gauntletScore,
+      weight: SKILL_SCORE_WEIGHTS.objectionHandling,
+      weighted: Math.round(gauntletScore * SKILL_SCORE_WEIGHTS.objectionHandling),
+      details: `${completedGauntlets.length} runs, avg ${gauntletScore}%`,
+    },
+    presentationMastery: {
+      score: presentationScore,
+      weight: SKILL_SCORE_WEIGHTS.presentationMastery,
+      weighted: Math.round(presentationScore * SKILL_SCORE_WEIGHTS.presentationMastery),
+      details: `${completedDelivery.length} analyses, avg ${presentationScore}%`,
+    },
+    scenarioDecisionMaking: {
+      score: scenarioScore,
+      weight: SKILL_SCORE_WEIGHTS.scenarioDecisionMaking,
+      weighted: Math.round(scenarioScore * SKILL_SCORE_WEIGHTS.scenarioDecisionMaking),
+      details: `${completedScenarios.length} completed, avg ${scenarioScore}%`,
+    },
+    consistency: {
+      score: consistencyScore,
+      weight: SKILL_SCORE_WEIGHTS.consistency,
+      weighted: Math.round(consistencyScore * SKILL_SCORE_WEIGHTS.consistency),
+      details: `${streak}-day streak`,
+    },
+  };
+
+  const overallScore = Object.values(components).reduce((sum, c) => sum + c.weighted, 0);
+
+  return { overallScore: Math.min(100, overallScore), components };
+}
+
+// ========== 5-LEVEL PROGRESSION LADDER ==========
+// Career progression badges requiring both XP and Skill Score
+
+export const PROGRESSION_LADDER = [
+  { level: 1, title: "Field Scout", xpRequired: 200, skillScoreRequired: 20,
+    description: "Beginning the journey. Learning the basics of field sales." },
+  { level: 2, title: "Pipeline Builder", xpRequired: 1000, skillScoreRequired: 35,
+    description: "Building a consistent pipeline of merchant opportunities." },
+  { level: 3, title: "Deal Closer", xpRequired: 3000, skillScoreRequired: 50,
+    description: "Consistently closing deals with strong sales technique." },
+  { level: 4, title: "Revenue Generator", xpRequired: 7000, skillScoreRequired: 65,
+    description: "Driving significant revenue with advanced selling skills." },
+  { level: 5, title: "Residual Architect", xpRequired: 15000, skillScoreRequired: 80,
+    description: "Mastering every aspect of PCBancard sales methodology." },
+];
+
+export async function checkProgressionLadder(userId: string): Promise<{
+  currentLevel: number;
+  currentTitle: string;
+  nextLevel: typeof PROGRESSION_LADDER[number] | null;
+  progress: { xpPercent: number; skillScorePercent: number };
+  allLevels: (typeof PROGRESSION_LADDER[number] & { earned: boolean; earnedAt?: string })[];
+  skillScoreWarning: boolean;
+  warningMessage?: string;
+}> {
+  const profile = await storage.getGamificationProfile(userId);
+  const totalXp = profile?.totalXp || 0;
+  const skillScore = profile?.skillScore || 0;
+
+  let currentLevel = 0;
+  let currentTitle = "Unranked";
+
+  const existingBadges = await storage.getBadgesForUser(userId);
+  const ladderBadges = existingBadges.filter((b: any) => b.category === 'progression_ladder');
+
+  for (const level of PROGRESSION_LADDER) {
+    if (totalXp >= level.xpRequired && skillScore >= level.skillScoreRequired) {
+      currentLevel = level.level;
+      currentTitle = level.title;
+
+      const badgeId = `ladder_level_${level.level}`;
+      const existing = ladderBadges.find((b: any) => b.badgeId === badgeId);
+      if (!existing) {
+        await storage.createBadge({
+          userId,
+          badgeId,
+          badgeLevel: level.level,
+          category: 'progression_ladder',
+        });
+
+        if (profile) {
+          await storage.upsertGamificationProfile(userId, {
+            badgesEarned: (profile.badgesEarned || 0) + 1,
+          });
+        }
+      }
+    }
+  }
+
+  const nextLevel = PROGRESSION_LADDER.find(l => l.level === currentLevel + 1) || null;
+
+  const progress = nextLevel ? {
+    xpPercent: Math.min(100, Math.round((totalXp / nextLevel.xpRequired) * 100)),
+    skillScorePercent: Math.min(100, Math.round((skillScore / nextLevel.skillScoreRequired) * 100)),
+  } : { xpPercent: 100, skillScorePercent: 100 };
+
+  let skillScoreWarning = false;
+  let warningMessage: string | undefined;
+  const currentLevelDef = PROGRESSION_LADDER.find(l => l.level === currentLevel);
+  if (currentLevelDef && skillScore < currentLevelDef.skillScoreRequired) {
+    skillScoreWarning = true;
+    warningMessage = `Your Skill Score (${skillScore}) has dropped below the ${currentTitle} requirement (${currentLevelDef.skillScoreRequired}). Your badge is retained, but practice to maintain your level!`;
+  }
+
+  const allLevels = PROGRESSION_LADDER.map(level => {
+    const badgeId = `ladder_level_${level.level}`;
+    const badge = ladderBadges.find((b: any) => b.badgeId === badgeId);
+    return {
+      ...level,
+      earned: !!badge,
+      earnedAt: badge?.earnedAt?.toISOString(),
+    };
+  });
+
+  return {
+    currentLevel,
+    currentTitle,
+    nextLevel,
+    progress,
+    allLevels,
+    skillScoreWarning,
+    warningMessage,
   };
 }
 

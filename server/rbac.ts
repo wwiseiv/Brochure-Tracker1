@@ -64,6 +64,10 @@ async function isImpersonating(req: Request): Promise<boolean> {
   return false;
 }
 
+export function isAdmin(role: string): boolean {
+  return role === "master_admin" || role === "relationship_manager";
+}
+
 export function isAdminEmail(email: string | undefined | null): boolean {
   if (!email) return false;
   const lowerEmail = email.toLowerCase();
