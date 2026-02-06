@@ -55,6 +55,7 @@ import {
   FileSignature,
   FileText,
   Cpu,
+  Info,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -2102,6 +2103,39 @@ export default function CoachPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
+              {mode === "roleplay" && (
+                <div className="border-b bg-muted/30 px-4 py-2">
+                  <div className="max-w-4xl mx-auto flex items-start gap-2">
+                    <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">
+                        <span className="font-medium text-foreground">{scenarioOptions.find(s => s.value === scenario)?.label || scenario}</span>
+                      </span>
+                      {selectedMerchantCharacter && (() => {
+                        const character = MERCHANT_PERSONAS.find(p => p.id === selectedMerchantCharacter);
+                        return character ? (
+                          <span className="text-muted-foreground">
+                            with <span className="font-medium text-foreground">{character.name}</span>
+                            <span className="text-xs ml-1">({character.businessType})</span>
+                          </span>
+                        ) : null;
+                      })()}
+                      {selectedPersonaId && !selectedMerchantCharacter && (() => {
+                        const persona = sortedPersonas.find(p => p.id === selectedPersonaId);
+                        return persona ? (
+                          <span className="text-muted-foreground">
+                            with <span className="font-medium text-foreground">{persona.name}</span>
+                            {persona.businessType && <span className="text-xs ml-1">({persona.businessType})</span>}
+                          </span>
+                        ) : null;
+                      })()}
+                      <Badge variant="outline" className="text-xs">
+                        {difficultyOptions.find(d => d.value === difficulty)?.label || difficulty}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex-1 overflow-auto p-4">
                 <div className="max-w-4xl mx-auto space-y-3">
                 {messages.length === 0 && (
