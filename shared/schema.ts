@@ -3491,3 +3491,25 @@ export const insertGeneratedCertificateSchema = createInsertSchema(generatedCert
 });
 export type InsertGeneratedCertificate = z.infer<typeof insertGeneratedCertificateSchema>;
 export type GeneratedCertificate = typeof generatedCertificates.$inferSelect;
+
+// Video Watch Progress - tracks agent video watching for Sales Videos training
+export const videoWatchProgress = pgTable("video_watch_progress", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  videoId: varchar("video_id", { length: 50 }).notNull(),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  watchTimeSeconds: integer("watch_time_seconds").default(0),
+  completed: boolean("completed").default(false),
+  lastWatchedAt: timestamp("last_watched_at").defaultNow(),
+}, (table) => ({
+  uniqueUserVideo: unique().on(table.userId, table.videoId),
+}));
+
+export const insertVideoWatchProgressSchema = createInsertSchema(videoWatchProgress).omit({
+  id: true,
+  startedAt: true,
+  lastWatchedAt: true,
+});
+export type InsertVideoWatchProgress = z.infer<typeof insertVideoWatchProgressSchema>;
+export type VideoWatchProgress = typeof videoWatchProgress.$inferSelect;

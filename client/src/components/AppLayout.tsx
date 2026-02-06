@@ -46,6 +46,7 @@ import {
   Megaphone,
   Menu,
   Trophy,
+  PlayCircle,
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
@@ -81,6 +82,7 @@ const pathToFeatureMap: Record<string, string> = {
   "/activity": "activity_feed",
   "/help": "help_center",
   "/gamification": "gamification_dashboard",
+  "/training/sales-videos": "video_hello",
 };
 
 const menuCategories = [
@@ -116,6 +118,7 @@ const menuCategories = [
       { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
       { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
+      { path: "/training/sales-videos", icon: PlayCircle, label: "Sales Videos" },
       { path: "/gamification", icon: Trophy, label: "Gamification" },
     ],
   },

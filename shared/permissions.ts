@@ -30,7 +30,8 @@ export type FeatureCategory =
   | 'communication'
   | 'team_management'
   | 'analytics'
-  | 'system';
+  | 'system'
+  | 'sales_videos';
 
 export interface FeatureDefinition {
   id: string;
@@ -229,6 +230,90 @@ export const FEATURES: FeatureDefinition[] = [
     roleDefaults: { admin: true, manager: true, agent: true },
     stageDefaults: { trainee: true, active: true, senior: true },
     icon: 'Sparkles'
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SALES VIDEOS — PCBancard sales presentation training videos
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'video_hello',
+    name: 'Hello — Stop Losing to Fees',
+    description: 'Core dual pricing value proposition video',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_grow',
+    name: 'Grow — Reinvest & Scale',
+    description: 'Reinvest fee savings into business growth',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_next_steps',
+    name: 'Next Steps — $1K Incentive',
+    description: 'Conversion incentive and risk-free switching',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_trust',
+    name: 'Trust — Support & Guarantees',
+    description: 'US-based support, 60-day policy, BBB A+ rating',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_in_store',
+    name: 'In-Store — Brick & Mortar Tools',
+    description: 'Smart terminal and POS integration demo',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_mobile',
+    name: 'Mobile — Get Paid Anywhere',
+    description: 'Mobile payment solutions for field businesses',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_online',
+    name: 'Online — Get Paid Virtually',
+    description: 'E-commerce, virtual terminal, payment links',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'PlayCircle'
+  },
+  {
+    id: 'video_give_back',
+    name: 'Give Back — Business Into Impact',
+    description: 'Charitable giving through transactions',
+    category: 'sales_videos',
+    routes: ['/training/sales-videos'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: false, active: true, senior: true },
+    icon: 'PlayCircle'
   },
 
   // ─────────────────────────────────────────────────────────────────────────────

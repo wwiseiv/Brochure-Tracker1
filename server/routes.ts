@@ -75,6 +75,11 @@ import {
   prospectActivities,
   prospectSearches,
   drops,
+  videoWatchProgress,
+  equipmentQuizResults,
+  dailyEdgeStreaks,
+  gamificationProfiles,
+  badgesEarned,
 } from "@shared/schema";
 import { eq, and, desc, ilike, or, asc, lte, gte, count, sql } from "drizzle-orm";
 import { 
@@ -16146,6 +16151,281 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
     } catch (error) {
       console.error("[OnePageProposal] Generation error:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
+  async function checkVideoBadges(userId: string, completedCount: number, allProgress: any[]): Promise<string[]> {
+    const newBadges: string[] = [];
+    const VIDEO_BADGES = [
+      { id: 'video_first_watch', name: 'First Video', condition: (count: number) => count >= 1, level: 1, category: 'videos' },
+      { id: 'video_halfway', name: 'Halfway There', condition: (count: number) => count >= 4, level: 2, category: 'videos' },
+      { id: 'video_all_complete', name: 'Video Master', condition: (count: number) => count >= 8, level: 3, category: 'videos' },
+    ];
+    
+    for (const badge of VIDEO_BADGES) {
+      if (badge.condition(completedCount)) {
+        try {
+          const existing = await db.select().from(badgesEarned)
+            .where(and(eq(badgesEarned.userId, userId), eq(badgesEarned.badgeId, badge.id)));
+          if (existing.length === 0) {
+            await db.insert(badgesEarned).values({
+              userId,
+              badgeId: badge.id,
+              badgeLevel: badge.level,
+              category: badge.category,
+            });
+            newBadges.push(badge.name);
+          }
+        } catch (e) {
+          console.log(`Badge ${badge.id} already earned by user ${userId}`);
+        }
+      }
+    }
+    
+    if (completedCount >= 8) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allToday = allProgress.every(p => p.completedAt && new Date(p.completedAt) >= today);
+      if (allToday) {
+        try {
+          const existing = await db.select().from(badgesEarned)
+            .where(and(eq(badgesEarned.userId, userId), eq(badgesEarned.badgeId, 'video_speed_learner')));
+          if (existing.length === 0) {
+            await db.insert(badgesEarned).values({
+              userId,
+              badgeId: 'video_speed_learner',
+              badgeLevel: 4,
+              category: 'videos',
+            });
+            newBadges.push('Speed Learner');
+          }
+        } catch (e) {
+          console.log(`Speed Learner badge already earned by user ${userId}`);
+        }
+      }
+    }
+    
+    return newBadges;
+  }
+
+  app.get("/api/training/video-progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const progress = await db.select().from(videoWatchProgress).where(eq(videoWatchProgress.userId, userId));
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching video progress:", error);
+      res.status(500).json({ error: "Failed to fetch video progress" });
+    }
+  });
+
+  app.post("/api/training/video-progress/:videoId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const { videoId } = req.params;
+      
+      const bodySchema = z.object({
+        action: z.enum(["start", "progress", "complete"]),
+        watchTimeSeconds: z.number().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request body", details: parsed.error.message });
+      }
+      const { action, watchTimeSeconds } = parsed.data;
+
+      const existing = await db.select().from(videoWatchProgress)
+        .where(and(eq(videoWatchProgress.userId, userId), eq(videoWatchProgress.videoId, videoId)));
+      
+      if (action === "start") {
+        if (existing.length === 0) {
+          const [record] = await db.insert(videoWatchProgress).values({
+            userId,
+            videoId,
+            watchTimeSeconds: 0,
+            completed: false,
+          }).returning();
+          return res.json(record);
+        }
+        return res.json(existing[0]);
+      }
+      
+      if (action === "progress") {
+        if (existing.length === 0) {
+          const [record] = await db.insert(videoWatchProgress).values({
+            userId,
+            videoId,
+            watchTimeSeconds: watchTimeSeconds || 0,
+            completed: false,
+          }).returning();
+          return res.json(record);
+        }
+        const [updated] = await db.update(videoWatchProgress)
+          .set({ 
+            watchTimeSeconds: watchTimeSeconds || existing[0].watchTimeSeconds,
+            lastWatchedAt: new Date(),
+          })
+          .where(and(eq(videoWatchProgress.userId, userId), eq(videoWatchProgress.videoId, videoId)))
+          .returning();
+        return res.json(updated);
+      }
+      
+      if (action === "complete") {
+        if (existing.length === 0) {
+          const [record] = await db.insert(videoWatchProgress).values({
+            userId,
+            videoId,
+            watchTimeSeconds: watchTimeSeconds || 0,
+            completed: true,
+            completedAt: new Date(),
+          }).returning();
+          const allProgress = await db.select().from(videoWatchProgress)
+            .where(and(eq(videoWatchProgress.userId, userId), eq(videoWatchProgress.completed, true)));
+          const completedCount = allProgress.length + 1;
+          const badges = await checkVideoBadges(userId, completedCount, allProgress);
+          return res.json({ progress: record, badges });
+        }
+        const [updated] = await db.update(videoWatchProgress)
+          .set({ 
+            completed: true,
+            completedAt: new Date(),
+            watchTimeSeconds: watchTimeSeconds || existing[0].watchTimeSeconds,
+            lastWatchedAt: new Date(),
+          })
+          .where(and(eq(videoWatchProgress.userId, userId), eq(videoWatchProgress.videoId, videoId)))
+          .returning();
+        const allProgress = await db.select().from(videoWatchProgress)
+          .where(and(eq(videoWatchProgress.userId, userId), eq(videoWatchProgress.completed, true)));
+        const completedCount = allProgress.length;
+        const badges = await checkVideoBadges(userId, completedCount, allProgress);
+        return res.json({ progress: updated, badges });
+      }
+      
+      res.status(400).json({ error: "Invalid action. Use 'start', 'progress', or 'complete'" });
+    } catch (error) {
+      console.error("Error updating video progress:", error);
+      res.status(500).json({ error: "Failed to update video progress" });
+    }
+  });
+
+  app.get("/api/training/video-progress/user/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user?.claims?.sub;
+      if (!requestingUserId) return res.status(401).json({ error: "Unauthorized" });
+      const { isAdmin } = await import("./rbac");
+      const requestingMember = await storage.getUserMembership(requestingUserId);
+      if (!requestingMember || !isAdmin(requestingMember.role)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const targetUserId = req.params.userId;
+      const progress = await db.select().from(videoWatchProgress).where(eq(videoWatchProgress.userId, targetUserId));
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching user video progress:", error);
+      res.status(500).json({ error: "Failed to fetch video progress" });
+    }
+  });
+
+  app.get("/api/admin/agent/:userId/training-overview", isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user?.claims?.sub;
+      if (!requestingUserId) return res.status(401).json({ error: "Unauthorized" });
+      const { isAdmin } = await import("./rbac");
+      const requestingMember = await storage.getUserMembership(requestingUserId);
+      if (!requestingMember || !isAdmin(requestingMember.role)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const targetUserId = req.params.userId;
+      
+      const targetMember = await storage.getUserMembership(targetUserId);
+      
+      const videoProgress = await db.select().from(videoWatchProgress)
+        .where(eq(videoWatchProgress.userId, targetUserId));
+      const videosCompleted = videoProgress.filter(v => v.completed).length;
+      
+      const presProgress = await db.select().from(presentationProgress)
+        .where(eq(presentationProgress.userId, targetUserId));
+      const presLessons = await db.select().from(presentationLessons);
+      const modulesCompleted = presProgress.filter(p => p.completed).length;
+      
+      const sessions = await storage.getTrainingSessions(targetUserId, undefined, 50);
+      const completedSessions = sessions.filter(s => s.endedAt);
+      const roleplaySessions = completedSessions.filter(s => s.mode === 'roleplay');
+      const avgScore = completedSessions.length > 0 
+        ? Math.round(completedSessions.reduce((sum, s) => sum + (s.scorePercent || 0), 0) / completedSessions.length)
+        : 0;
+      
+      const equipResults = await db.select().from(equipmentQuizResults)
+        .where(eq(equipmentQuizResults.userId, targetUserId));
+      const uniqueVendors = new Set(equipResults.map(r => r.vendorId).filter(Boolean));
+      
+      const streakData = await db.select().from(dailyEdgeStreaks)
+        .where(eq(dailyEdgeStreaks.userId, targetUserId));
+      const streak = streakData[0] || null;
+      
+      const badges = await db.select().from(badgesEarned)
+        .where(eq(badgesEarned.userId, targetUserId));
+      
+      const gamProfile = await db.select().from(gamificationProfiles)
+        .where(eq(gamificationProfiles.userId, targetUserId));
+      
+      const totalTasks = 8 + presLessons.length + 6;
+      const completedTasks = videosCompleted + modulesCompleted + uniqueVendors.size;
+      const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      
+      res.json({
+        user: targetMember ? {
+          id: targetMember.userId,
+          role: targetMember.role,
+          stage: targetMember.agentStage,
+          joinedAt: targetMember.createdAt,
+        } : null,
+        overallProgress,
+        videos: {
+          completed: videosCompleted,
+          total: 8,
+          items: videoProgress,
+        },
+        presentationTraining: {
+          modulesCompleted,
+          totalModules: presLessons.length,
+          items: presProgress.map(p => {
+            const lesson = presLessons.find(l => l.id === p.lessonId);
+            return { ...p, lessonTitle: lesson?.title || `Lesson ${p.lessonId}`, moduleNumber: lesson?.moduleNumber };
+          }),
+        },
+        salesCoach: {
+          sessionsCompleted: completedSessions.length,
+          averageScore: avgScore,
+          recentSessions: completedSessions.slice(0, 10).map(s => ({
+            id: s.id,
+            mode: s.mode,
+            personaId: s.personaId,
+            scorePercent: s.scorePercent,
+            startedAt: s.startedAt,
+            endedAt: s.endedAt,
+            xpAwarded: s.xpAwarded,
+          })),
+        },
+        equipiq: {
+          vendorsCompleted: uniqueVendors.size,
+          totalVendors: 6,
+          results: equipResults,
+        },
+        dailyEdge: streak ? {
+          currentStreak: streak.currentStreak,
+          longestStreak: streak.longestStreak,
+          lastCompleted: streak.lastActiveDate,
+        } : null,
+        badges,
+        gamification: gamProfile[0] || null,
+      });
+    } catch (error) {
+      console.error("Error fetching training overview:", error);
+      res.status(500).json({ error: "Failed to fetch training overview" });
     }
   });
 

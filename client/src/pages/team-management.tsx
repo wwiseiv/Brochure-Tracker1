@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ import {
   Lock,
   Eye,
   Zap,
+  GraduationCap,
 } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { Switch } from "@/components/ui/switch";
@@ -172,6 +173,7 @@ function TeamManagementSkeleton() {
 export default function TeamManagementPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { startImpersonation, isLoading: impersonationLoading, canImpersonate, availableUsers } = useImpersonation();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -390,6 +392,7 @@ export default function TeamManagementPage() {
     team_management: "Team Management",
     analytics: "Analytics",
     system: "System",
+    sales_videos: "Sales Videos",
   };
 
   const featuresByCategory = useMemo(() => {
@@ -404,6 +407,7 @@ export default function TeamManagementPage() {
       team_management: [],
       analytics: [],
       system: [],
+      sales_videos: [],
     };
     FEATURES.forEach((feature) => {
       if (!feature.isCritical) {
@@ -1055,6 +1059,15 @@ export default function TeamManagementPage() {
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setLocation(`/admin/agent/${member.userId}/training`)}
+                                  title="View Training Progress"
+                                  data-testid={`button-training-member-${member.id}`}
+                                >
+                                  <GraduationCap className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
