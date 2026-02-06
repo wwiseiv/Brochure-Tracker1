@@ -6,7 +6,7 @@ import {
   Home, QrCode, User, FileSignature, HelpCircle, CalendarCheck, Users, 
   GraduationCap, Building2, Menu, X, Briefcase, MapPin, FileText, 
   BarChart3, MessageSquare, Settings, Users2, Sparkles, Package,
-  Target, Megaphone, History, PenTool, Shield, ChevronRight
+  Target, Megaphone, History, PenTool, Shield, ChevronRight, Trophy
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -45,6 +45,7 @@ const pathToFeatureMap: Record<string, string> = {
   "/my-work": "my_analytics",
   "/activity": "activity_feed",
   "/help": "help_center",
+  "/gamification": "gamification_dashboard",
 };
 
 // Bottom nav items - most used features
@@ -97,6 +98,7 @@ const menuCategories = [
       { path: "/coach", icon: GraduationCap, label: "AI Coach & Training" },
       { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
+      { path: "/gamification", icon: Trophy, label: "Gamification" },
     ]
   },
   {

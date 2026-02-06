@@ -49,6 +49,8 @@ import {
   CheckCircle,
   Trash2,
   Pencil,
+  Award,
+  Image,
 } from "lucide-react";
 import { isToday, isPast, parseISO, startOfDay } from "date-fns";
 import { format, formatDistanceToNow } from "date-fns";
@@ -174,6 +176,114 @@ interface UserRole {
   };
   managerId: number | null;
   profilePhotoUrl: string | null;
+}
+
+interface CertificateManifest {
+  totalAssets: number;
+  categories: Record<string, number>;
+  generatedAt?: string;
+}
+
+function CertificateBadgeAssetsSection() {
+  const { toast } = useToast();
+
+  const { data: manifest, isLoading: manifestLoading } = useQuery<CertificateManifest>({
+    queryKey: ["/api/certificates/manifest"],
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/generate-certificate-assets");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to regenerate assets");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Assets Regenerated",
+        description: "Certificate and badge assets have been regenerated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/certificates/manifest"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Regeneration Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const totalAssets = manifest?.totalAssets || 0;
+  const categories = manifest?.categories || {};
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" data-testid="text-certificate-assets-title">
+        <Award className="h-5 w-5 text-primary" />
+        Certificate & Badge Assets
+      </h2>
+      <Card className="p-6" data-testid="card-certificate-assets">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Image className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground" data-testid="text-asset-count">
+                {manifestLoading ? "Loading..." : `${totalAssets} assets available`}
+              </span>
+            </div>
+            {manifest?.generatedAt && (
+              <span className="text-xs text-muted-foreground" data-testid="text-asset-generated-at">
+                Last generated: {formatDistanceToNow(new Date(manifest.generatedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+          <Button
+            onClick={() => regenerateMutation.mutate()}
+            disabled={regenerateMutation.isPending}
+            data-testid="button-regenerate-assets"
+          >
+            {regenerateMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Regenerate Assets
+              </>
+            )}
+          </Button>
+        </div>
+
+        {Object.keys(categories).length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3" data-testid="grid-asset-categories">
+            {Object.entries(categories).map(([category, count]) => (
+              <div
+                key={category}
+                className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                data-testid={`card-asset-category-${category}`}
+              >
+                <span className="text-sm font-medium capitalize">{category}</span>
+                <Badge variant="secondary" data-testid={`badge-asset-count-${category}`}>
+                  {count}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!manifestLoading && totalAssets === 0 && (
+          <div className="text-center py-4 text-muted-foreground" data-testid="text-no-assets">
+            No certificate assets found. Click "Regenerate Assets" to create them.
+          </div>
+        )}
+      </Card>
+    </section>
+  );
 }
 
 export default function AdminDashboardPage() {
@@ -872,6 +982,8 @@ export default function AdminDashboardPage() {
                 )}
               </Card>
             </section>
+
+            <CertificateBadgeAssetsSection />
           </>
         )}
       </main>
