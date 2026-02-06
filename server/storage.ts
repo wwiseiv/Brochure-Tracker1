@@ -202,12 +202,18 @@ import {
   trainingSessions,
   trainingMessages,
   gauntletResponses,
+  earnedItems,
+  generatedCertificates,
   type TrainingSession,
   type InsertTrainingSession,
   type TrainingMessage,
   type InsertTrainingMessage,
   type GauntletResponse,
   type InsertGauntletResponse,
+  type EarnedItem,
+  type InsertEarnedItem,
+  type GeneratedCertificate,
+  type InsertGeneratedCertificate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -482,6 +488,17 @@ export interface IStorage {
   // Gauntlet Response methods
   createGauntletResponse(data: InsertGauntletResponse): Promise<GauntletResponse>;
   getGauntletResponses(sessionId: number): Promise<GauntletResponse[]>;
+
+  // Earned Items (visual badge/tier/seal/stage tracking)
+  getEarnedItems(userId: string, type?: string): Promise<EarnedItem[]>;
+  createEarnedItem(data: InsertEarnedItem): Promise<EarnedItem>;
+  getEarnedItem(userId: string, assetId: string): Promise<EarnedItem | undefined>;
+  
+  // Generated Certificates (PDF records with visual assets)
+  getGeneratedCertificates(userId: string): Promise<GeneratedCertificate[]>;
+  createGeneratedCertificate(data: InsertGeneratedCertificate): Promise<GeneratedCertificate>;
+  getGeneratedCertificateByVerification(code: string): Promise<GeneratedCertificate | undefined>;
+  getAllCertificates(): Promise<Certificate[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3008,6 +3025,51 @@ export class DatabaseStorage implements IStorage {
       .from(gauntletResponses)
       .where(eq(gauntletResponses.sessionId, sessionId))
       .orderBy(gauntletResponses.createdAt);
+  }
+
+  // Earned Items
+  async getEarnedItems(userId: string, type?: string): Promise<EarnedItem[]> {
+    if (type) {
+      return db.select().from(earnedItems)
+        .where(and(eq(earnedItems.userId, userId), eq(earnedItems.type, type)))
+        .orderBy(desc(earnedItems.earnedAt));
+    }
+    return db.select().from(earnedItems)
+      .where(eq(earnedItems.userId, userId))
+      .orderBy(desc(earnedItems.earnedAt));
+  }
+
+  async createEarnedItem(data: InsertEarnedItem): Promise<EarnedItem> {
+    const [item] = await db.insert(earnedItems).values(data).returning();
+    return item;
+  }
+
+  async getEarnedItem(userId: string, assetId: string): Promise<EarnedItem | undefined> {
+    const [item] = await db.select().from(earnedItems)
+      .where(and(eq(earnedItems.userId, userId), eq(earnedItems.assetId, assetId)));
+    return item;
+  }
+
+  // Generated Certificates
+  async getGeneratedCertificates(userId: string): Promise<GeneratedCertificate[]> {
+    return db.select().from(generatedCertificates)
+      .where(eq(generatedCertificates.userId, userId))
+      .orderBy(desc(generatedCertificates.issuedAt));
+  }
+
+  async createGeneratedCertificate(data: InsertGeneratedCertificate): Promise<GeneratedCertificate> {
+    const [cert] = await db.insert(generatedCertificates).values(data).returning();
+    return cert;
+  }
+
+  async getGeneratedCertificateByVerification(code: string): Promise<GeneratedCertificate | undefined> {
+    const [cert] = await db.select().from(generatedCertificates)
+      .where(eq(generatedCertificates.verificationCode, code));
+    return cert;
+  }
+
+  async getAllCertificates(): Promise<Certificate[]> {
+    return db.select().from(certificates).orderBy(desc(certificates.issuedAt));
   }
 }
 

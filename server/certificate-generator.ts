@@ -1,5 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { storage } from "./storage";
+import fs from 'fs';
+import path from 'path';
 
 export interface CertificateData {
   recipientName: string;
@@ -228,6 +230,244 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Buf
     size: verifySize,
     font: helvetica,
     color: rgb(0.5, 0.5, 0.5),
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
+
+export interface VisualCertificateData {
+  recipientName: string;
+  certificateTitle: string;
+  description: string;
+  primaryAssetId: string;
+  secondaryAssetIds?: string[];
+  issuedBy: string;
+  verificationCode: string;
+}
+
+function resolveAssetFile(assetId: string): string {
+  const manifestPath = path.join(process.cwd(), 'public', 'certificates', 'certificate-assets.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  const asset = manifest.assets[assetId];
+  if (!asset) throw new Error(`Unknown assetId: ${assetId}`);
+  return path.join(process.cwd(), 'public', 'certificates', asset.file);
+}
+
+export async function generateVisualCertificatePDF(data: VisualCertificateData): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([792, 612]);
+  const { width, height } = page.getSize();
+
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const timesRomanBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+  const timesRomanBoldItalic = await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic);
+
+  try {
+    const borderPath = path.join(process.cwd(), 'public', 'certificates', 'borders', 'certificate-border-template.png');
+    if (fs.existsSync(borderPath)) {
+      const borderImageBytes = fs.readFileSync(borderPath);
+      const borderImage = await pdfDoc.embedPng(borderImageBytes);
+      page.drawImage(borderImage, {
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
+      });
+    }
+  } catch (e) {
+    // Gracefully handle missing border template
+  }
+
+  page.drawText('PCBancard Field Sales Intelligence Suite', {
+    x: (width - helvetica.widthOfTextAtSize('PCBancard Field Sales Intelligence Suite', 11)) / 2,
+    y: height - 95,
+    size: 11,
+    font: helvetica,
+    color: rgb(0.39, 0.4, 0.95),
+  });
+
+  page.drawText('CERTIFICATE OF ACHIEVEMENT', {
+    x: (width - timesRomanBold.widthOfTextAtSize('CERTIFICATE OF ACHIEVEMENT', 22)) / 2,
+    y: height - 130,
+    size: 22,
+    font: timesRomanBold,
+    color: rgb(0.12, 0.23, 0.37),
+  });
+
+  const certifiesText = 'This certifies that';
+  page.drawText(certifiesText, {
+    x: (width - timesRomanBoldItalic.widthOfTextAtSize(certifiesText, 13)) / 2,
+    y: height - 165,
+    size: 13,
+    font: timesRomanBoldItalic,
+    color: rgb(0.42, 0.42, 0.42),
+  });
+
+  page.drawText(data.recipientName, {
+    x: (width - timesRomanBold.widthOfTextAtSize(data.recipientName, 28)) / 2,
+    y: height - 200,
+    size: 28,
+    font: timesRomanBold,
+    color: rgb(0.12, 0.23, 0.37),
+  });
+
+  page.drawLine({
+    start: { x: (width - 300) / 2, y: height - 210 },
+    end: { x: (width + 300) / 2, y: height - 210 },
+    thickness: 1,
+    color: rgb(0.96, 0.62, 0.04),
+  });
+
+  const achievedText = 'has successfully achieved the designation of';
+  page.drawText(achievedText, {
+    x: (width - timesRomanBoldItalic.widthOfTextAtSize(achievedText, 13)) / 2,
+    y: height - 235,
+    size: 13,
+    font: timesRomanBoldItalic,
+    color: rgb(0.42, 0.42, 0.42),
+  });
+
+  page.drawText(data.certificateTitle, {
+    x: (width - timesRomanBold.widthOfTextAtSize(data.certificateTitle, 20)) / 2,
+    y: height - 265,
+    size: 20,
+    font: timesRomanBold,
+    color: rgb(0.96, 0.62, 0.04),
+  });
+
+  try {
+    const primaryAssetPath = resolveAssetFile(data.primaryAssetId);
+    if (fs.existsSync(primaryAssetPath)) {
+      const primaryImageBytes = fs.readFileSync(primaryAssetPath);
+      const primaryImage = await pdfDoc.embedPng(primaryImageBytes);
+      const medallionSize = 120;
+      const medallionX = (width - medallionSize) / 2;
+      const medallionY = height - 405;
+      page.drawImage(primaryImage, {
+        x: medallionX,
+        y: medallionY,
+        width: medallionSize,
+        height: medallionSize,
+      });
+
+      let sealX = medallionX + medallionSize + 10;
+      if (data.secondaryAssetIds && data.secondaryAssetIds.length > 0) {
+        for (const sealId of data.secondaryAssetIds) {
+          try {
+            const sealPath = resolveAssetFile(sealId);
+            if (fs.existsSync(sealPath)) {
+              const sealImageBytes = fs.readFileSync(sealPath);
+              const sealImage = await pdfDoc.embedPng(sealImageBytes);
+              const sealSize = 60;
+              page.drawImage(sealImage, {
+                x: sealX,
+                y: medallionY + (medallionSize - sealSize) / 2,
+                width: sealSize,
+                height: sealSize,
+              });
+              sealX += sealSize + 10;
+            }
+          } catch (e) {
+            // Gracefully skip missing secondary assets
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Gracefully handle missing primary medallion
+  }
+
+  const descSize = 10;
+  const maxLineWidth = width - 100;
+  const descWords = data.description.split(' ');
+  let descLines: string[] = [];
+  let currentLine = '';
+
+  for (const word of descWords) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = helvetica.widthOfTextAtSize(testLine, descSize);
+    if (testWidth > maxLineWidth) {
+      if (currentLine) descLines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) descLines.push(currentLine);
+
+  let yPos = height - 430;
+  for (const line of descLines) {
+    const lineWidth = helvetica.widthOfTextAtSize(line, descSize);
+    page.drawText(line, {
+      x: (width - lineWidth) / 2,
+      y: yPos,
+      size: descSize,
+      font: helvetica,
+      color: rgb(0.42, 0.42, 0.42),
+    });
+    yPos -= 15;
+  }
+
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const awardedText = `Awarded: ${today}`;
+  const awardedWidth = helvetica.widthOfTextAtSize(awardedText, 10);
+  page.drawText(awardedText, {
+    x: (width - awardedWidth) / 2,
+    y: height - 460,
+    size: 10,
+    font: helvetica,
+    color: rgb(0.42, 0.42, 0.42),
+  });
+
+  const lineY = 95;
+  const leftLineStart = 130;
+  const leftLineEnd = 330;
+  const rightLineStart = 462;
+  const rightLineEnd = 662;
+
+  page.drawLine({
+    start: { x: leftLineStart, y: lineY },
+    end: { x: leftLineEnd, y: lineY },
+    thickness: 0.5,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+
+  const issuerNameWidth = helvetica.widthOfTextAtSize(data.issuedBy, 9);
+  page.drawText(data.issuedBy, {
+    x: (leftLineStart + leftLineEnd) / 2 - issuerNameWidth / 2,
+    y: 80,
+    size: 9,
+    font: helvetica,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  page.drawLine({
+    start: { x: rightLineStart, y: lineY },
+    end: { x: rightLineEnd, y: lineY },
+    thickness: 0.5,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+
+  const managerTitle = 'Sales Manager';
+  const managerWidth = helvetica.widthOfTextAtSize(managerTitle, 9);
+  page.drawText(managerTitle, {
+    x: (rightLineStart + rightLineEnd) / 2 - managerWidth / 2,
+    y: 80,
+    size: 9,
+    font: helvetica,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  const verifyText = `Verification: ${data.verificationCode}`;
+  const verifyWidth = helvetica.widthOfTextAtSize(verifyText, 7);
+  page.drawText(verifyText, {
+    x: (width - verifyWidth) / 2,
+    y: 50,
+    size: 7,
+    font: helvetica,
+    color: rgb(0.7, 0.7, 0.7),
   });
 
   const pdfBytes = await pdfDoc.save();

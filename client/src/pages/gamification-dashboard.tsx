@@ -237,6 +237,14 @@ export default function GamificationDashboardPage() {
     queryKey: ["/api/training/sessions"],
   });
 
+  const { data: assetManifest } = useQuery<any>({
+    queryKey: ["/api/certificates/manifest"],
+  });
+
+  const { data: earnedItemsData } = useQuery<{ earnedItems: any[] }>({
+    queryKey: ["/api/certificates/earned"],
+  });
+
   const generateCertMutation = useMutation({
     mutationFn: async (certificateType: string) => {
       const res = await apiRequest("POST", "/api/gamification/certificates/generate", { certificateType });
@@ -542,6 +550,140 @@ export default function GamificationDashboardPage() {
                 </div>
               );
             })}
+          </div>
+        </Card>
+
+        <Card className="p-4" data-testid="card-badge-wall">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Award className="w-4 h-4 text-purple-500" />
+            Visual Badge Collection
+          </h3>
+
+          {/* Tier Medallions */}
+          <div className="mb-6">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Tier Medallions</p>
+            <div className="grid grid-cols-4 gap-3">
+              {assetManifest?.assets && Object.entries(assetManifest.assets)
+                .filter(([, asset]) => asset.type === "tier")
+                .sort(([, a], [, b]) => (a.tier_level || 0) - (b.tier_level || 0))
+                .map(([assetId, asset]) => {
+                  const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
+                  const isEarned = !!earnedItem;
+                  return (
+                    <div
+                      key={assetId}
+                      className="flex flex-col items-center gap-1.5"
+                      data-testid={`visual-badge-${assetId.replace(/\./g, '-')}`}
+                    >
+                      <div className="relative">
+                        <img
+                          src={`/certificates/${asset.file}`}
+                          alt={asset.displayName}
+                          className="w-20 h-20 md:w-24 md:h-24 object-contain"
+                          style={isEarned ? {} : { filter: 'grayscale(100%) opacity(40%)' }}
+                        />
+                        {!isEarned && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Lock className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground text-center leading-tight max-w-[80px]">
+                        {asset.displayName}
+                      </span>
+                      {isEarned && earnedItem && (
+                        <span className="text-[9px] text-emerald-500">
+                          {new Date(earnedItem.earnedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* Training Badges */}
+          <div className="mb-6">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Training Badges</p>
+            <div className="grid grid-cols-4 gap-3">
+              {assetManifest?.assets && Object.entries(assetManifest.assets)
+                .filter(([, asset]) => asset.type === "badge")
+                .map(([assetId, asset]) => {
+                  const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
+                  const isEarned = !!earnedItem;
+                  return (
+                    <div
+                      key={assetId}
+                      className="flex flex-col items-center gap-1.5"
+                      data-testid={`visual-badge-${assetId.replace(/\./g, '-')}`}
+                    >
+                      <div className="relative">
+                        <img
+                          src={`/certificates/${asset.file}`}
+                          alt={asset.displayName}
+                          className="w-16 h-16 md:w-20 md:h-20 object-contain"
+                          style={isEarned ? {} : { filter: 'grayscale(100%) opacity(40%)' }}
+                        />
+                        {!isEarned && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Lock className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground text-center leading-tight max-w-[80px]">
+                        {asset.displayName}
+                      </span>
+                      {isEarned && earnedItem && (
+                        <span className="text-[9px] text-emerald-500">
+                          {new Date(earnedItem.earnedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* Seals & Stages */}
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Certifications & Milestones</p>
+            <div className="grid grid-cols-5 gap-3">
+              {assetManifest?.assets && Object.entries(assetManifest.assets)
+                .filter(([, asset]) => asset.type === "seal" || asset.type === "stage")
+                .map(([assetId, asset]) => {
+                  const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
+                  const isEarned = !!earnedItem;
+                  return (
+                    <div
+                      key={assetId}
+                      className="flex flex-col items-center gap-1.5"
+                      data-testid={`visual-badge-${assetId.replace(/\./g, '-')}`}
+                    >
+                      <div className="relative">
+                        <img
+                          src={`/certificates/${asset.file}`}
+                          alt={asset.displayName}
+                          className="w-12 h-12 md:w-16 md:h-16 object-contain"
+                          style={isEarned ? {} : { filter: 'grayscale(100%) opacity(40%)' }}
+                        />
+                        {!isEarned && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Lock className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground text-center leading-tight max-w-[80px]">
+                        {asset.displayName}
+                      </span>
+                      {isEarned && earnedItem && (
+                        <span className="text-[9px] text-emerald-500">
+                          {new Date(earnedItem.earnedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </Card>
 

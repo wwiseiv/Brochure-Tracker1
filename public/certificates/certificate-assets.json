@@ -1,0 +1,213 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-02-06T16:00:23.075Z",
+  "basePath": "/certificates",
+  "assets": {
+    "border.master": {
+      "file": "borders/certificate-border-template.png",
+      "type": "border",
+      "displayName": "Master Certificate Border",
+      "dimensions": {
+        "width": 3300,
+        "height": 2550
+      }
+    },
+    "tier.bronze": {
+      "file": "medallions/tier-bronze-medallion.png",
+      "type": "tier",
+      "displayName": "Bronze Tier",
+      "tier_level": 1,
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "colors": {
+        "primary": "#CD9B1D",
+        "dark": "#6B4F12",
+        "light": "#F5DEB3"
+      }
+    },
+    "tier.silver": {
+      "file": "medallions/tier-silver-medallion.png",
+      "type": "tier",
+      "displayName": "Silver Tier",
+      "tier_level": 2,
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "colors": {
+        "primary": "#C0C0D0",
+        "dark": "#5A5A6E",
+        "light": "#E8E8F0"
+      }
+    },
+    "tier.gold": {
+      "file": "medallions/tier-gold-medallion.png",
+      "type": "tier",
+      "displayName": "Gold Tier",
+      "tier_level": 3,
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "colors": {
+        "primary": "#FFD700",
+        "dark": "#8B6914",
+        "light": "#FFF2CC"
+      }
+    },
+    "tier.platinum": {
+      "file": "medallions/tier-platinum-medallion.png",
+      "type": "tier",
+      "displayName": "Platinum Tier",
+      "tier_level": 4,
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "colors": {
+        "primary": "#D4D4E8",
+        "dark": "#6B6B7B",
+        "light": "#F0F0FF",
+        "accent": "#6366F1"
+      }
+    },
+    "badge.problem_master": {
+      "file": "badges/badge-problem-master.png",
+      "type": "badge",
+      "displayName": "Problem Master",
+      "requirement": "Complete Module 2 with 90%+",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "badge.objection_slayer": {
+      "file": "badges/badge-objection-slayer.png",
+      "type": "badge",
+      "displayName": "Objection Slayer",
+      "requirement": "Handle all 4 critical objections in simulator",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "badge.script_scholar": {
+      "file": "badges/badge-script-scholar.png",
+      "type": "badge",
+      "displayName": "Script Scholar",
+      "requirement": "100% on script knowledge quiz",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "badge.psychology_pro": {
+      "file": "badges/badge-psychology-pro.png",
+      "type": "badge",
+      "displayName": "Psychology Pro",
+      "requirement": "Complete all Deep Dives",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "badge.roleplay_rookie": {
+      "file": "badges/badge-roleplay-rookie.png",
+      "type": "badge",
+      "displayName": "Role-Play Rookie",
+      "requirement": "Complete 5 simulations",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "circle"
+    },
+    "badge.roleplay_expert": {
+      "file": "badges/badge-roleplay-expert.png",
+      "type": "badge",
+      "displayName": "Role-Play Expert",
+      "requirement": "Score 85%+ on 10 simulations",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "badge.speed_learner": {
+      "file": "badges/badge-speed-learner.png",
+      "type": "badge",
+      "displayName": "Speed Learner",
+      "requirement": "Complete 3 modules in one day",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "bolt"
+    },
+    "badge.presentation_master": {
+      "file": "badges/badge-presentation-master.png",
+      "type": "badge",
+      "displayName": "Presentation Master",
+      "requirement": "100% overall mastery across all modules",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "shape": "shield"
+    },
+    "seal.certified_partner": {
+      "file": "seals/seal-certified-partner.png",
+      "type": "seal",
+      "displayName": "Certified Partner",
+      "dimensions": {
+        "width": 800,
+        "height": 800
+      }
+    },
+    "seal.equipiq_certified": {
+      "file": "seals/seal-equipiq-certified.png",
+      "type": "seal",
+      "displayName": "EquipIQ Certified",
+      "dimensions": {
+        "width": 800,
+        "height": 800
+      }
+    },
+    "stage.1.prospecting": {
+      "file": "stages/stage-1-prospecting.png",
+      "type": "stage",
+      "displayName": "Prospecting Complete",
+      "stageNumber": 1,
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      }
+    },
+    "stage.2.discovery": {
+      "file": "stages/stage-2-discovery.png",
+      "type": "stage",
+      "displayName": "Discovery & Presentation Complete",
+      "stageNumber": 2,
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      }
+    },
+    "stage.3.close": {
+      "file": "stages/stage-3-close.png",
+      "type": "stage",
+      "displayName": "Close & Follow-Up Complete",
+      "stageNumber": 3,
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      }
+    }
+  }
+}

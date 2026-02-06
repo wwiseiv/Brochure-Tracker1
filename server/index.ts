@@ -74,6 +74,17 @@ app.use((req, res, next) => {
     }
   }));
 
+  // Serve certificate/badge visual assets from public/certificates
+  const certificatesDir = path.join(process.cwd(), 'public', 'certificates');
+  app.use('/certificates', express.static(certificatesDir, {
+    maxAge: '7d',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.png')) {
+        res.set('Content-Type', 'image/png');
+      }
+    }
+  }));
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

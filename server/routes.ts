@@ -109,6 +109,7 @@ import path from "path";
 import { validateAndSanitize, getDefaultSanitizedData } from "./services/statement-validator";
 import { awardXP, getGamificationProfile, getLeaderboard, checkBadgeProgression, XP_CONFIG, LEVEL_THRESHOLDS, BADGE_DEFINITIONS, BADGE_LEVELS, getLevelInfo, generateVerificationCode } from "./gamification-engine";
 import { generateCertificatePDF, checkCertificateEligibility, CERTIFICATE_TYPES } from "./certificate-generator";
+import { generateAllAssets, getAssetManifest, resolveAssetPath } from "./certificate-asset-generator";
 import { getTrainingKnowledgeForRoleplay } from "./training-knowledge-context";
 
 // Internal secret for background job processing
@@ -15854,6 +15855,192 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
     } catch (error) {
       console.error("Error awarding XP:", error);
       res.status(500).json({ error: "Failed to award XP" });
+    }
+  });
+
+  // ==========================================
+  // EARNED ITEMS (Visual Badge/Tier/Seal/Stage)
+  // ==========================================
+  
+  app.get("/api/certificates/earned", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const type = req.query.type as string | undefined;
+      const items = await storage.getEarnedItems(userId, type);
+      res.json({ earnedItems: items });
+    } catch (error) {
+      console.error("[EarnedItems] Error:", error);
+      res.status(500).json({ error: "Failed to fetch earned items" });
+    }
+  });
+
+  app.post("/api/certificates/award", isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, type, assetId, title, metadata } = req.body;
+      
+      const validTypes = ['tier', 'badge', 'seal', 'stage'];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ error: "Invalid type. Must be: tier, badge, seal, or stage" });
+      }
+      
+      const manifest = getAssetManifest();
+      if (!manifest.assets[assetId]) {
+        return res.status(400).json({ error: `Unknown assetId: ${assetId}` });
+      }
+      
+      const targetUserId = userId || req.user.claims.sub;
+      const existing = await storage.getEarnedItem(targetUserId, assetId);
+      if (existing) {
+        return res.status(409).json({ error: "Item already earned", earnedItem: existing });
+      }
+      
+      const item = await storage.createEarnedItem({
+        userId: targetUserId,
+        type,
+        assetId,
+        title: title || manifest.assets[assetId].displayName,
+        metadata: metadata || {},
+      });
+      
+      res.json({ earnedItem: item });
+    } catch (error) {
+      console.error("[EarnedItems] Error awarding:", error);
+      res.status(500).json({ error: "Failed to award item" });
+    }
+  });
+
+  // ==========================================
+  // CERTIFICATE PDF GENERATION (with visual assets)
+  // ==========================================
+  
+  app.post("/api/certificates/generate-visual", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { primaryAssetId, secondaryAssetIds, recipientName } = req.body;
+      
+      if (!primaryAssetId) {
+        return res.status(400).json({ error: "primaryAssetId is required" });
+      }
+      
+      const manifest = getAssetManifest();
+      if (!manifest.assets[primaryAssetId]) {
+        return res.status(400).json({ error: `Unknown asset: ${primaryAssetId}` });
+      }
+      
+      const asset = manifest.assets[primaryAssetId];
+      const verificationCode = generateVerificationCode();
+      
+      const certTypeMap: Record<string, string> = {
+        'tier': 'tier_certificate',
+        'badge': 'module_certificate',
+        'seal': 'partner_certificate',
+        'stage': 'stage_certificate',
+      };
+      
+      const membership = req.orgMembership;
+      const name = recipientName || (membership
+        ? `${membership.firstName || ''} ${membership.lastName || ''}`.trim() || 'Agent'
+        : 'Agent');
+      
+      const cert = await storage.createGeneratedCertificate({
+        userId,
+        certificateType: certTypeMap[asset.type] || 'module_certificate',
+        borderId: 'border.master',
+        primaryAssetId,
+        secondaryAssetIds: secondaryAssetIds || [],
+        recipientName: name,
+        issuedBy: 'PCBancard Training Division',
+        verificationCode,
+        status: 'active',
+        metadata: {},
+      });
+      
+      res.json(cert);
+    } catch (error) {
+      console.error("[Certificates] Error generating visual certificate:", error);
+      res.status(500).json({ error: "Failed to generate certificate" });
+    }
+  });
+
+  app.get("/api/certificates/verify/:code", async (req: any, res) => {
+    try {
+      const { code } = req.params;
+      const cert = await storage.getGeneratedCertificateByVerification(code);
+      if (!cert) {
+        return res.status(404).json({ valid: false, error: "Certificate not found" });
+      }
+      res.json({
+        valid: cert.status === 'active',
+        certificate: {
+          recipientName: cert.recipientName,
+          certificateType: cert.certificateType,
+          issuedAt: cert.issuedAt,
+          issuedBy: cert.issuedBy,
+          status: cert.status,
+        },
+      });
+    } catch (error) {
+      console.error("[Certificates] Verify error:", error);
+      res.status(500).json({ error: "Failed to verify certificate" });
+    }
+  });
+
+  // ==========================================
+  // ASSET MANIFEST & ADMIN
+  // ==========================================
+  
+  app.get("/api/certificates/manifest", async (_req: any, res) => {
+    try {
+      const manifest = getAssetManifest();
+      res.json(manifest);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load asset manifest" });
+    }
+  });
+  
+  app.post("/api/admin/generate-certificate-assets", isAuthenticated, async (req: any, res) => {
+    try {
+      const isAdmin = req.orgMembership?.role === 'master_admin';
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const result = await generateAllAssets();
+      res.json({ generated: 18, errors: [], message: "All certificate assets regenerated successfully" });
+    } catch (error) {
+      console.error("[Admin] Error generating assets:", error);
+      res.status(500).json({ error: "Failed to generate certificate assets" });
+    }
+  });
+
+  app.get("/api/certificates/generated/:id/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const certId = parseInt(req.params.id);
+      
+      const certs = await storage.getGeneratedCertificates(userId);
+      const cert = certs.find(c => c.id === certId);
+      if (!cert) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      
+      const { generateVisualCertificatePDF } = await import("./certificate-generator");
+      const pdfBuffer = await generateVisualCertificatePDF({
+        recipientName: cert.recipientName,
+        certificateTitle: cert.certificateType.replace(/_/g, ' ').toUpperCase(),
+        description: `Awarded for achieving ${cert.primaryAssetId.replace(/\./g, ' ')} certification.`,
+        primaryAssetId: cert.primaryAssetId,
+        secondaryAssetIds: (cert.secondaryAssetIds as string[]) || [],
+        issuedBy: cert.issuedBy,
+        verificationCode: cert.verificationCode,
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="certificate-${cert.verificationCode}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("[Certificates] Download error:", error);
+      res.status(500).json({ error: "Failed to download certificate" });
     }
   });
 

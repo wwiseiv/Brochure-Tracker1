@@ -3447,3 +3447,47 @@ export const insertGauntletResponseSchema = createInsertSchema(gauntletResponses
 });
 export type InsertGauntletResponse = z.infer<typeof insertGauntletResponseSchema>;
 export type GauntletResponse = typeof gauntletResponses.$inferSelect;
+
+// Earned Items table - Tracks every badge, tier, seal, or stage completion an agent earns
+export const earnedItems = pgTable("earned_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // "tier" | "badge" | "seal" | "stage"
+  assetId: varchar("asset_id", { length: 100 }).notNull(), // Must match key in certificate-assets.json
+  title: varchar("title", { length: 200 }).notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+  metadata: jsonb("metadata").default({}),
+}, (table) => ({
+  uniqueUserAsset: unique().on(table.userId, table.assetId),
+}));
+
+export const insertEarnedItemSchema = createInsertSchema(earnedItems).omit({
+  id: true,
+  earnedAt: true,
+});
+export type InsertEarnedItem = z.infer<typeof insertEarnedItemSchema>;
+export type EarnedItem = typeof earnedItems.$inferSelect;
+
+// Generated Certificates table - Records every PDF certificate generated with verification codes
+export const generatedCertificates = pgTable("generated_certificates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  certificateType: varchar("certificate_type", { length: 50 }).notNull(), // "tier_certificate" | "module_certificate" | "partner_certificate" | "stage_certificate"
+  borderId: varchar("border_id", { length: 100 }).notNull().default("border.master"),
+  primaryAssetId: varchar("primary_asset_id", { length: 100 }).notNull(),
+  secondaryAssetIds: jsonb("secondary_asset_ids").default([]),
+  recipientName: varchar("recipient_name", { length: 200 }).notNull(),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+  issuedBy: varchar("issued_by", { length: 200 }).notNull().default("PCBancard Training Division"),
+  verificationCode: varchar("verification_code", { length: 20 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  pdfPath: text("pdf_path"),
+  metadata: jsonb("metadata").default({}),
+});
+
+export const insertGeneratedCertificateSchema = createInsertSchema(generatedCertificates).omit({
+  id: true,
+  issuedAt: true,
+});
+export type InsertGeneratedCertificate = z.infer<typeof insertGeneratedCertificateSchema>;
+export type GeneratedCertificate = typeof generatedCertificates.$inferSelect;
