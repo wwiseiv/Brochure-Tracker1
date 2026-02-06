@@ -1408,7 +1408,7 @@ export default function TeamManagementPage() {
               </div>
             </div>
           ) : (
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="flex-1 overflow-y-auto overflow-x-visible">
               <div className="space-y-4 py-3">
                 {(Object.keys(featuresByCategory) as FeatureCategory[]).map((category) => {
                   const features = featuresByCategory[category];
@@ -1419,7 +1419,7 @@ export default function TeamManagementPage() {
                       <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                         {CATEGORY_LABELS[category]}
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {features.map((feature) => {
                           const state = getFeatureCurrentState(feature);
                           const isTogglingThisFeature = toggleFeatureOverrideMutation.isPending && 
@@ -1428,7 +1428,7 @@ export default function TeamManagementPage() {
                           return (
                             <div
                               key={feature.id}
-                              className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/30"
+                              className="flex items-center gap-3 py-2.5 px-2 rounded-md"
                               data-testid={`feature-row-${feature.id}`}
                             >
                               <div className="min-w-0 flex-1">
@@ -1437,14 +1437,13 @@ export default function TeamManagementPage() {
                                   {feature.description}
                                 </p>
                               </div>
-                              <div className="flex-shrink-0 ml-2">
-                                <Switch
-                                  checked={state.enabled}
-                                  onCheckedChange={() => handleToggleFeature(feature)}
-                                  disabled={isTogglingThisFeature}
-                                  data-testid={`switch-feature-${feature.id}`}
-                                />
-                              </div>
+                              <Switch
+                                checked={state.enabled}
+                                onCheckedChange={() => handleToggleFeature(feature)}
+                                disabled={isTogglingThisFeature}
+                                className="shrink-0"
+                                data-testid={`switch-feature-${feature.id}`}
+                              />
                             </div>
                           );
                         })}
@@ -1453,7 +1452,7 @@ export default function TeamManagementPage() {
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           )}
           
           <div className="pt-3 border-t border-border flex-shrink-0">
