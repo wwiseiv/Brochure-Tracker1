@@ -318,7 +318,7 @@ export function OnePageProposal() {
         savings.interchangePlus = interchangePlusSavings;
       }
 
-      const body = {
+      const body: Record<string, any> = {
         templateId: selectedTemplateId,
         merchantName,
         agentName: contactName,
@@ -328,7 +328,14 @@ export function OnePageProposal() {
         equipment: equipment || undefined,
         savings: Object.keys(savings).length > 0 ? savings : undefined,
         merchantStatementUploaded: !!merchantStatementFile,
+        generationMode,
+        templateName: selectedTemplate?.displayName,
+        templateCategory: selectedTemplate?.category,
       };
+
+      if (generationMode === "ai-custom" && merchantWebsite.trim()) {
+        body.merchantWebsite = merchantWebsite.trim();
+      }
 
       const res = await fetch("/api/one-page-proposal/generate", {
         method: "POST",
@@ -342,11 +349,17 @@ export function OnePageProposal() {
         throw new Error(err.error || "Generation failed");
       }
 
+      const aiFallback = res.headers.get("X-AI-Fallback") === "true";
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setGeneratedPdfBlob(blob);
       setGeneratedPdfUrl(url);
-      toast({ title: "PDF Generated", description: "Your one-page proposal is ready to download." });
+
+      if (aiFallback) {
+        toast({ title: "AI customization unavailable", description: "Generated using standard template instead.", variant: "default" });
+      } else {
+        toast({ title: "PDF Generated", description: generationMode === "ai-custom" ? "Your AI-customized proposal is ready." : "Your one-page proposal is ready to download." });
+      }
     } catch (error: any) {
       toast({ title: "Generation Failed", description: error.message || "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
@@ -502,8 +515,10 @@ export function OnePageProposal() {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="merchant-website">Website URL (optional)</Label>
+      <div className={`space-y-2 p-3 rounded-lg transition-colors ${generationMode === "ai-custom" ? "border border-primary/30 bg-primary/5" : ""}`}>
+        <Label htmlFor="merchant-website">
+          Website URL {generationMode === "ai-custom" ? "(recommended)" : "(optional)"}
+        </Label>
         <div className="relative">
           <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -518,7 +533,7 @@ export function OnePageProposal() {
         </div>
         <p className="text-xs text-muted-foreground">
           {generationMode === "ai-custom"
-            ? "AI will use this to tailor the proposal messaging to their industry"
+            ? "AI will scrape this site to tailor the proposal to their industry and business"
             : "Used in AI-Custom mode to tailor messaging"}
         </p>
       </div>
@@ -908,6 +923,16 @@ export function OnePageProposal() {
           Review your selections and generate the one-page proposal PDF.
         </p>
 
+        {generationMode === "ai-custom" && (
+          <Alert>
+            <Sparkles className="w-4 h-4" />
+            <AlertDescription className="text-sm">
+              AI will customize the headline, copy, and messaging for this merchant&apos;s business type.
+              {merchantWebsite.trim() ? " Website content will be used for context." : " Add a website URL in Step 2 for better results."}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-3">
           <div className="p-3 rounded-lg bg-muted/50 space-y-1" data-testid="summary-template">
             <p className="text-xs text-muted-foreground">Template</p>
@@ -1014,12 +1039,12 @@ export function OnePageProposal() {
             {generating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
+                {generationMode === "ai-custom" ? "Customizing your proposal..." : "Generating PDF..."}
               </>
             ) : (
               <>
-                <FileOutput className="w-4 h-4 mr-2" />
-                Generate PDF
+                {generationMode === "ai-custom" ? <Sparkles className="w-4 h-4 mr-2" /> : <FileOutput className="w-4 h-4 mr-2" />}
+                {generationMode === "ai-custom" ? "Generate AI Proposal" : "Generate PDF"}
               </>
             )}
           </Button>

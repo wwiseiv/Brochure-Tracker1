@@ -16073,10 +16073,50 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
   // ─── One-Page Proposal: PDF Generation ──────────────────────────────
   app.post("/api/one-page-proposal/generate", isAuthenticated, async (req: any, res) => {
     try {
-      const { templateId, merchantName, agentName, agentTitle, agentPhone, agentEmail, equipment, savings, merchantStatementUploaded } = req.body;
+      const { templateId, merchantName, agentName, agentTitle, agentPhone, agentEmail, equipment, savings, merchantStatementUploaded, generationMode, merchantWebsite, templateName, templateCategory } = req.body;
 
       if (!templateId || !merchantName || !agentName) {
         return res.status(400).json({ error: "templateId, merchantName, and agentName are required" });
+      }
+
+      let aiContent = undefined;
+      let aiFallback = false;
+
+      if (generationMode === "ai-custom") {
+        try {
+          const { scrapeWebsiteContext, generateAICustomContent } = await import("./one-page-ai-service");
+
+          let websiteContext = null;
+          if (merchantWebsite) {
+            websiteContext = await scrapeWebsiteContext(merchantWebsite);
+            if (!websiteContext) {
+              console.log("[OnePageProposal] Website scrape failed, continuing without website context");
+            }
+          }
+
+          const result = await generateAICustomContent({
+            templateName: templateName || templateId,
+            templateCategory: templateCategory || "Savings Proposals",
+            merchantName,
+            websiteContext,
+            financials: {
+              dualPricing: savings?.dualPricing || null,
+              interchangePlus: savings?.interchangePlus || null,
+            },
+            equipment: equipment || null,
+            agentName,
+          });
+
+          if (result) {
+            aiContent = result;
+          } else {
+            aiFallback = true;
+            console.log("[OnePageProposal] AI generation failed, falling back to Template-Fill");
+          }
+        } catch (aiError) {
+          aiFallback = true;
+          console.error("[OnePageProposal] AI-Custom error, falling back to Template-Fill:", aiError);
+        }
       }
 
       const { generateOnePagePdf } = await import("./one-page-pdf-service");
@@ -16090,6 +16130,7 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
         equipment: equipment || null,
         savings: savings || null,
         merchantStatementUploaded: !!merchantStatementUploaded,
+        aiContent,
       });
 
       const safeName = merchantName.replace(/[^a-zA-Z0-9]/g, "_");
@@ -16098,6 +16139,9 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      if (aiFallback) {
+        res.setHeader("X-AI-Fallback", "true");
+      }
       res.send(pdfBuffer);
     } catch (error) {
       console.error("[OnePageProposal] Generation error:", error);
