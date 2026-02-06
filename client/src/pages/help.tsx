@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   ArrowLeft, 
   Home, 
@@ -37,6 +38,7 @@ import {
   AlertCircle,
   Keyboard,
   MessageSquare,
+  MessageSquarePlus,
   Target,
   History,
   Store,
@@ -74,6 +76,7 @@ import {
   LayoutGrid,
   Megaphone,
   Image,
+  MoreVertical,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,6 +98,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 interface UserRole {
   role: string;
@@ -162,12 +178,218 @@ function HelpSection({
   );
 }
 
+interface FeedbackAttachment {
+  objectPath: string;
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+interface FeedbackFileUploadItem {
+  id: string;
+  file: File;
+  status: "uploading" | "done" | "error";
+  progress: number;
+  attachment?: FeedbackAttachment;
+  previewUrl?: string;
+  errorMessage?: string;
+}
+
+const FEEDBACK_MAX_FILES = 5;
+const FEEDBACK_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const FEEDBACK_ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+];
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function uploadFeedbackFile(file: File): Promise<FeedbackAttachment> {
+  const isPdf = file.type === "application/pdf";
+  const endpoint = isPdf ? "/api/uploads/documents" : "/api/uploads/proxy";
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Upload failed");
+  }
+  const data = await response.json();
+  return {
+    objectPath: data.objectPath,
+    name: data.metadata.name,
+    size: data.metadata.size,
+    contentType: data.metadata.contentType,
+  };
+}
+
 export default function HelpPage() {
   const { toast } = useToast();
   const { hasFeature } = usePermissions();
+  const isMobile = useIsMobile();
   const { data: userRole } = useQuery<UserRole>({
     queryKey: ["/api/me/role"],
   });
+
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState("");
+  const [feedbackSubject, setFeedbackSubject] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackFiles, setFeedbackFiles] = useState<FeedbackFileUploadItem[]>([]);
+  const [isFeedbackDragOver, setIsFeedbackDragOver] = useState(false);
+  const feedbackFileInputRef = useRef<HTMLInputElement>(null);
+
+  const resetFeedbackForm = useCallback(() => {
+    setFeedbackType("");
+    setFeedbackSubject("");
+    setFeedbackMessage("");
+    setFeedbackFiles((prev) => {
+      prev.forEach((f) => {
+        if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+      });
+      return [];
+    });
+  }, []);
+
+  const feedbackSubmitMutation = useMutation({
+    mutationFn: async () => {
+      const attachments = feedbackFiles
+        .filter((f) => f.status === "done" && f.attachment)
+        .map((f) => f.attachment!);
+      await apiRequest("POST", "/api/feedback", {
+        type: feedbackType,
+        subject: feedbackSubject,
+        message: feedbackMessage,
+        attachments,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback. We will review it shortly.",
+      });
+      resetFeedbackForm();
+      setFeedbackOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to submit feedback",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFeedbackFiles = useCallback(
+    (newFiles: FileList | File[]) => {
+      const fileArray = Array.from(newFiles);
+      const currentCount = feedbackFiles.length;
+      const remaining = FEEDBACK_MAX_FILES - currentCount;
+      if (remaining <= 0) {
+        toast({
+          title: "File limit reached",
+          description: `Maximum ${FEEDBACK_MAX_FILES} files allowed.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      const filesToAdd = fileArray.slice(0, remaining);
+      filesToAdd.forEach((file) => {
+        if (!FEEDBACK_ACCEPTED_TYPES.includes(file.type)) {
+          toast({
+            title: "Invalid file type",
+            description: `${file.name} is not a supported file type.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        if (file.size > FEEDBACK_MAX_FILE_SIZE) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds the 10MB limit.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const previewUrl = file.type.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : undefined;
+        const item: FeedbackFileUploadItem = {
+          id,
+          file,
+          status: "uploading",
+          progress: 50,
+          previewUrl,
+        };
+        setFeedbackFiles((prev) => [...prev, item]);
+        uploadFeedbackFile(file)
+          .then((attachment) => {
+            setFeedbackFiles((prev) =>
+              prev.map((f) =>
+                f.id === id
+                  ? { ...f, status: "done" as const, progress: 100, attachment }
+                  : f
+              )
+            );
+          })
+          .catch((err) => {
+            setFeedbackFiles((prev) =>
+              prev.map((f) =>
+                f.id === id
+                  ? { ...f, status: "error" as const, errorMessage: err.message }
+                  : f
+              )
+            );
+          });
+      });
+    },
+    [feedbackFiles.length, toast]
+  );
+
+  const removeFeedbackFile = useCallback((id: string) => {
+    setFeedbackFiles((prev) => {
+      const file = prev.find((f) => f.id === id);
+      if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl);
+      return prev.filter((f) => f.id !== id);
+    });
+  }, []);
+
+  const handleFeedbackDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsFeedbackDragOver(false);
+      if (e.dataTransfer.files.length > 0) {
+        handleFeedbackFiles(e.dataTransfer.files);
+      }
+    },
+    [handleFeedbackFiles]
+  );
+
+  const handleFeedbackDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsFeedbackDragOver(true);
+  }, []);
+
+  const handleFeedbackDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsFeedbackDragOver(false);
+  }, []);
+
+  const hasFeedbackUploading = feedbackFiles.some((f) => f.status === "uploading");
+  const canSubmitFeedback =
+    feedbackType && feedbackSubject.trim() && feedbackMessage.trim() && !hasFeedbackUploading;
 
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -1053,18 +1275,194 @@ export default function HelpPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-50 bg-background border-b">
-        <div className="flex items-center gap-3 p-4">
-          <Link href="/profile">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <HelpCircle className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-semibold">Help & Guide</h1>
+        <div className="flex items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-3">
+            <Link href="/profile">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-primary" />
+              <h1 className="text-lg font-semibold">Help & Guide</h1>
+            </div>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" data-testid="button-help-menu">
+                <MoreVertical className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                data-testid="menu-item-send-feedback"
+                onClick={() => setFeedbackOpen(true)}
+              >
+                <MessageSquarePlus className="w-4 h-4 mr-2" />
+                Send Feedback
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
+
+      <Sheet open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+        <SheetContent
+          side={isMobile ? "bottom" : "right"}
+          className={
+            isMobile
+              ? "max-h-[85vh] overflow-y-auto rounded-t-lg"
+              : "w-full sm:max-w-md overflow-y-auto"
+          }
+        >
+          <SheetHeader>
+            <SheetTitle>Send Feedback</SheetTitle>
+            <SheetDescription>
+              Let us know how we can improve your experience.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex flex-col gap-4 mt-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Type</label>
+              <Select value={feedbackType} onValueChange={setFeedbackType}>
+                <SelectTrigger data-testid="select-feedback-type">
+                  <SelectValue placeholder="Select feedback type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="feature_suggestion">Feature Suggestion</SelectItem>
+                  <SelectItem value="bug_report">Bug Report</SelectItem>
+                  <SelectItem value="help_request">Help Request</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Subject</label>
+              <Input
+                data-testid="input-feedback-subject"
+                placeholder="Brief summary"
+                value={feedbackSubject}
+                onChange={(e) => setFeedbackSubject(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Message</label>
+              <Textarea
+                data-testid="textarea-feedback-message"
+                placeholder="Describe your feedback in detail..."
+                value={feedbackMessage}
+                onChange={(e) => setFeedbackMessage(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Attachments</label>
+              <div
+                data-testid="dropzone-feedback-files"
+                onDrop={handleFeedbackDrop}
+                onDragOver={handleFeedbackDragOver}
+                onDragLeave={handleFeedbackDragLeave}
+                onClick={() => feedbackFileInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 cursor-pointer transition-colors ${
+                  isFeedbackDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/25"
+                }`}
+              >
+                <Upload className="w-6 h-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  Drop files here or click to upload
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Images or PDF, max 10MB each, up to {FEEDBACK_MAX_FILES} files
+                </p>
+              </div>
+              <input
+                ref={feedbackFileInputRef}
+                type="file"
+                className="hidden"
+                multiple
+                accept={FEEDBACK_ACCEPTED_TYPES.join(",")}
+                onChange={(e) => {
+                  if (e.target.files) handleFeedbackFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            {feedbackFiles.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {feedbackFiles.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 rounded-md border p-2"
+                  >
+                    <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center">
+                      {item.previewUrl ? (
+                        <img
+                          src={item.previewUrl}
+                          alt={item.file.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <FileText className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{item.file.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">
+                          {formatFileSize(item.file.size)}
+                        </span>
+                        {item.status === "uploading" && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Uploading
+                          </Badge>
+                        )}
+                        {item.status === "done" && (
+                          <Badge variant="secondary" className="text-xs">
+                            Uploaded
+                          </Badge>
+                        )}
+                        {item.status === "error" && (
+                          <Badge variant="destructive" className="text-xs">
+                            Failed
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeFeedbackFile(item.id)}
+                      aria-label={`Remove ${item.file.name}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              data-testid="button-submit-feedback"
+              onClick={() => feedbackSubmitMutation.mutate()}
+              disabled={!canSubmitFeedback || feedbackSubmitMutation.isPending}
+              className="w-full"
+            >
+              {feedbackSubmitMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Submit Feedback
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <main className="p-4 space-y-8 max-w-2xl mx-auto">
         <div className="text-center py-4">
@@ -1680,7 +2078,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Use the feedback button in the bottom-right corner of any page to submit suggestions, report bugs, or request help. You can also attach screenshots and files to help us understand your feedback better.
+              Use the menu at the top of this page to submit feedback, report bugs, or request help. You can also attach screenshots and files to help us understand your feedback better.
             </p>
           </CardContent>
         </Card>

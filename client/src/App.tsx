@@ -50,7 +50,6 @@ import AdminFeedbackPage from "@/pages/admin-feedback";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
-import { FeedbackButton } from "@/components/FeedbackButton";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import { ImpersonationProvider, useImpersonation } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -253,7 +252,6 @@ function AppContent() {
       <PermissionProvider>
         <ProfileCompletionGuard>
           <AuthenticatedRouter />
-          <FeedbackButton />
         </ProfileCompletionGuard>
       </PermissionProvider>
     </ImpersonationProvider>
