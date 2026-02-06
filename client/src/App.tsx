@@ -46,9 +46,11 @@ import MarketingMaterialsPage from "@/pages/marketing-materials";
 import GamificationDashboardPage from "@/pages/gamification-dashboard";
 import SalesVideosTrainingPage from "@/pages/sales-videos-training";
 import AgentTrainingDetailPage from "@/pages/agent-training-detail";
+import AdminFeedbackPage from "@/pages/admin-feedback";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
+import { FeedbackButton } from "@/components/FeedbackButton";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import { ImpersonationProvider, useImpersonation } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -183,6 +185,7 @@ function AuthenticatedRouter() {
         <Route path="/gamification" component={GamificationDashboardPage} />
         <Route path="/training/sales-videos" component={SalesVideosTrainingPage} />
         <Route path="/admin/agent/:userId/training" component={AgentTrainingDetailPage} />
+        <Route path="/admin/feedback" component={AdminFeedbackPage} />
         <Route path="/help" component={HelpPage} />
         <Route path="/email" component={EmailDrafterPage} />
         <Route component={NotFound} />
@@ -250,6 +253,7 @@ function AppContent() {
       <PermissionProvider>
         <ProfileCompletionGuard>
           <AuthenticatedRouter />
+          <FeedbackButton />
         </ProfileCompletionGuard>
       </PermissionProvider>
     </ImpersonationProvider>

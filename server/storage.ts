@@ -283,6 +283,8 @@ export interface IStorage {
   
   // Feedback
   createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
+  getAllFeedbackSubmissions(filters?: { type?: string; status?: string }): Promise<FeedbackSubmission[]>;
+  updateFeedbackSubmission(id: number, data: { status?: string; adminNotes?: string }): Promise<FeedbackSubmission>;
   
   // Roleplay Sessions
   createRoleplaySession(data: InsertRoleplaySession): Promise<RoleplaySession>;
@@ -1224,6 +1226,29 @@ export class DatabaseStorage implements IStorage {
   async createFeedbackSubmission(data: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
     const [created] = await db.insert(feedbackSubmissions).values(data as any).returning();
     return created;
+  }
+
+  async getAllFeedbackSubmissions(filters?: { type?: string; status?: string }): Promise<FeedbackSubmission[]> {
+    const conditions = [];
+    if (filters?.type) {
+      conditions.push(eq(feedbackSubmissions.type, filters.type));
+    }
+    if (filters?.status) {
+      conditions.push(eq(feedbackSubmissions.status, filters.status));
+    }
+    if (conditions.length > 0) {
+      return await db.select().from(feedbackSubmissions).where(and(...conditions)).orderBy(desc(feedbackSubmissions.createdAt));
+    }
+    return await db.select().from(feedbackSubmissions).orderBy(desc(feedbackSubmissions.createdAt));
+  }
+
+  async updateFeedbackSubmission(id: number, data: { status?: string; adminNotes?: string }): Promise<FeedbackSubmission> {
+    const [updated] = await db
+      .update(feedbackSubmissions)
+      .set(data as any)
+      .where(eq(feedbackSubmissions.id, id))
+      .returning();
+    return updated;
   }
 
   // Role-play Sessions

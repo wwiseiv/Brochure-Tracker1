@@ -6,7 +6,7 @@ import {
   Home, QrCode, User, FileSignature, HelpCircle, CalendarCheck, Users, 
   GraduationCap, Building2, Menu, X, Briefcase, MapPin, FileText, 
   BarChart3, MessageSquare, Settings, Users2, Sparkles, Package,
-  Target, Megaphone, History, PenTool, Shield, ChevronRight, Trophy
+  Target, Megaphone, History, PenTool, Shield, ChevronRight, Trophy, MessageSquarePlus
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -135,6 +135,7 @@ const adminMenuItems = [
     title: "Admin",
     items: [
       { path: "/admin", icon: Shield, label: "Admin Dashboard" },
+      { path: "/admin/feedback", icon: MessageSquarePlus, label: "Feedback & Issues" },
     ]
   },
 ];

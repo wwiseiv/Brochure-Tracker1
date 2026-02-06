@@ -170,9 +170,7 @@ export default function HelpPage() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [feedbackType, setFeedbackType] = useState<string>("feature_suggestion");
-  const [feedbackSubject, setFeedbackSubject] = useState("");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
+  
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [showAiChat, setShowAiChat] = useState(false);
   const aiResponseRef = useRef<HTMLDivElement>(null);
@@ -211,44 +209,6 @@ export default function HelpPage() {
     return questionIndicators.some(q => lower.includes(q));
   };
 
-  const feedbackMutation = useMutation({
-    mutationFn: async (data: { type: string; subject: string; message: string }) => {
-      await apiRequest("POST", "/api/feedback", data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Thanks for your feedback!",
-        description: "We'll get back to you soon.",
-      });
-      setFeedbackType("feature_suggestion");
-      setFeedbackSubject("");
-      setFeedbackMessage("");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to submit feedback",
-        description: error.message || "Please try again later.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleFeedbackSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
-      toast({
-        title: "Missing required fields",
-        description: "Please fill in both subject and message.",
-        variant: "destructive",
-      });
-      return;
-    }
-    feedbackMutation.mutate({
-      type: feedbackType,
-      subject: feedbackSubject,
-      message: feedbackMessage,
-    });
-  };
 
   const gettingStartedItems: HelpItem[] = [
     {
@@ -1715,66 +1675,13 @@ export default function HelpPage() {
               Feature Suggestions & Help
             </CardTitle>
             <CardDescription>
-              Have a feature idea or need help? Let us know!
+              Have a feature idea, bug report, or need help?
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleFeedbackSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="feedback-type">Type</Label>
-                <Select value={feedbackType} onValueChange={setFeedbackType}>
-                  <SelectTrigger id="feedback-type" data-testid="select-feedback-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="feature_suggestion">Feature Suggestion</SelectItem>
-                    <SelectItem value="help_request">Help Request</SelectItem>
-                    <SelectItem value="bug_report">Bug Report</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="feedback-subject">Subject</Label>
-                <Input
-                  id="feedback-subject"
-                  placeholder="Brief summary of your feedback"
-                  value={feedbackSubject}
-                  onChange={(e) => setFeedbackSubject(e.target.value)}
-                  required
-                  data-testid="input-feedback-subject"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="feedback-message">Message</Label>
-                <Textarea
-                  id="feedback-message"
-                  placeholder="Describe your feature idea, question, or issue..."
-                  value={feedbackMessage}
-                  onChange={(e) => setFeedbackMessage(e.target.value)}
-                  required
-                  className="min-h-[120px]"
-                  data-testid="textarea-feedback-message"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={feedbackMutation.isPending}
-                className="w-full"
-                data-testid="button-submit-feedback"
-              >
-                {feedbackMutation.isPending ? (
-                  "Submitting..."
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Submit Feedback
-                  </>
-                )}
-              </Button>
-            </form>
+            <p className="text-sm text-muted-foreground">
+              Use the feedback button in the bottom-right corner of any page to submit suggestions, report bugs, or request help. You can also attach screenshots and files to help us understand your feedback better.
+            </p>
           </CardContent>
         </Card>
 

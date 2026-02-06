@@ -3055,7 +3055,7 @@ Format your response as JSON:
   app.post("/api/feedback", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { type, subject, message } = req.body;
+      const { type, subject, message, attachments } = req.body;
 
       const parsed = insertFeedbackSubmissionSchema.safeParse({
         userId,
@@ -3064,6 +3064,7 @@ Format your response as JSON:
         type,
         subject,
         message,
+        attachments,
       });
 
       if (!parsed.success) {
@@ -3092,6 +3093,50 @@ Format your response as JSON:
     } catch (error) {
       console.error("Error submitting feedback:", error);
       res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  // Get all feedback submissions (admin only)
+  app.get("/api/admin/feedback", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { type, status } = req.query;
+      const filters: { type?: string; status?: string } = {};
+      if (type) filters.type = type as string;
+      if (status) filters.status = status as string;
+      const submissions = await storage.getAllFeedbackSubmissions(filters);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching feedback submissions:", error);
+      res.status(500).json({ error: "Failed to fetch feedback submissions" });
+    }
+  });
+
+  // Update feedback submission (admin only)
+  app.patch("/api/admin/feedback/:id", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid feedback ID" });
+      }
+
+      const { status, adminNotes } = req.body;
+      const validStatuses = ["new", "in_progress", "resolved", "closed"];
+      if (status && !validStatuses.includes(status)) {
+        return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(", ")}` });
+      }
+
+      const updateData: { status?: string; adminNotes?: string } = {};
+      if (status) updateData.status = status;
+      if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+
+      const updated = await storage.updateFeedbackSubmission(id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Feedback submission not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating feedback submission:", error);
+      res.status(500).json({ error: "Failed to update feedback submission" });
     }
   });
 

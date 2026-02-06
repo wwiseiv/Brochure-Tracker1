@@ -47,6 +47,7 @@ import {
   Menu,
   Trophy,
   PlayCircle,
+  MessageSquarePlus,
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
@@ -154,7 +155,10 @@ const managerMenuItems = [
 const adminMenuItems = [
   {
     title: "Admin",
-    items: [{ path: "/admin", icon: Shield, label: "Admin Dashboard" }],
+    items: [
+      { path: "/admin", icon: Shield, label: "Admin Dashboard" },
+      { path: "/admin/feedback", icon: MessageSquarePlus, label: "Feedback & Issues" },
+    ],
   },
 ];
 

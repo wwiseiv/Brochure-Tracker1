@@ -719,19 +719,30 @@ export const feedbackSubmissions = pgTable("feedback_submissions", {
   type: varchar("type", { length: 30 }).notNull(), // feature_suggestion, help_request, bug_report
   subject: varchar("subject", { length: 200 }).notNull(),
   message: text("message").notNull(),
+  attachments: jsonb("attachments").$type<{ objectPath: string; name: string; size: number; contentType: string }[]>(),
   status: varchar("status", { length: 20 }).default("new").notNull(),
+  adminNotes: text("admin_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const FEEDBACK_TYPES = ["feature_suggestion", "help_request", "bug_report"] as const;
 export type FeedbackType = typeof FEEDBACK_TYPES[number];
 
+export const feedbackAttachmentSchema = z.object({
+  objectPath: z.string(),
+  name: z.string(),
+  size: z.number(),
+  contentType: z.string(),
+});
+
 export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({
   id: true,
   createdAt: true,
   status: true,
+  adminNotes: true,
 }).extend({
   type: z.enum(FEEDBACK_TYPES),
+  attachments: z.array(feedbackAttachmentSchema).optional(),
 });
 export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
