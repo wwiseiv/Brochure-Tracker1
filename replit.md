@@ -41,6 +41,14 @@ Preferred communication style: Simple, everyday language.
     - **AI-Powered Prospecting**: Local business discovery using AI with web search, MCC code filtering, pipeline integration, background processing, and push notifications.
     - **AI Help Chatbot**: In-app Claude AI assistant.
     - **Email Digest System**: Personalized, AI-powered daily/weekly email summaries with customizable content and timezone-aware scheduling.
+- **Gamification System**: Comprehensive training gamification with XP tracking, 10-level progression (Rookie to Grand Master), 6-category badge system (Bronze through Diamond), daily XP caps (300/day), streak tracking, leaderboard, and PDF certificates. Admin-controllable via 5 separate feature toggles (XP Tracking, Badges, Certificates, Leaderboard, Progress Dashboard).
+    - **Database Tables**: `gamification_profiles`, `xp_ledger`, `badges_earned`, `certificates`, `gamification_daily_log`
+    - **Engine**: `server/gamification-engine.ts` (XP awards, badge progression, level calculation, streak management)
+    - **Certificates**: `server/certificate-generator.ts` (PDF generation via pdf-lib, 4 certificate types, eligibility checking)
+    - **Event Hooks**: XP automatically awarded on presentation lesson completion, quiz passing, EquipIQ quizzes, roleplay session completion, Daily Edge views/challenges
+    - **API Routes**: `/api/gamification/profile`, `/api/gamification/leaderboard`, `/api/gamification/badges`, `/api/gamification/xp-history`, `/api/gamification/certificates/*`, `/api/gamification/admin/*`
+    - **Frontend**: `/gamification` dashboard page, profile page summary card, team management training column
+    - **Permission Keys**: `gamification_xp_tracking`, `gamification_badges`, `gamification_certificates`, `gamification_leaderboard`, `gamification_dashboard`
 - **Offline Capabilities**: PWA with service worker and IndexedDB for offline data sync.
 - **Data Export**: CSV/Excel export for key data.
 - **Accessibility**: Dictation support for inputs, TTS playback for AI content.

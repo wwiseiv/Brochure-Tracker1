@@ -107,6 +107,8 @@ import webpush from "web-push";
 import fs from "fs";
 import path from "path";
 import { validateAndSanitize, getDefaultSanitizedData } from "./services/statement-validator";
+import { awardXP, getGamificationProfile, getLeaderboard, checkBadgeProgression, XP_CONFIG, LEVEL_THRESHOLDS, BADGE_DEFINITIONS, BADGE_LEVELS, getLevelInfo, generateVerificationCode } from "./gamification-engine";
+import { generateCertificatePDF, checkCertificateEligibility, CERTIFICATE_TYPES } from "./certificate-generator";
 
 // Internal secret for background job processing
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'prospect-job-internal-key-' + Date.now();
@@ -7051,6 +7053,19 @@ Provide constructive feedback in JSON format:
         performanceScore: feedback.overallScore || 50,
       });
 
+      // Gamification: Award XP for roleplay session
+      try {
+        const perfScore = feedback.overallScore || 50;
+        const xpAmount = perfScore >= 80 ? XP_CONFIG.ROLEPLAY_HIGH_SCORE : XP_CONFIG.ROLEPLAY_SESSION_COMPLETE;
+        await awardXP(userId, xpAmount, 'roleplay_session', String(sessionId), `Roleplay session (score: ${perfScore})`);
+        
+        const allSessions = await storage.getRoleplaySessionsByAgent(userId);
+        const completedSessions = allSessions.filter(s => s.status === 'completed').length;
+        await checkBadgeProgression(userId, 'roleplay', completedSessions);
+      } catch (gamErr) {
+        console.error("[Gamification] Error awarding roleplay XP:", gamErr);
+      }
+
       // Send email notification with session summary
       const agentName = req.user.claims.name || req.user.claims.username || "Agent";
       const agentEmail = req.user.claims.email || "";
@@ -7156,6 +7171,14 @@ Provide constructive feedback in JSON format:
       }
       
       const view = await storage.recordDailyEdgeView(userId, contentId, reflection);
+
+      // Gamification: Award XP for daily edge view
+      try {
+        await awardXP(userId, XP_CONFIG.DAILY_EDGE_VIEW, 'daily_edge_view', String(contentId), 'Daily Edge content viewed');
+      } catch (gamErr) {
+        console.error("[Gamification] Error awarding Daily Edge view XP:", gamErr);
+      }
+
       res.status(201).json(view);
     } catch (error: any) {
       console.error("Error recording Daily Edge view:", error);
@@ -7179,6 +7202,16 @@ Provide constructive feedback in JSON format:
       const result = await storage.markChallengeCompleted(userId, contentId);
       if (!result) {
         return res.status(404).json({ error: "Content not found" });
+      }
+
+      // Gamification: Award XP for challenge completion
+      try {
+        await awardXP(userId, XP_CONFIG.DAILY_EDGE_CHALLENGE, 'daily_edge_challenge', String(contentId), 'Daily Edge challenge completed');
+        
+        const progress = await storage.getUserDailyEdgeProgress(userId);
+        await checkBadgeProgression(userId, 'daily_edge', progress.challengesCompleted || 0);
+      } catch (gamErr) {
+        console.error("[Gamification] Error awarding Daily Edge challenge XP:", gamErr);
       }
       
       res.json(result);
@@ -7675,6 +7708,18 @@ If you don't have enough info, ask ONE clarifying question. Common questions:
         score,
       });
 
+      // Gamification: Award XP for quiz completion
+      try {
+        const isPerfect = correctAnswers === totalQuestions;
+        const xpAmount = isPerfect ? XP_CONFIG.EQUIPIQ_QUIZ_PERFECT : XP_CONFIG.EQUIPIQ_QUIZ_COMPLETE;
+        await awardXP(userId, xpAmount, 'equipiq_quiz', String(result.id), `EquipIQ quiz: ${isPerfect ? 'Perfect score' : `${correctAnswers}/${totalQuestions}`}`);
+        
+        const allResults = await storage.getEquipmentQuizResults(userId);
+        await checkBadgeProgression(userId, 'equipiq', allResults.length);
+      } catch (gamErr) {
+        console.error("[Gamification] Error awarding EquipIQ XP:", gamErr);
+      }
+
       res.json(result);
     } catch (error) {
       console.error("[EquipIQ] Error saving quiz result:", error);
@@ -7840,6 +7885,24 @@ Return ONLY valid JSON in this exact format:
       };
       
       const progress = await storage.upsertPresentationProgress(progressData);
+
+      // Gamification: Award XP for lesson completion
+      try {
+        if (completed) {
+          const xpResult = await awardXP(userId, XP_CONFIG.PRESENTATION_LESSON_COMPLETE, 'presentation_lesson', String(lessonId), `Completed presentation lesson`);
+          
+          if (quizPassed) {
+            await awardXP(userId, XP_CONFIG.PRESENTATION_QUIZ_PASS, 'presentation_quiz', String(lessonId), `Passed presentation quiz`);
+          }
+          
+          const allProgress = await storage.getUserPresentationProgress(userId);
+          const completedLessons = allProgress.filter((p: any) => p.completed).length;
+          await checkBadgeProgression(userId, 'presentation', completedLessons);
+        }
+      } catch (gamErr) {
+        console.error("[Gamification] Error awarding presentation XP:", gamErr);
+      }
+
       res.json(progress);
     } catch (error) {
       console.error("[Presentation] Error updating progress:", error);
@@ -14846,6 +14909,224 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
     } catch (error) {
       console.error('[DeliveryAnalyzer] Error in delivery analysis:', error);
       res.status(500).json({ error: 'Failed to analyze delivery. Please try again.' });
+    }
+  });
+
+  // ==================== GAMIFICATION ROUTES ====================
+
+  app.get("/api/gamification/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const profile = await getGamificationProfile(userId);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching gamification profile:", error);
+      res.status(500).json({ error: "Failed to fetch gamification profile" });
+    }
+  });
+
+  app.get("/api/gamification/leaderboard", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const membership = req.orgMembership as OrgMembershipInfo;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await getLeaderboard(membership.organization.id, limit);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  app.get("/api/gamification/badges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const badges = await storage.getBadgesForUser(userId);
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ error: "Failed to fetch badges" });
+    }
+  });
+
+  app.get("/api/gamification/xp-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const history = await storage.getXpLedger(userId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching XP history:", error);
+      res.status(500).json({ error: "Failed to fetch XP history" });
+    }
+  });
+
+  app.get("/api/gamification/certificates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const certs = await storage.getCertificatesForUser(userId);
+      res.json(certs);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      res.status(500).json({ error: "Failed to fetch certificates" });
+    }
+  });
+
+  app.get("/api/gamification/certificates/:code/verify", async (req: any, res) => {
+    try {
+      const { code } = req.params;
+      const cert = await storage.getCertificateByVerification(code);
+      if (!cert) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      res.json(cert);
+    } catch (error) {
+      console.error("Error verifying certificate:", error);
+      res.status(500).json({ error: "Failed to verify certificate" });
+    }
+  });
+
+  app.get("/api/gamification/certificates/check-eligibility", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = await getEffectiveUserId(req);
+      const eligible = await checkCertificateEligibility(userId);
+      const eligibleWithDetails = eligible.map(type => ({
+        type,
+        ...CERTIFICATE_TYPES[type as keyof typeof CERTIFICATE_TYPES],
+      }));
+      res.json({ eligible: eligibleWithDetails });
+    } catch (error) {
+      console.error("[Certificates] Error checking eligibility:", error);
+      res.status(500).json({ error: "Failed to check certificate eligibility" });
+    }
+  });
+
+  app.post("/api/gamification/certificates/generate", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { certificateType } = req.body;
+
+      if (!certificateType || !CERTIFICATE_TYPES[certificateType as keyof typeof CERTIFICATE_TYPES]) {
+        return res.status(400).json({ error: "Invalid certificate type" });
+      }
+
+      const existing = await storage.getCertificatesForUser(userId);
+      if (existing.some(c => c.certificateType === certificateType)) {
+        return res.status(400).json({ error: "Certificate already earned" });
+      }
+
+      const eligible = await checkCertificateEligibility(userId);
+      if (!eligible.includes(certificateType)) {
+        return res.status(403).json({ error: "Not yet eligible for this certificate" });
+      }
+
+      const certDef = CERTIFICATE_TYPES[certificateType as keyof typeof CERTIFICATE_TYPES];
+      const verificationCode = generateVerificationCode();
+
+      const certificate = await storage.createCertificate({
+        userId,
+        certificateType,
+        title: certDef.title,
+        description: certDef.description,
+        verificationCode,
+      });
+
+      const profile = await storage.getGamificationProfile(userId);
+      if (profile) {
+        await storage.upsertGamificationProfile(userId, {
+          certificatesEarned: (profile.certificatesEarned || 0) + 1,
+        });
+      }
+
+      res.json(certificate);
+    } catch (error) {
+      console.error("[Certificates] Error generating certificate:", error);
+      res.status(500).json({ error: "Failed to generate certificate" });
+    }
+  });
+
+  app.get("/api/gamification/certificates/:id/download", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const certId = parseInt(req.params.id);
+
+      // Allow admin to download any cert, otherwise must own it
+      const isAdmin = req.orgMembership?.role === 'master_admin';
+      let cert: any;
+      
+      if (!isAdmin) {
+        const certs = await storage.getCertificatesForUser(userId);
+        cert = certs.find(c => c.id === certId);
+        if (!cert) {
+          return res.status(404).json({ error: "Certificate not found" });
+        }
+      } else {
+        // Admin can access any certificate
+        const allCerts = await storage.getAllCertificates?.();
+        cert = allCerts?.find(c => c.id === certId);
+        if (!cert) {
+          return res.status(404).json({ error: "Certificate not found" });
+        }
+      }
+
+      const membership = req.orgMembership;
+      const recipientName = membership
+        ? `${membership.firstName || ''} ${membership.lastName || ''}`.trim() || 'Agent'
+        : 'Agent';
+
+      const pdfBuffer = await generateCertificatePDF({
+        recipientName,
+        certificateType: cert.certificateType,
+        title: cert.title,
+        description: cert.description || '',
+        issuedDate: new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        verificationCode: cert.verificationCode,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="certificate-${cert.verificationCode}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("[Certificates] Error downloading certificate:", error);
+      res.status(500).json({ error: "Failed to download certificate" });
+    }
+  });
+
+  app.get("/api/gamification/admin/org-profiles", isAuthenticated, ensureOrgMembership(), async (req: any, res) => {
+    try {
+      const role = req.orgMembership.role;
+      if (role !== "master_admin" && role !== "relationship_manager") {
+        return res.status(403).json({ error: "Admin or manager role required" });
+      }
+      const members = await storage.getOrganizationMembers(req.orgMembership.orgId);
+      const userIds = members.map((m: any) => m.userId);
+      const profiles = await storage.getOrgGamificationProfiles(userIds);
+      const profileMap: Record<string, any> = {};
+      for (const profile of profiles) {
+        profileMap[profile.userId] = {
+          totalXp: profile.totalXp,
+          currentLevel: profile.currentLevel,
+          currentStreak: profile.currentStreak,
+          badgesEarned: profile.badgesEarned,
+        };
+      }
+      res.json({ profiles: profileMap });
+    } catch (error) {
+      console.error("Error fetching org gamification profiles:", error);
+      res.status(500).json({ error: "Failed to fetch org gamification profiles" });
+    }
+  });
+
+  app.post("/api/gamification/admin/award-xp", isAuthenticated, requireRole("master_admin"), async (req: any, res) => {
+    try {
+      const { userId, amount, description } = req.body;
+      if (!userId || !amount) {
+        return res.status(400).json({ error: "userId and amount are required" });
+      }
+      const result = await awardXP(userId, amount, "admin_award", undefined, description || "Manual XP award by admin");
+      res.json(result);
+    } catch (error) {
+      console.error("Error awarding XP:", error);
+      res.status(500).json({ error: "Failed to award XP" });
     }
   });
 

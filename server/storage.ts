@@ -184,6 +184,21 @@ import {
   merchantIntelligence,
   type MerchantIntelligence,
   type InsertMerchantIntelligence,
+  gamificationProfiles,
+  xpLedger,
+  badgesEarned as badgesEarnedTable,
+  certificates,
+  gamificationDailyLog,
+  type GamificationProfile,
+  type InsertGamificationProfile,
+  type XpLedger,
+  type InsertXpLedger,
+  type BadgesEarned,
+  type InsertBadgesEarned,
+  type Certificate,
+  type InsertCertificate,
+  type GamificationDailyLog,
+  type InsertGamificationDailyLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, gte, lte, isNull, notInArray, or } from "drizzle-orm";
@@ -429,6 +444,21 @@ export interface IStorage {
   createImpersonationAuditLog(data: InsertImpersonationAuditLog): Promise<ImpersonationAuditLog>;
   getImpersonationAuditLogs(orgId?: number, limit?: number, offset?: number): Promise<ImpersonationAuditLog[]>;
   getImpersonatableUsers(requestingUserId: string, orgId: number): Promise<OrganizationMember[]>;
+
+  // Gamification
+  getGamificationProfile(userId: string): Promise<GamificationProfile | undefined>;
+  upsertGamificationProfile(userId: string, data: Partial<GamificationProfile>): Promise<GamificationProfile>;
+  getXpLedger(userId: string, limit?: number): Promise<XpLedger[]>;
+  createXpEntry(data: InsertXpLedger): Promise<XpLedger>;
+  getBadgesForUser(userId: string): Promise<BadgesEarned[]>;
+  createBadge(data: InsertBadgesEarned): Promise<BadgesEarned>;
+  getBadge(userId: string, badgeId: string): Promise<BadgesEarned | undefined>;
+  getCertificatesForUser(userId: string): Promise<Certificate[]>;
+  createCertificate(data: InsertCertificate): Promise<Certificate>;
+  getCertificateByVerification(code: string): Promise<Certificate | undefined>;
+  getDailyLog(userId: string, date: string): Promise<GamificationDailyLog | undefined>;
+  upsertDailyLog(userId: string, date: string, xpToAdd: number): Promise<GamificationDailyLog>;
+  getOrgGamificationProfiles(userIds: string[]): Promise<GamificationProfile[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2787,6 +2817,118 @@ export class DatabaseStorage implements IStorage {
       default:
         return [];
     }
+  }
+
+  // Gamification
+  async getGamificationProfile(userId: string): Promise<GamificationProfile | undefined> {
+    const [profile] = await db.select().from(gamificationProfiles).where(eq(gamificationProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertGamificationProfile(userId: string, data: Partial<GamificationProfile>): Promise<GamificationProfile> {
+    const insertData: any = {
+      userId,
+      totalXp: data.totalXp ?? 0,
+      currentLevel: data.currentLevel ?? 1,
+      currentStreak: data.currentStreak ?? 0,
+      longestStreak: data.longestStreak ?? 0,
+      badgesEarned: data.badgesEarned ?? 0,
+      certificatesEarned: data.certificatesEarned ?? 0,
+      lastActivityDate: data.lastActivityDate ?? null,
+    };
+
+    const updateData: any = { updatedAt: new Date() };
+    if (data.totalXp !== undefined) updateData.totalXp = data.totalXp;
+    if (data.currentLevel !== undefined) updateData.currentLevel = data.currentLevel;
+    if (data.currentStreak !== undefined) updateData.currentStreak = data.currentStreak;
+    if (data.longestStreak !== undefined) updateData.longestStreak = data.longestStreak;
+    if (data.badgesEarned !== undefined) updateData.badgesEarned = data.badgesEarned;
+    if (data.certificatesEarned !== undefined) updateData.certificatesEarned = data.certificatesEarned;
+    if (data.lastActivityDate !== undefined) updateData.lastActivityDate = data.lastActivityDate;
+
+    const [result] = await db
+      .insert(gamificationProfiles)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: gamificationProfiles.userId,
+        set: updateData,
+      })
+      .returning();
+    return result;
+  }
+
+  async getXpLedger(userId: string, limit: number = 50): Promise<XpLedger[]> {
+    return db.select().from(xpLedger).where(eq(xpLedger.userId, userId)).orderBy(desc(xpLedger.earnedAt)).limit(limit);
+  }
+
+  async createXpEntry(data: InsertXpLedger): Promise<XpLedger> {
+    const [entry] = await db.insert(xpLedger).values(data).returning();
+    return entry;
+  }
+
+  async getBadgesForUser(userId: string): Promise<BadgesEarned[]> {
+    return db.select().from(badgesEarnedTable).where(eq(badgesEarnedTable.userId, userId)).orderBy(desc(badgesEarnedTable.earnedAt));
+  }
+
+  async createBadge(data: InsertBadgesEarned): Promise<BadgesEarned> {
+    const [badge] = await db.insert(badgesEarnedTable).values(data).returning();
+    return badge;
+  }
+
+  async getBadge(userId: string, badgeId: string): Promise<BadgesEarned | undefined> {
+    const [badge] = await db
+      .select()
+      .from(badgesEarnedTable)
+      .where(and(eq(badgesEarnedTable.userId, userId), eq(badgesEarnedTable.badgeId, badgeId)));
+    return badge;
+  }
+
+  async getCertificatesForUser(userId: string): Promise<Certificate[]> {
+    return db.select().from(certificates).where(eq(certificates.userId, userId)).orderBy(desc(certificates.issuedAt));
+  }
+
+  async createCertificate(data: InsertCertificate): Promise<Certificate> {
+    const [cert] = await db.insert(certificates).values(data).returning();
+    return cert;
+  }
+
+  async getCertificateByVerification(code: string): Promise<Certificate | undefined> {
+    const [cert] = await db.select().from(certificates).where(eq(certificates.verificationCode, code));
+    return cert;
+  }
+
+  async getDailyLog(userId: string, date: string): Promise<GamificationDailyLog | undefined> {
+    const [log] = await db
+      .select()
+      .from(gamificationDailyLog)
+      .where(and(eq(gamificationDailyLog.userId, userId), eq(gamificationDailyLog.logDate, date)));
+    return log;
+  }
+
+  async upsertDailyLog(userId: string, date: string, xpToAdd: number): Promise<GamificationDailyLog> {
+    const [result] = await db
+      .insert(gamificationDailyLog)
+      .values({
+        userId,
+        logDate: date,
+        xpEarned: xpToAdd,
+        activitiesCompleted: 1,
+      })
+      .onConflictDoUpdate({
+        target: [gamificationDailyLog.userId, gamificationDailyLog.logDate],
+        set: {
+          xpEarned: sql`${gamificationDailyLog.xpEarned} + ${xpToAdd}`,
+          activitiesCompleted: sql`${gamificationDailyLog.activitiesCompleted} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async getOrgGamificationProfiles(userIds: string[]): Promise<GamificationProfile[]> {
+    if (userIds.length === 0) return [];
+    return db.select().from(gamificationProfiles).where(inArray(gamificationProfiles.userId, userIds));
   }
 }
 

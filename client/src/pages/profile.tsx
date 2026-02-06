@@ -46,7 +46,10 @@ import {
   Play,
   Pause,
   AlertCircle,
-  Zap
+  Zap,
+  Trophy,
+  Award,
+  Flame
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Link } from "wouter";
@@ -147,6 +150,14 @@ export default function ProfilePage() {
   // Helper that allows admins to see all features - check both userRole and permission context
   const isAdmin = userRole?.role === 'master_admin' || userRole?.role === 'owner' || hasRole('admin');
   const canAccessFeature = (featureId: string) => isAdmin || hasFeature(featureId);
+
+  const { data: gamificationProfile } = useQuery<{
+    profile: { totalXp: number; currentLevel: number; currentStreak: number; badgesEarned: number };
+    levelInfo: { level: number; title: string; currentXp: number; xpRequired: number; progressPercent: number };
+  }>({
+    queryKey: ["/api/gamification/profile"],
+    enabled: canAccessFeature("gamification_dashboard"),
+  });
 
   const { data: digestPrefs, isLoading: digestLoading } = useQuery<EmailDigestPreferences>({
     queryKey: ["/api/email-digest/preferences"],
@@ -371,6 +382,47 @@ export default function ProfilePage() {
               </div>
             </Card>
           </>
+        )}
+
+        {canAccessFeature("gamification_dashboard") && gamificationProfile && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-500" />
+                Training Progress
+              </h3>
+              <Link href="/gamification">
+                <Button variant="ghost" size="sm" data-testid="button-view-gamification">
+                  View Full Dashboard
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div data-testid="text-gamification-level">
+                <p className="text-xl font-bold">{gamificationProfile.levelInfo?.level ?? 1}</p>
+                <p className="text-xs text-muted-foreground">Level</p>
+              </div>
+              <div data-testid="text-gamification-xp">
+                <p className="text-xl font-bold">{gamificationProfile.profile?.totalXp ?? 0}</p>
+                <p className="text-xs text-muted-foreground">XP</p>
+              </div>
+              <div data-testid="text-gamification-streak">
+                <div className="flex items-center justify-center gap-1">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  <p className="text-xl font-bold">{gamificationProfile.profile?.currentStreak ?? 0}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Streak</p>
+              </div>
+              <div data-testid="text-gamification-badges">
+                <div className="flex items-center justify-center gap-1">
+                  <Award className="w-4 h-4 text-amber-500" />
+                  <p className="text-xl font-bold">{gamificationProfile.profile?.badgesEarned ?? 0}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Badges</p>
+              </div>
+            </div>
+          </Card>
         )}
 
         <Collapsible open={notificationSettingsOpen} onOpenChange={setNotificationSettingsOpen}>

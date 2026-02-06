@@ -43,6 +43,7 @@ import ESignDocumentLibraryPage from "@/pages/esign-document-library";
 import ESignRequestDetailPage from "@/pages/esign-request-detail";
 import CompleteProfilePage from "@/pages/complete-profile";
 import MarketingMaterialsPage from "@/pages/marketing-materials";
+import GamificationDashboardPage from "@/pages/gamification-dashboard";
 import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import { HelpChatbot } from "@/components/HelpChatbot";
@@ -177,6 +178,7 @@ function AuthenticatedRouter() {
         <Route path="/esign/:id" component={ESignRequestDetailPage} />
         <Route path="/complete-profile" component={CompleteProfilePage} />
         <Route path="/marketing" component={MarketingMaterialsPage} />
+        <Route path="/gamification" component={GamificationDashboardPage} />
         <Route path="/help" component={HelpPage} />
         <Route path="/email" component={EmailDrafterPage} />
         <Route component={NotFound} />

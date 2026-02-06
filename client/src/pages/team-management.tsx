@@ -70,6 +70,7 @@ import {
   Settings,
   Lock,
   Eye,
+  Zap,
 } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { Switch } from "@/components/ui/switch";
@@ -203,6 +204,11 @@ export default function TeamManagementPage() {
 
   const { data: invitations, isLoading: invitationsLoading } = useQuery<Invitation[]>({
     queryKey: ["/api/invitations"],
+  });
+
+  const { data: gamificationData } = useQuery<{ profiles: Record<string, any> }>({
+    queryKey: ["/api/gamification/admin/org-profiles"],
+    enabled: userRole?.role === "master_admin" || userRole?.role === "relationship_manager",
   });
 
   const addMemberMutation = useMutation({
@@ -897,13 +903,14 @@ export default function TeamManagementPage() {
                       <TableHead className="hidden sm:table-cell">Contact</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead className="hidden lg:table-cell">Manager</TableHead>
+                      <TableHead className="hidden lg:table-cell">Training</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {!members || members.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8">
+                        <TableCell colSpan={6} className="text-center py-8">
                           <div className="flex flex-col items-center gap-3">
                             <p className="text-muted-foreground">No team members found</p>
                             {userRole?.role === "master_admin" && (
@@ -1002,6 +1009,21 @@ export default function TeamManagementPage() {
                                 </span>
                               ) : (
                                 <span className="text-sm text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {gamificationData?.profiles?.[member.userId] ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1 text-sm" data-testid={`text-training-xp-${member.id}`}>
+                                    <Zap className="h-3 w-3 text-amber-500" />
+                                    <span>{gamificationData.profiles[member.userId].totalXp || 0}</span>
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    Lv{gamificationData.profiles[member.userId].currentLevel || 1}
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground" data-testid={`text-no-data-${member.id}`}>No data</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">

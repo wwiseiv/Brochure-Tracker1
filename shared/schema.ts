@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, real, boolean, timestamp, integer, unique, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, boolean, timestamp, integer, unique, jsonb, numeric, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -3282,3 +3282,101 @@ export const insertMarketingImportedFlyerSchema = createInsertSchema(marketingIm
 });
 export type InsertMarketingImportedFlyer = z.infer<typeof insertMarketingImportedFlyerSchema>;
 export type MarketingImportedFlyer = typeof marketingImportedFlyers.$inferSelect;
+
+// Gamification Profiles - tracks overall XP, level, streaks per user
+export const gamificationProfiles = pgTable("gamification_profiles", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull().unique(),
+  totalXp: integer("total_xp").default(0).notNull(),
+  currentLevel: integer("current_level").default(1).notNull(),
+  currentStreak: integer("current_streak").default(0).notNull(),
+  longestStreak: integer("longest_streak").default(0).notNull(),
+  lastActivityDate: date("last_activity_date"),
+  badgesEarned: integer("badges_earned").default(0).notNull(),
+  certificatesEarned: integer("certificates_earned").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGamificationProfileSchema = createInsertSchema(gamificationProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertGamificationProfile = z.infer<typeof insertGamificationProfileSchema>;
+export type GamificationProfile = typeof gamificationProfiles.$inferSelect;
+
+// XP Ledger - immutable log of every XP earn event
+export const xpLedger = pgTable("xp_ledger", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  source: varchar("source", { length: 50 }).notNull(),
+  sourceId: varchar("source_id", { length: 100 }),
+  description: text("description"),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+});
+
+export const insertXpLedgerSchema = createInsertSchema(xpLedger).omit({
+  id: true,
+  earnedAt: true,
+});
+export type InsertXpLedger = z.infer<typeof insertXpLedgerSchema>;
+export type XpLedger = typeof xpLedger.$inferSelect;
+
+// Badges Earned - tracks which badges each user has earned
+export const badgesEarned = pgTable("badges_earned", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  badgeId: varchar("badge_id", { length: 50 }).notNull(),
+  badgeLevel: integer("badge_level").notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserBadge: unique().on(table.userId, table.badgeId),
+}));
+
+export const insertBadgesEarnedSchema = createInsertSchema(badgesEarned).omit({
+  id: true,
+  earnedAt: true,
+});
+export type InsertBadgesEarned = z.infer<typeof insertBadgesEarnedSchema>;
+export type BadgesEarned = typeof badgesEarned.$inferSelect;
+
+// Certificates - training completion certificates
+export const certificates = pgTable("certificates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  certificateType: varchar("certificate_type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  verificationCode: varchar("verification_code", { length: 20 }).notNull().unique(),
+  pdfUrl: text("pdf_url"),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+});
+
+export const insertCertificateSchema = createInsertSchema(certificates).omit({
+  id: true,
+  issuedAt: true,
+});
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type Certificate = typeof certificates.$inferSelect;
+
+// Gamification Daily Log - tracks daily activity for streak calculation and daily caps
+export const gamificationDailyLog = pgTable("gamification_daily_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  logDate: date("log_date").notNull(),
+  xpEarned: integer("xp_earned").default(0).notNull(),
+  activitiesCompleted: integer("activities_completed").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserDate: unique().on(table.userId, table.logDate),
+}));
+
+export const insertGamificationDailyLogSchema = createInsertSchema(gamificationDailyLog).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertGamificationDailyLog = z.infer<typeof insertGamificationDailyLogSchema>;
+export type GamificationDailyLog = typeof gamificationDailyLog.$inferSelect;

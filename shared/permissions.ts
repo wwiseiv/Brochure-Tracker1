@@ -25,6 +25,7 @@ export type FeatureCategory =
   | 'brochure_management'
   | 'ai_tools'
   | 'sales_training'
+  | 'gamification'
   | 'documents'
   | 'communication'
   | 'team_management'
@@ -228,6 +229,65 @@ export const FEATURES: FeatureDefinition[] = [
     roleDefaults: { admin: true, manager: true, agent: true },
     stageDefaults: { trainee: true, active: true, senior: true },
     icon: 'Sparkles'
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GAMIFICATION FEATURES (Available to ALL roles/stages)
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'gamification_xp_tracking',
+    name: 'XP & Progress Tracking',
+    description: 'Track XP earned from training activities and overall progress',
+    category: 'gamification',
+    routes: [],
+    apiEndpoints: ['/api/gamification/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Zap'
+  },
+  {
+    id: 'gamification_badges',
+    name: 'Badges & Levels',
+    description: 'Earn badges and level up through training milestones',
+    category: 'gamification',
+    routes: [],
+    apiEndpoints: ['/api/gamification/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Award'
+  },
+  {
+    id: 'gamification_certificates',
+    name: 'Certificates',
+    description: 'Earn and download training completion certificates',
+    category: 'gamification',
+    routes: [],
+    apiEndpoints: ['/api/gamification/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Award'
+  },
+  {
+    id: 'gamification_leaderboard',
+    name: 'Leaderboard',
+    description: 'View team rankings and competitive standings',
+    category: 'gamification',
+    routes: [],
+    apiEndpoints: ['/api/gamification/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'Trophy'
+  },
+  {
+    id: 'gamification_dashboard',
+    name: 'Progress Dashboard',
+    description: 'Comprehensive training progress dashboard with analytics',
+    category: 'gamification',
+    routes: [],
+    apiEndpoints: ['/api/gamification/*'],
+    roleDefaults: { admin: true, manager: true, agent: true },
+    stageDefaults: { trainee: true, active: true, senior: true },
+    icon: 'BarChart3'
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
