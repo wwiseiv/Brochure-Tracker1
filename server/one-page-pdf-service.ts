@@ -8,6 +8,8 @@ const PAGE_H = 792;
 const NAVY = { r: 0x1a / 255, g: 0x36 / 255, b: 0x5d / 255 };
 const GOLD = { r: 0xd6 / 255, g: 0x9e / 255, b: 0x2e / 255 };
 
+import type { AIGeneratedContent } from "./one-page-ai-service";
+
 interface OnePagePdfInput {
   templateId: string;
   merchantName: string;
@@ -21,6 +23,7 @@ interface OnePagePdfInput {
     interchangePlus?: { programType: string; annualSavings: string; monthlySavings?: string } | null;
   } | null;
   merchantStatementUploaded?: boolean;
+  aiContent?: AIGeneratedContent;
 }
 
 const TEMPLATE_FILE_MAP: Record<string, string> = {
@@ -109,7 +112,8 @@ async function generateTemplate1(input: OnePagePdfInput): Promise<Buffer> {
     color: rgb(1, 1, 1),
     opacity: 0.85,
   });
-  page.drawText(`Prepared for: ${input.merchantName}`, {
+  const headlineText = input.aiContent?.headline || `Prepared for: ${input.merchantName}`;
+  page.drawText(headlineText, {
     x: 40,
     y: PAGE_H - 45,
     size: 14,
@@ -117,18 +121,28 @@ async function generateTemplate1(input: OnePagePdfInput): Promise<Buffer> {
     color: rgb(NAVY.r, NAVY.g, NAVY.b),
   });
 
-  const savingsLines = buildSavingsText(input);
+  const savingsLines = input.aiContent?.savingsItems?.length
+    ? input.aiContent.savingsItems.map((item) => `${item.label}: ${item.amount} ${item.note}`)
+    : buildSavingsText(input);
   let savingsY = PAGE_H - 350;
+  const extraLines: string[] = [];
+  if (input.aiContent?.features) {
+    extraLines.push(...input.aiContent.features);
+  }
+  if (input.aiContent?.customBodyCopy) {
+    extraLines.push(input.aiContent.customBodyCopy);
+  }
+  const allContentLines = [...savingsLines, ...extraLines];
   page.drawRectangle({
     x: 30,
     y: savingsY - 10,
     width: 350,
-    height: savingsLines.length * 20 + 10,
+    height: allContentLines.length * 20 + 10,
     color: rgb(1, 1, 1),
     opacity: 0.9,
   });
-  for (const line of savingsLines) {
-    page.drawText(line, {
+  for (const line of allContentLines) {
+    page.drawText(line.substring(0, 80), {
       x: 40,
       y: savingsY,
       size: 10,
@@ -217,7 +231,8 @@ async function generateTemplate2(input: OnePagePdfInput): Promise<Buffer> {
     height: 18,
     color: rgb(NAVY.r, NAVY.g, NAVY.b),
   });
-  page.drawText(`Customized savings proposal for ${input.merchantName}`, {
+  const merchantLine = input.aiContent?.headline || `Customized savings proposal for ${input.merchantName}`;
+  page.drawText(merchantLine, {
     x: 40,
     y: PAGE_H - 110,
     size: 11,
@@ -225,7 +240,9 @@ async function generateTemplate2(input: OnePagePdfInput): Promise<Buffer> {
     color: rgb(0.8, 0.85, 0.9),
   });
 
-  const savingsLines = buildSavingsText(input);
+  const savingsLines = input.aiContent?.savingsItems?.length
+    ? input.aiContent.savingsItems.map((item) => `${item.label}: ${item.amount} ${item.note}`)
+    : buildSavingsText(input);
   let bulletY = PAGE_H - 185;
   page.drawRectangle({
     x: 50,
@@ -252,28 +269,38 @@ async function generateTemplate2(input: OnePagePdfInput): Promise<Buffer> {
     bulletY -= 18;
   }
 
-  if (input.equipment) {
+  const equipLines = input.aiContent?.equipmentItems?.length
+    ? input.aiContent.equipmentItems.map((item) => `${item.name}: ${item.detail}`)
+    : input.equipment
+      ? [`${input.equipment.name}: ${input.equipment.price}`]
+      : [];
+
+  if (equipLines.length > 0) {
+    let eqY = PAGE_H - 290;
     page.drawRectangle({
       x: 50,
-      y: PAGE_H - 305,
+      y: eqY - (equipLines.length * 18) + 5,
       width: 400,
-      height: 20,
+      height: equipLines.length * 18 + 10,
       color: rgb(0xf7 / 255, 0xfa / 255, 0xfc / 255),
     });
-    page.drawText("\u2022", {
-      x: 55,
-      y: PAGE_H - 290,
-      size: 10,
-      font: regular,
-      color: rgb(GOLD.r, GOLD.g, GOLD.b),
-    });
-    page.drawText(`${input.equipment.name}: ${input.equipment.price}`, {
-      x: 69,
-      y: PAGE_H - 290,
-      size: 10,
-      font: regular,
-      color: rgb(0.3, 0.3, 0.35),
-    });
+    for (const eLine of equipLines) {
+      page.drawText("\u2022", {
+        x: 55,
+        y: eqY,
+        size: 10,
+        font: regular,
+        color: rgb(GOLD.r, GOLD.g, GOLD.b),
+      });
+      page.drawText(eLine.substring(0, 80), {
+        x: 69,
+        y: eqY,
+        size: 10,
+        font: regular,
+        color: rgb(0.3, 0.3, 0.35),
+      });
+      eqY -= 18;
+    }
   }
 
   const pdfBytes = await pdfDoc.save();
