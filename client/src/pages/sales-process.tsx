@@ -518,12 +518,12 @@ export default function SalesProcessPage() {
 
         <main className="p-4 pb-24 max-w-4xl mx-auto space-y-4" role="main">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5 mb-4" role="tablist">
-              <TabsTrigger value="phases" data-testid="tab-phases" role="tab" aria-selected={activeTab === "phases"}>Phases</TabsTrigger>
-              <TabsTrigger value="practice" data-testid="tab-practice" role="tab" aria-selected={activeTab === "practice"}>Practice</TabsTrigger>
-              <TabsTrigger value="objections" data-testid="tab-objections" role="tab" aria-selected={activeTab === "objections"}>Objections</TabsTrigger>
-              <TabsTrigger value="industries" data-testid="tab-industries" role="tab" aria-selected={activeTab === "industries"}>Industries</TabsTrigger>
-              <TabsTrigger value="contacts" data-testid="tab-contacts" role="tab" aria-selected={activeTab === "contacts"}>Contacts</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-5 mb-4 gap-1 bg-transparent p-0 h-auto" role="tablist">
+              <TabsTrigger value="phases" data-testid="tab-phases" role="tab" aria-selected={activeTab === "phases"} className="border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm data-[state=inactive]:bg-muted/50 rounded-md py-2 text-xs font-semibold">Phases</TabsTrigger>
+              <TabsTrigger value="practice" data-testid="tab-practice" role="tab" aria-selected={activeTab === "practice"} className="border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm data-[state=inactive]:bg-muted/50 rounded-md py-2 text-xs font-semibold">Practice</TabsTrigger>
+              <TabsTrigger value="objections" data-testid="tab-objections" role="tab" aria-selected={activeTab === "objections"} className="border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm data-[state=inactive]:bg-muted/50 rounded-md py-2 text-xs font-semibold">Objections</TabsTrigger>
+              <TabsTrigger value="industries" data-testid="tab-industries" role="tab" aria-selected={activeTab === "industries"} className="border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm data-[state=inactive]:bg-muted/50 rounded-md py-2 text-xs font-semibold">Industries</TabsTrigger>
+              <TabsTrigger value="contacts" data-testid="tab-contacts" role="tab" aria-selected={activeTab === "contacts"} className="border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm data-[state=inactive]:bg-muted/50 rounded-md py-2 text-xs font-semibold">Contacts</TabsTrigger>
             </TabsList>
 
             <TabsContent value="phases" className="space-y-4" role="tabpanel">
