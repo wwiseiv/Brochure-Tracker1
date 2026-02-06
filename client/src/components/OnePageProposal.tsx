@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Check,
   ChevronLeft,
@@ -26,6 +27,7 @@ import {
   Download,
   Search,
   Eye,
+  HelpCircle,
 } from "lucide-react";
 
 interface TemplateMetadata {
@@ -249,10 +251,16 @@ export function OnePageProposal() {
     }
   };
 
+  const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
   const handleFileUpload = async (
     file: File,
     type: "statement" | "dualPricing" | "interchangePlus"
   ) => {
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "File too large", description: "Maximum file size is 25MB. Please upload a smaller PDF.", variant: "destructive" });
+      return;
+    }
     if (type === "statement") {
       setMerchantStatementFile(file);
     } else if (type === "dualPricing") {
@@ -286,6 +294,10 @@ export function OnePageProposal() {
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       toast({ title: "Invalid file type", description: "Please upload a PDF file only.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "File too large", description: "Maximum file size is 25MB. Please upload a smaller PDF.", variant: "destructive" });
       return;
     }
     handleFileUpload(file, type);
@@ -418,20 +430,32 @@ export function OnePageProposal() {
   );
 
   const renderStepTitle = () => {
-    const titles = [
+    const titles: { icon: JSX.Element; label: string; tooltip?: string }[] = [
       { icon: <FileOutput className="w-5 h-5" />, label: "Choose a Template" },
       { icon: <Globe className="w-5 h-5" />, label: "Merchant Information" },
       { icon: <Upload className="w-5 h-5" />, label: "Upload Documents" },
-      { icon: <Package className="w-5 h-5" />, label: "Choose Equipment" },
-      { icon: <User className="w-5 h-5" />, label: "Your Contact Info" },
+      { icon: <Package className="w-5 h-5" />, label: "Choose Equipment", tooltip: "Choose recommended equipment to feature on the proposal" },
+      { icon: <User className="w-5 h-5" />, label: "Your Contact Info", tooltip: "This info will appear on the proposal — verify it's correct before generating" },
       { icon: <FileText className="w-5 h-5" />, label: "Generate Proposal" },
     ];
     const t = titles[currentStep];
     return (
-      <div className="flex items-center gap-2 mb-4" data-testid="step-header">
+      <div className="flex items-center gap-2 mb-4 flex-wrap" data-testid="step-header">
         {t.icon}
-        <h2 className="text-lg font-semibold" data-testid="text-step-title">{t.label}</h2>
-        <span className="text-sm text-muted-foreground ml-auto" data-testid="text-step-counter">
+        <h2 className="text-base sm:text-lg font-semibold flex items-center gap-1.5" data-testid="text-step-title">
+          {t.label}
+          {t.tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t.tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </h2>
+        <span className="text-xs sm:text-sm text-muted-foreground ml-auto" data-testid="text-step-counter">
           Step {currentStep + 1} of 6
         </span>
       </div>
@@ -516,8 +540,16 @@ export function OnePageProposal() {
       </div>
 
       <div className={`space-y-2 p-3 rounded-lg transition-colors ${generationMode === "ai-custom" ? "border border-primary/30 bg-primary/5" : ""}`}>
-        <Label htmlFor="merchant-website">
+        <Label htmlFor="merchant-website" className="flex items-center gap-1.5">
           Website URL {generationMode === "ai-custom" ? "(recommended)" : "(optional)"}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Optional — provide the merchant's website so AI can tailor the messaging to their industry</p>
+            </TooltipContent>
+          </Tooltip>
         </Label>
         <div className="relative">
           <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -555,6 +587,14 @@ export function OnePageProposal() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">Template-Fill</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Fills your data directly into the template — fast and reliable</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Badge variant="secondary" className="text-[10px]">Fast</Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -572,6 +612,14 @@ export function OnePageProposal() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">AI-Custom</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>AI customizes the copy for the merchant's business type</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Badge variant="secondary" className="text-[10px]">
                   <Sparkles className="w-3 h-3 mr-1" />
                   AI
@@ -593,14 +641,27 @@ export function OnePageProposal() {
     savings: ExtractedSavings | null,
     inputRef: React.RefObject<HTMLInputElement>,
     type: "statement" | "dualPricing" | "interchangePlus",
-    onRemove: () => void
+    onRemove: () => void,
+    tooltipText?: string
   ) => (
     <div
       className="space-y-2"
       onDrop={(e) => handleDrop(e, type)}
       onDragOver={handleDragOver}
     >
-      <Label className="text-sm">{label}</Label>
+      <Label className="flex items-center gap-1.5 text-sm">
+        {label}
+        {tooltipText && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{tooltipText}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </Label>
       {file ? (
         <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
           <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -671,7 +732,8 @@ export function OnePageProposal() {
         null,
         merchantStatementRef,
         "statement",
-        () => setMerchantStatementFile(null)
+        () => setMerchantStatementFile(null),
+        "Upload the merchant's current processing statement (PDF)"
       )}
 
       {renderUploadSlot(
@@ -680,7 +742,8 @@ export function OnePageProposal() {
         dualPricingSavings,
         dualPricingRef,
         "dualPricing",
-        () => { setDualPricingFile(null); setDualPricingSavings(null); }
+        () => { setDualPricingFile(null); setDualPricingSavings(null); },
+        "Upload a dual pricing savings analysis (PDF) to include specific savings numbers"
       )}
 
       {renderUploadSlot(
@@ -689,7 +752,8 @@ export function OnePageProposal() {
         interchangePlusSavings,
         interchangePlusRef,
         "interchangePlus",
-        () => { setInterchangePlusFile(null); setInterchangePlusSavings(null); }
+        () => { setInterchangePlusFile(null); setInterchangePlusSavings(null); },
+        "Upload an interchange plus analysis (PDF) to include specific savings numbers"
       )}
 
       {(dualPricingSavings || interchangePlusSavings) && (
@@ -1030,24 +1094,31 @@ export function OnePageProposal() {
             </div>
           </div>
         ) : (
-          <Button
-            onClick={handleGenerate}
-            disabled={generating || !selectedTemplateId || !merchantName.trim() || !contactName.trim()}
-            className="w-full"
-            data-testid="button-generate-proposal"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {generationMode === "ai-custom" ? "Customizing your proposal..." : "Generating PDF..."}
-              </>
-            ) : (
-              <>
-                {generationMode === "ai-custom" ? <Sparkles className="w-4 h-4 mr-2" /> : <FileOutput className="w-4 h-4 mr-2" />}
-                {generationMode === "ai-custom" ? "Generate AI Proposal" : "Generate PDF"}
-              </>
-            )}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleGenerate}
+                disabled={generating || !selectedTemplateId || !merchantName.trim() || !contactName.trim()}
+                className="w-full"
+                data-testid="button-generate-proposal"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {generationMode === "ai-custom" ? "Customizing your proposal..." : "Generating PDF..."}
+                  </>
+                ) : (
+                  <>
+                    {generationMode === "ai-custom" ? <Sparkles className="w-4 h-4 mr-2" /> : <FileOutput className="w-4 h-4 mr-2" />}
+                    {generationMode === "ai-custom" ? "Generate AI Proposal" : "Generate PDF"}
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Create your one-page PDF proposal</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     );

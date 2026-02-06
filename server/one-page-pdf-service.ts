@@ -112,11 +112,12 @@ async function generateTemplate1(input: OnePagePdfInput): Promise<Buffer> {
     color: rgb(1, 1, 1),
     opacity: 0.85,
   });
-  const headlineText = input.aiContent?.headline || `Prepared for: ${input.merchantName}`;
+  const rawHeadline = input.aiContent?.headline || `Prepared for: ${input.merchantName}`;
+  const headlineText = rawHeadline.length > 60 ? rawHeadline.substring(0, 57) + "..." : rawHeadline;
   page.drawText(headlineText, {
     x: 40,
     y: PAGE_H - 45,
-    size: 14,
+    size: headlineText.length > 45 ? 12 : 14,
     font: bold,
     color: rgb(NAVY.r, NAVY.g, NAVY.b),
   });
@@ -231,11 +232,12 @@ async function generateTemplate2(input: OnePagePdfInput): Promise<Buffer> {
     height: 18,
     color: rgb(NAVY.r, NAVY.g, NAVY.b),
   });
-  const merchantLine = input.aiContent?.headline || `Customized savings proposal for ${input.merchantName}`;
+  const rawMerchantLine = input.aiContent?.headline || `Customized savings proposal for ${input.merchantName}`;
+  const merchantLine = rawMerchantLine.length > 65 ? rawMerchantLine.substring(0, 62) + "..." : rawMerchantLine;
   page.drawText(merchantLine, {
     x: 40,
     y: PAGE_H - 110,
-    size: 11,
+    size: merchantLine.length > 50 ? 9 : 11,
     font: regular,
     color: rgb(0.8, 0.85, 0.9),
   });
@@ -331,10 +333,12 @@ async function generateGenericTemplate(input: OnePagePdfInput): Promise<Buffer> 
       color: rgb(1, 1, 1),
       opacity: 0.85,
     });
-    page.drawText(`Prepared for: ${input.merchantName}`, {
+    const preparedText = `Prepared for: ${input.merchantName}`;
+    const truncatedText = preparedText.length > 55 ? preparedText.substring(0, 52) + "..." : preparedText;
+    page.drawText(truncatedText, {
       x: 40,
       y: headerBottom,
-      size: 12,
+      size: truncatedText.length > 40 ? 10 : 12,
       font: bold,
       color: rgb(NAVY.r, NAVY.g, NAVY.b),
     });

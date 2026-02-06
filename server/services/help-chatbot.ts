@@ -90,6 +90,23 @@ BrochureTracker is a comprehensive field sales platform that empowers PCBancard 
   5. Download as PDF or Word document
 - **Rendering Options**: Claude AI, Replit Native, or Gamma
 
+##### One-Page Proposal (Third tab in Proposal Generator)
+- **Purpose**: Generate professional one-page PDF proposals/flyers from 7 pre-designed templates
+- **How to use**:
+  1. Go to Proposal Generator → One-Page Proposal tab
+  2. Choose from 7 professional templates (savings proposals, payroll offers, marketing audit flyers, video brochure flyers, and referral partner pitches)
+  3. Enter the merchant's business name
+  4. Optionally upload analysis documents to include real savings numbers
+  5. Select recommended equipment from Equipment IQ
+  6. Review your contact info
+  7. Generate and download your one-page PDF
+- **Two modes available**:
+  - **Template-Fill**: Fills your data directly into the template — fast and reliable. Best when you just need a clean proposal with real numbers.
+  - **AI-Custom**: Uses AI to customize the headline and copy for the merchant's specific business type. Optionally provide the merchant's website URL for more targeted messaging. Falls back to Template-Fill if AI is unavailable.
+- **Templates**: Exclusive Offer (Standard), Exclusive Offer (QR Code), Referral Program (Client-Facing), Enrolled Agent Referral, Free Payroll for 12 Months, What's Your Business Grade?, The Best 5 Minutes
+- **Tips**: Upload a Dual Pricing AND Interchange Plus analysis for a side-by-side comparison. The system never invents savings numbers — if no analysis docs are uploaded, the savings section uses generic language.
+- **Governed by**: Same Proposal Generator permission — no separate toggle needed
+
 #### 6. Statement Analyzer
 - **Purpose**: Analyze competitor statements to find savings opportunities
 - **How to use**:
@@ -161,6 +178,7 @@ BrochureTracker is a comprehensive field sales platform that empowers PCBancard 
 ## NAVIGATION REFERENCE:
 - **Bottom Nav**: Home, Scan, E-Sign, Coach, Merchants, Profile
 - **Coach Page Cards**: Role-Play, Presentation Training, Daily Edge, EquipIQ, Proposal Generator, Statement Analyzer
+- **Proposal Generator Tabs**: AI Workflow, Manual Upload, One-Page Proposal
 - **Deal Pipeline**: Access from Home dashboard (Quick Action button) or via /prospects/pipeline route
 - **Prospect Finder**: Access from Home dashboard
 - **Today View**: Daily action center showing follow-ups due, appointments, and stale deals
