@@ -11,14 +11,12 @@ async function getCredentials() {
     ? 'depl ' + process.env.WEB_REPL_RENEWAL 
     : null;
 
+  const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "PCBancard <noreply@pcbisv.com>";
+
   if (!xReplitToken || !hostname) {
-    // Fallback to environment variable if Replit connector not available
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey) {
-      return { 
-        apiKey, 
-        fromEmail: process.env.RESEND_FROM_EMAIL || "PCBancard <onboarding@resend.dev>" 
-      };
+      return { apiKey, fromEmail: DEFAULT_FROM_EMAIL };
     }
     throw new Error('Resend not configured - no connector or RESEND_API_KEY found');
   }
@@ -34,19 +32,15 @@ async function getCredentials() {
   ).then(res => res.json()).then(data => data.items?.[0]);
 
   if (!connectionSettings || (!connectionSettings.settings.api_key)) {
-    // Fallback to environment variable
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey) {
-      return { 
-        apiKey, 
-        fromEmail: process.env.RESEND_FROM_EMAIL || "PCBancard <onboarding@resend.dev>" 
-      };
+      return { apiKey, fromEmail: DEFAULT_FROM_EMAIL };
     }
     throw new Error('Resend not connected');
   }
   return { 
     apiKey: connectionSettings.settings.api_key, 
-    fromEmail: connectionSettings.settings.from_email || process.env.RESEND_FROM_EMAIL || "PCBancard <onboarding@resend.dev>" 
+    fromEmail: DEFAULT_FROM_EMAIL
   };
 }
 
