@@ -84,7 +84,7 @@ export function HelpChatbot() {
     if (messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: "Hi! I'm your AI assistant. I can help you navigate the app, explain features, or answer questions about how to use BrochureTracker. What would you like to know?"
+        content: "Hi! I'm your AI assistant. I can help you navigate the app, explain features, or answer questions about how to use PCBancard Sales Intelligence Suite. What would you like to know?"
       }]);
     }
   };

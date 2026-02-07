@@ -239,7 +239,7 @@ export default function NewDropPage() {
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
             {
               headers: {
-                "User-Agent": "BrochureTracker/1.0",
+                "User-Agent": "PCBancardSIS/1.0",
               },
             }
           );

@@ -17,7 +17,7 @@ async function getCredentials() {
     if (apiKey) {
       return { 
         apiKey, 
-        fromEmail: process.env.RESEND_FROM_EMAIL || "BrochureTracker <onboarding@resend.dev>" 
+        fromEmail: process.env.RESEND_FROM_EMAIL || "PCBancard Sales Intelligence Suite <onboarding@resend.dev>" 
       };
     }
     throw new Error('Resend not configured - no connector or RESEND_API_KEY found');
@@ -39,14 +39,14 @@ async function getCredentials() {
     if (apiKey) {
       return { 
         apiKey, 
-        fromEmail: process.env.RESEND_FROM_EMAIL || "BrochureTracker <onboarding@resend.dev>" 
+        fromEmail: process.env.RESEND_FROM_EMAIL || "PCBancard Sales Intelligence Suite <onboarding@resend.dev>" 
       };
     }
     throw new Error('Resend not connected');
   }
   return { 
     apiKey: connectionSettings.settings.api_key, 
-    fromEmail: connectionSettings.settings.from_email || process.env.RESEND_FROM_EMAIL || "BrochureTracker <onboarding@resend.dev>" 
+    fromEmail: connectionSettings.settings.from_email || process.env.RESEND_FROM_EMAIL || "PCBancard Sales Intelligence Suite <onboarding@resend.dev>" 
   };
 }
 
@@ -100,7 +100,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
     const { error } = await client.emails.send({
       from: fromEmail,
       to: params.to,
-      subject: `You're invited to join ${params.organizationName} on BrochureTracker`,
+      subject: `You're invited to join ${params.organizationName} on PCBancard Sales Intelligence Suite`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -110,7 +110,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">BrochureTracker</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">PCBancard Sales Intelligence Suite</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">You're Invited!</p>
           </div>
           
@@ -120,11 +120,11 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
             </p>
             
             <p style="font-size: 16px; margin: 0 0 20px 0;">
-              <strong>${params.inviterName}</strong> has invited you to join <strong>${params.organizationName}</strong> as a <strong>${roleLabel}</strong> on BrochureTracker.
+              <strong>${params.inviterName}</strong> has invited you to join <strong>${params.organizationName}</strong> as a <strong>${roleLabel}</strong> on PCBancard Sales Intelligence Suite.
             </p>
             
             <p style="font-size: 16px; margin: 0 0 25px 0;">
-              BrochureTracker is a mobile app for tracking video brochure deployments. As a team member, you'll be able to log drops, track pickups, and manage your sales activities.
+              PCBancard Sales Intelligence Suite is a mobile app for tracking video brochure deployments. As a team member, you'll be able to log drops, track pickups, and manage your sales activities.
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -191,7 +191,7 @@ export async function sendFeedbackEmail(params: SendFeedbackParams): Promise<boo
     const { error } = await client.emails.send({
       from: fromEmail,
       to: FEEDBACK_RECIPIENT,
-      subject: `[BrochureTracker ${typeLabel}] ${params.subject}`,
+      subject: `[PCBancard SIS ${typeLabel}] ${params.subject}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -405,13 +405,13 @@ export async function sendNewMemberNotification(params: SendNewMemberNotificatio
             </div>
             
             <p style="font-size: 14px; color: #64748b; margin: 20px 0 0 0;">
-              You can manage team members and their roles from the Team Management page in BrochureTracker.
+              You can manage team members and their roles from the Team Management page in PCBancard Sales Intelligence Suite.
             </p>
             
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
             
             <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">
-              This is an automated notification from BrochureTracker.
+              This is an automated notification from PCBancard Sales Intelligence Suite.
             </p>
           </div>
         </body>

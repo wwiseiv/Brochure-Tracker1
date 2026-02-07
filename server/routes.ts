@@ -5249,7 +5249,7 @@ Format the response clearly with numbered action items. Be specific - instead of
         return res.status(400).json({ error: "Subject and body are required" });
       }
       
-      const senderName = req.user.claims.name || req.user.claims.email || "BrochureTracker Team";
+      const senderName = req.user.claims.name || req.user.claims.email || "PCBancard Sales Intelligence Suite Team";
       const recipientName = referral.referringPartyName || "Valued Partner";
       
       const result = await sendThankYouEmail({

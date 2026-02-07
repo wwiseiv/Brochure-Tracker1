@@ -248,7 +248,7 @@ self.addEventListener('push', (event) => {
   
   try {
     const data = event.data?.json() || {};
-    const title = data.title || 'BrochureTracker';
+    const title = data.title || 'PCBancard SIS';
     
     // Build notification options based on type
     const options = {

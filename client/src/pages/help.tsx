@@ -435,7 +435,7 @@ export default function HelpPage() {
   const gettingStartedItems: HelpItem[] = [
     {
       title: "Install the App",
-      description: "Add BrochureTracker to your home screen for quick access. Works offline and feels like a native app.",
+      description: "Add PCBancard SIS to your home screen for quick access. Works offline and feels like a native app.",
       link: "/profile",
       icon: <Download className="w-5 h-5 text-primary" />,
     },
@@ -1466,7 +1466,7 @@ export default function HelpPage() {
 
       <main className="p-4 space-y-8 max-w-2xl mx-auto">
         <div className="text-center py-4">
-          <h1 className="text-2xl font-bold text-primary">BrochureTracker Help</h1>
+          <h1 className="text-2xl font-bold text-primary">PCBancard Sales Intelligence Suite Help</h1>
           <p className="text-muted-foreground mt-2">
             Complete guide to all features and how to use them
           </p>
@@ -1628,7 +1628,7 @@ export default function HelpPage() {
           const query = searchQuery.toLowerCase().trim();
           
           const allSections: HelpSectionData[] = [
-            { title: "Getting Started", description: "New to BrochureTracker? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
+            { title: "Getting Started", description: "New to PCBancard Sales Intelligence Suite? Start here to get up and running quickly.", items: gettingStartedItems, badge: "New Users" },
             { title: "Navigation & Core Features", description: "The main features you'll use every day as a field sales representative.", items: agentFeatures, badge: "All Users" },
             { title: "Drop Management", description: "Everything you need to know about logging and managing brochure drops.", items: dropFeatures, badge: "All Users", requiredFeature: "drop_management" },
             { title: "AI-Powered Tools", description: "Smart features that help you work faster and communicate more effectively.", items: aiToolsFeatures, badge: "All Users", requiredFeature: "ai_coaching" },
@@ -1642,7 +1642,7 @@ export default function HelpPage() {
             { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users", requiredFeature: "proposal_generator" },
             { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users", requiredFeature: "presentation_training" },
             { title: "Interactive AI Training", description: "AI-powered sales training with live roleplay, objection handling, scenario decisions, and delivery analysis with voice I/O.", items: interactiveTrainingFeatures, badge: "AI Powered", requiredFeature: "interactive_ai_training" },
-            { title: "Offline & Mobile", description: "BrochureTracker is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
+            { title: "Offline & Mobile", description: "PCBancard Sales Intelligence Suite is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users", requiredFeature: "merchant_profiles" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users", requiredFeature: "brochure_inventory" },
             { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users", requiredFeature: "referral_tracking" },
@@ -1742,7 +1742,7 @@ export default function HelpPage() {
               User Roles & Permissions
             </CardTitle>
             <CardDescription>
-              BrochureTracker has three user roles, each with different access levels:
+              PCBancard Sales Intelligence Suite has three user roles, each with different access levels:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1801,7 +1801,7 @@ export default function HelpPage() {
               <AccordionItem value="item-4">
                 <AccordionTrigger className="text-sm">Can I use the app without internet?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  Yes! BrochureTracker works offline. You can view your drops, log new ones, and record notes. Everything syncs automatically when you're back online. Voice transcription requires internet.
+                  Yes! PCBancard Sales Intelligence Suite works offline. You can view your drops, log new ones, and record notes. Everything syncs automatically when you're back online. Voice transcription requires internet.
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-5">

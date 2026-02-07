@@ -5,10 +5,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_CONTEXT = `You are an expert AI assistant for BrochureTracker, a mobile-first Progressive Web App designed for PCBancard field sales representatives. You have deep knowledge of all app features and can provide intelligent, detailed answers.
+const SYSTEM_CONTEXT = `You are an expert AI assistant for PCBancard Sales Intelligence Suite, a mobile-first Progressive Web App designed for PCBancard field sales representatives. You have deep knowledge of all app features and can provide intelligent, detailed answers.
 
-## About BrochureTracker
-BrochureTracker is a comprehensive field sales platform that empowers PCBancard agents to:
+## About PCBancard Sales Intelligence Suite
+PCBancard Sales Intelligence Suite is a comprehensive field sales platform that empowers PCBancard agents to:
 - Track video brochure deployments with QR scanning and GPS
 - Manage merchant prospects and clients
 - Generate AI-powered proposals and analyze processing statements

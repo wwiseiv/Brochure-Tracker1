@@ -1,7 +1,7 @@
-# BrochureTracker
+# PCBancard Sales Intelligence Suite
 
 ## Overview
-BrochureTracker is a mobile-first Progressive Web App (PWA) designed for PCBancard field sales representatives. Its primary purpose is to track video brochure deployments by capturing essential data such as brochure ID (via QR code), GPS location, business details, AI-transcribed voice notes, and scheduling follow-up reminders. This system aims to significantly enhance sales efficiency, ensure timely customer interactions, and provide comprehensive tracking of physical marketing assets. The project's vision is to empower sales teams with advanced AI-driven tools for prospecting, training, proposal generation, and statement analysis, thereby boosting sales productivity and market penetration.
+PCBancard Sales Intelligence Suite is a mobile-first Progressive Web App (PWA) designed for PCBancard field sales representatives. Its primary purpose is to track video brochure deployments by capturing essential data such as brochure ID (via QR code), GPS location, business details, AI-transcribed voice notes, and scheduling follow-up reminders. This system aims to significantly enhance sales efficiency, ensure timely customer interactions, and provide comprehensive tracking of physical marketing assets. The project's vision is to empower sales teams with advanced AI-driven tools for prospecting, training, proposal generation, and statement analysis, thereby boosting sales productivity and market penetration.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

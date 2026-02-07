@@ -1,6 +1,6 @@
 {
-  "name": "BrochureTracker",
-  "short_name": "BrochureTracker",
+  "name": "PCBancard Sales Intelligence Suite",
+  "short_name": "PCBancard SIS",
   "description": "PCBancard field tracking app for video brochure deployment",
   "start_url": "/",
   "display": "standalone",
