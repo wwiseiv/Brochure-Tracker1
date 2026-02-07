@@ -754,6 +754,7 @@ export const userPreferences = pgTable("user_preferences", {
   reminderHoursBefore: integer("reminder_hours_before").default(24).notNull(),
   emailNotifications: boolean("email_notifications").default(true).notNull(),
   pushNotifications: boolean("push_notifications").default(true).notNull(),
+  notificationEmail: varchar("notification_email"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

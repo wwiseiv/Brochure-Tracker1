@@ -129,6 +129,67 @@ interface EmailDigestPreferences {
   totalEmailsSent?: number;
 }
 
+function NotificationEmailInput({ 
+  currentEmail, 
+  defaultEmail, 
+  onSave, 
+  disabled 
+}: { 
+  currentEmail: string; 
+  defaultEmail: string; 
+  onSave: (email: string) => void; 
+  disabled: boolean;
+}) {
+  const [localEmail, setLocalEmail] = useState(currentEmail);
+  const [hasEdited, setHasEdited] = useState(false);
+
+  const displayEmail = hasEdited ? localEmail : currentEmail;
+
+  const handleSave = () => {
+    const trimmed = localEmail.trim();
+    if (trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      onSave(trimmed);
+      setHasEdited(false);
+    } else if (!trimmed) {
+      onSave("");
+      setHasEdited(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5 pl-8">
+      <Label htmlFor="notification-email" className="text-sm text-muted-foreground">
+        Send notifications to
+      </Label>
+      <Input
+        id="notification-email"
+        type="email"
+        placeholder={defaultEmail || "your@email.com"}
+        value={displayEmail}
+        onChange={(e) => {
+          setLocalEmail(e.target.value);
+          setHasEdited(true);
+        }}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="min-h-[48px]"
+        disabled={disabled}
+        data-testid="input-notification-email"
+      />
+      <p className="text-xs text-muted-foreground" data-testid="text-notification-email-status">
+        {currentEmail 
+          ? `Currently sending to: ${currentEmail}`
+          : `Defaults to your account email: ${defaultEmail || "not set"}`
+        }
+      </p>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user, logout, isLoggingOut } = useAuth();
   const { toast } = useToast();
@@ -513,6 +574,15 @@ export default function ProfilePage() {
                     data-testid="switch-email-notifications"
                   />
                 </div>
+
+                {(preferences?.emailNotifications && preferences?.notificationsEnabled) && (
+                  <NotificationEmailInput
+                    currentEmail={preferences?.notificationEmail || ""}
+                    defaultEmail={user?.email || ""}
+                    onSave={(email) => updatePreferences.mutate({ notificationEmail: email || (null as any) })}
+                    disabled={preferencesLoading || updatePreferences.isPending}
+                  />
+                )}
 
                 <div className="flex items-center justify-between min-h-[48px]">
                   <div className="flex items-center gap-3 flex-1">
