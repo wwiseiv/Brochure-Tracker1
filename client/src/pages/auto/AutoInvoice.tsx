@@ -561,95 +561,58 @@ function InvoiceScreen({
           <Separator />
 
           <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-3 gap-2 font-semibold text-xs uppercase text-muted-foreground">
-              <div></div>
-              <div className="text-right">Cash Price</div>
-              <div className="text-right">Card Price</div>
+            <div className="flex justify-between gap-2">
+              <span>Subtotal</span>
+              <span className="font-mono" data-testid="text-subtotal-cash">${fmt(subtotalCash)}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div>Subtotal</div>
-              <div className="text-right font-mono" data-testid="text-subtotal-cash">${fmt(subtotalCash)}</div>
-              <div className="text-right font-mono" data-testid="text-subtotal-card">${fmt(subtotalCard)}</div>
-            </div>
-
-            {taxPartsAmount > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>Parts Tax</div>
-                <div className="text-right font-mono">${fmt(taxPartsAmount)}</div>
-                <div className="text-right font-mono">${fmt(taxPartsAmount)}</div>
-              </div>
-            )}
-
-            {shop?.laborTaxable && taxLaborAmount > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>Labor Tax</div>
-                <div className="text-right font-mono">${fmt(taxLaborAmount)}</div>
-                <div className="text-right font-mono">${fmt(taxLaborAmount)}</div>
-              </div>
-            )}
-
-            {(taxPartsAmount === 0 && taxLaborAmount === 0 && taxAmount > 0) && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>Tax</div>
-                <div className="text-right font-mono">${fmt(taxAmount)}</div>
-                <div className="text-right font-mono">${fmt(taxAmount)}</div>
+            {taxAmount > 0 && (
+              <div className="flex justify-between gap-2">
+                <span>Tax</span>
+                <span className="font-mono">${fmt(taxAmount)}</span>
               </div>
             )}
 
             {shopSupplyCash > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>Shop Supplies</div>
-                <div className="text-right font-mono">${fmt(shopSupplyCash)}</div>
-                <div className="text-right font-mono">${fmt(shopSupplyCard)}</div>
+              <div className="flex justify-between gap-2">
+                <span>Shop Supplies</span>
+                <span className="font-mono">${fmt(shopSupplyCash)}</span>
               </div>
             )}
 
             {discountCash > 0 && (
-              <div className="grid grid-cols-3 gap-2 text-green-600 dark:text-green-400">
-                <div>Discount</div>
-                <div className="text-right font-mono">-${fmt(discountCash)}</div>
-                <div className="text-right font-mono">-${fmt(discountCard)}</div>
-              </div>
-            )}
-
-            {feeAmount > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>Service Fee</div>
-                <div className="text-right font-mono">—</div>
-                <div className="text-right font-mono">${fmt(feeAmount)}</div>
+              <div className="flex justify-between gap-2 text-green-600 dark:text-green-400">
+                <span>Discount</span>
+                <span className="font-mono">-${fmt(discountCash)}</span>
               </div>
             )}
 
             <Separator />
 
-            <div className="grid grid-cols-3 gap-2 font-bold text-base">
-              <div>Total</div>
-              <div className="text-right font-mono text-green-600 dark:text-green-400" data-testid="text-total-cash">${fmt(totalCash)}</div>
-              <div className="text-right font-mono text-blue-600 dark:text-blue-400" data-testid="text-total-card">${fmt(totalCard)}</div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="border rounded-md p-4 text-center" data-testid="box-cash-price">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">Cash Price</p>
+                <p className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">${fmt(totalCash)}</p>
+              </div>
+              <div className="border rounded-md p-4 text-center" data-testid="box-card-price">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">Card Price</p>
+                <p className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">${fmt(totalCard)}</p>
+              </div>
             </div>
 
             {paidAmount > 0 && (
-              <>
-                <div className="grid grid-cols-3 gap-2 text-muted-foreground">
-                  <div>Amount Paid</div>
-                  <div className="text-right font-mono" data-testid="text-paid-amount">${fmt(paidAmount)}</div>
-                  <div></div>
+              <div className="space-y-1 pt-2">
+                <div className="flex justify-between gap-2 text-muted-foreground">
+                  <span>Amount Paid</span>
+                  <span className="font-mono" data-testid="text-paid-amount">${fmt(paidAmount)}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 font-bold text-destructive">
-                  <div>Balance Due</div>
-                  <div className="text-right font-mono" data-testid="text-balance-due">${fmt(balanceDue)}</div>
-                  <div></div>
+                <div className="flex justify-between gap-2 font-bold text-destructive">
+                  <span>Balance Due</span>
+                  <span className="font-mono" data-testid="text-balance-due">${fmt(balanceDue)}</span>
                 </div>
-              </>
+              </div>
             )}
           </div>
-
-          {dualPricingRate > 0 && (
-            <p className="text-xs text-muted-foreground text-center" data-testid="text-dual-pricing-disclosure">
-              Card price includes {dualPricingRate}% service fee
-            </p>
-          )}
         </CardContent>
       </Card>
 
@@ -698,7 +661,7 @@ function SettingsScreen({
       <Card>
         <CardContent className="p-5 space-y-6">
           <div className="space-y-3">
-            <Label>Card Dual Pricing Rate</Label>
+            <Label>Dual Pricing Rate</Label>
             <div className="flex items-center gap-4">
               <Slider
                 value={[localRate]}
@@ -735,7 +698,7 @@ function SettingsScreen({
               <CardContent className="p-3">
                 <p className="text-sm text-muted-foreground" data-testid="text-disclosure-preview">
                   {localRate > 0
-                    ? `Card price includes a ${localRate.toFixed(2)}% service fee. Cash/debit price reflects the base price.`
+                    ? `This is the difference between your cash price and card price. The card price is automatically calculated as: Cash Price + (Cash Price × ${localRate.toFixed(2)}%) = Card Price`
                     : "No dual pricing applied. Cash and card prices are the same."}
                 </p>
               </CardContent>
@@ -806,7 +769,10 @@ function PaymentScreen({
           data-testid="button-select-cash"
         >
           <Banknote className="h-8 w-8" />
-          <span className="font-semibold">Cash</span>
+          <div className="text-center">
+            <span className="font-semibold text-sm">CASH</span>
+            <p className="text-lg font-bold font-mono mt-1">${fmt(totalCash)}</p>
+          </div>
         </Button>
         <Button
           variant={paymentMethod === "card" ? "default" : "outline"}
@@ -815,7 +781,10 @@ function PaymentScreen({
           data-testid="button-select-card"
         >
           <CreditCard className="h-8 w-8" />
-          <span className="font-semibold">Card</span>
+          <div className="text-center">
+            <span className="font-semibold text-sm">CARD</span>
+            <p className="text-lg font-bold font-mono mt-1">${fmt(totalCard)}</p>
+          </div>
         </Button>
       </div>
 
@@ -839,11 +808,6 @@ function PaymentScreen({
                     <p className="text-3xl font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-card-price">
                       ${fmt(activeAmount)}
                     </p>
-                    {dualPricingRate > 0 && (
-                      <p className="text-xs text-muted-foreground" data-testid="text-dual-pricing-info">
-                        Includes {dualPricingRate}% dual pricing fee (${fmt(feeAmount)})
-                      </p>
-                    )}
                   </div>
 
                   <Separator />
@@ -1090,18 +1054,12 @@ function ReceiptScreen({
             <div className="space-y-1 text-xs">
               <div className="flex justify-between gap-2">
                 <span>Subtotal</span>
-                <span className="font-mono">${fmt(subtotalCash)}</span>
+                <span className="font-mono">${fmt(isCard ? (activeAmount - taxAmount) : subtotalCash)}</span>
               </div>
               {taxAmount > 0 && (
                 <div className="flex justify-between gap-2">
                   <span>Tax</span>
                   <span className="font-mono">${fmt(taxAmount)}</span>
-                </div>
-              )}
-              {isCard && feeAmount > 0 && (
-                <div className="flex justify-between gap-2">
-                  <span>Dual Pricing ({dualPricingRate}%)</span>
-                  <span className="font-mono">${fmt(feeAmount)}</span>
                 </div>
               )}
               {tipAmount > 0 && (

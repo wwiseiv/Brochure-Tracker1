@@ -71,7 +71,7 @@ DASHBOARD: Shows today's car count, revenue, pending approvals, pending payments
 
 REPAIR ORDERS (ROs): The core of everything. Tracks a single visit for a single vehicle. Create by tapping New RO, selecting customer/vehicle, adding labor and parts lines. RO statuses flow: Estimate → Approved → In Progress → Completed → Invoiced → Paid. The RO detail page shows header info, estimate builder with line items, running totals with dual pricing, and action buttons.
 
-DUAL PRICING: Shows two prices on every estimate/invoice/receipt — Cash Price (base + tax) and Card Price (cash price + credit card fee). The fee rate is configurable in Settings (typically 3-4%). Customers choose which to pay. Either way the shop nets the same amount.
+DUAL PRICING: Two prices are always displayed side by side — Cash Price and Card Price. This is NOT surcharging. Customers simply choose which price to pay. The difference between cash and card price is the dual pricing rate, configurable in Settings (typically 3-4%). The customer never sees the word "fee" or "surcharge" — they just see two prices and pick one. Either way the shop nets the same amount.
 
 ESTIMATES & APPROVALS: After building an estimate, send it for approval via text/email. Customer sees dual pricing, can approve/decline individual line items, and the RO auto-updates.
 
@@ -1907,6 +1907,55 @@ router.get("/dashboard/stats", autoAuth, async (req: Request, res: Response) => 
   }
 });
 
+router.get("/dashboard/dual-pricing", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.autoUser!;
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, user.shopId));
+    if (!shop) return res.json({ totalCollected: 0, cashTotal: 0, cardTotal: 0, cashCount: 0, cardCount: 0, dpEarned: 0, totalPayments: 0 });
+
+    const today = new Date();
+    const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+    const payments = await db.select({
+      method: autoPayments.method,
+      amount: autoPayments.amount,
+      tipAmount: autoPayments.tipAmount,
+      totalCash: autoRepairOrders.totalCash,
+      totalCard: autoRepairOrders.totalCard,
+    })
+    .from(autoPayments)
+    .innerJoin(autoRepairOrders, eq(autoPayments.repairOrderId, autoRepairOrders.id))
+    .where(and(
+      eq(autoPayments.shopId, shop.id),
+      gte(autoPayments.processedAt, dayStart),
+      lte(autoPayments.processedAt, dayEnd)
+    ));
+
+    let cashTotal = 0, cardTotal = 0, cashCount = 0, cardCount = 0, dpEarned = 0, totalCollected = 0;
+    for (const p of payments) {
+      const amt = parseFloat(p.amount || "0");
+      const tip = parseFloat(p.tipAmount || "0");
+      totalCollected += amt + tip;
+      if (p.method === 'cash') {
+        cashTotal += amt + tip;
+        cashCount++;
+      } else {
+        cardTotal += amt + tip;
+        cardCount++;
+        const cashPrice = parseFloat(p.totalCash || "0");
+        const cardPrice = parseFloat(p.totalCard || "0");
+        dpEarned += (cardPrice - cashPrice);
+      }
+    }
+
+    res.json({ totalCollected, cashTotal, cardTotal, cashCount, cardCount, dpEarned, totalPayments: payments.length });
+  } catch (err) {
+    console.error("Dashboard dual pricing error:", err);
+    res.json({ totalCollected: 0, cashTotal: 0, cardTotal: 0, cashCount: 0, cardCount: 0, dpEarned: 0, totalPayments: 0 });
+  }
+});
+
 // ============================================================================
 // PDF GENERATION (authenticated)
 // ============================================================================
@@ -2534,6 +2583,254 @@ router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: R
   } catch (err: any) {
     console.error("Approval conversion report error:", err);
     res.status(500).json({ error: "Failed to generate approval conversion report" });
+  }
+});
+
+router.get("/reports/dual-pricing", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+
+    const shop = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
+    if (!shop.length) return res.status(404).json({ error: "Shop not found" });
+
+    const payments = await db.select({
+      paymentId: autoPayments.id,
+      roId: autoRepairOrders.id,
+      roNumber: autoRepairOrders.roNumber,
+      customerFirstName: autoCustomers.firstName,
+      customerLastName: autoCustomers.lastName,
+      vehicleYear: autoVehicles.year,
+      vehicleMake: autoVehicles.make,
+      vehicleModel: autoVehicles.model,
+      method: autoPayments.method,
+      amount: autoPayments.amount,
+      tipAmount: autoPayments.tipAmount,
+      cardBrand: autoPayments.cardBrand,
+      cardLast4: autoPayments.cardLast4,
+      authCode: autoPayments.authCode,
+      processedAt: autoPayments.processedAt,
+      totalCash: autoRepairOrders.totalCash,
+      totalCard: autoRepairOrders.totalCard,
+      feeAmount: autoRepairOrders.feeAmount,
+    })
+    .from(autoPayments)
+    .innerJoin(autoRepairOrders, eq(autoPayments.repairOrderId, autoRepairOrders.id))
+    .innerJoin(autoCustomers, eq(autoRepairOrders.customerId, autoCustomers.id))
+    .innerJoin(autoVehicles, eq(autoRepairOrders.vehicleId, autoVehicles.id))
+    .where(and(
+      eq(autoPayments.shopId, shopId),
+      gte(autoPayments.processedAt, new Date(startDate)),
+      lte(autoPayments.processedAt, new Date(endDate + 'T23:59:59'))
+    ));
+
+    const transactions = payments.map(p => {
+      const cashPrice = parseFloat(p.totalCash || "0");
+      const cardPrice = parseFloat(p.totalCard || "0");
+      const amountPaid = parseFloat(p.amount || "0");
+      const tip = parseFloat(p.tipAmount || "0");
+      const dpAmount = p.method === 'card' ? (cardPrice - cashPrice) : 0;
+      return {
+        date: p.processedAt,
+        roNumber: p.roNumber,
+        customerName: `${p.customerFirstName} ${p.customerLastName}`,
+        vehicle: `${p.vehicleYear || ''} ${p.vehicleMake || ''} ${p.vehicleModel || ''}`.trim(),
+        method: p.method,
+        cashPrice,
+        cardPrice,
+        amountPaid,
+        tip,
+        totalCollected: amountPaid + tip,
+        dpAmount,
+        cardBrand: p.cardBrand || null,
+        cardLast4: p.cardLast4 || null,
+        authCode: p.authCode || null,
+      };
+    });
+
+    const cashTx = transactions.filter(t => t.method === 'cash');
+    const cardTx = transactions.filter(t => t.method === 'card');
+    const totalCashBasis = transactions.reduce((s, t) => s + t.cashPrice, 0);
+    const totalDPCollected = cardTx.reduce((s, t) => s + t.dpAmount, 0);
+    const totalCollected = transactions.reduce((s, t) => s + t.totalCollected, 0);
+
+    const summary = {
+      totalTransactions: transactions.length,
+      cashTransactions: cashTx.length,
+      cardTransactions: cardTx.length,
+      cashPercent: transactions.length > 0 ? Math.round((cashTx.length / transactions.length) * 100) : 0,
+      cardPercent: transactions.length > 0 ? Math.round((cardTx.length / transactions.length) * 100) : 0,
+      totalRevenueCashBasis: totalCashBasis,
+      totalDualPricingCollected: totalDPCollected,
+      totalCollected,
+      avgTransactionCash: cashTx.length > 0 ? cashTx.reduce((s, t) => s + t.amountPaid, 0) / cashTx.length : 0,
+      avgTransactionCard: cardTx.length > 0 ? cardTx.reduce((s, t) => s + t.amountPaid, 0) / cardTx.length : 0,
+      dualPricingRate: parseFloat(shop[0].cardFeePercent || "0") * 100,
+    };
+
+    res.json({ summary, transactions });
+  } catch (err: any) {
+    console.error("Dual pricing report error:", err);
+    res.status(500).json({ error: "Failed to generate dual pricing report" });
+  }
+});
+
+router.get("/reports/dual-pricing/export", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, shopId));
+    if (!shop) return res.status(404).json({ error: "Shop not found" });
+
+    const { startDate, endDate } = req.query as { startDate: string; endDate: string };
+    if (!startDate || !endDate) return res.status(400).json({ error: "startDate and endDate required" });
+
+    const payments = await db.select({
+      method: autoPayments.method,
+      amount: autoPayments.amount,
+      tipAmount: autoPayments.tipAmount,
+      cardBrand: autoPayments.cardBrand,
+      cardLast4: autoPayments.cardLast4,
+      authCode: autoPayments.authCode,
+      processedAt: autoPayments.processedAt,
+      roNumber: autoRepairOrders.roNumber,
+      totalCash: autoRepairOrders.totalCash,
+      totalCard: autoRepairOrders.totalCard,
+      customerFirstName: autoCustomers.firstName,
+      customerLastName: autoCustomers.lastName,
+      vehicleYear: autoVehicles.year,
+      vehicleMake: autoVehicles.make,
+      vehicleModel: autoVehicles.model,
+    })
+    .from(autoPayments)
+    .innerJoin(autoRepairOrders, eq(autoPayments.repairOrderId, autoRepairOrders.id))
+    .innerJoin(autoCustomers, eq(autoRepairOrders.customerId, autoCustomers.id))
+    .innerJoin(autoVehicles, eq(autoRepairOrders.vehicleId, autoVehicles.id))
+    .where(and(
+      eq(autoPayments.shopId, shop.id),
+      gte(autoPayments.processedAt, new Date(startDate)),
+      lte(autoPayments.processedAt, new Date(endDate + "T23:59:59"))
+    ));
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "PCB Auto";
+    workbook.created = new Date();
+
+    const txSheet = workbook.addWorksheet("Transactions");
+    txSheet.columns = [
+      { header: "Date", key: "date", width: 12 },
+      { header: "RO #", key: "roNumber", width: 10 },
+      { header: "Customer", key: "customer", width: 22 },
+      { header: "Vehicle", key: "vehicle", width: 26 },
+      { header: "Method", key: "method", width: 12 },
+      { header: "Cash Price", key: "cashPrice", width: 14, style: { numFmt: "$#,##0.00" } },
+      { header: "Card Price", key: "cardPrice", width: 14, style: { numFmt: "$#,##0.00" } },
+      { header: "Amount Paid", key: "amountPaid", width: 14, style: { numFmt: "$#,##0.00" } },
+      { header: "Tip", key: "tip", width: 10, style: { numFmt: "$#,##0.00" } },
+      { header: "Total Collected", key: "totalCollected", width: 16, style: { numFmt: "$#,##0.00" } },
+      { header: "Dual Pricing Amt", key: "dpAmount", width: 18, style: { numFmt: "$#,##0.00" } },
+      { header: "Card Brand", key: "cardBrand", width: 12 },
+      { header: "Last 4", key: "cardLast4", width: 8 },
+      { header: "Auth Code", key: "authCode", width: 12 },
+    ];
+
+    const headerRow = txSheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+    headerRow.height = 28;
+
+    payments.forEach((p, i) => {
+      const cashPrice = parseFloat(p.totalCash || "0");
+      const cardPrice = parseFloat(p.totalCard || "0");
+      const amountPaid = parseFloat(p.amount || "0");
+      const tip = parseFloat(p.tipAmount || "0");
+      const dpAmount = p.method === "card" ? (cardPrice - cashPrice) : 0;
+
+      const row = txSheet.addRow({
+        date: p.processedAt ? new Date(p.processedAt) : new Date(),
+        roNumber: p.roNumber,
+        customer: `${p.customerFirstName} ${p.customerLastName}`,
+        vehicle: `${p.vehicleYear || ""} ${p.vehicleMake || ""} ${p.vehicleModel || ""}`.trim(),
+        method: p.method === "card" ? "Card" : "Cash",
+        cashPrice,
+        cardPrice,
+        amountPaid,
+        tip,
+        totalCollected: amountPaid + tip,
+        dpAmount,
+        cardBrand: p.cardBrand || "—",
+        cardLast4: p.cardLast4 || "—",
+        authCode: p.authCode || "—",
+      });
+
+      if (i % 2 === 1) {
+        row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+      row.getCell("date").numFmt = "m/d/yyyy";
+    });
+
+    txSheet.views = [{ state: "frozen", ySplit: 1 }];
+    txSheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: payments.length + 1, column: 14 },
+    };
+
+    const sumSheet = workbook.addWorksheet("Summary");
+    sumSheet.columns = [
+      { header: "Metric", key: "metric", width: 32 },
+      { header: "Value", key: "value", width: 22 },
+    ];
+
+    const sumHeader = sumSheet.getRow(1);
+    sumHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    sumHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+    sumHeader.height = 28;
+
+    const cashTx = payments.filter(p => p.method === "cash");
+    const cardTx = payments.filter(p => p.method === "card");
+    const totalCashBasis = payments.reduce((s, p) => s + parseFloat(p.totalCash || "0"), 0);
+    const totalDPCollected = cardTx.reduce((s, p) => s + (parseFloat(p.totalCard || "0") - parseFloat(p.totalCash || "0")), 0);
+    const avgCash = cashTx.length > 0 ? cashTx.reduce((s, p) => s + parseFloat(p.amount || "0"), 0) / cashTx.length : 0;
+    const avgCard = cardTx.length > 0 ? cardTx.reduce((s, p) => s + parseFloat(p.amount || "0"), 0) / cardTx.length : 0;
+
+    const summaryData = [
+      { metric: "Report Period", value: `${startDate} to ${endDate}` },
+      { metric: "Total Transactions", value: payments.length.toString() },
+      { metric: "Cash Transactions", value: cashTx.length.toString() },
+      { metric: "Card Transactions", value: cardTx.length.toString() },
+      { metric: "Cash Percentage", value: payments.length > 0 ? `${Math.round((cashTx.length / payments.length) * 100)}%` : "0%" },
+      { metric: "Card Percentage", value: payments.length > 0 ? `${Math.round((cardTx.length / payments.length) * 100)}%` : "0%" },
+      { metric: "Total Revenue (Cash Basis)", value: `$${totalCashBasis.toFixed(2)}` },
+      { metric: "Total Dual Pricing Collected", value: `$${totalDPCollected.toFixed(2)}` },
+      { metric: "Average Transaction (Cash)", value: `$${avgCash.toFixed(2)}` },
+      { metric: "Average Transaction (Card)", value: `$${avgCard.toFixed(2)}` },
+      { metric: "Dual Pricing Rate", value: `${(parseFloat(shop.cardFeePercent || "0") * 100).toFixed(2)}%` },
+    ];
+
+    summaryData.forEach((row, i) => {
+      const r = sumSheet.addRow(row);
+      r.getCell("metric").font = { bold: true };
+      if (i % 2 === 1) {
+        r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+    });
+
+    const filename = `PCB_Auto_Transactions_${startDate}_to_${endDate}.xlsx`;
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error("Dual pricing export error:", err);
+    res.status(500).json({ error: "Failed to generate report" });
   }
 });
 

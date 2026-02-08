@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Clock, Users,
-  Loader2, FileText, CheckCircle, XCircle, AlertCircle,
+  Loader2, FileText, CheckCircle, XCircle, AlertCircle, Download,
 } from "lucide-react";
 import { DesktopNudge } from "./DesktopNudge";
 
@@ -77,6 +77,37 @@ interface ApprovalData {
   pending: number; conversionRate: number; avgApprovalTimeHours: number;
 }
 
+interface DualPricingData {
+  summary: {
+    totalTransactions: number;
+    cashTransactions: number;
+    cardTransactions: number;
+    cashPercent: number;
+    cardPercent: number;
+    totalRevenueCashBasis: number;
+    totalDualPricingCollected: number;
+    totalCollected: number;
+    avgTransactionCash: number;
+    avgTransactionCard: number;
+    dualPricingRate: number;
+  };
+  transactions: Array<{
+    date: string;
+    roNumber: string;
+    customerName: string;
+    vehicle: string;
+    method: string;
+    cashPrice: number;
+    cardPrice: number;
+    amountPaid: number;
+    tip: number;
+    totalCollected: number;
+    dpAmount: number;
+    cardBrand: string | null;
+    cardLast4: string | null;
+  }>;
+}
+
 export default function AutoReports() {
   const { autoFetch } = useAutoAuth();
   const defaults = getQuickDates("thisMonth");
@@ -88,23 +119,26 @@ export default function AutoReports() {
   const [salesTax, setSalesTax] = useState<SalesTaxData | null>(null);
   const [techProd, setTechProd] = useState<TechProductivityData | null>(null);
   const [approvals, setApprovals] = useState<ApprovalData | null>(null);
+  const [dualPricing, setDualPricing] = useState<DualPricingData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const params = `startDate=${startDate}&endDate=${endDate}`;
-      const [plRes, taxRes, techRes, appRes] = await Promise.all([
+      const [plRes, taxRes, techRes, appRes, dpRes] = await Promise.all([
         autoFetch(`/api/auto/reports/job-profitability?${params}`),
         autoFetch(`/api/auto/reports/sales-tax?${params}`),
         autoFetch(`/api/auto/reports/tech-productivity?${params}`),
         autoFetch(`/api/auto/reports/approval-conversion?${params}`),
+        autoFetch(`/api/auto/reports/dual-pricing?${params}`),
       ]);
 
       if (plRes.ok) setJobPL(await plRes.json());
       if (taxRes.ok) setSalesTax(await taxRes.json());
       if (techRes.ok) setTechProd(await techRes.json());
       if (appRes.ok) setApprovals(await appRes.json());
+      if (dpRes.ok) setDualPricing(await dpRes.json());
     } catch (err) {
       console.error("Failed to fetch reports:", err);
     } finally {
@@ -176,6 +210,7 @@ export default function AutoReports() {
             <TabsTrigger value="sales-tax" data-testid="tab-sales-tax">Sales Tax</TabsTrigger>
             <TabsTrigger value="tech-productivity" data-testid="tab-tech-productivity">Tech Productivity</TabsTrigger>
             <TabsTrigger value="approvals" data-testid="tab-approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="dual-pricing" data-testid="tab-dual-pricing">Dual Pricing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="job-pl" className="space-y-4 mt-4">
@@ -474,6 +509,135 @@ export default function AutoReports() {
                       <p className="text-xs text-muted-foreground mt-1">From estimate creation to approval</p>
                     </CardContent>
                   </Card>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="dual-pricing" className="space-y-4 mt-4">
+            {dualPricing && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold" data-testid="text-dp-title">Dual Pricing Report</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-download-dp-excel"
+                    onClick={() => {
+                      const url = `/api/auto/reports/dual-pricing/export?startDate=${startDate}&endDate=${endDate}`;
+                      autoFetch(url)
+                        .then(res => res.blob())
+                        .then(blob => {
+                          const a = document.createElement("a");
+                          a.href = URL.createObjectURL(blob);
+                          a.download = `PCB_Auto_Transactions_${startDate}_to_${endDate}.xlsx`;
+                          a.click();
+                          URL.revokeObjectURL(a.href);
+                        })
+                        .catch(err => console.error("Export failed:", err));
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Excel
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold" data-testid="text-dp-total-collected">{formatCurrency(dualPricing.summary.totalCollected)}</div>
+                      <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.totalTransactions} transactions</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Cash / Card Split</CardTitle>
+                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold" data-testid="text-dp-split">{dualPricing.summary.cashPercent}% / {dualPricing.summary.cardPercent}%</div>
+                      <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.cashTransactions} cash, {dualPricing.summary.cardTransactions} card</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">DP Earned</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-dp-earned">{formatCurrency(dualPricing.summary.totalDualPricingCollected)}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Rate: {dualPricing.summary.dualPricingRate.toFixed(2)}%</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Avg Transaction</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm font-semibold" data-testid="text-dp-avg-cash">Cash: {formatCurrency(dualPricing.summary.avgTransactionCash)}</div>
+                      <div className="text-sm font-semibold" data-testid="text-dp-avg-card">Card: {formatCurrency(dualPricing.summary.avgTransactionCard)}</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span>Cash {dualPricing.summary.cashPercent}%</span>
+                      <div className="flex-1 bg-muted rounded-md h-4 overflow-hidden flex">
+                        <div className="bg-green-500 h-full" style={{ width: `${dualPricing.summary.cashPercent}%` }} />
+                        <div className="bg-blue-500 h-full" style={{ width: `${dualPricing.summary.cardPercent}%` }} />
+                      </div>
+                      <span>Card {dualPricing.summary.cardPercent}%</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" data-testid="table-dual-pricing">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2 font-medium">Date</th>
+                        <th className="text-left py-3 px-2 font-medium">RO #</th>
+                        <th className="text-left py-3 px-2 font-medium">Customer</th>
+                        <th className="text-left py-3 px-2 font-medium hidden md:table-cell">Vehicle</th>
+                        <th className="text-left py-3 px-2 font-medium">Method</th>
+                        <th className="text-right py-3 px-2 font-medium">Cash Price</th>
+                        <th className="text-right py-3 px-2 font-medium">Card Price</th>
+                        <th className="text-right py-3 px-2 font-medium">Paid</th>
+                        <th className="text-right py-3 px-2 font-medium">DP Amt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dualPricing.transactions.map((tx, idx) => (
+                        <tr key={idx} className="border-b" data-testid={`row-dp-${idx}`}>
+                          <td className="py-2 px-2 text-muted-foreground">{formatDate(tx.date)}</td>
+                          <td className="py-2 px-2 font-mono">{tx.roNumber}</td>
+                          <td className="py-2 px-2">{tx.customerName}</td>
+                          <td className="py-2 px-2 hidden md:table-cell text-muted-foreground">{tx.vehicle}</td>
+                          <td className="py-2 px-2">
+                            <Badge variant={tx.method === 'cash' ? 'secondary' : 'default'}>
+                              {tx.method}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cashPrice)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cardPrice)}</td>
+                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(tx.amountPaid)}</td>
+                          <td className={`py-2 px-2 text-right ${tx.dpAmount > 0 ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
+                            {tx.dpAmount > 0 ? formatCurrency(tx.dpAmount) : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                      {dualPricing.transactions.length === 0 && (
+                        <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">No dual pricing data for selected date range</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}

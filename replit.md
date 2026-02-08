@@ -56,7 +56,7 @@ Preferred communication style: Simple, everyday language.
   - Tablet (640-1024px): Compressed top nav with icon+short labels, no bottom tab bar.
   - Desktop (1024px+): Full top nav with icons and full text labels.
   - Customer phone/email are tappable tel:/mailto: links on mobile. Settings form grids responsive. Schedule has mobile date nav header + week strip.
-- **Invoice & Payment System (Feb 2026)**: Full dual pricing payment flow at `/auto/invoice/:roId` with 5 screens: professional invoice view (dual cash/card pricing), surcharge settings, take payment (cash/card with tip selection), processing animation, and printable receipt. "Invoice / Pay" button on RO detail page for completed/invoiced/in_progress ROs.
+- **Invoice & Payment System (Feb 2026)**: Full dual pricing payment flow at `/auto/invoice/:roId` with 5 screens: professional invoice view (dual cash/card pricing), dual pricing rate settings, take payment (cash/card with tip selection), processing animation, and printable receipt. "Invoice / Pay" button on RO detail page for completed/invoiced/in_progress ROs.
   - New page: `client/src/pages/auto/AutoInvoice.tsx`.
   - Route: `/auto/invoice/:roId` (authenticated).
 - **Resend Email Integration (Feb 2026)**: Backend email service sending invoice/receipt emails with jsPDF-generated PDF attachments via Resend. Professional HTML email templates with dual pricing display, line items, and payment confirmation.
@@ -71,6 +71,16 @@ Preferred communication style: Simple, everyday language.
 - **Parts Lookup & MOTOR Labor Guide (Feb 2026)**: Simulated integrations on the RO detail page for investor demo. "Parts" button opens PartsTech-branded parts search dialog with 30 demo parts, supplier availability, and one-click add-to-RO. "Labor Guide" button opens MOTOR-branded labor time lookup with 30 demo operations, configurable labor rate, difficulty ratings, and one-click add-to-RO. Both auto-populate line items with proper pricing and trigger RO total recalculation.
   - New API routes: GET `/api/auto/parts/search` (simulated PartsTech), GET `/api/auto/labor/search` (simulated MOTOR).
   - UI: Dialogs in `AutoRepairOrderForm.tsx` with search, vehicle context, and add-to-RO flow.
+- **Dual Pricing Compliance (Feb 2026)**: Complete compliance overhaul across all customer-facing screens. Dual pricing is NOT surcharging — customers see "Cash Price" and "Card Price" side by side, never "fee", "surcharge", or any variant. Legal in all 50 states.
+  - Invoice screen: single-amount line items + side-by-side Cash Price / Card Price boxes at bottom.
+  - Payment screen: two equal buttons "CASH $X" / "CARD $Y" with no explanatory text.
+  - Receipt: shows amount paid as one number, no fee breakdown.
+  - Settings: "Dual Pricing Rate (%)" label (not "Card Fee").
+  - Email/PDF: compliant dual pricing display, no fee line items.
+  - New report tab: Dual Pricing Summary + Transaction Detail with ExcelJS export.
+  - Dashboard widget: Today's Revenue with cash/card split and DP Earned.
+  - New API routes: GET `/api/auto/reports/dual-pricing`, GET `/api/auto/reports/dual-pricing/export`, GET `/api/auto/dashboard/dual-pricing`.
+  - Dependencies: `exceljs`.
 
 ## External Dependencies
 

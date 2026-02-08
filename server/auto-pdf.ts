@@ -316,9 +316,17 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
   doc.moveTo(totalsX, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(1).strokeColor("#333333").stroke();
   y += 6;
 
-  doc.font("Helvetica-Bold").fontSize(12);
-  doc.text("Total:", totalsX, y, { width: colWidths.price, align: "right" });
+  const grandTotalCard = parseFloat(String(ro.totalCard || "0"));
+
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#158040");
+  doc.text("Cash Price:", totalsX, y, { width: colWidths.price, align: "right" });
   doc.text(formatCurrency(grandTotal), tableX.total, y, { width: colWidths.total, align: "right" });
+  y += 14;
+
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#1d4ed8");
+  doc.text("Card Price:", totalsX, y, { width: colWidths.price, align: "right" });
+  doc.text(formatCurrency(grandTotalCard), tableX.total, y, { width: colWidths.total, align: "right" });
+  doc.fillColor("#000000");
   y += 20;
 
   if (type === "invoice" && payments && payments.length > 0) {

@@ -139,14 +139,12 @@ function generateInvoicePdf(data: InvoiceEmailData): Buffer {
     item.description || "",
     parseFloat(item.quantity || "1").toString(),
     money(fmt(item.unitPriceCash)),
-    money(fmt(item.unitPriceCard)),
     money(fmt(item.totalCash)),
-    money(fmt(item.totalCard)),
   ]);
 
   autoTable(doc, {
     startY: y,
-    head: [["Type", "Description", "Qty", "Unit (Cash)", "Unit (Card)", "Total (Cash)", "Total (Card)"]],
+    head: [["Type", "Description", "Qty", "Unit Price", "Amount"]],
     body: tableRows,
     theme: "striped",
     headStyles: {
@@ -163,10 +161,8 @@ function generateInvoicePdf(data: InvoiceEmailData): Buffer {
       0: { cellWidth: 16, fontStyle: "bold", fontSize: 7 },
       1: { cellWidth: "auto" },
       2: { cellWidth: 12, halign: "center" },
-      3: { cellWidth: 22, halign: "right" },
-      4: { cellWidth: 22, halign: "right" },
-      5: { cellWidth: 24, halign: "right", fontStyle: "bold" },
-      6: { cellWidth: 24, halign: "right", fontStyle: "bold" },
+      3: { cellWidth: 24, halign: "right" },
+      4: { cellWidth: 28, halign: "right", fontStyle: "bold" },
     },
     margin: { left: 14, right: 14 },
   });
@@ -184,29 +180,19 @@ function generateInvoicePdf(data: InvoiceEmailData): Buffer {
     y += 6;
   };
 
-  addTotalLine("Subtotal (Cash)", money(fmt(data.ro.subtotalCash)));
-  addTotalLine("Subtotal (Card)", money(fmt(data.ro.subtotalCard)));
+  addTotalLine("Subtotal", money(fmt(data.ro.subtotalCash)));
 
   const discCash = fmt(data.ro.discountAmountCash);
-  const discCard = fmt(data.ro.discountAmountCard);
-  if (discCash > 0 || discCard > 0) {
-    addTotalLine("Discount (Cash)", `-${money(discCash)}`, false, [220, 38, 38]);
-    addTotalLine("Discount (Card)", `-${money(discCard)}`, false, [220, 38, 38]);
+  if (discCash > 0) {
+    addTotalLine("Discount", `-${money(discCash)}`, false, [220, 38, 38]);
   }
 
   const supplyCash = fmt(data.ro.shopSupplyAmountCash);
-  const supplyCard = fmt(data.ro.shopSupplyAmountCard);
-  if (supplyCash > 0 || supplyCard > 0) {
-    addTotalLine("Shop Supplies (Cash)", money(supplyCash));
-    addTotalLine("Shop Supplies (Card)", money(supplyCard));
+  if (supplyCash > 0) {
+    addTotalLine("Shop Supplies", money(supplyCash));
   }
 
   addTotalLine("Tax", money(fmt(data.ro.taxAmount)));
-
-  const feeAmt = fmt(data.ro.feeAmount);
-  if (feeAmt > 0) {
-    addTotalLine(`Card Fee (${fmt(data.shop.cardFeePercent)}%)`, money(feeAmt), false, [100, 100, 100]);
-  }
 
   y += 2;
   doc.setDrawColor(200);
@@ -260,7 +246,6 @@ function buildEmailHtml(data: InvoiceEmailData): string {
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">${item.description || ""}</td>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">${parseFloat(item.quantity || "1")}</td>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;">${money(fmt(item.totalCash))}</td>
-      <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;">${money(fmt(item.totalCard))}</td>
     </tr>`
     )
     .join("");
@@ -326,8 +311,7 @@ function buildEmailHtml(data: InvoiceEmailData): string {
         <tr style="background:#111827;">
           <th style="padding:8px;color:white;font-size:12px;text-align:left;">Description</th>
           <th style="padding:8px;color:white;font-size:12px;text-align:center;">Qty</th>
-          <th style="padding:8px;color:white;font-size:12px;text-align:right;">Cash</th>
-          <th style="padding:8px;color:white;font-size:12px;text-align:right;">Card</th>
+          <th style="padding:8px;color:white;font-size:12px;text-align:right;">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -338,12 +322,8 @@ function buildEmailHtml(data: InvoiceEmailData): string {
     <div style="margin-top:20px;border-top:2px solid #e5e7eb;padding-top:16px;">
       <table style="width:100%;max-width:300px;margin-left:auto;">
         <tr>
-          <td style="padding:4px 0;font-size:13px;color:#6b7280;">Subtotal (Cash)</td>
+          <td style="padding:4px 0;font-size:13px;color:#6b7280;">Subtotal</td>
           <td style="padding:4px 0;font-size:13px;text-align:right;">${money(fmt(data.ro.subtotalCash))}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;font-size:13px;color:#6b7280;">Subtotal (Card)</td>
-          <td style="padding:4px 0;font-size:13px;text-align:right;">${money(fmt(data.ro.subtotalCard))}</td>
         </tr>
         <tr>
           <td style="padding:4px 0;font-size:13px;color:#6b7280;">Tax</td>

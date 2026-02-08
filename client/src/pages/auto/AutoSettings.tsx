@@ -237,7 +237,11 @@ export default function AutoSettings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Labor Rate ($/hr)</Label><Input type="number" step="0.01" value={form.laborRate} onChange={(e) => setForm({ ...form, laborRate: e.target.value })} disabled={!isOwner} data-testid="input-labor-rate" /></div>
-              <div className="space-y-2"><Label>Card Fee (%)</Label><Input type="number" step="0.01" value={form.cardFeePercent} onChange={(e) => setForm({ ...form, cardFeePercent: e.target.value })} disabled={!isOwner} data-testid="input-card-fee" /></div>
+              <div className="space-y-2">
+                <Label>Dual Pricing Rate (%)</Label>
+                <Input type="number" step="0.01" value={form.cardFeePercent} onChange={(e) => setForm({ ...form, cardFeePercent: e.target.value })} disabled={!isOwner} data-testid="input-card-fee" />
+                <p className="text-xs text-muted-foreground">The difference between your cash price and card price. Card Price = Cash Price + (Cash Price x Rate)</p>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -8,6 +8,16 @@ import { AutoLayout } from "./AutoLayout";
 import { handleCall, handleSms, SMS_TEMPLATES } from "@/lib/auto-communication";
 import CopyMessageModal from "@/components/auto/CopyMessageModal";
 
+interface DualPricingStats {
+  totalCollected: number;
+  cashTotal: number;
+  cardTotal: number;
+  cashCount: number;
+  cardCount: number;
+  dpEarned: number;
+  totalPayments: number;
+}
+
 interface DashboardStats {
   totalRepairOrders: number;
   openRepairOrders: number;
@@ -36,6 +46,7 @@ export default function AutoDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [todayApts, setTodayApts] = useState<DashboardAppointment[]>([]);
+  const [dpStats, setDpStats] = useState<DualPricingStats | null>(null);
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
   useEffect(() => {
@@ -44,6 +55,11 @@ export default function AutoDashboard() {
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    autoFetch("/api/auto/dashboard/dual-pricing")
+      .then((res) => res.json())
+      .then(setDpStats)
+      .catch(console.error);
 
     const today = new Date();
     const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -104,6 +120,55 @@ export default function AutoDashboard() {
             </Link>
           ))}
         </div>
+
+        {dpStats && dpStats.totalPayments > 0 && (
+          <Card data-testid="card-dual-pricing-widget">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-base font-semibold">Today's Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-3xl font-bold" data-testid="text-total-collected">
+                ${dpStats.totalCollected.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Cash Payments</p>
+                  <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    ${dpStats.cashTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{dpStats.cashCount} transactions</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Card Payments</p>
+                  <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                    ${dpStats.cardTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{dpStats.cardCount} transactions</p>
+                </div>
+              </div>
+              {dpStats.dpEarned > 0 && (
+                <div className="border rounded-md p-3 text-center">
+                  <p className="text-sm text-muted-foreground">Dual Pricing Earned</p>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-dp-earned">
+                    ${dpStats.dpEarned.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">from {dpStats.cardCount} card transactions</p>
+                </div>
+              )}
+              {dpStats.totalPayments > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-green-600 dark:text-green-400">Cash {Math.round((dpStats.cashCount / dpStats.totalPayments) * 100)}%</span>
+                  <div className="flex-1 bg-muted rounded-md h-2.5 overflow-hidden flex">
+                    <div className="bg-green-500 h-full" style={{ width: `${(dpStats.cashCount / dpStats.totalPayments) * 100}%` }} />
+                    <div className="bg-blue-500 h-full" style={{ width: `${(dpStats.cardCount / dpStats.totalPayments) * 100}%` }} />
+                  </div>
+                  <span className="text-blue-600 dark:text-blue-400">Card {Math.round((dpStats.cardCount / dpStats.totalPayments) * 100)}%</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid md:grid-cols-2 gap-4">
           <Card>
