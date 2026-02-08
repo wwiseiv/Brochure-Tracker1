@@ -2619,6 +2619,16 @@ export function registerAutoRoutes(app: Express) {
           zip: "75001",
           phone: "(214) 555-1234",
           timezone: "America/New_York",
+          taxRate: "0.0700",
+          partsTaxRate: "0.0700",
+          laborTaxRate: "0.0700",
+          laborRate: "125.00",
+          cardFeePercent: "0.0350",
+          laborTaxable: true,
+          shopSupplyEnabled: true,
+          shopSupplyRatePct: "5.00",
+          shopSupplyMaxAmount: "50.00",
+          shopSupplyTaxable: true,
         }).returning();
         shopId = shop.id;
         console.log("[AutoInit] Created demo shop (id:", shopId, ")");

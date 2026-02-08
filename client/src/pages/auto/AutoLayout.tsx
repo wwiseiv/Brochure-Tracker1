@@ -142,7 +142,7 @@ function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
 
 export function AutoLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, logout } = useAutoAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -245,7 +245,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
               Help & Guide
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} data-testid="button-logout">
+            <DropdownMenuItem onClick={() => { logout(); setLocation("/auto/login"); }} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
               Log Out
             </DropdownMenuItem>
@@ -354,6 +354,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             onClick={() => {
               setMoreSheetOpen(false);
               logout();
+              setLocation("/auto/login");
             }}
             data-testid="more-logout"
           >
