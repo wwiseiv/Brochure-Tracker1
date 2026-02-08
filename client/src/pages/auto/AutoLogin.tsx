@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +36,6 @@ export default function AutoLogin() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <img src={pcbAutoLogo} alt="PCB Auto" className="mx-auto h-16 object-contain mb-3" />
-          <CardTitle className="text-xl" data-testid="text-login-title">PCB Auto</CardTitle>
           <CardDescription>Sign in to your shop account</CardDescription>
         </CardHeader>
         <CardContent>
