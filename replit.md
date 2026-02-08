@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
   - New schema fields: `paidAmount`/`balanceDue`/`discountAmountCash`/`discountAmountCard`/`shopSupplyAmountCash`/`shopSupplyAmountCard` on repair orders; `discountPercent`/`discountAmountCash`/`discountAmountCard`/`approvalStatus`/`approvedAt`/`declinedAt`/`isShopSupply`/`warrantyMonths`/`warrantyMiles` on line items; `preferredContactMethod` on customers; `shopSupplyEnabled`/`shopSupplyRatePct`/`shopSupplyMaxAmount`/`shopSupplyTaxable` on shops.
   - New tables: `auto_canned_services`, `auto_canned_service_items`.
   - New API routes: GET/POST/PATCH/DELETE `/api/auto/canned-services`, POST `/api/auto/repair-orders/:roId/apply-canned-service/:serviceId`, GET `/api/auto/public/estimate/:token/lines`, POST `/api/auto/public/estimate/:token/line-approval`.
+- **Shop Logo Feature**: Upload via POST `/api/auto/logo/upload` (multipart FormData), stored in object storage, displayed on Settings page with aspect-ratio preservation, embedded in PDF documents (estimates/invoices/work orders) with automatic format conversion via sharp. Logos are dynamically scaled to fit (max 120x60px on PDF) while preserving proportions.
 
 ## External Dependencies
 

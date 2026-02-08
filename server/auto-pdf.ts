@@ -1,5 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Response } from "express";
+import sharp from "sharp";
+import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 
 interface PDFData {
   type: "estimate" | "work_order" | "invoice";
@@ -9,6 +11,30 @@ interface PDFData {
   repairOrder: any;
   lineItems: any[];
   payments?: any[];
+}
+
+async function fetchLogoBuffer(logoUrl: string): Promise<Buffer | null> {
+  try {
+    if (!logoUrl || !logoUrl.startsWith("/objects/")) return null;
+    const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+    if (!privateDir) return null;
+    const entityId = logoUrl.replace("/objects/", "");
+    let entityDir = privateDir.endsWith("/") ? privateDir : privateDir + "/";
+    const fullPath = `${entityDir}${entityId}`;
+    const pathWithoutSlash = fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
+    const [bucketName, ...rest] = pathWithoutSlash.split("/");
+    const objectName = rest.join("/");
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [buffer] = await file.download();
+    const pngBuffer = await sharp(buffer).png().toBuffer();
+    return pngBuffer;
+  } catch (err) {
+    console.error("[PDF] Failed to fetch logo:", err);
+    return null;
+  }
 }
 
 const MARGIN = 50;
@@ -51,7 +77,30 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
 
   doc.pipe(res);
 
-  doc.font("Helvetica-Bold").fontSize(20).text(shop.name || "Auto Shop", MARGIN, MARGIN);
+  const logoBuffer = shop.logoUrl ? await fetchLogoBuffer(shop.logoUrl) : null;
+
+  let textStartX = MARGIN;
+  const LOGO_MAX_HEIGHT = 60;
+  const LOGO_MAX_WIDTH = 120;
+
+  if (logoBuffer) {
+    try {
+      const logoImg = doc.openImage(logoBuffer);
+      const origW = logoImg.width;
+      const origH = logoImg.height;
+      const scale = Math.min(LOGO_MAX_WIDTH / origW, LOGO_MAX_HEIGHT / origH, 1);
+      const drawW = origW * scale;
+      const drawH = origH * scale;
+      const logoY = MARGIN + (LOGO_MAX_HEIGHT - drawH) / 2;
+      doc.image(logoBuffer, MARGIN, logoY, { width: drawW, height: drawH });
+      textStartX = MARGIN + drawW + 12;
+    } catch (err) {
+      console.error("[PDF] Failed to render logo:", err);
+    }
+  }
+
+  const textAreaWidth = PAGE_WIDTH - MARGIN - textStartX;
+  doc.font("Helvetica-Bold").fontSize(20).text(shop.name || "Auto Shop", textStartX, MARGIN, { width: textAreaWidth });
   let headerY = doc.y;
 
   const shopDetails: string[] = [];
@@ -62,10 +111,10 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
   if (shop.email) shopDetails.push(shop.email);
 
   if (shopDetails.length) {
-    doc.font("Helvetica").fontSize(9).text(shopDetails.join("  |  "), MARGIN, headerY, { width: CONTENT_WIDTH });
+    doc.font("Helvetica").fontSize(9).text(shopDetails.join("  |  "), textStartX, headerY, { width: textAreaWidth });
   }
 
-  headerY = doc.y + 12;
+  headerY = Math.max(doc.y, MARGIN + LOGO_MAX_HEIGHT) + 12;
   doc.moveTo(MARGIN, headerY).lineTo(PAGE_WIDTH - MARGIN, headerY).lineWidth(1).strokeColor("#333333").stroke();
 
   headerY += 10;

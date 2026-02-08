@@ -50,15 +50,16 @@ export function useAutoAuth() {
     isLoading: true,
   });
 
-  const autoFetch = useCallback(async (url: string, options: RequestInit = {}) => {
+  const autoFetch = useCallback(async (url: string, options: RequestInit & { rawBody?: boolean } = {}) => {
     const token = getStoredToken();
+    const { rawBody, ...fetchOptions } = options;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string> || {}),
+      ...(rawBody ? {} : { "Content-Type": "application/json" }),
+      ...(fetchOptions.headers as Record<string, string> || {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...fetchOptions, headers });
     if (res.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       setState({ user: null, shop: null, token: null, isLoading: false });

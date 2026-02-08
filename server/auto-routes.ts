@@ -11,7 +11,20 @@ import {
 import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
 import crypto from "crypto";
+import { randomUUID } from "crypto";
+import multer from "multer";
 import { generateROPdf } from "./auto-pdf";
+import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  }
+});
 
 const router = Router();
 
@@ -1526,6 +1539,44 @@ router.patch("/shop/settings", autoAuth, autoRequireRole("owner", "manager"), as
     res.json(shop);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update shop settings" });
+  }
+});
+
+router.post("/logo/upload", autoAuth, autoRequireRole("owner", "manager"), logoUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+
+    const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
+    if (!privateObjectDir) {
+      return res.status(500).json({ error: "Object storage not configured" });
+    }
+
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/auto-logos/${objectId}`;
+
+    const pathWithoutLeadingSlash = fullPath.startsWith("/") ? fullPath.slice(1) : fullPath;
+    const [bucketName, ...rest] = pathWithoutLeadingSlash.split("/");
+    const objectName = rest.join("/");
+
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(req.file.buffer, {
+      contentType: req.file.mimetype || "application/octet-stream",
+      metadata: { originalName: req.file.originalname }
+    });
+
+    const objectPath = `/objects/auto-logos/${objectId}`;
+
+    const [shop] = await db.update(autoShops).set({ logoUrl: objectPath, updatedAt: new Date() })
+      .where(eq(autoShops.id, req.autoUser!.shopId)).returning();
+
+    res.json({ logoUrl: objectPath, shop });
+  } catch (err: any) {
+    console.error("Logo upload error:", err);
+    res.status(500).json({ error: "Failed to upload logo" });
   }
 });
 

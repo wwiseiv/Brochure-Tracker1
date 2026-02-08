@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { Settings, Save, Loader2, Plus, Trash2, Upload, ImageIcon } from "lucide-react";
 
 interface Bay { id: number; name: string; isActive: boolean; }
 
@@ -22,6 +22,8 @@ export default function AutoSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [bays, setBays] = useState<Bay[]>([]);
   const [newBayName, setNewBayName] = useState("");
   const [form, setForm] = useState({
@@ -42,6 +44,7 @@ export default function AutoSettings() {
       ]);
       const s = await settingsRes.json();
       setBays(await baysRes.json());
+      setLogoUrl(s.logoUrl || null);
       setForm({
         name: s.name || "", address: s.address || "", city: s.city || "",
         state: s.state || "", zip: s.zip || "", phone: s.phone || "",
@@ -87,6 +90,43 @@ export default function AutoSettings() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await autoFetch("/api/auto/logo/upload", {
+        method: "POST",
+        body: formData,
+        rawBody: true,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setLogoUrl(data.logoUrl);
+      toast({ title: "Logo Updated" });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to upload logo", variant: "destructive" });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    try {
+      const res = await autoFetch("/api/auto/shop/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ logoUrl: null }),
+      });
+      if (!res.ok) throw new Error("Failed to remove logo");
+      setLogoUrl(null);
+      toast({ title: "Logo Removed" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const deleteBay = async (id: number) => {
     try {
       await autoFetch(`/api/auto/bays/${id}`, { method: "DELETE" });
@@ -105,6 +145,62 @@ export default function AutoSettings() {
         <h1 className="text-xl font-bold flex items-center gap-2" data-testid="text-settings-title">
           <Settings className="h-5 w-5" /> Shop Settings
         </h1>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Shop Logo</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {logoUrl ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="border rounded-md p-4 flex items-center justify-center w-full">
+                  <img
+                    src={logoUrl}
+                    alt="Shop logo"
+                    className="max-h-[120px] object-contain"
+                    data-testid="img-shop-logo"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="border rounded-md p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <ImageIcon className="h-10 w-10" />
+                <span className="text-sm">No logo uploaded</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Recommended: 300x100px. Any size accepted - your logo will be automatically scaled to fit.
+            </p>
+            {(isOwner || user?.role === "manager") && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="file"
+                  id="logo-upload"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                  onChange={handleLogoUpload}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById("logo-upload")?.click()}
+                  disabled={uploadingLogo}
+                  data-testid="button-upload-logo"
+                >
+                  {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                  {uploadingLogo ? "Uploading..." : "Upload Logo"}
+                </Button>
+                {logoUrl && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleRemoveLogo}
+                    data-testid="button-remove-logo"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remove Logo
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader><CardTitle className="text-base">Shop Information</CardTitle></CardHeader>
