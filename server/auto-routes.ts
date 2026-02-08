@@ -16,6 +16,7 @@ import multer from "multer";
 import { generateROPdf, generateDviPdf } from "./auto-pdf";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { sendAutoInvoiceEmail } from "./auto-email";
+import Anthropic from "@anthropic-ai/sdk";
 
 const logoUpload = multer({
   storage: multer.memoryStorage(),
@@ -28,6 +29,105 @@ const logoUpload = multer({
 });
 
 const router = Router();
+
+const anthropicClient = new Anthropic({
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || "dummy",
+  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+});
+
+const assistantSessions = new Map<string, { messages: Array<{role: string; content: string}>, lastAccess: number }>();
+const MAX_HISTORY = 20;
+const SESSION_TTL = 24 * 60 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of assistantSessions) {
+    if (now - session.lastAccess > SESSION_TTL) assistantSessions.delete(id);
+  }
+}, 60 * 60 * 1000);
+
+const ASSISTANT_SYSTEM_PROMPT = `You are the PCB Auto Assistant — a helpful, knowledgeable guide built into the PCB Auto shop management platform. You help auto repair shop owners, service advisors, and technicians use every feature of the platform.
+
+YOUR PERSONALITY:
+- Talk like a knowledgeable coworker, not a customer support bot
+- Be direct and concise — shop people are busy
+- Use plain English, no jargon unless it's industry terms they already know
+- When walking someone through steps, number them clearly
+- If they're on a specific page, reference what they can see right now
+- Never say "I'm just an AI" — you're the PCB Auto Assistant
+- If asked something outside your knowledge, say "That's outside what I can help with — but I can show you how to run your reports so you can share them with your accountant."
+
+RESPONSE GUIDELINES:
+- Keep responses under 150 words unless walking through a multi-step process
+- Use bold for button names and page names: **New RO**, **Settings**
+- Use numbered lists for step-by-step instructions
+- After answering, offer one relevant follow-up
+- If the user seems frustrated, acknowledge it briefly
+- Never overwhelm with all features at once
+
+PCB AUTO FEATURE KNOWLEDGE:
+
+DASHBOARD: Shows today's car count, revenue, pending approvals, pending payments, fees saved (dual pricing savings), cash vs card breakdown, upcoming appointments, and ROs needing attention.
+
+REPAIR ORDERS (ROs): The core of everything. Tracks a single visit for a single vehicle. Create by tapping New RO, selecting customer/vehicle, adding labor and parts lines. RO statuses flow: Estimate → Approved → In Progress → Completed → Invoiced → Paid. The RO detail page shows header info, estimate builder with line items, running totals with dual pricing, and action buttons.
+
+DUAL PRICING: Shows two prices on every estimate/invoice/receipt — Cash Price (base + tax) and Card Price (cash price + credit card fee). The fee rate is configurable in Settings (typically 3-4%). Customers choose which to pay. Either way the shop nets the same amount.
+
+ESTIMATES & APPROVALS: After building an estimate, send it for approval via text/email. Customer sees dual pricing, can approve/decline individual line items, and the RO auto-updates.
+
+DIGITAL VEHICLE INSPECTIONS (DVI): Multi-point inspection on tablet. Each item marked Good (green), Watch (yellow), or Bad (red). Can add notes and photos. Generates customer-facing report. Bad items can convert to RO service lines.
+
+SCHEDULING: Calendar view with bay rows. Create appointments with customer, vehicle, date, time, bay. Appointments auto-create RO on check-in.
+
+CUSTOMERS: Search by name/phone/email/vehicle. Customer detail shows contact info, vehicles, full service history, communication log.
+
+PAYMENTS: Open completed RO, tap Take Payment, choose Cash or Card. System shows correct amount. Can add tip. Print or email receipt.
+
+COMMUNICATION: Text/email/call customers from any RO or customer profile. Pre-filled templates for estimates, invoices, vehicle ready.
+
+REPORTS: Daily/weekly/monthly revenue, car count, average RO value, tech productivity, cash vs card breakdown, approval conversion rates.
+
+SETTINGS: Shop profile, employees, bays, dual pricing rate, tax rates, labor rates, parts markup.
+
+GUIDED WORKFLOWS: When asked "how do I...", respond with numbered steps referencing what's on their current screen.
+
+HANDLING UNKNOWNS:
+- Car repair questions: "I'm here to help you use PCB Auto — for technical repair questions, check with your team."
+- Accounting/legal: "I'd recommend checking with your accountant — but I can show you how to pull the report you'd need."
+- Features not built: "That feature is coming soon. Here's how you can handle it for now."
+- Bugs: "That doesn't sound right. Try refreshing. If it persists, reach out to support."`;
+
+function buildAssistantContextBlock(context: any): string {
+  if (!context) return '';
+  let block = '\n## CURRENT USER CONTEXT\n';
+  block += `- User: ${context.userName || 'Unknown'} (${context.userRole || 'unknown'})\n`;
+  block += `- Shop: ${context.shopName || 'Unknown'}\n`;
+  block += `- Currently viewing: ${context.currentPage} (${context.currentUrl})\n`;
+  if (context.roNumber) block += `- Looking at RO #${context.roNumber} (status: ${context.roStatus})\n`;
+  if (context.customerName) block += `- Customer: ${context.customerName}\n`;
+  if (context.vehicleInfo) block += `- Vehicle: ${context.vehicleInfo}\n`;
+  block += '\n## SHOP CONFIGURATION\n';
+  block += `- Dual pricing: ${context.dualPricingEnabled ? `enabled at ${context.dualPricingRate}%` : 'disabled'}\n`;
+  block += `- Staff configured: ${context.hasEmployees ? 'yes' : 'no'}\n`;
+  block += `- Bays configured: ${context.hasBays ? 'yes' : 'no'}\n`;
+  return block;
+}
+
+function stripMarkdownForTTS(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s*[-*+]\s/gm, '')
+    .replace(/^\s*\d+\.\s/gm, '')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, '. ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 // ============================================================================
 // AUTH ROUTES (no auth required)
@@ -2590,6 +2690,85 @@ router.post("/email/invoice", autoAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Auto email error:", err);
     res.status(500).json({ success: false, error: "Failed to send email" });
+  }
+});
+
+// ============================================================================
+// AI ASSISTANT ROUTES
+// ============================================================================
+
+router.post("/assistant/chat", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { message, sessionId, context } = req.body;
+    if (!message?.trim()) return res.status(400).json({ error: "Message is required" });
+
+    const sid = sessionId || `sess_${Date.now()}`;
+    if (!assistantSessions.has(sid)) {
+      assistantSessions.set(sid, { messages: [], lastAccess: Date.now() });
+    }
+    const session = assistantSessions.get(sid)!;
+    session.lastAccess = Date.now();
+    session.messages.push({ role: "user", content: message });
+    while (session.messages.length > MAX_HISTORY) session.messages.shift();
+
+    const contextBlock = buildAssistantContextBlock(context);
+
+    const response = await anthropicClient.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 800,
+      system: ASSISTANT_SYSTEM_PROMPT + '\n\n' + contextBlock,
+      messages: session.messages.map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    });
+
+    const assistantMessage = response.content
+      .filter((block: any) => block.type === "text")
+      .map((block: any) => block.text)
+      .join("");
+
+    session.messages.push({ role: "assistant", content: assistantMessage });
+
+    res.json({ message: assistantMessage, sessionId: sid });
+  } catch (err: any) {
+    console.error("[AutoAssistant] Chat error:", err);
+    res.status(500).json({ message: "Sorry, I'm having trouble right now. Try again in a moment." });
+  }
+});
+
+router.post("/assistant/tts", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: "Text is required" });
+
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: "TTS not configured" });
+
+    const cleanText = stripMarkdownForTTS(text);
+    const voiceId = "pNInz6obpgDQGcFmaJgB";
+
+    const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
+      body: JSON.stringify({
+        text: cleanText,
+        model_id: "eleven_turbo_v2",
+        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true },
+      }),
+    });
+
+    if (!ttsResponse.ok) {
+      console.error("[AutoTTS] ElevenLabs error:", ttsResponse.status);
+      return res.status(500).json({ error: "Text-to-speech failed" });
+    }
+
+    const arrayBuffer = await ttsResponse.arrayBuffer();
+    res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-cache" });
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err: any) {
+    console.error("[AutoTTS] Error:", err);
+    res.status(500).json({ error: "Text-to-speech failed" });
   }
 });
 

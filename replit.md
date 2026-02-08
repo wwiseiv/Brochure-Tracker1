@@ -64,6 +64,10 @@ Preferred communication style: Simple, everyday language.
   - New route: POST `/api/auto/email/invoice` (sends invoice or receipt email with PDF attachment).
   - Dependencies: `jspdf`, `jspdf-autotable`.
 - **Help Menu (Feb 2026)**: Accessible from desktop user dropdown and mobile "More" sheet. Dialog with 6 categorized help sections: Invoice & Payments, Dual Pricing, Email, Customer Communication, Repair Orders, and Printing. Includes support contact info.
+- **AI Assistant (Feb 2026)**: Floating chat assistant available on all PCB Auto pages. Context-aware responses powered by Anthropic Claude (via Replit AI Integrations). Features: page-specific quick action chips (11 page types), voice dictation via Web Speech API, text-to-speech via ElevenLabs, markdown-rendered responses, conversation persistence across navigation, in-memory session storage (max 20 messages, 24hr TTL).
+  - New API routes: POST `/api/auto/assistant/chat` (authenticated, Anthropic Claude), POST `/api/auto/assistant/tts` (authenticated, ElevenLabs).
+  - New files: `client/src/components/auto/AutoAssistantProvider.tsx` (context/state), `client/src/components/auto/AutoAssistantChat.tsx` (UI panel).
+  - Dependencies: `react-markdown`.
 
 ## External Dependencies
 
