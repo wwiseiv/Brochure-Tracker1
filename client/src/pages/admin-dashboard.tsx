@@ -51,6 +51,8 @@ import {
   Pencil,
   Award,
   Image,
+  Wrench,
+  ExternalLink,
 } from "lucide-react";
 import { isToday, isPast, parseISO, startOfDay } from "date-fns";
 import { format, formatDistanceToNow } from "date-fns";
@@ -980,6 +982,37 @@ export default function AdminDashboardPage() {
                     </div>
                   ))
                 )}
+              </Card>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" data-testid="text-pcb-auto-title">
+                <Wrench className="h-5 w-5 text-primary" />
+                PCB Auto Shop Management
+              </h2>
+              <Card className="p-6" data-testid="card-pcb-auto-shortcut">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Wrench className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Auto Repair Shop Platform</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Manage repair orders, inspections, scheduling, customers, payments, and staff for auto repair shops.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    asChild
+                    data-testid="button-open-pcb-auto"
+                  >
+                    <a href="https://4bfdeb81-6da7-43df-808d-276793a396f0.replit.app/auto/login" target="_blank" rel="noopener noreferrer">
+                      Open PCB Auto
+                      <ExternalLink className="h-4 w-4 ml-2" />
+                    </a>
+                  </Button>
+                </div>
               </Card>
             </section>
 
