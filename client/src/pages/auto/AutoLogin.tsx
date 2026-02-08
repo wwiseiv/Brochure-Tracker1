@@ -55,7 +55,7 @@ export default function AutoLogin() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -66,17 +66,15 @@ export default function AutoLogin() {
                   className="pr-10"
                   data-testid="input-password"
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  className="absolute right-2 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                   tabIndex={-1}
                   data-testid="button-toggle-password"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                </Button>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading} data-testid="button-login">
