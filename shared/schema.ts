@@ -3581,6 +3581,15 @@ export const autoShops = pgTable("auto_shops", {
   invoiceFooter: text("invoice_footer"),
   logoUrl: text("logo_url"),
   settings: jsonb("settings").default({}),
+  rollfiEnabled: boolean("rollfi_enabled").default(false),
+  rollfiCompanyId: varchar("rollfi_company_id", { length: 100 }),
+  rollfiApiKey: text("rollfi_api_key"),
+  rollfiKybStatus: varchar("rollfi_kyb_status", { length: 30 }).default("not_started"),
+  rollfiKybCompletedAt: timestamp("rollfi_kyb_completed_at"),
+  rollfiPayFrequency: varchar("rollfi_pay_frequency", { length: 20 }).default("biweekly"),
+  rollfiNextPayDate: date("rollfi_next_pay_date"),
+  rollfiCheckDate: date("rollfi_check_date"),
+  rollfiBankVerified: boolean("rollfi_bank_verified").default(false),
   isActive: boolean("is_active").default(true),
   createdById: varchar("created_by_id"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3598,6 +3607,7 @@ export const autoShopsRelations = relations(autoShops, ({ many }) => ({
   messageTemplates: many(autoMessageTemplates),
   paymentLinks: many(autoPaymentLinks),
   timeClock: many(autoTimeClock),
+  payrollRuns: many(autoPayrollRuns),
 }));
 
 export const insertAutoShopSchema = createInsertSchema(autoShops).omit({
@@ -3622,6 +3632,10 @@ export const autoUsers = pgTable("auto_users", {
   payType: varchar("pay_type", { length: 20 }).default("hourly"),
   payRate: numeric("pay_rate", { precision: 8, scale: 2 }),
   hoursPerWeek: numeric("hours_per_week", { precision: 5, scale: 2 }).default("40"),
+  rollfiEmployeeId: varchar("rollfi_employee_id", { length: 100 }),
+  rollfiOnboardStatus: varchar("rollfi_onboard_status", { length: 30 }).default("not_started"),
+  rollfiOnboardedAt: timestamp("rollfi_onboarded_at"),
+  rollfiLastSyncAt: timestamp("rollfi_last_sync_at"),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -4369,3 +4383,154 @@ export const insertAutoActivityLogSchema = createInsertSchema(autoActivityLog).o
 });
 export type InsertAutoActivityLog = z.infer<typeof insertAutoActivityLogSchema>;
 export type AutoActivityLog = typeof autoActivityLog.$inferSelect;
+
+// 17. Auto Payroll Runs
+export const autoPayrollRuns = pgTable("auto_payroll_runs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  payPeriodStart: date("pay_period_start").notNull(),
+  payPeriodEnd: date("pay_period_end").notNull(),
+  checkDate: date("check_date").notNull(),
+  submissionDeadline: timestamp("submission_deadline"),
+  rollfiPayrollId: varchar("rollfi_payroll_id", { length: 100 }),
+  rollfiBatchId: varchar("rollfi_batch_id", { length: 100 }),
+  status: varchar("status", { length: 30 }).default("draft"),
+  totalGrossPay: numeric("total_gross_pay", { precision: 12, scale: 2 }),
+  totalEmployeeTaxes: numeric("total_employee_taxes", { precision: 12, scale: 2 }),
+  totalEmployerTaxes: numeric("total_employer_taxes", { precision: 12, scale: 2 }),
+  totalDeductions: numeric("total_deductions", { precision: 12, scale: 2 }),
+  totalNetPay: numeric("total_net_pay", { precision: 12, scale: 2 }),
+  totalEmployerCost: numeric("total_employer_cost", { precision: 12, scale: 2 }),
+  employeeCount: integer("employee_count"),
+  idempotencyKey: varchar("idempotency_key", { length: 100 }).notNull().unique(),
+  errorCode: varchar("error_code", { length: 50 }),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  maxRetries: integer("max_retries").default(3),
+  initiatedById: integer("initiated_by_id").references(() => autoUsers.id),
+  approvedById: integer("approved_by_id").references(() => autoUsers.id),
+  approvedAt: timestamp("approved_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const autoPayrollRunsRelations = relations(autoPayrollRuns, ({ one, many }) => ({
+  shop: one(autoShops, {
+    fields: [autoPayrollRuns.shopId],
+    references: [autoShops.id],
+  }),
+  initiatedBy: one(autoUsers, {
+    fields: [autoPayrollRuns.initiatedById],
+    references: [autoUsers.id],
+    relationName: "payrollInitiator",
+  }),
+  approvedBy: one(autoUsers, {
+    fields: [autoPayrollRuns.approvedById],
+    references: [autoUsers.id],
+    relationName: "payrollApprover",
+  }),
+  items: many(autoPayrollRunItems),
+}));
+
+export const insertAutoPayrollRunSchema = createInsertSchema(autoPayrollRuns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAutoPayrollRun = z.infer<typeof insertAutoPayrollRunSchema>;
+export type AutoPayrollRun = typeof autoPayrollRuns.$inferSelect;
+
+// 18. Auto Payroll Run Items (per-employee line items)
+export const autoPayrollRunItems = pgTable("auto_payroll_run_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  payrollRunId: integer("payroll_run_id").notNull().references(() => autoPayrollRuns.id),
+  userId: integer("user_id").notNull().references(() => autoUsers.id),
+  regularHours: numeric("regular_hours", { precision: 6, scale: 2 }).default("0"),
+  overtimeHours: numeric("overtime_hours", { precision: 6, scale: 2 }).default("0"),
+  holidayHours: numeric("holiday_hours", { precision: 6, scale: 2 }).default("0"),
+  ptoHours: numeric("pto_hours", { precision: 6, scale: 2 }).default("0"),
+  flaggedHours: numeric("flagged_hours", { precision: 6, scale: 2 }).default("0"),
+  payRate: numeric("pay_rate", { precision: 8, scale: 2 }),
+  overtimeRate: numeric("overtime_rate", { precision: 8, scale: 2 }),
+  grossPay: numeric("gross_pay", { precision: 10, scale: 2 }),
+  regularPay: numeric("regular_pay", { precision: 10, scale: 2 }),
+  overtimePay: numeric("overtime_pay", { precision: 10, scale: 2 }),
+  flatRatePay: numeric("flat_rate_pay", { precision: 10, scale: 2 }),
+  bonusPay: numeric("bonus_pay", { precision: 10, scale: 2 }),
+  additionalEarnings: jsonb("additional_earnings").default([]),
+  federalIncomeTax: numeric("federal_income_tax", { precision: 10, scale: 2 }),
+  stateIncomeTax: numeric("state_income_tax", { precision: 10, scale: 2 }),
+  localIncomeTax: numeric("local_income_tax", { precision: 10, scale: 2 }),
+  socialSecurityEmployee: numeric("social_security_employee", { precision: 10, scale: 2 }),
+  medicareEmployee: numeric("medicare_employee", { precision: 10, scale: 2 }),
+  socialSecurityEmployer: numeric("social_security_employer", { precision: 10, scale: 2 }),
+  medicareEmployer: numeric("medicare_employer", { precision: 10, scale: 2 }),
+  futa: numeric("futa", { precision: 10, scale: 2 }),
+  suta: numeric("suta", { precision: 10, scale: 2 }),
+  totalEmployeeTaxes: numeric("total_employee_taxes", { precision: 10, scale: 2 }),
+  totalEmployerTaxes: numeric("total_employer_taxes", { precision: 10, scale: 2 }),
+  deductions: jsonb("deductions").default([]),
+  totalDeductions: numeric("total_deductions", { precision: 10, scale: 2 }).default("0"),
+  netPay: numeric("net_pay", { precision: 10, scale: 2 }),
+  paymentMethod: varchar("payment_method", { length: 20 }).default("direct_deposit"),
+  rollfiItemId: varchar("rollfi_item_id", { length: 100 }),
+  rollfiPaystubUrl: text("rollfi_paystub_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoPayrollRunItemsRelations = relations(autoPayrollRunItems, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoPayrollRunItems.shopId],
+    references: [autoShops.id],
+  }),
+  payrollRun: one(autoPayrollRuns, {
+    fields: [autoPayrollRunItems.payrollRunId],
+    references: [autoPayrollRuns.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoPayrollRunItems.userId],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoPayrollRunItemSchema = createInsertSchema(autoPayrollRunItems).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoPayrollRunItem = z.infer<typeof insertAutoPayrollRunItemSchema>;
+export type AutoPayrollRunItem = typeof autoPayrollRunItems.$inferSelect;
+
+// 19. Auto Rollfi Webhook Log
+export const autoRollfiWebhookLog = pgTable("auto_rollfi_webhook_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  eventId: varchar("event_id", { length: 100 }).notNull().unique(),
+  payload: jsonb("payload").notNull(),
+  signature: varchar("signature", { length: 255 }),
+  shopId: integer("shop_id").references(() => autoShops.id),
+  payrollRunId: integer("payroll_run_id").references(() => autoPayrollRuns.id),
+  processed: boolean("processed").default(false),
+  processedAt: timestamp("processed_at"),
+  error: text("error"),
+  receivedAt: timestamp("received_at").defaultNow(),
+});
+
+export const autoRollfiWebhookLogRelations = relations(autoRollfiWebhookLog, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoRollfiWebhookLog.shopId],
+    references: [autoShops.id],
+  }),
+  payrollRun: one(autoPayrollRuns, {
+    fields: [autoRollfiWebhookLog.payrollRunId],
+    references: [autoPayrollRuns.id],
+  }),
+}));
+
+export const insertAutoRollfiWebhookLogSchema = createInsertSchema(autoRollfiWebhookLog).omit({
+  id: true,
+  receivedAt: true,
+});
+export type InsertAutoRollfiWebhookLog = z.infer<typeof insertAutoRollfiWebhookLogSchema>;
+export type AutoRollfiWebhookLog = typeof autoRollfiWebhookLog.$inferSelect;
