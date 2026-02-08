@@ -346,6 +346,7 @@ router.get("/staff", autoAuth, async (req: Request, res: Response) => {
       id: autoUsers.id, email: autoUsers.email, firstName: autoUsers.firstName,
       lastName: autoUsers.lastName, phone: autoUsers.phone, role: autoUsers.role,
       isActive: autoUsers.isActive, lastLoginAt: autoUsers.lastLoginAt, createdAt: autoUsers.createdAt,
+      payType: autoUsers.payType, payRate: autoUsers.payRate, pin: autoUsers.pin,
     }).from(autoUsers).where(eq(autoUsers.shopId, req.autoUser!.shopId)).orderBy(asc(autoUsers.firstName));
 
     const invitations = await db.select().from(autoInvitations)
@@ -360,7 +361,7 @@ router.get("/staff", autoAuth, async (req: Request, res: Response) => {
 router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
-    const { role, isActive } = req.body;
+    const { role, isActive, phone, pin, payType, payRate } = req.body;
 
     const user = await db.select().from(autoUsers).where(and(eq(autoUsers.id, userId), eq(autoUsers.shopId, req.autoUser!.shopId))).limit(1);
     if (!user.length) return res.status(404).json({ error: "User not found" });
@@ -372,6 +373,10 @@ router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async 
     const updates: any = {};
     if (role !== undefined) updates.role = role;
     if (isActive !== undefined) updates.isActive = isActive;
+    if (phone !== undefined) updates.phone = phone;
+    if (pin !== undefined) updates.pin = pin;
+    if (payType !== undefined) updates.payType = payType;
+    if (payRate !== undefined) updates.payRate = payRate;
     updates.updatedAt = new Date();
 
     const [updated] = await db.update(autoUsers).set(updates).where(eq(autoUsers.id, userId)).returning();

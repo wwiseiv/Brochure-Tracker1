@@ -40,6 +40,10 @@ Preferred communication style: Simple, everyday language.
   - New tables: `auto_canned_services`, `auto_canned_service_items`.
   - New API routes: GET/POST/PATCH/DELETE `/api/auto/canned-services`, POST `/api/auto/repair-orders/:roId/apply-canned-service/:serviceId`, GET `/api/auto/public/estimate/:token/lines`, POST `/api/auto/public/estimate/:token/line-approval`.
 - **Shop Logo Feature**: Upload via POST `/api/auto/logo/upload` (multipart FormData), stored in object storage, displayed on Settings page with aspect-ratio preservation, embedded in PDF documents (estimates/invoices/work orders) with automatic format conversion via sharp. Logos are dynamically scaled to fit (max 120x60px on PDF) while preserving proportions.
+- **Demo Data (Feb 2026)**: Comprehensive realistic demo data seeded on startup — 4 staff (3 techs + 1 service advisor), 8 customers, 9 vehicles, 10 ROs (3 paid, 7 active), 27 appointments across the week, DVI inspection, activity log. All linked to proper technicians, bays, and customers.
+- **Schedule Page Redesign**: Two-panel layout with mini calendar sidebar (dots for days with appointments), technician availability panel, and list/grid view toggle. Default list view shows appointment cards; grid view shows bay-based time grid.
+- **Staff Management Enhancement**: Edit dialog for staff members with phone, pay type/rate, PIN, and active toggle. Staff list shows role and pay type badges.
+- **Landing Page**: Full professional landing page at /auto/login with hero section, 8 feature cards with generated illustrations, login form, and contact footer (hello@pcbancard.com, (888) 537-7332, 420 Boulevard Suite 206, Mountain Lakes, NJ 07046).
 
 ## External Dependencies
 
