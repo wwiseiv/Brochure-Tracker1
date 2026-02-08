@@ -4187,6 +4187,7 @@ export const autoDviInspections = pgTable("auto_dvi_inspections", {
   templateId: integer("template_id").references(() => autoDviTemplates.id),
   technicianId: integer("technician_id").notNull().references(() => autoUsers.id),
   vehicleMileage: integer("vehicle_mileage"),
+  overallCondition: varchar("overall_condition", { length: 20 }),
   publicToken: varchar("public_token", { length: 100 }).unique(),
   status: varchar("status", { length: 20 }).default("in_progress"),
   completedAt: timestamp("completed_at"),

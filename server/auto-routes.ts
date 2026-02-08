@@ -13,7 +13,7 @@ import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToke
 import crypto from "crypto";
 import { randomUUID } from "crypto";
 import multer from "multer";
-import { generateROPdf } from "./auto-pdf";
+import { generateROPdf, generateDviPdf } from "./auto-pdf";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 
 const logoUpload = multer({
@@ -1085,7 +1085,11 @@ router.get("/dvi/inspections", autoAuth, async (req: Request, res: Response) => 
       repairOrderId: autoDviInspections.repairOrderId,
       status: autoDviInspections.status,
       overallCondition: autoDviInspections.overallCondition,
-      technicianNotes: autoDviInspections.technicianNotes,
+      notes: autoDviInspections.notes,
+      vehicleMileage: autoDviInspections.vehicleMileage,
+      technicianId: autoDviInspections.technicianId,
+      publicToken: autoDviInspections.publicToken,
+      sentToCustomerAt: autoDviInspections.sentToCustomerAt,
       createdAt: autoDviInspections.createdAt,
     }).from(autoDviInspections)
       .innerJoin(autoRepairOrders, eq(autoDviInspections.repairOrderId, autoRepairOrders.id))
@@ -1094,8 +1098,27 @@ router.get("/dvi/inspections", autoAuth, async (req: Request, res: Response) => 
 
     const result = [];
     for (const insp of inspections) {
-      const ro = await db.select({ roNumber: autoRepairOrders.roNumber }).from(autoRepairOrders).where(eq(autoRepairOrders.id, insp.repairOrderId)).limit(1);
-      result.push({ ...insp, repairOrder: ro[0] || null });
+      const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.id, insp.repairOrderId)).limit(1);
+      let customer = null, vehicle = null, technician = null;
+      if (ro) {
+        const [c] = await db.select({ id: autoCustomers.id, firstName: autoCustomers.firstName, lastName: autoCustomers.lastName, phone: autoCustomers.phone }).from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+        customer = c || null;
+        const [v] = await db.select({ id: autoVehicles.id, year: autoVehicles.year, make: autoVehicles.make, model: autoVehicles.model, licensePlate: autoVehicles.licensePlate }).from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+        vehicle = v || null;
+      }
+      if (insp.technicianId) {
+        const [t] = await db.select({ id: autoUsers.id, firstName: autoUsers.firstName, lastName: autoUsers.lastName }).from(autoUsers).where(eq(autoUsers.id, insp.technicianId));
+        technician = t || null;
+      }
+      const items = await db.select({ condition: autoDviItems.condition }).from(autoDviItems).where(eq(autoDviItems.inspectionId, insp.id));
+      const counts = { good: 0, fair: 0, poor: 0, not_inspected: 0, total: items.length };
+      for (const it of items) {
+        if (it.condition === "good") counts.good++;
+        else if (it.condition === "fair") counts.fair++;
+        else if (it.condition === "poor") counts.poor++;
+        else counts.not_inspected++;
+      }
+      result.push({ ...insp, repairOrder: ro ? { roNumber: ro.roNumber, status: ro.status } : null, customer, vehicle, technician, conditionCounts: counts });
     }
     res.json(result);
   } catch (err: any) {
@@ -1184,6 +1207,142 @@ router.post("/dvi/inspections/:id/complete", autoAuth, async (req: Request, res:
     res.json(inspection);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to complete inspection" });
+  }
+});
+
+router.get("/dvi/public/:token", async (req: Request, res: Response) => {
+  try {
+    const [inspection] = await db.select().from(autoDviInspections)
+      .where(eq(autoDviInspections.publicToken, req.params.token));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+
+    if (!inspection.customerViewedAt) {
+      await db.update(autoDviInspections).set({ customerViewedAt: new Date() })
+        .where(eq(autoDviInspections.id, inspection.id));
+    }
+
+    const items = await db.select().from(autoDviItems)
+      .where(eq(autoDviItems.inspectionId, inspection.id))
+      .orderBy(asc(autoDviItems.sortOrder));
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(eq(autoRepairOrders.id, inspection.repairOrderId));
+
+    const [shop] = await db.select().from(autoShops)
+      .where(eq(autoShops.id, inspection.shopId));
+
+    const [technician] = await db.select().from(autoUsers)
+      .where(eq(autoUsers.id, inspection.technicianId));
+
+    let customer = null;
+    let vehicle = null;
+    if (ro) {
+      const [c] = await db.select().from(autoCustomers)
+        .where(eq(autoCustomers.id, ro.customerId));
+      customer = c;
+      const [v] = await db.select().from(autoVehicles)
+        .where(eq(autoVehicles.id, ro.vehicleId));
+      vehicle = v;
+    }
+
+    res.json({
+      inspection,
+      shop: shop ? { name: shop.name, phone: shop.phone, address: shop.address, city: shop.city, state: shop.state, zip: shop.zip } : null,
+      customer: customer ? { firstName: customer.firstName } : null,
+      vehicle: vehicle ? { year: vehicle.year, make: vehicle.make, model: vehicle.model, color: vehicle.color, licensePlate: vehicle.licensePlate } : null,
+      technician: technician ? { firstName: technician.firstName, lastName: technician.lastName } : null,
+      items,
+      repairOrder: ro ? { roNumber: ro.roNumber } : null,
+    });
+  } catch (err: any) {
+    console.error("Public DVI fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch inspection report" });
+  }
+});
+
+router.post("/dvi/inspections/:id/send", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const [inspection] = await db.update(autoDviInspections).set({
+      status: "sent", sentToCustomerAt: new Date(), updatedAt: new Date(),
+    }).where(and(
+      eq(autoDviInspections.id, parseInt(req.params.id)),
+      eq(autoDviInspections.shopId, req.autoUser!.shopId)
+    )).returning();
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+    res.json(inspection);
+  } catch (err: any) {
+    console.error("Send DVI error:", err);
+    res.status(500).json({ error: "Failed to send inspection" });
+  }
+});
+
+router.get("/dvi/inspections/:id/pdf", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const [inspection] = await db.select().from(autoDviInspections)
+      .where(and(eq(autoDviInspections.id, parseInt(req.params.id)), eq(autoDviInspections.shopId, req.autoUser!.shopId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+
+    const items = await db.select().from(autoDviItems)
+      .where(eq(autoDviItems.inspectionId, inspection.id)).orderBy(asc(autoDviItems.sortOrder));
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(eq(autoRepairOrders.id, inspection.repairOrderId));
+
+    const [shop] = await db.select().from(autoShops)
+      .where(eq(autoShops.id, inspection.shopId));
+
+    const [technician] = inspection.technicianId
+      ? await db.select().from(autoUsers).where(eq(autoUsers.id, inspection.technicianId))
+      : [null];
+
+    let customer = null;
+    let vehicle = null;
+    if (ro) {
+      const [c] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+      customer = c;
+      const [v] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+      vehicle = v;
+    }
+
+    await generateDviPdf(res, { shop, customer, vehicle, repairOrder: ro, inspection, items, technician });
+  } catch (err: any) {
+    console.error("DVI PDF error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Failed to generate DVI PDF" });
+  }
+});
+
+router.get("/dvi/public/:token/pdf", async (req: Request, res: Response) => {
+  try {
+    const [inspection] = await db.select().from(autoDviInspections)
+      .where(eq(autoDviInspections.publicToken, req.params.token));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+
+    const items = await db.select().from(autoDviItems)
+      .where(eq(autoDviItems.inspectionId, inspection.id)).orderBy(asc(autoDviItems.sortOrder));
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(eq(autoRepairOrders.id, inspection.repairOrderId));
+
+    const [shop] = await db.select().from(autoShops)
+      .where(eq(autoShops.id, inspection.shopId));
+
+    const [technician] = inspection.technicianId
+      ? await db.select().from(autoUsers).where(eq(autoUsers.id, inspection.technicianId))
+      : [null];
+
+    let customer = null;
+    let vehicle = null;
+    if (ro) {
+      const [c] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+      customer = c;
+      const [v] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+      vehicle = v;
+    }
+
+    await generateDviPdf(res, { shop, customer, vehicle, repairOrder: ro, inspection, items, technician });
+  } catch (err: any) {
+    console.error("Public DVI PDF error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Failed to generate DVI PDF" });
   }
 });
 

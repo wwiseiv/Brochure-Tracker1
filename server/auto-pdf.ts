@@ -363,3 +363,234 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
 
   doc.end();
 }
+
+interface DviPdfData {
+  shop: any;
+  customer: any;
+  vehicle: any;
+  repairOrder: any;
+  inspection: any;
+  items: any[];
+  technician: any;
+}
+
+const CONDITION_COLORS: Record<string, string> = {
+  good: "#22c55e",
+  fair: "#eab308",
+  poor: "#ef4444",
+  not_inspected: "#9ca3af",
+};
+
+export async function generateDviPdf(res: Response, data: DviPdfData): Promise<void> {
+  const { shop, customer, vehicle, repairOrder: ro, inspection, items, technician } = data;
+
+  const filename = `DVI-${ro?.roNumber || inspection.id}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+
+  const doc = new PDFDocument({
+    size: "LETTER",
+    margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    bufferPages: true,
+  });
+
+  doc.pipe(res);
+
+  const logoBuffer = shop?.logoUrl ? await fetchLogoBuffer(shop.logoUrl) : null;
+
+  let textStartX = MARGIN;
+  const LOGO_MAX_HEIGHT = 60;
+  const LOGO_MAX_WIDTH = 120;
+
+  if (logoBuffer) {
+    try {
+      const logoImg = doc.openImage(logoBuffer);
+      const origW = logoImg.width;
+      const origH = logoImg.height;
+      const scale = Math.min(LOGO_MAX_WIDTH / origW, LOGO_MAX_HEIGHT / origH, 1);
+      const drawW = origW * scale;
+      const drawH = origH * scale;
+      const logoY = MARGIN + (LOGO_MAX_HEIGHT - drawH) / 2;
+      doc.image(logoBuffer, MARGIN, logoY, { width: drawW, height: drawH });
+      textStartX = MARGIN + drawW + 12;
+    } catch (err) {
+      console.error("[PDF] Failed to render logo:", err);
+    }
+  }
+
+  const textAreaWidth = PAGE_WIDTH - MARGIN - textStartX;
+  doc.font("Helvetica-Bold").fontSize(20).text(shop?.name || "Auto Shop", textStartX, MARGIN, { width: textAreaWidth });
+  let headerY = doc.y;
+
+  const shopDetails: string[] = [];
+  if (shop?.address) shopDetails.push(shop.address);
+  const cityStateZip = [shop?.city, shop?.state, shop?.zip].filter(Boolean).join(", ");
+  if (cityStateZip) shopDetails.push(cityStateZip);
+  if (shop?.phone) shopDetails.push(shop.phone);
+  if (shop?.email) shopDetails.push(shop.email);
+
+  if (shopDetails.length) {
+    doc.font("Helvetica").fontSize(9).text(shopDetails.join("  |  "), textStartX, headerY, { width: textAreaWidth });
+  }
+
+  headerY = Math.max(doc.y, MARGIN + LOGO_MAX_HEIGHT) + 12;
+  doc.moveTo(MARGIN, headerY).lineTo(PAGE_WIDTH - MARGIN, headerY).lineWidth(1).strokeColor("#333333").stroke();
+
+  headerY += 10;
+  doc.font("Helvetica-Bold").fontSize(16).fillColor("#333333")
+    .text("DIGITAL VEHICLE INSPECTION REPORT", MARGIN, headerY, { width: CONTENT_WIDTH, align: "center" });
+
+  let y = doc.y + 14;
+  doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(0.5).strokeColor("#999999").stroke();
+  y += 10;
+
+  const colLeft = MARGIN;
+  const colRight = MARGIN + CONTENT_WIDTH / 2 + 20;
+  const colWidth = CONTENT_WIDTH / 2 - 20;
+
+  doc.font("Helvetica").fontSize(9).fillColor("#000000");
+
+  const vehParts: string[] = [];
+  if (vehicle?.year) vehParts.push(String(vehicle.year));
+  if (vehicle?.make) vehParts.push(vehicle.make);
+  if (vehicle?.model) vehParts.push(vehicle.model);
+  const vehStr = vehParts.join(" ");
+
+  if (vehStr) {
+    doc.font("Helvetica-Bold").fontSize(9).text("Vehicle: ", colLeft, y, { continued: true });
+    doc.font("Helvetica").text(vehStr);
+    y = doc.y;
+  }
+
+  const vehDetails: string[] = [];
+  if (vehicle?.vin) vehDetails.push(`VIN: ${vehicle.vin}`);
+  if (vehicle?.color) vehDetails.push(`Color: ${vehicle.color}`);
+  if (vehicle?.licensePlate) vehDetails.push(`Plate: ${vehicle.licensePlate}`);
+  if (inspection.vehicleMileage) vehDetails.push(`Mileage: ${Number(inspection.vehicleMileage).toLocaleString()}`);
+  if (vehDetails.length) {
+    doc.font("Helvetica").fontSize(8).text(vehDetails.join("  |  "), colLeft, y, { width: CONTENT_WIDTH });
+    y = doc.y;
+  }
+
+  y += 4;
+
+  if (customer?.firstName) {
+    doc.font("Helvetica-Bold").fontSize(9).text("Customer: ", colLeft, y, { continued: true });
+    doc.font("Helvetica").text(customer.firstName);
+    y = doc.y;
+  }
+
+  if (ro?.roNumber) {
+    doc.font("Helvetica-Bold").fontSize(9).text("RO #: ", colLeft, y, { continued: true });
+    doc.font("Helvetica").text(ro.roNumber);
+    y = doc.y;
+  }
+
+  doc.font("Helvetica-Bold").fontSize(9).text("Inspection Date: ", colLeft, y, { continued: true });
+  doc.font("Helvetica").text(formatDate(inspection.createdAt));
+  y = doc.y;
+
+  if (technician) {
+    doc.font("Helvetica-Bold").fontSize(9).text("Technician: ", colLeft, y, { continued: true });
+    doc.font("Helvetica").text(`${technician.firstName || ""} ${technician.lastName || ""}`.trim());
+    y = doc.y;
+  }
+
+  y += 10;
+
+  const goodCount = items.filter(i => i.condition === "good").length;
+  const fairCount = items.filter(i => i.condition === "fair").length;
+  const poorCount = items.filter(i => i.condition === "poor").length;
+
+  doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(0.5).strokeColor("#999999").stroke();
+  y += 8;
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000").text("OVERALL SUMMARY", MARGIN, y);
+  y += 16;
+
+  const summaryBoxWidth = CONTENT_WIDTH / 3;
+
+  doc.save();
+  doc.roundedRect(MARGIN, y, summaryBoxWidth - 8, 30, 4).fillColor("#f0fdf4").fill();
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#22c55e").text(String(goodCount), MARGIN, y + 4, { width: summaryBoxWidth - 8, align: "center" });
+  doc.font("Helvetica").fontSize(8).fillColor("#166534").text("Good", MARGIN, y + 20, { width: summaryBoxWidth - 8, align: "center" });
+  doc.restore();
+
+  doc.save();
+  doc.roundedRect(MARGIN + summaryBoxWidth, y, summaryBoxWidth - 8, 30, 4).fillColor("#fefce8").fill();
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#eab308").text(String(fairCount), MARGIN + summaryBoxWidth, y + 4, { width: summaryBoxWidth - 8, align: "center" });
+  doc.font("Helvetica").fontSize(8).fillColor("#854d0e").text("Fair", MARGIN + summaryBoxWidth, y + 20, { width: summaryBoxWidth - 8, align: "center" });
+  doc.restore();
+
+  doc.save();
+  doc.roundedRect(MARGIN + summaryBoxWidth * 2, y, summaryBoxWidth - 8, 30, 4).fillColor("#fef2f2").fill();
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#ef4444").text(String(poorCount), MARGIN + summaryBoxWidth * 2, y + 4, { width: summaryBoxWidth - 8, align: "center" });
+  doc.font("Helvetica").fontSize(8).fillColor("#991b1b").text("Poor", MARGIN + summaryBoxWidth * 2, y + 20, { width: summaryBoxWidth - 8, align: "center" });
+  doc.restore();
+
+  y += 44;
+
+  const categories = new Map<string, typeof items>();
+  for (const item of items) {
+    const cat = item.category || "General";
+    if (!categories.has(cat)) categories.set(cat, []);
+    categories.get(cat)!.push(item);
+  }
+
+  for (const [categoryName, categoryItems] of categories) {
+    if (y > PAGE_HEIGHT - 120) {
+      doc.addPage();
+      y = MARGIN;
+    }
+
+    doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(0.5).strokeColor("#cccccc").stroke();
+    y += 8;
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333").text(categoryName.toUpperCase(), MARGIN, y);
+    y += 16;
+
+    for (const item of categoryItems) {
+      if (y > PAGE_HEIGHT - 80) {
+        doc.addPage();
+        y = MARGIN;
+      }
+
+      const color = CONDITION_COLORS[item.condition] || CONDITION_COLORS.not_inspected;
+      doc.save();
+      doc.circle(MARGIN + 6, y + 4, 4).fillColor(color).fill();
+      doc.restore();
+
+      doc.font("Helvetica").fontSize(9).fillColor("#000000")
+        .text(item.name || item.itemName || "", MARGIN + 16, y, { width: CONTENT_WIDTH - 16 });
+      y = doc.y;
+
+      if (item.notes) {
+        doc.font("Helvetica-Oblique").fontSize(8).fillColor("#666666")
+          .text(item.notes, MARGIN + 16, y, { width: CONTENT_WIDTH - 16 });
+        y = doc.y;
+      }
+
+      y += 4;
+    }
+  }
+
+  if (inspection.notes) {
+    if (y > PAGE_HEIGHT - 100) {
+      doc.addPage();
+      y = MARGIN;
+    }
+    y += 6;
+    doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(0.5).strokeColor("#999999").stroke();
+    y += 8;
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000").text("TECHNICIAN NOTES", MARGIN, y);
+    y += 14;
+    doc.font("Helvetica").fontSize(9).fillColor("#333333")
+      .text(inspection.notes, MARGIN, y, { width: CONTENT_WIDTH });
+    y = doc.y;
+  }
+
+  doc.font("Helvetica").fontSize(7).fillColor("#aaaaaa")
+    .text(`Generated by PCB Auto on ${new Date().toLocaleDateString("en-US")}`, MARGIN, PAGE_HEIGHT - MARGIN - 12, {
+      width: CONTENT_WIDTH, align: "center",
+    });
+
+  doc.end();
+}

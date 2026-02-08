@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ClipboardCheck, Plus, Loader2, ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, XCircle, Circle } from "lucide-react";
+import { ClipboardCheck, Plus, Loader2, ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, XCircle, Circle, Car, User, Wrench, Send, Calendar, FileText, Copy, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface DviTemplate {
@@ -24,15 +24,23 @@ interface Inspection {
   repairOrderId: number;
   status: string;
   overallCondition: string | null;
-  technicianNotes: string | null;
+  notes: string | null;
+  vehicleMileage: number | null;
+  technicianId: number | null;
+  publicToken: string | null;
+  sentToCustomerAt: string | null;
   createdAt: string;
-  repairOrder?: { roNumber: string } | null;
+  repairOrder?: { roNumber: string; status: string } | null;
+  customer?: { id: number; firstName: string; lastName: string; phone: string } | null;
+  vehicle?: { id: number; year: number; make: string; model: string; licensePlate: string } | null;
+  technician?: { id: number; firstName: string; lastName: string } | null;
+  conditionCounts?: { good: number; fair: number; poor: number; not_inspected: number; total: number } | null;
 }
 
 interface InspectionItem {
   id: number;
   inspectionId: number;
-  category: string;
+  categoryName: string;
   itemName: string;
   condition: string;
   notes: string | null;
@@ -83,12 +91,37 @@ const DEFAULT_CATEGORIES = {
   ],
 };
 
+function getStatusBadgeVariant(status: string, sentToCustomerAt: string | null): { label: string; variant: "default" | "secondary" | "outline" | "destructive" } {
+  if (sentToCustomerAt) {
+    return { label: "Sent", variant: "default" };
+  }
+  switch (status) {
+    case "completed":
+      return { label: "Completed", variant: "secondary" };
+    case "in_progress":
+      return { label: "In Progress", variant: "outline" };
+    default:
+      return { label: status, variant: "outline" };
+  }
+}
+
+function getVehicleLabel(vehicle: Inspection["vehicle"]): string {
+  if (!vehicle) return "";
+  return `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+}
+
+function getCustomerName(customer: Inspection["customer"]): string {
+  if (!customer) return "";
+  return `${customer.firstName} ${customer.lastName}`;
+}
+
 export default function AutoInspections() {
   const { autoFetch } = useAutoAuth();
   const { toast } = useToast();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
+  const [selectedListInspection, setSelectedListInspection] = useState<Inspection | null>(null);
   const [items, setItems] = useState<InspectionItem[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -138,12 +171,15 @@ export default function AutoInspections() {
 
   const openInspection = async (id: number) => {
     try {
+      const listData = inspections.find(i => i.id === id) || null;
+      setSelectedListInspection(listData);
+
       const res = await autoFetch(`/api/auto/dvi/inspections/${id}`);
       const data = await res.json();
       setActiveInspection(data.inspection);
       setItems(data.items || []);
       const categories = new Set<string>();
-      (data.items || []).forEach((item: InspectionItem) => categories.add(item.category));
+      (data.items || []).forEach((item: InspectionItem) => categories.add(item.categoryName));
       setExpandedCategories(categories);
     } catch (err) { console.error(err); }
   };
@@ -191,9 +227,41 @@ export default function AutoInspections() {
     }
   };
 
+  const sendToCustomer = async () => {
+    if (!activeInspection) return;
+    try {
+      const res = await autoFetch(`/api/auto/dvi/inspections/${activeInspection.id}/send`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to send");
+      const updated = await res.json();
+      setActiveInspection({ ...activeInspection, status: "sent", publicToken: updated.publicToken, sentToCustomerAt: new Date().toISOString() });
+      const publicUrl = `${window.location.origin}/auto/inspect/${updated.publicToken}`;
+      await navigator.clipboard.writeText(publicUrl);
+      toast({ title: "Sent to Customer", description: "Public inspection link copied to clipboard" });
+      fetchInspections();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const downloadPdf = () => {
+    if (!activeInspection) return;
+    const token = localStorage.getItem("auto_token");
+    const url = `/api/auto/dvi/inspections/${activeInspection.id}/pdf`;
+    window.open(url + `?token=${encodeURIComponent(token || "")}`, "_blank");
+  };
+
+  const copyPublicLink = () => {
+    if (!activeInspection?.publicToken) return;
+    const publicUrl = `${window.location.origin}/auto/inspect/${activeInspection.publicToken}`;
+    navigator.clipboard.writeText(publicUrl);
+    toast({ title: "Link Copied", description: "Public inspection link copied to clipboard" });
+  };
+
   const groupedItems = items.reduce<Record<string, InspectionItem[]>>((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
+    if (!acc[item.categoryName]) acc[item.categoryName] = [];
+    acc[item.categoryName].push(item);
     return acc;
   }, {});
 
@@ -204,26 +272,69 @@ export default function AutoInspections() {
     notInspected: items.filter(i => i.condition === "not_inspected").length,
   };
 
+  const vehicleLabel = selectedListInspection?.vehicle ? getVehicleLabel(selectedListInspection.vehicle) : null;
+  const customerName = selectedListInspection?.customer ? getCustomerName(selectedListInspection.customer) : null;
+  const technicianName = selectedListInspection?.technician
+    ? `${selectedListInspection.technician.firstName} ${selectedListInspection.technician.lastName}`
+    : null;
+
   if (activeInspection) {
     return (
       <AutoLayout>
         <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => setActiveInspection(null)} data-testid="button-back-inspections">Back</Button>
-              <h1 className="text-xl font-bold">Vehicle Inspection</h1>
-              <Badge variant="outline" className="capitalize">{activeInspection.status}</Badge>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button variant="ghost" size="sm" onClick={() => { setActiveInspection(null); setSelectedListInspection(null); }} data-testid="button-back-inspections">Back</Button>
+              <h1 className="text-xl font-bold" data-testid="text-inspection-detail-title">
+                {vehicleLabel || "Vehicle Inspection"}
+              </h1>
+              <Badge variant="outline" className="capitalize" data-testid="badge-inspection-status">{activeInspection.status}</Badge>
             </div>
-            {activeInspection.status !== "completed" && (
-              <Button onClick={completeInspection} data-testid="button-complete-inspection">Complete Inspection</Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {activeInspection.status === "in_progress" && (
+                <Button onClick={completeInspection} data-testid="button-complete-inspection">Complete Inspection</Button>
+              )}
+              {(activeInspection.status === "completed" || activeInspection.status === "sent") && (
+                <Button variant="outline" onClick={sendToCustomer} className="gap-1" data-testid="button-send-customer">
+                  <Send className="h-4 w-4" /> {activeInspection.status === "sent" ? "Resend" : "Send to Customer"}
+                </Button>
+              )}
+              {activeInspection.publicToken && activeInspection.status === "sent" && (
+                <Button variant="ghost" size="icon" onClick={copyPublicLink} data-testid="button-copy-link">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={downloadPdf} data-testid="button-download-pdf">
+                <FileText className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
+          {(customerName || technicianName || activeInspection.vehicleMileage) && (
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              {customerName && (
+                <span className="flex items-center gap-1" data-testid="text-detail-customer">
+                  <User className="h-3.5 w-3.5" /> {customerName}
+                </span>
+              )}
+              {technicianName && (
+                <span className="flex items-center gap-1" data-testid="text-detail-technician">
+                  <Wrench className="h-3.5 w-3.5" /> {technicianName}
+                </span>
+              )}
+              {activeInspection.vehicleMileage && (
+                <span className="flex items-center gap-1" data-testid="text-detail-mileage">
+                  <Car className="h-3.5 w-3.5" /> {activeInspection.vehicleMileage.toLocaleString()} mi
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-4 gap-2">
-            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-green-600 dark:text-green-400">{conditionStats.good}</p><p className="text-[10px] text-muted-foreground">Good</p></CardContent></Card>
-            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{conditionStats.fair}</p><p className="text-[10px] text-muted-foreground">Fair</p></CardContent></Card>
-            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-red-600 dark:text-red-400">{conditionStats.poor}</p><p className="text-[10px] text-muted-foreground">Needs Work</p></CardContent></Card>
-            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-muted-foreground">{conditionStats.notInspected}</p><p className="text-[10px] text-muted-foreground">Pending</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-green-600 dark:text-green-400" data-testid="stat-good">{conditionStats.good}</p><p className="text-[10px] text-muted-foreground">Good</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-yellow-600 dark:text-yellow-400" data-testid="stat-fair">{conditionStats.fair}</p><p className="text-[10px] text-muted-foreground">Fair</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-red-600 dark:text-red-400" data-testid="stat-poor">{conditionStats.poor}</p><p className="text-[10px] text-muted-foreground">Needs Work</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><p className="text-lg font-bold text-muted-foreground" data-testid="stat-pending">{conditionStats.notInspected}</p><p className="text-[10px] text-muted-foreground">Pending</p></CardContent></Card>
           </div>
 
           {Object.entries(groupedItems).map(([category, catItems]) => (
@@ -327,22 +438,86 @@ export default function AutoInspections() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {inspections.map((inspection) => (
-              <Card
-                key={inspection.id}
-                className="hover-elevate cursor-pointer"
-                onClick={() => openInspection(inspection.id)}
-                data-testid={`card-inspection-${inspection.id}`}
-              >
-                <CardContent className="flex items-center justify-between gap-3 p-4">
-                  <div>
-                    <p className="font-medium text-sm">{inspection.repairOrder?.roNumber || `Inspection #${inspection.id}`}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(inspection.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <Badge variant="outline" className="capitalize">{inspection.status}</Badge>
-                </CardContent>
-              </Card>
-            ))}
+            {inspections.map((inspection) => {
+              const vLabel = getVehicleLabel(inspection.vehicle);
+              const cName = getCustomerName(inspection.customer);
+              const tName = inspection.technician
+                ? `${inspection.technician.firstName} ${inspection.technician.lastName}`
+                : null;
+              const counts = inspection.conditionCounts;
+              const statusInfo = getStatusBadgeVariant(inspection.status, inspection.sentToCustomerAt || null);
+
+              return (
+                <Card
+                  key={inspection.id}
+                  className="hover-elevate cursor-pointer"
+                  onClick={() => openInspection(inspection.id)}
+                  data-testid={`card-inspection-${inspection.id}`}
+                >
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate" data-testid={`text-vehicle-${inspection.id}`}>
+                          {vLabel || `Inspection #${inspection.id}`}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          {cName && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-customer-${inspection.id}`}>
+                              <User className="h-3 w-3" /> {cName}
+                            </span>
+                          )}
+                          {inspection.repairOrder?.roNumber && (
+                            <span className="text-xs text-muted-foreground" data-testid={`text-ro-${inspection.id}`}>
+                              {inspection.repairOrder.roNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant={statusInfo.variant} className="capitalize shrink-0" data-testid={`badge-status-${inspection.id}`}>
+                        {statusInfo.label === "Sent" && <Send className="h-3 w-3 mr-1" />}
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        {tName && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-technician-${inspection.id}`}>
+                            <Wrench className="h-3 w-3" /> {tName}
+                          </span>
+                        )}
+                        {counts && (counts.good > 0 || counts.fair > 0 || counts.poor > 0) && (
+                          <div className="flex items-center gap-1.5" data-testid={`condition-summary-${inspection.id}`}>
+                            {counts.good > 0 && (
+                              <span className="flex items-center gap-0.5 text-xs font-medium text-green-600 dark:text-green-400" data-testid={`count-good-${inspection.id}`}>
+                                <span className="h-2 w-2 rounded-full bg-green-600 dark:bg-green-400 inline-block" />
+                                {counts.good}
+                              </span>
+                            )}
+                            {counts.fair > 0 && (
+                              <span className="flex items-center gap-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400" data-testid={`count-fair-${inspection.id}`}>
+                                <span className="h-2 w-2 rounded-full bg-yellow-600 dark:bg-yellow-400 inline-block" />
+                                {counts.fair}
+                              </span>
+                            )}
+                            {counts.poor > 0 && (
+                              <span className="flex items-center gap-0.5 text-xs font-medium text-red-600 dark:text-red-400" data-testid={`count-poor-${inspection.id}`}>
+                                <span className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-400 inline-block" />
+                                {counts.poor}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-date-${inspection.id}`}>
+                        <Calendar className="h-3 w-3" />
+                        {new Date(inspection.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

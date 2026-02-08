@@ -51,6 +51,8 @@ export function autoAuth(req: Request, res: Response, next: NextFunction) {
     token = authHeader.substring(7);
   } else if (req.cookies?.auto_token) {
     token = req.cookies.auto_token;
+  } else if (req.query.token && typeof req.query.token === "string") {
+    token = req.query.token;
   }
 
   if (!token) {

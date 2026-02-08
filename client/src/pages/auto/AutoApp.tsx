@@ -13,6 +13,7 @@ import AutoSchedule from "./AutoSchedule";
 import AutoSettings from "./AutoSettings";
 import AutoStaff from "./AutoStaff";
 import AutoPublicApproval from "./AutoPublicApproval";
+import AutoPublicInspection from "./AutoPublicInspection";
 import AutoReports from "./AutoReports";
 import { Loader2 } from "lucide-react";
 
@@ -67,6 +68,7 @@ export default function AutoApp() {
       <Route path="/auto/login" component={AutoLogin} />
       <Route path="/auto/register" component={AutoRegister} />
       <Route path="/auto/approve/:token" component={AutoPublicApproval} />
+      <Route path="/auto/inspect/:token" component={AutoPublicInspection} />
       <Route path="/auto/public/*">
         {() => <div className="p-6 text-center">Public page - Coming soon</div>}
       </Route>

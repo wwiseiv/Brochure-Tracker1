@@ -423,7 +423,106 @@ export async function seedDemoData(shopId: number, ownerId: number): Promise<voi
       { inspectionId: dvi.id, categoryName: "Undercarriage", itemName: "Suspension", condition: "good", sortOrder: 14 },
     ]);
 
-    console.log("[AutoInit] Created DVI inspection with 14 items");
+    console.log("[AutoInit] Created DVI inspection #1 with 14 items");
+
+    // ── DVI Inspection for RO-1002 (Maria Johnson / Camry — in_progress) ──
+    const [dvi2] = await db.insert(autoDviInspections).values({
+      repairOrderId: ro1002.id, shopId, technicianId: sarah.id,
+      vehicleMileage: 42310, status: "in_progress",
+      overallCondition: null,
+      publicToken: crypto.randomBytes(32).toString("hex"),
+    }).returning();
+
+    await db.insert(autoDviItems).values([
+      { inspectionId: dvi2.id, categoryName: "Under Hood", itemName: "Engine Oil Level", condition: "fair", notes: "Due for change", sortOrder: 1 },
+      { inspectionId: dvi2.id, categoryName: "Under Hood", itemName: "Coolant Level", condition: "good", sortOrder: 2 },
+      { inspectionId: dvi2.id, categoryName: "Under Hood", itemName: "Brake Fluid", condition: "good", sortOrder: 3 },
+      { inspectionId: dvi2.id, categoryName: "Under Hood", itemName: "Air Filter", condition: "fair", notes: "Moderate dirt buildup", sortOrder: 4 },
+      { inspectionId: dvi2.id, categoryName: "Under Hood", itemName: "Battery", condition: "good", notes: "Load test passed", sortOrder: 5 },
+      { inspectionId: dvi2.id, categoryName: "Tires & Wheels", itemName: "LF Tire Tread", condition: "good", notes: "7/32 remaining", sortOrder: 6 },
+      { inspectionId: dvi2.id, categoryName: "Tires & Wheels", itemName: "RF Tire Tread", condition: "good", notes: "7/32 remaining", sortOrder: 7 },
+      { inspectionId: dvi2.id, categoryName: "Tires & Wheels", itemName: "LR Tire Tread", condition: "not_inspected", sortOrder: 8 },
+      { inspectionId: dvi2.id, categoryName: "Tires & Wheels", itemName: "RR Tire Tread", condition: "not_inspected", sortOrder: 9 },
+      { inspectionId: dvi2.id, categoryName: "Tires & Wheels", itemName: "Tire Pressure", condition: "not_inspected", sortOrder: 10 },
+      { inspectionId: dvi2.id, categoryName: "Brakes", itemName: "Front Brake Pads", condition: "good", notes: "7mm remaining", sortOrder: 11 },
+      { inspectionId: dvi2.id, categoryName: "Brakes", itemName: "Rear Brake Pads", condition: "not_inspected", sortOrder: 12 },
+      { inspectionId: dvi2.id, categoryName: "Exterior", itemName: "Headlights", condition: "not_inspected", sortOrder: 13 },
+      { inspectionId: dvi2.id, categoryName: "Exterior", itemName: "Tail Lights", condition: "not_inspected", sortOrder: 14 },
+      { inspectionId: dvi2.id, categoryName: "Exterior", itemName: "Windshield", condition: "not_inspected", sortOrder: 15 },
+    ]);
+
+    // ── DVI Inspection for RO-1004 (James Williams / Silverado — completed, sent to customer) ──
+    const dvi3Token = crypto.randomBytes(32).toString("hex");
+    const [dvi3] = await db.insert(autoDviInspections).values({
+      repairOrderId: ro1004.id, shopId, technicianId: dave.id,
+      vehicleMileage: 89210, status: "sent",
+      overallCondition: "fair",
+      publicToken: dvi3Token,
+      completedAt: daysAgo(1),
+      sentToCustomerAt: daysAgo(1),
+      notes: "CEL diagnostic found P0300 random misfire. Recommend spark plugs and ignition coil pack inspection.",
+    }).returning();
+
+    await db.insert(autoDviItems).values([
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Engine Oil Level", condition: "good", sortOrder: 1 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Coolant Level", condition: "good", sortOrder: 2 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Brake Fluid", condition: "good", sortOrder: 3 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Air Filter", condition: "poor", notes: "Very dirty - recommend replacement", sortOrder: 4 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Battery", condition: "fair", notes: "483 CCA - marginal, OEM spec is 650 CCA", sortOrder: 5 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Belts", condition: "fair", notes: "Cracking visible on serpentine belt", sortOrder: 6 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Spark Plugs", condition: "poor", notes: "Worn electrodes, 80K+ miles - causing misfire", sortOrder: 7 },
+      { inspectionId: dvi3.id, categoryName: "Under Hood", itemName: "Ignition Coils", condition: "fair", notes: "#3 coil weak - intermittent misfire", sortOrder: 8 },
+      { inspectionId: dvi3.id, categoryName: "Brakes", itemName: "Front Brake Pads", condition: "fair", notes: "4mm remaining", sortOrder: 9 },
+      { inspectionId: dvi3.id, categoryName: "Brakes", itemName: "Rear Brake Pads", condition: "good", notes: "6mm remaining", sortOrder: 10 },
+      { inspectionId: dvi3.id, categoryName: "Brakes", itemName: "Front Rotors", condition: "fair", notes: "Light scoring", sortOrder: 11 },
+      { inspectionId: dvi3.id, categoryName: "Brakes", itemName: "Rear Rotors", condition: "good", sortOrder: 12 },
+      { inspectionId: dvi3.id, categoryName: "Tires & Wheels", itemName: "LF Tire Tread", condition: "fair", notes: "4/32 remaining", sortOrder: 13 },
+      { inspectionId: dvi3.id, categoryName: "Tires & Wheels", itemName: "RF Tire Tread", condition: "fair", notes: "4/32 remaining", sortOrder: 14 },
+      { inspectionId: dvi3.id, categoryName: "Tires & Wheels", itemName: "LR Tire Tread", condition: "poor", notes: "2/32 remaining - replace soon", sortOrder: 15 },
+      { inspectionId: dvi3.id, categoryName: "Tires & Wheels", itemName: "RR Tire Tread", condition: "poor", notes: "2/32 remaining - replace soon", sortOrder: 16 },
+      { inspectionId: dvi3.id, categoryName: "Tires & Wheels", itemName: "Tire Pressure", condition: "good", notes: "All 35 PSI", sortOrder: 17 },
+      { inspectionId: dvi3.id, categoryName: "Under Vehicle", itemName: "Exhaust System", condition: "fair", notes: "Surface rust on muffler", sortOrder: 18 },
+      { inspectionId: dvi3.id, categoryName: "Under Vehicle", itemName: "Suspension", condition: "good", sortOrder: 19 },
+      { inspectionId: dvi3.id, categoryName: "Under Vehicle", itemName: "CV Boots/Axles", condition: "good", sortOrder: 20 },
+      { inspectionId: dvi3.id, categoryName: "Exterior", itemName: "Headlights", condition: "good", sortOrder: 21 },
+      { inspectionId: dvi3.id, categoryName: "Exterior", itemName: "Tail Lights", condition: "good", sortOrder: 22 },
+      { inspectionId: dvi3.id, categoryName: "Exterior", itemName: "Windshield", condition: "good", sortOrder: 23 },
+      { inspectionId: dvi3.id, categoryName: "Exterior", itemName: "Wiper Blades", condition: "fair", notes: "Streaking slightly", sortOrder: 24 },
+    ]);
+
+    // ── DVI Inspection for RO-1006 (Amy Parker / Tucson — completed) ──
+    const [dvi4] = await db.insert(autoDviInspections).values({
+      repairOrderId: ro1006.id, shopId, technicianId: sarah.id,
+      vehicleMileage: 12400, status: "completed",
+      overallCondition: "good",
+      publicToken: crypto.randomBytes(32).toString("hex"),
+      completedAt: todayAt(10, 0),
+      notes: "Nearly new vehicle in excellent condition. Only concern is uneven tire wear suggesting alignment needed.",
+    }).returning();
+
+    await db.insert(autoDviItems).values([
+      { inspectionId: dvi4.id, categoryName: "Under Hood", itemName: "Engine Oil Level", condition: "good", sortOrder: 1 },
+      { inspectionId: dvi4.id, categoryName: "Under Hood", itemName: "Coolant Level", condition: "good", sortOrder: 2 },
+      { inspectionId: dvi4.id, categoryName: "Under Hood", itemName: "Brake Fluid", condition: "good", sortOrder: 3 },
+      { inspectionId: dvi4.id, categoryName: "Under Hood", itemName: "Air Filter", condition: "good", sortOrder: 4 },
+      { inspectionId: dvi4.id, categoryName: "Under Hood", itemName: "Battery", condition: "good", notes: "Factory battery, strong charge", sortOrder: 5 },
+      { inspectionId: dvi4.id, categoryName: "Brakes", itemName: "Front Brake Pads", condition: "good", notes: "9mm remaining", sortOrder: 6 },
+      { inspectionId: dvi4.id, categoryName: "Brakes", itemName: "Rear Brake Pads", condition: "good", notes: "8mm remaining", sortOrder: 7 },
+      { inspectionId: dvi4.id, categoryName: "Brakes", itemName: "Front Rotors", condition: "good", sortOrder: 8 },
+      { inspectionId: dvi4.id, categoryName: "Brakes", itemName: "Rear Rotors", condition: "good", sortOrder: 9 },
+      { inspectionId: dvi4.id, categoryName: "Tires & Wheels", itemName: "LF Tire Tread", condition: "fair", notes: "6/32 - slight inner edge wear", sortOrder: 10 },
+      { inspectionId: dvi4.id, categoryName: "Tires & Wheels", itemName: "RF Tire Tread", condition: "fair", notes: "6/32 - slight inner edge wear", sortOrder: 11 },
+      { inspectionId: dvi4.id, categoryName: "Tires & Wheels", itemName: "LR Tire Tread", condition: "good", notes: "8/32 remaining", sortOrder: 12 },
+      { inspectionId: dvi4.id, categoryName: "Tires & Wheels", itemName: "RR Tire Tread", condition: "good", notes: "8/32 remaining", sortOrder: 13 },
+      { inspectionId: dvi4.id, categoryName: "Tires & Wheels", itemName: "Tire Pressure", condition: "good", notes: "All 33 PSI", sortOrder: 14 },
+      { inspectionId: dvi4.id, categoryName: "Exterior", itemName: "Headlights", condition: "good", sortOrder: 15 },
+      { inspectionId: dvi4.id, categoryName: "Exterior", itemName: "Tail Lights", condition: "good", sortOrder: 16 },
+      { inspectionId: dvi4.id, categoryName: "Exterior", itemName: "Windshield", condition: "good", sortOrder: 17 },
+      { inspectionId: dvi4.id, categoryName: "Under Vehicle", itemName: "Exhaust System", condition: "good", sortOrder: 18 },
+      { inspectionId: dvi4.id, categoryName: "Under Vehicle", itemName: "Suspension", condition: "good", sortOrder: 19 },
+    ]);
+
+    console.log("[AutoInit] Created 4 DVI inspections total");
 
     // ── Appointments: TODAY ──
     await db.insert(autoAppointments).values([
