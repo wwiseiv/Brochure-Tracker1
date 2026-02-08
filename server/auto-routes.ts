@@ -39,11 +39,14 @@ router.post("/auth/login", async (req: Request, res: Response) => {
     }
 
     if (!query.length) {
+      console.log("[AutoLogin] No user found for email:", email.toLowerCase());
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const user = query[0];
+    console.log("[AutoLogin] Found user:", user.id, "hash length:", user.passwordHash?.length, "hash prefix:", user.passwordHash?.substring(0, 7));
     const valid = await comparePasswords(password, user.passwordHash);
+    console.log("[AutoLogin] Password compare result:", valid);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -1828,4 +1831,18 @@ router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: R
 
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);
+
+  // Ensure demo account password is always valid on startup
+  (async () => {
+    try {
+      const demoUser = await db.select().from(autoUsers).where(eq(autoUsers.email, "owner@demo.com")).limit(1);
+      if (demoUser.length) {
+        const freshHash = await hashPassword("password123");
+        await db.update(autoUsers).set({ passwordHash: freshHash }).where(eq(autoUsers.id, demoUser[0].id));
+        console.log("[AutoInit] Demo account password refreshed");
+      }
+    } catch (err) {
+      console.error("[AutoInit] Failed to refresh demo password:", err);
+    }
+  })();
 }
