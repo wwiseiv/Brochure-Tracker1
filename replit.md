@@ -68,6 +68,9 @@ Preferred communication style: Simple, everyday language.
   - New API routes: POST `/api/auto/assistant/chat` (authenticated, Anthropic Claude), POST `/api/auto/assistant/tts` (authenticated, ElevenLabs).
   - New files: `client/src/components/auto/AutoAssistantProvider.tsx` (context/state), `client/src/components/auto/AutoAssistantChat.tsx` (UI panel).
   - Dependencies: `react-markdown`.
+- **Parts Lookup & MOTOR Labor Guide (Feb 2026)**: Simulated integrations on the RO detail page for investor demo. "Parts" button opens PartsTech-branded parts search dialog with 30 demo parts, supplier availability, and one-click add-to-RO. "Labor Guide" button opens MOTOR-branded labor time lookup with 30 demo operations, configurable labor rate, difficulty ratings, and one-click add-to-RO. Both auto-populate line items with proper pricing and trigger RO total recalculation.
+  - New API routes: GET `/api/auto/parts/search` (simulated PartsTech), GET `/api/auto/labor/search` (simulated MOTOR).
+  - UI: Dialogs in `AutoRepairOrderForm.tsx` with search, vehicle context, and add-to-RO flow.
 
 ## External Dependencies
 

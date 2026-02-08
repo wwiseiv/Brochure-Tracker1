@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown, Search, Clock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { handleCall, handleSms, handleEmail, SMS_TEMPLATES, EMAIL_TEMPLATES, logCommunication } from "@/lib/auto-communication";
 import CopyMessageModal from "@/components/auto/CopyMessageModal";
@@ -82,6 +82,19 @@ export default function AutoRepairOrderForm() {
   });
 
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
+
+  const [partsDialogOpen, setPartsDialogOpen] = useState(false);
+  const [partsSearch, setPartsSearch] = useState("");
+  const [partsResults, setPartsResults] = useState<any[]>([]);
+  const [partsLoading, setPartsLoading] = useState(false);
+  const [addingPartId, setAddingPartId] = useState<string | null>(null);
+
+  const [laborDialogOpen, setLaborDialogOpen] = useState(false);
+  const [laborSearch, setLaborSearch] = useState("");
+  const [laborResults, setLaborResults] = useState<any[]>([]);
+  const [laborLoading, setLaborLoading] = useState(false);
+  const [laborRate, setLaborRate] = useState("120");
+  const [addingLaborId, setAddingLaborId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     customerId: "", vehicleId: "", technicianId: "",
@@ -265,6 +278,96 @@ export default function AutoRepairOrderForm() {
   const openPaymentDialog = () => {
     setPaymentForm({ method: "cash", amount: balanceDue > 0 ? balanceDue.toFixed(2) : "", referenceNumber: "", notes: "" });
     setPaymentDialogOpen(true);
+  };
+
+  const searchParts = async (query: string) => {
+    setPartsLoading(true);
+    try {
+      const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (vehicle?.year) params.set("vehicleYear", vehicle.year.toString());
+      if (vehicle?.make) params.set("vehicleMake", vehicle.make);
+      if (vehicle?.model) params.set("vehicleModel", vehicle.model);
+      const res = await autoFetch(`/api/auto/parts/search?${params.toString()}`);
+      const data = await res.json();
+      setPartsResults(data.parts || data.results || data || []);
+    } catch (err) { console.error(err); }
+    finally { setPartsLoading(false); }
+  };
+
+  const searchPartsDefault = () => searchParts("");
+
+  const searchLabor = async (query: string) => {
+    setLaborLoading(true);
+    try {
+      const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (vehicle?.year) params.set("vehicleYear", vehicle.year.toString());
+      if (vehicle?.make) params.set("vehicleMake", vehicle.make);
+      if (vehicle?.model) params.set("vehicleModel", vehicle.model);
+      const res = await autoFetch(`/api/auto/labor/search?${params.toString()}`);
+      const data = await res.json();
+      setLaborResults(data.operations || data.results || data || []);
+    } catch (err) { console.error(err); }
+    finally { setLaborLoading(false); }
+  };
+
+  const searchLaborDefault = () => searchLabor("");
+
+  const addPartToRO = async (part: any) => {
+    if (!roId) return;
+    setAddingPartId(part.id || part.partNumber);
+    try {
+      const res = await autoFetch(`/api/auto/repair-orders/${roId}/line-items`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: "parts",
+          description: part.description,
+          partNumber: part.partNumber,
+          quantity: "1",
+          unitPriceCash: part.listPrice.toString(),
+          costPrice: part.unitCost.toString(),
+          isTaxable: true,
+          isAdjustable: true,
+        }),
+      });
+      const item = await res.json();
+      if (!res.ok) throw new Error(item.error);
+      setLineItems(prev => [...prev, item]);
+      await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      toast({ title: "Part added to RO" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setAddingPartId(null); }
+  };
+
+  const addLaborToRO = async (labor: any) => {
+    if (!roId) return;
+    setAddingLaborId(labor.id || labor.operationCode);
+    try {
+      const price = labor.laborHours * parseFloat(laborRate);
+      const res = await autoFetch(`/api/auto/repair-orders/${roId}/line-items`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: "labor",
+          description: labor.description,
+          quantity: "1",
+          unitPriceCash: price.toFixed(2),
+          laborHours: labor.laborHours.toString(),
+          isTaxable: true,
+          isAdjustable: true,
+        }),
+      });
+      const item = await res.json();
+      if (!res.ok) throw new Error(item.error);
+      setLineItems(prev => [...prev, item]);
+      await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      toast({ title: "Labor operation added to RO" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setAddingLaborId(null); }
   };
 
   const canVoidPayments = user?.role === "owner" || user?.role === "manager";
@@ -514,6 +617,14 @@ export default function AutoRepairOrderForm() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base">Line Items</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setPartsDialogOpen(true); if (!partsResults.length) { setPartsSearch(""); searchPartsDefault(); } }} data-testid="button-parts-lookup">
+                    <Search className="h-4 w-4 mr-1" /> Parts
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { setLaborDialogOpen(true); if (!laborResults.length) { setLaborSearch(""); searchLaborDefault(); } }} data-testid="button-labor-guide">
+                    <Clock className="h-4 w-4 mr-1" /> Labor Guide
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {lineItems.map((item) => (
@@ -662,6 +773,204 @@ export default function AutoRepairOrderForm() {
                 </div>
               </CardContent>
             </Card>
+
+            <Dialog open={partsDialogOpen} onOpenChange={setPartsDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    Parts Lookup
+                    <Badge variant="secondary" className="text-xs font-normal">Powered by PartsTech</Badge>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {(() => {
+                    const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+                    return vehicle ? (
+                      <Badge variant="outline" data-testid="badge-parts-vehicle">
+                        Vehicle: {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ")}
+                      </Badge>
+                    ) : null;
+                  })()}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search parts (e.g., brake pads, oil filter)..."
+                      value={partsSearch}
+                      onChange={(e) => setPartsSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") searchParts(partsSearch); }}
+                      data-testid="input-parts-search"
+                    />
+                    <Button size="sm" onClick={() => searchParts(partsSearch)} disabled={partsLoading} data-testid="button-parts-search">
+                      {partsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                    {partsLoading && (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {!partsLoading && partsResults.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-8">No results found. Try a different search term.</p>
+                    )}
+                    {!partsLoading && partsResults.map((part, idx) => (
+                      <div key={part.id || part.partNumber || idx} className="p-3 rounded-md border space-y-2" data-testid={`parts-result-${idx}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {part.partNumber && <Badge variant="outline" className="text-xs">{part.partNumber}</Badge>}
+                              {part.brand && <Badge variant="secondary" className="text-xs">{part.brand}</Badge>}
+                              {part.category && <Badge variant="secondary" className="text-xs">{part.category}</Badge>}
+                            </div>
+                            <p className="text-sm font-medium">{part.description}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {part.unitCost != null && <span>Cost: ${parseFloat(part.unitCost).toFixed(2)}</span>}
+                              {part.listPrice != null && <span className="font-medium text-foreground">List: ${parseFloat(part.listPrice).toFixed(2)}</span>}
+                              {part.coreCharge > 0 && <span>Core: ${parseFloat(part.coreCharge).toFixed(2)}</span>}
+                            </div>
+                            {part.suppliers && part.suppliers.length > 0 && (
+                              <div className="flex items-center gap-3 flex-wrap mt-1">
+                                {part.suppliers.map((s: any, si: number) => (
+                                  <div key={si} className="flex items-center gap-1 text-xs">
+                                    <span className={`inline-block h-2 w-2 rounded-full ${s.inStock ? "bg-green-500" : "bg-red-500"}`} />
+                                    <span>{s.name}</span>
+                                    {s.quantity != null && <span className="text-muted-foreground">({s.quantity})</span>}
+                                    {s.deliveryTime && <span className="text-muted-foreground">{s.deliveryTime}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => addPartToRO(part)}
+                            disabled={addingPartId === (part.id || part.partNumber)}
+                            data-testid={`button-add-part-${idx}`}
+                          >
+                            {addingPartId === (part.id || part.partNumber) ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                              <Plus className="h-4 w-4 mr-1" />
+                            )}
+                            Add to RO
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={laborDialogOpen} onOpenChange={setLaborDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    MOTOR Labor Guide
+                    <Badge variant="secondary" className="text-xs font-normal">Standard Labor Times</Badge>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {(() => {
+                      const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+                      return vehicle ? (
+                        <Badge variant="outline" data-testid="badge-labor-vehicle">
+                          Vehicle: {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ")}
+                        </Badge>
+                      ) : null;
+                    })()}
+                    <div className="flex items-center gap-1 text-sm">
+                      <span className="text-muted-foreground">Shop Labor Rate: $</span>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        className="w-20"
+                        value={laborRate}
+                        onChange={(e) => setLaborRate(e.target.value)}
+                        data-testid="input-labor-rate"
+                      />
+                      <span className="text-muted-foreground">/hr</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search labor operations (e.g., brake job, timing belt)..."
+                      value={laborSearch}
+                      onChange={(e) => setLaborSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") searchLabor(laborSearch); }}
+                      data-testid="input-labor-search"
+                    />
+                    <Button size="sm" onClick={() => searchLabor(laborSearch)} disabled={laborLoading} data-testid="button-labor-search">
+                      {laborLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                    {laborLoading && (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {!laborLoading && laborResults.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-8">No results found. Try a different search term.</p>
+                    )}
+                    {!laborLoading && laborResults.map((labor, idx) => {
+                      const difficultyColors: Record<string, string> = {
+                        Easy: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+                        Moderate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+                        Advanced: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+                        Expert: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+                      };
+                      const estimatedPrice = (labor.laborHours * parseFloat(laborRate || "0")).toFixed(2);
+                      return (
+                        <div key={labor.id || labor.operationCode || idx} className="p-3 rounded-md border space-y-2" data-testid={`labor-result-${idx}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {labor.operationCode && <Badge variant="outline" className="text-xs">{labor.operationCode}</Badge>}
+                                {labor.category && <Badge variant="secondary" className="text-xs">{labor.category}</Badge>}
+                                {labor.difficulty && (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${difficultyColors[labor.difficulty] || difficultyColors.Moderate}`}>
+                                    {labor.difficulty}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium">{labor.description}</p>
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="font-semibold text-base">{labor.laborHours} hrs</span>
+                                <span className="text-muted-foreground">Estimated: ${estimatedPrice}</span>
+                              </div>
+                              {labor.includes && labor.includes.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  <span className="font-medium">Includes:</span>{" "}
+                                  {labor.includes.join(", ")}
+                                </div>
+                              )}
+                              {labor.notes && (
+                                <p className="text-xs text-muted-foreground italic">{labor.notes}</p>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => addLaborToRO(labor)}
+                              disabled={addingLaborId === (labor.id || labor.operationCode)}
+                              data-testid={`button-add-labor-${idx}`}
+                            >
+                              {addingLaborId === (labor.id || labor.operationCode) ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                              ) : (
+                                <Plus className="h-4 w-4 mr-1" />
+                              )}
+                              Add to RO
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
               <DialogContent>

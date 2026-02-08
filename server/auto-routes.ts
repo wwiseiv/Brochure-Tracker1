@@ -2772,6 +2772,125 @@ router.post("/assistant/tts", autoAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// PARTS LOOKUP (PartsTech Simulation)
+// ============================================================================
+
+const demoParts = [
+  { id: "PT-1001", partNumber: "MOT-3087", description: "Premium Brake Pad Set - Front", brand: "Motorcraft", category: "Brakes", unitCost: 32.50, listPrice: 54.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 12, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 8, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 5, deliveryTime: "30 min" }] },
+  { id: "PT-1002", partNumber: "ACDelco-17D1367CH", description: "Ceramic Brake Pad Set - Rear", brand: "ACDelco", category: "Brakes", unitCost: 28.75, listPrice: 48.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 6, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 14, deliveryTime: "Next Day" }] },
+  { id: "PT-1003", partNumber: "BOA-BP1234", description: "Brake Rotor - Front (Pair)", brand: "Bosch", category: "Brakes", unitCost: 58.00, listPrice: 94.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 4, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: false, qty: 0, deliveryTime: "Next Day" }, { name: "Worldpac", inStock: true, qty: 10, deliveryTime: "30 min" }] },
+  { id: "PT-1004", partNumber: "WIX-57502", description: "Engine Oil Filter", brand: "WIX", category: "Filters", unitCost: 4.25, listPrice: 8.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 50, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 30, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 25, deliveryTime: "In Stock" }] },
+  { id: "PT-1005", partNumber: "FRM-CA11114", description: "Engine Air Filter", brand: "Fram", category: "Filters", unitCost: 8.50, listPrice: 18.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 15, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 10, deliveryTime: "In Stock" }] },
+  { id: "PT-1006", partNumber: "FRM-CF11966", description: "Cabin Air Filter", brand: "Fram", category: "Filters", unitCost: 10.25, listPrice: 22.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 8, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 12, deliveryTime: "In Stock" }] },
+  { id: "PT-1007", partNumber: "MOB-M1-110A", description: "Full Synthetic Motor Oil 5W-30 (5 Qt)", brand: "Mobil 1", category: "Oil & Fluids", unitCost: 22.00, listPrice: 36.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 40, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 25, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 30, deliveryTime: "In Stock" }] },
+  { id: "PT-1008", partNumber: "CAS-03520C", description: "Conventional Motor Oil 5W-20 (5 Qt)", brand: "Castrol", category: "Oil & Fluids", unitCost: 16.50, listPrice: 28.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 35, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 20, deliveryTime: "In Stock" }] },
+  { id: "PT-1009", partNumber: "NGK-7090", description: "Iridium IX Spark Plug", brand: "NGK", category: "Ignition", unitCost: 7.50, listPrice: 13.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 48, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 36, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 100, deliveryTime: "In Stock" }] },
+  { id: "PT-1010", partNumber: "ACDelco-41-110", description: "Professional Platinum Spark Plug", brand: "ACDelco", category: "Ignition", unitCost: 5.75, listPrice: 11.49, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 24, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 18, deliveryTime: "In Stock" }] },
+  { id: "PT-1011", partNumber: "DEN-234-4209", description: "Oxygen Sensor - Upstream", brand: "Denso", category: "Sensors", unitCost: 42.00, listPrice: 74.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 3, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 7, deliveryTime: "30 min" }] },
+  { id: "PT-1012", partNumber: "BOA-15010", description: "Mass Air Flow Sensor", brand: "Bosch", category: "Sensors", unitCost: 85.00, listPrice: 139.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: false, qty: 0, deliveryTime: "Next Day" }, { name: "Worldpac", inStock: true, qty: 4, deliveryTime: "30 min" }] },
+  { id: "PT-1013", partNumber: "GAT-K060923", description: "Serpentine Belt", brand: "Gates", category: "Belts & Hoses", unitCost: 18.00, listPrice: 32.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 6, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 4, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 3, deliveryTime: "30 min" }] },
+  { id: "PT-1014", partNumber: "GAT-T43215", description: "Timing Belt Kit with Water Pump", brand: "Gates", category: "Belts & Hoses", unitCost: 125.00, listPrice: 219.99, coreCharge: 0, suppliers: [{ name: "Worldpac", inStock: true, qty: 2, deliveryTime: "30 min" }, { name: "NAPA", inStock: false, qty: 0, deliveryTime: "Next Day" }] },
+  { id: "PT-1015", partNumber: "GAT-22319", description: "Upper Radiator Hose", brand: "Gates", category: "Belts & Hoses", unitCost: 14.50, listPrice: 26.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 5, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 3, deliveryTime: "In Stock" }] },
+  { id: "PT-1016", partNumber: "DUR-DL-96R", description: "Automotive Battery - Group 96R", brand: "Duralast", category: "Electrical", unitCost: 95.00, listPrice: 164.99, coreCharge: 22.00, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 8, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 5, deliveryTime: "In Stock" }] },
+  { id: "PT-1017", partNumber: "DEN-210-0580", description: "Remanufactured Alternator", brand: "Denso", category: "Electrical", unitCost: 145.00, listPrice: 249.99, coreCharge: 45.00, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 2, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 3, deliveryTime: "30 min" }] },
+  { id: "PT-1018", partNumber: "DOR-926-313", description: "Remanufactured Starter Motor", brand: "Dorman", category: "Electrical", unitCost: 110.00, listPrice: 189.99, coreCharge: 35.00, suppliers: [{ name: "NAPA", inStock: true, qty: 2, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: false, qty: 0, deliveryTime: "Next Day" }, { name: "Worldpac", inStock: true, qty: 4, deliveryTime: "30 min" }] },
+  { id: "PT-1019", partNumber: "MOG-MK80442", description: "Front Wheel Hub Assembly", brand: "Moog", category: "Suspension", unitCost: 72.00, listPrice: 124.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 4, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 2, deliveryTime: "30 min" }] },
+  { id: "PT-1020", partNumber: "MON-71214", description: "Strut Assembly - Front Left", brand: "Monroe", category: "Suspension", unitCost: 88.00, listPrice: 149.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 2, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 5, deliveryTime: "30 min" }] },
+  { id: "PT-1021", partNumber: "BOA-26-CA5528", description: "Wiper Blade Set - All Season (Pair)", brand: "Bosch", category: "Wipers", unitCost: 16.00, listPrice: 29.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 20, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 15, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 12, deliveryTime: "In Stock" }] },
+  { id: "PT-1022", partNumber: "SYL-9006", description: "Halogen Headlight Bulb - Low Beam", brand: "Sylvania", category: "Lighting", unitCost: 9.50, listPrice: 18.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 25, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 15, deliveryTime: "In Stock" }] },
+  { id: "PT-1023", partNumber: "SYL-H11", description: "LED Headlight Bulb Upgrade", brand: "Sylvania", category: "Lighting", unitCost: 28.00, listPrice: 49.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 10, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 8, deliveryTime: "30 min" }] },
+  { id: "PT-1024", partNumber: "DOR-902-062", description: "Thermostat Housing Assembly", brand: "Dorman", category: "Cooling", unitCost: 35.00, listPrice: 62.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 3, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 6, deliveryTime: "30 min" }] },
+  { id: "PT-1025", partNumber: "DOR-620-232", description: "Radiator Fan Assembly", brand: "Dorman", category: "Cooling", unitCost: 115.00, listPrice: 199.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: false, qty: 0, deliveryTime: "Next Day" }, { name: "Worldpac", inStock: true, qty: 2, deliveryTime: "30 min" }] },
+  { id: "PT-1026", partNumber: "ACDelco-252-846", description: "Water Pump", brand: "ACDelco", category: "Cooling", unitCost: 48.00, listPrice: 84.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 3, deliveryTime: "In Stock" }, { name: "AutoZone Commercial", inStock: true, qty: 2, deliveryTime: "In Stock" }] },
+  { id: "PT-1027", partNumber: "BOA-69620", description: "Ignition Coil Pack", brand: "Bosch", category: "Ignition", unitCost: 32.00, listPrice: 56.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 6, deliveryTime: "In Stock" }, { name: "NAPA", inStock: true, qty: 4, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 12, deliveryTime: "In Stock" }] },
+  { id: "PT-1028", partNumber: "DOR-911-149", description: "EVAP Purge Valve Solenoid", brand: "Dorman", category: "Engine", unitCost: 22.00, listPrice: 39.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 4, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 6, deliveryTime: "30 min" }] },
+  { id: "PT-1029", partNumber: "FEL-26325PT", description: "Valve Cover Gasket Set", brand: "Fel-Pro", category: "Engine", unitCost: 18.50, listPrice: 34.99, coreCharge: 0, suppliers: [{ name: "NAPA", inStock: true, qty: 5, deliveryTime: "In Stock" }, { name: "O'Reilly", inStock: true, qty: 3, deliveryTime: "In Stock" }] },
+  { id: "PT-1030", partNumber: "ATO-FU84", description: "Electric Fuel Pump Assembly", brand: "Airtex", category: "Fuel System", unitCost: 135.00, listPrice: 229.99, coreCharge: 0, suppliers: [{ name: "AutoZone Commercial", inStock: true, qty: 2, deliveryTime: "In Stock" }, { name: "Worldpac", inStock: true, qty: 3, deliveryTime: "30 min" }, { name: "NAPA", inStock: false, qty: 0, deliveryTime: "Next Day" }] },
+];
+
+router.get("/parts/search", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || "").trim().toLowerCase();
+
+    let results = demoParts;
+    if (q) {
+      results = demoParts.filter(p =>
+        p.description.toLowerCase().includes(q) ||
+        p.partNumber.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      );
+    } else {
+      results = demoParts.slice(0, 10);
+    }
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("Parts search error:", err);
+    res.status(500).json({ error: "Parts search failed" });
+  }
+});
+
+// ============================================================================
+// LABOR GUIDE (MOTOR Simulation)
+// ============================================================================
+
+const demoLaborOps = [
+  { id: "LB-1001", operationCode: "B1010", category: "Brakes", description: "Front Brake Pads - Remove & Replace", laborHours: 1.2, difficulty: "Easy", notes: "Includes cleaning and lubricating slide pins", includes: ["Remove wheels", "Remove calipers", "Replace pads", "Lubricate slide pins", "Reassemble"] },
+  { id: "LB-1002", operationCode: "B1020", category: "Brakes", description: "Rear Brake Pads - Remove & Replace", laborHours: 1.4, difficulty: "Easy", notes: "Electronic parking brake models may require scan tool", includes: ["Remove wheels", "Remove calipers", "Replace pads", "Reassemble", "Reset parking brake if applicable"] },
+  { id: "LB-1003", operationCode: "B1030", category: "Brakes", description: "Front Brake Rotors - Remove & Replace (Pair)", laborHours: 1.8, difficulty: "Moderate", notes: "Add 0.3 hrs if replacing pads at the same time", includes: ["Remove wheels", "Remove calipers and brackets", "Replace rotors", "Reassemble", "Torque to spec"] },
+  { id: "LB-1004", operationCode: "B1040", category: "Brakes", description: "Brake Fluid Flush - Complete System", laborHours: 0.8, difficulty: "Easy", notes: null, includes: ["Pressure bleed all four corners", "Replace fluid", "Check pedal feel"] },
+  { id: "LB-1005", operationCode: "E2010", category: "Engine", description: "Spark Plugs - Remove & Replace (4-Cylinder)", laborHours: 0.8, difficulty: "Easy", notes: "Add 0.5 hrs for V6, add 1.0 hrs for V8", includes: ["Remove ignition coils", "Remove and inspect spark plugs", "Gap and install new plugs", "Reinstall coils"] },
+  { id: "LB-1006", operationCode: "E2020", category: "Engine", description: "Spark Plugs - Remove & Replace (V6)", laborHours: 1.3, difficulty: "Moderate", notes: "Some models require intake manifold removal for rear bank access", includes: ["Remove engine covers", "Remove ignition coils", "Replace all 6 plugs", "Reassemble"] },
+  { id: "LB-1007", operationCode: "E2030", category: "Engine", description: "Valve Cover Gasket - Replace (Inline 4)", laborHours: 1.5, difficulty: "Moderate", notes: "Clean mating surfaces thoroughly", includes: ["Remove valve cover", "Clean surfaces", "Install new gasket", "Torque to spec", "Check for leaks"] },
+  { id: "LB-1008", operationCode: "E2040", category: "Engine", description: "Timing Belt & Water Pump - Replace", laborHours: 4.5, difficulty: "Advanced", notes: "Includes tensioner and idler pulleys. Verify timing marks before and after.", includes: ["Remove accessories and covers", "Set engine to TDC", "Remove old belt, tensioner, idler", "Replace water pump", "Install new components", "Verify timing", "Reassemble"] },
+  { id: "LB-1009", operationCode: "E2050", category: "Engine", description: "Engine Oil & Filter Change", laborHours: 0.4, difficulty: "Easy", notes: null, includes: ["Drain oil", "Replace filter", "Refill with correct oil", "Check for leaks", "Reset oil life monitor"] },
+  { id: "LB-1010", operationCode: "EL3010", category: "Electrical", description: "Battery - Remove & Replace", laborHours: 0.4, difficulty: "Easy", notes: "May require radio code re-entry and power window relearn", includes: ["Disconnect cables", "Remove hold-down", "Install new battery", "Apply terminal protectant"] },
+  { id: "LB-1011", operationCode: "EL3020", category: "Electrical", description: "Alternator - Remove & Replace", laborHours: 1.8, difficulty: "Moderate", notes: "Some models require removal from below", includes: ["Remove serpentine belt", "Disconnect electrical", "Remove mounting bolts", "Install new alternator", "Reinstall belt", "Verify charging output"] },
+  { id: "LB-1012", operationCode: "EL3030", category: "Electrical", description: "Starter Motor - Remove & Replace", laborHours: 1.5, difficulty: "Moderate", notes: "Access may vary significantly by model", includes: ["Disconnect battery", "Remove starter bolts", "Disconnect wiring", "Install new starter", "Reconnect and test"] },
+  { id: "LB-1013", operationCode: "S4010", category: "Suspension", description: "Front Strut Assembly - Replace (Each)", laborHours: 1.5, difficulty: "Moderate", notes: "Alignment recommended after replacement", includes: ["Remove wheel", "Disconnect sway bar link", "Remove strut bolts", "Install new strut assembly", "Torque all fasteners"] },
+  { id: "LB-1014", operationCode: "S4020", category: "Suspension", description: "Front Wheel Hub/Bearing - Replace (Each)", laborHours: 1.8, difficulty: "Moderate", notes: "Requires torque wrench for axle nut", includes: ["Remove wheel and brake components", "Remove axle nut", "Remove hub assembly", "Install new hub", "Reassemble brakes", "Torque axle nut to spec"] },
+  { id: "LB-1015", operationCode: "S4030", category: "Suspension", description: "Ball Joint - Lower - Replace (Each)", laborHours: 2.0, difficulty: "Advanced", notes: "Press-in type requires special tools. Alignment required after.", includes: ["Remove wheel", "Separate ball joint from knuckle", "Press out old joint", "Press in new joint", "Reassemble", "Alignment check"] },
+  { id: "LB-1016", operationCode: "C5010", category: "Cooling", description: "Radiator - Remove & Replace", laborHours: 2.2, difficulty: "Moderate", notes: "Includes coolant drain and refill", includes: ["Drain cooling system", "Remove hoses and fan shroud", "Disconnect transmission cooler lines if applicable", "Remove radiator", "Install new radiator", "Refill and bleed cooling system"] },
+  { id: "LB-1017", operationCode: "C5020", category: "Cooling", description: "Thermostat - Remove & Replace", laborHours: 1.0, difficulty: "Easy", notes: "Refill and bleed cooling system after replacement", includes: ["Drain coolant partially", "Remove thermostat housing", "Replace thermostat and gasket", "Reassemble", "Refill coolant and bleed air"] },
+  { id: "LB-1018", operationCode: "C5030", category: "Cooling", description: "Water Pump - Remove & Replace", laborHours: 2.5, difficulty: "Advanced", notes: "Belt-driven: includes serpentine belt removal. Check for timing cover access.", includes: ["Drain cooling system", "Remove belt and accessories", "Remove water pump", "Clean mating surface", "Install new pump with gasket", "Reassemble and refill"] },
+  { id: "LB-1019", operationCode: "T6010", category: "Transmission", description: "Transmission Fluid & Filter Service (Automatic)", laborHours: 1.2, difficulty: "Moderate", notes: "Pan drop service. Does not include full flush.", includes: ["Remove transmission pan", "Replace filter", "Clean pan and magnet", "Install new gasket", "Refill with correct ATF"] },
+  { id: "LB-1020", operationCode: "T6020", category: "Transmission", description: "Clutch Assembly - Remove & Replace (Manual Trans)", laborHours: 5.5, difficulty: "Expert", notes: "Includes pressure plate, disc, and throw-out bearing", includes: ["Remove transmission", "Remove pressure plate and disc", "Inspect flywheel", "Install new clutch components", "Reinstall transmission", "Adjust clutch if applicable", "Road test"] },
+  { id: "LB-1021", operationCode: "X7010", category: "Exhaust", description: "Catalytic Converter - Remove & Replace", laborHours: 1.5, difficulty: "Moderate", notes: "May require welding on some applications", includes: ["Raise vehicle", "Disconnect O2 sensors", "Remove converter bolts or clamps", "Install new converter", "Reconnect sensors", "Check for leaks"] },
+  { id: "LB-1022", operationCode: "X7020", category: "Exhaust", description: "Muffler - Remove & Replace", laborHours: 1.0, difficulty: "Easy", notes: "Bolt-on type. Add 0.5 hrs if welded.", includes: ["Raise vehicle", "Remove hangers and clamps", "Remove old muffler", "Install new muffler", "Secure hangers", "Check for leaks"] },
+  { id: "LB-1023", operationCode: "ST8010", category: "Steering", description: "Tie Rod End - Outer - Replace (Each)", laborHours: 0.8, difficulty: "Easy", notes: "Alignment required after replacement", includes: ["Remove cotter pin and nut", "Separate tie rod from knuckle", "Unthread from inner tie rod", "Install new tie rod end", "Set approximate toe"] },
+  { id: "LB-1024", operationCode: "ST8020", category: "Steering", description: "Power Steering Pump - Replace", laborHours: 2.0, difficulty: "Moderate", notes: "Includes fluid flush and bleed", includes: ["Remove belt", "Disconnect lines", "Remove pump mounting bolts", "Install new pump", "Reconnect lines", "Fill and bleed system"] },
+  { id: "LB-1025", operationCode: "H9010", category: "HVAC", description: "A/C Compressor - Remove & Replace", laborHours: 2.8, difficulty: "Advanced", notes: "Requires R-134a recovery and recharge. EPA certified tech required.", includes: ["Recover refrigerant", "Remove belt", "Disconnect lines", "Remove compressor", "Transfer clutch if needed", "Install new compressor", "Add oil", "Evacuate and recharge"] },
+  { id: "LB-1026", operationCode: "H9020", category: "HVAC", description: "Cabin Air Filter - Replace", laborHours: 0.2, difficulty: "Easy", notes: "Location varies by model - check behind glove box or under cowl", includes: ["Access filter housing", "Remove old filter", "Install new filter"] },
+  { id: "LB-1027", operationCode: "H9030", category: "HVAC", description: "Heater Core - Remove & Replace", laborHours: 6.0, difficulty: "Expert", notes: "Requires dashboard removal on most vehicles", includes: ["Drain coolant", "Remove dashboard assembly", "Disconnect heater hoses", "Remove heater core", "Install new core", "Reassemble dashboard", "Refill and bleed cooling system"] },
+  { id: "LB-1028", operationCode: "D0010", category: "Drivetrain", description: "CV Axle/Half Shaft - Replace (Each)", laborHours: 1.5, difficulty: "Moderate", notes: "Check for transmission seal leak after removal", includes: ["Remove wheel and brake components", "Remove axle nut", "Separate lower ball joint", "Remove axle from transmission", "Install new axle", "Reassemble", "Torque axle nut"] },
+  { id: "LB-1029", operationCode: "D0020", category: "Drivetrain", description: "Differential Fluid Service (Rear)", laborHours: 0.6, difficulty: "Easy", notes: "Use manufacturer-specified fluid", includes: ["Remove drain plug", "Drain old fluid", "Replace gasket or RTV", "Refill with correct fluid", "Check for leaks"] },
+  { id: "LB-1030", operationCode: "EL3040", category: "Electrical", description: "Oxygen Sensor - Remove & Replace", laborHours: 0.7, difficulty: "Easy", notes: "Upstream or downstream. Use anti-seize on threads.", includes: ["Locate sensor", "Disconnect electrical connector", "Remove sensor", "Install new sensor with anti-seize", "Clear codes and verify"] },
+];
+
+router.get("/labor/search", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || "").trim().toLowerCase();
+
+    let results = demoLaborOps;
+    if (q) {
+      results = demoLaborOps.filter(op =>
+        op.description.toLowerCase().includes(q) ||
+        op.category.toLowerCase().includes(q) ||
+        op.operationCode.toLowerCase().includes(q)
+      );
+    } else {
+      results = demoLaborOps.slice(0, 10);
+    }
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("Labor search error:", err);
+    res.status(500).json({ error: "Labor search failed" });
+  }
+});
+
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);
 
