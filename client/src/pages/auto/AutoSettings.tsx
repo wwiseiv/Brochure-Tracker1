@@ -1,0 +1,173 @@
+import { useEffect, useState, useCallback } from "react";
+import { useAutoAuth } from "@/hooks/use-auto-auth";
+import { AutoLayout } from "./AutoLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Settings, Save, Loader2, Plus, Trash2 } from "lucide-react";
+
+interface Bay { id: number; name: string; isActive: boolean; }
+
+const TIMEZONES = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Phoenix", "America/Anchorage", "Pacific/Honolulu",
+];
+
+export default function AutoSettings() {
+  const { autoFetch, shop, user } = useAutoAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [bays, setBays] = useState<Bay[]>([]);
+  const [newBayName, setNewBayName] = useState("");
+  const [form, setForm] = useState({
+    name: "", address: "", city: "", state: "", zip: "",
+    phone: "", email: "", timezone: "America/New_York",
+    taxRate: "0", laborRate: "0", cardFeePercent: "3.5",
+  });
+
+  const isOwner = user?.role === "owner";
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const [settingsRes, baysRes] = await Promise.all([
+        autoFetch("/api/auto/shop/settings"),
+        autoFetch("/api/auto/bays"),
+      ]);
+      const s = await settingsRes.json();
+      setBays(await baysRes.json());
+      setForm({
+        name: s.name || "", address: s.address || "", city: s.city || "",
+        state: s.state || "", zip: s.zip || "", phone: s.phone || "",
+        email: s.email || "", timezone: s.timezone || "America/New_York",
+        taxRate: s.taxRate || "0", laborRate: s.laborRate || "0",
+        cardFeePercent: s.cardFeePercent || "3.5",
+      });
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [autoFetch]);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await autoFetch("/api/auto/shop/settings", { method: "PATCH", body: JSON.stringify(form) });
+      if (!res.ok) throw new Error("Failed to save");
+      toast({ title: "Settings Saved" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  const addBay = async () => {
+    if (!newBayName.trim()) return;
+    try {
+      const res = await autoFetch("/api/auto/bays", {
+        method: "POST", body: JSON.stringify({ name: newBayName.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to add bay");
+      const bay = await res.json();
+      setBays([...bays, bay]);
+      setNewBayName("");
+      toast({ title: "Bay Added" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const deleteBay = async (id: number) => {
+    try {
+      await autoFetch(`/api/auto/bays/${id}`, { method: "DELETE" });
+      setBays(bays.filter(b => b.id !== id));
+      toast({ title: "Bay Removed" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <AutoLayout><div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div></AutoLayout>;
+
+  return (
+    <AutoLayout>
+      <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
+        <h1 className="text-xl font-bold flex items-center gap-2" data-testid="text-settings-title">
+          <Settings className="h-5 w-5" /> Shop Settings
+        </h1>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Shop Information</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Shop Name</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!isOwner} data-testid="input-shop-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} disabled={!isOwner} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2"><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} disabled={!isOwner} /></div>
+              <div className="space-y-2"><Label>State</Label><Input maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} disabled={!isOwner} /></div>
+              <div className="space-y-2"><Label>ZIP</Label><Input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} disabled={!isOwner} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!isOwner} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!isOwner} /></div>
+            </div>
+            <div className="space-y-2">
+              <Label>Timezone</Label>
+              <Select value={form.timezone} onValueChange={(v) => setForm({ ...form, timezone: v })} disabled={!isOwner}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Pricing & Rates</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2"><Label>Labor Rate ($/hr)</Label><Input type="number" step="0.01" value={form.laborRate} onChange={(e) => setForm({ ...form, laborRate: e.target.value })} disabled={!isOwner} data-testid="input-labor-rate" /></div>
+              <div className="space-y-2"><Label>Tax Rate (%)</Label><Input type="number" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} disabled={!isOwner} data-testid="input-tax-rate" /></div>
+              <div className="space-y-2"><Label>Card Fee (%)</Label><Input type="number" step="0.01" value={form.cardFeePercent} onChange={(e) => setForm({ ...form, cardFeePercent: e.target.value })} disabled={!isOwner} data-testid="input-card-fee" /></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {isOwner && (
+          <Button className="w-full gap-2" onClick={handleSave} disabled={saving} data-testid="button-save-settings">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save Settings
+          </Button>
+        )}
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Service Bays</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {bays.map(bay => (
+              <div key={bay.id} className="flex items-center justify-between gap-3 p-2 rounded-md border" data-testid={`bay-${bay.id}`}>
+                <span className="text-sm font-medium">{bay.name}</span>
+                {isOwner && (
+                  <Button variant="ghost" size="icon" onClick={() => deleteBay(bay.id)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {isOwner && (
+              <div className="flex items-center gap-2">
+                <Input placeholder="New bay name" value={newBayName} onChange={(e) => setNewBayName(e.target.value)} data-testid="input-new-bay" />
+                <Button variant="outline" onClick={addBay} data-testid="button-add-bay"><Plus className="h-4 w-4" /></Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AutoLayout>
+  );
+}

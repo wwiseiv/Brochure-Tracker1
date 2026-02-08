@@ -5,6 +5,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import AutoApp from "@/pages/auto/AutoApp";
 import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import ScanPage from "@/pages/scan";
@@ -274,6 +275,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Switch>
+          <Route path="/auto/*?" component={AutoApp} />
           <Route path="/accept-invite" component={AcceptInvitePage} />
           <Route path="/help" component={HelpPageWrapper} />
           <Route component={AppContent} />
