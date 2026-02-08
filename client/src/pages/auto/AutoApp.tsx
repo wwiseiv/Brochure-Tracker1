@@ -16,6 +16,7 @@ import AutoPublicApproval from "./AutoPublicApproval";
 import AutoPublicInspection from "./AutoPublicInspection";
 import AutoReports from "./AutoReports";
 import AutoInvoice from "./AutoInvoice";
+import AutoQuickBooks from "./AutoQuickBooks";
 import { Loader2 } from "lucide-react";
 
 function AutoAuthGuard({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,7 @@ function AuthenticatedAutoRoutes() {
         <Route path="/auto/schedule" component={AutoSchedule} />
         <Route path="/auto/reports" component={AutoReports} />
         <Route path="/auto/settings" component={AutoSettings} />
+        <Route path="/auto/quickbooks" component={AutoQuickBooks} />
         <Route path="/auto/staff" component={AutoStaff} />
         <Route>
           <Redirect to="/auto/dashboard" />

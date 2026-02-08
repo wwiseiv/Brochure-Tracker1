@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Car, FileText, ClipboardCheck,
   Calendar, Settings, LogOut, Menu, X, Wrench, ChevronDown,
   UserPlus, CreditCard, BarChart3, MoreHorizontal, HelpCircle,
-  DollarSign, Printer, Mail, Phone, Shield, Receipt,
+  DollarSign, Printer, Mail, Phone, Shield, Receipt, Landmark,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { path: "/auto/inspections", label: "Inspections", shortLabel: "Insp", icon: ClipboardCheck },
   { path: "/auto/schedule", label: "Schedule", shortLabel: "Sched", icon: Calendar },
   { path: "/auto/reports", label: "Reports", shortLabel: "Reports", icon: BarChart3 },
+  { path: "/auto/quickbooks", label: "QuickBooks", shortLabel: "QB", icon: Landmark },
   { path: "/auto/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 

@@ -4,6 +4,7 @@ import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Loader2,
@@ -14,9 +15,7 @@ import {
   CalendarDays,
   Users,
   CreditCard,
-  FileText,
   BarChart3,
-  CheckCircle,
   MessageSquare,
   UserCog,
   Mail,
@@ -24,6 +23,11 @@ import {
   MapPin,
   ChevronRight,
   ArrowRight,
+  Sparkles,
+  Search,
+  DollarSign,
+  BookOpen,
+  Cog,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import pcbAutoLogo from "@assets/IMG_3010-small_for_logon_1770571814665.png";
@@ -32,83 +36,177 @@ import featureDvi from "@/assets/images/feature-dvi.png";
 import featureScheduling from "@/assets/images/feature-scheduling.png";
 import featureCustomers from "@/assets/images/feature-customers.png";
 import featurePayments from "@/assets/images/feature-payments.png";
-import featurePdf from "@/assets/images/feature-pdf.png";
 import featureReports from "@/assets/images/feature-reports.png";
-import featureApprovals from "@/assets/images/feature-approvals.png";
 import featureStaff from "@/assets/images/feature-staff.png";
 import featureCommunication from "@/assets/images/feature-communication.png";
+import featureDualPricing from "@/assets/images/feature-dual-pricing.png";
+import featureQuickbooks from "@/assets/images/feature-quickbooks.png";
+import featurePartstech from "@/assets/images/feature-partstech.png";
+import featureAiAssistant from "@/assets/images/feature-ai-assistant.png";
+import deepDualPricing from "@/assets/images/deep-dual-pricing.png";
+import deepDvi from "@/assets/images/deep-dvi.png";
+import deepPartstech from "@/assets/images/deep-partstech.png";
+import deepQuickbooks from "@/assets/images/deep-quickbooks.png";
+import deepAiAssistant from "@/assets/images/deep-ai-assistant.png";
 
 const features = [
   {
-    title: "Repair Order Management",
+    title: "Repair Orders & Estimates",
     icon: Wrench,
     image: featureRepairOrders,
     description:
-      "Create, track, and manage repair orders from estimate to paid with dual cash/card pricing, canned services, shop supply auto-calculation, and complete lifecycle management.",
+      "Build detailed estimates in minutes. Track every job from estimate to paid with a visual Kanban board.",
   },
   {
-    title: "Digital Vehicle Inspection",
+    title: "Dual Pricing \u2014 Cash & Card",
+    icon: DollarSign,
+    image: featureDualPricing,
+    description:
+      "Show your customers a cash price and a card price on every estimate, invoice, and receipt. Legal in all 50 states. Keep more margin.",
+  },
+  {
+    title: "72-Point Digital Inspections",
     icon: ClipboardCheck,
     image: featureDvi,
     description:
-      "Conduct thorough multi-point inspections with condition ratings, photo documentation, shareable customer reports, and downloadable PDF results.",
+      "Technicians complete inspections on a tablet with one-tap green/yellow/red scoring and camera photos. Customers get a visual report texted to their phone.",
   },
   {
-    title: "Appointment Scheduling",
+    title: "Parts Ordering \u2014 PartsTech Built In",
+    icon: Cog,
+    image: featurePartstech,
+    description:
+      "Search 30,000+ supplier locations. See live inventory and pricing from O\u2019Reilly, NAPA, AutoZone, and more. Parts drop onto the RO with your markup applied.",
+  },
+  {
+    title: "Scheduling & Bay Management",
     icon: CalendarDays,
     image: featureScheduling,
     description:
-      "Manage your shop calendar with bay-based scheduling, technician assignment, mini calendar sidebar, and list or grid views across desktop and mobile.",
+      "Visual calendar with bay rows. Drag and drop appointments. Automatic text reminders sent to customers 24 hours before.",
   },
   {
-    title: "Customer & Vehicle Database",
-    icon: Users,
-    image: featureCustomers,
-    description:
-      "Maintain detailed customer profiles with VIN decoding, complete vehicle histories, one-tap call/text/email, and communication tracking.",
-  },
-  {
-    title: "One-Tap Communication",
-    icon: MessageSquare,
-    image: featureCommunication,
-    description:
-      "Call, text, or email customers with one tap from anywhere. Pre-filled message templates for estimates, invoices, reminders, and follow-ups.",
-  },
-  {
-    title: "Payment Processing",
+    title: "Payments \u2014 In-Store or Text-to-Pay",
     icon: CreditCard,
     image: featurePayments,
     description:
-      "Handle split payments, track balances, and manage invoices with separate cash and card pricing, discounts, and balance-due tracking.",
+      "Take payment at the counter, push to a terminal, or text a payment link. Customers choose cash or card. Receipts emailed with PDF attached.",
   },
   {
-    title: "Professional PDF Documents",
-    icon: FileText,
-    image: featurePdf,
+    title: "Customer & Vehicle Management",
+    icon: Users,
+    image: featureCustomers,
     description:
-      "Generate branded estimates, work orders, invoices, and DVI reports as professional PDFs with your shop logo and detailed line items.",
+      "Full customer profiles with every vehicle, every visit, every service \u2014 searchable instantly. VIN decode auto-fills year, make, model, and engine.",
   },
   {
-    title: "Customer Approval Workflow",
-    icon: CheckCircle,
-    image: featureApprovals,
+    title: "QuickBooks Auto-Sync",
+    icon: BookOpen,
+    image: featureQuickbooks,
     description:
-      "Send digital estimates for remote customer approval. Customers approve or decline individual service lines right from their phone.",
+      "Every invoice and payment syncs to QuickBooks automatically. Dual pricing splits into its own income account. No CSV imports. Set it and forget it.",
   },
   {
-    title: "Reports & Analytics",
+    title: "AI-Powered Assistant \u2014 Voice Enabled",
+    icon: Sparkles,
+    image: featureAiAssistant,
+    description:
+      "An intelligent assistant on every screen that knows your shop, your RO, and your settings. Ask a question by typing or talking. It walks you through any process step by step.",
+  },
+  {
+    title: "Text, Email & Call \u2014 All Built In",
+    icon: MessageSquare,
+    image: featureCommunication,
+    description:
+      "Text estimates, email invoices, call customers \u2014 without leaving the app. Every touchpoint logged automatically on the customer timeline.",
+  },
+  {
+    title: "Reports & Excel Export",
     icon: BarChart3,
     image: featureReports,
     description:
-      "Track job profitability, sales tax, technician productivity, and approval conversion rates with comprehensive reporting dashboards.",
+      "Revenue, car count, approval rates, dual pricing earnings, technician productivity. Download any report as a professionally formatted Excel spreadsheet.",
   },
   {
     title: "Staff Management",
     icon: UserCog,
     image: featureStaff,
     description:
-      "Manage technicians, service advisors, and shop staff with role assignments, pay rates, PIN codes, and availability tracking.",
+      "Add managers, service advisors, and technicians with role-based access. Assign bays, set pay rates, and manage PINs. Everyone sees only what they need.",
   },
+];
+
+const deepDives = [
+  {
+    image: deepDualPricing,
+    headline: "Dual Pricing That Keeps You Compliant and Profitable",
+    body: "Every estimate, invoice, and receipt shows two prices \u2014 a cash price and a card price. Your customer chooses how to pay. No surprises, no fine print. Legal in all 50 states. The difference goes straight to covering your processing costs, so you keep the same margin either way.",
+    badges: [
+      "Legal in all 50 states",
+      "Cash price and card price on every document",
+      "Configurable dual pricing rate",
+      "Customers simply see two prices",
+    ],
+    reversed: false,
+  },
+  {
+    image: deepDvi,
+    headline: "Inspections That Sell Work \u2014 Without the Hard Sell",
+    body: "Your tech does a 72-point inspection on a tablet, right in the bay. One tap for green, yellow, or red. Photos from the camera go right on the report. When it\u2019s done, the customer gets a clean visual report on their phone \u2014 they see exactly what needs attention, with pictures. Items they approve convert to service lines on the RO with one click.",
+    badges: [
+      "72-point checklist across 9 categories",
+      "Photo capture built in",
+      "Green / Yellow / Red one-tap scoring",
+      "Customer report sent via text",
+      "Approved items auto-create RO lines",
+    ],
+    reversed: true,
+  },
+  {
+    image: deepPartstech,
+    headline: "Every Part, Every Supplier, One Search",
+    body: "Search PartsTech\u2019s network of 30,000+ supplier locations without leaving the repair order. See live inventory, wholesale pricing, ratings, and delivery times from O\u2019Reilly, NAPA, AutoZone, Advance, WorldPac, and more. Add parts to your cart, and they land on the RO with your markup already calculated. No double-entry. No mistakes.",
+    badges: [
+      "30,000+ supplier locations",
+      "Live inventory and pricing",
+      "Markup auto-applied",
+      "Order tracking: quoted to installed",
+    ],
+    reversed: false,
+  },
+  {
+    image: deepQuickbooks,
+    headline: "Your Books Stay Current \u2014 Automatically",
+    body: "Connect QuickBooks in 30 seconds. From that point on, every invoice and every payment syncs automatically. Labor goes to your labor income account. Parts to parts revenue. Dual pricing to its own trackable income account. Tax to your liability account. No more end-of-month data entry. No CSV imports. Your accountant will thank you.",
+    badges: [
+      "One-click QuickBooks Online connection",
+      "Real-time invoice and payment sync",
+      "Dual pricing tracked separately",
+      "Chart of accounts fully configurable",
+    ],
+    reversed: true,
+  },
+  {
+    image: deepAiAssistant,
+    headline: "An Expert in Your Pocket \u2014 On Every Screen",
+    body: "PCB Auto includes an AI assistant that lives on every page of the application. It knows which screen you\u2019re on, which repair order you\u2019re looking at, and how your shop is configured. Ask it anything \u2014 by typing or by voice. It walks you through the process step by step. New employee? They\u2019re productive on day one.",
+    badges: [
+      "Context-aware \u2014 knows your current page and RO",
+      "Voice input \u2014 tap the mic and talk",
+      "Read aloud \u2014 tap the speaker to hear the answer",
+      "Guides new staff through any workflow",
+    ],
+    reversed: false,
+  },
+];
+
+const integrations = [
+  { icon: Cog, name: "PartsTech", category: "Parts Ordering" },
+  { icon: BookOpen, name: "QuickBooks", category: "Accounting" },
+  { icon: CreditCard, name: "FluidPay", category: "Payment Gateway" },
+  { icon: Mail, name: "Resend", category: "Email Delivery" },
+  { icon: Search, name: "NHTSA", category: "VIN Decode" },
+  { icon: Sparkles, name: "Claude AI", category: "AI Assistant" },
 ];
 
 function scrollTo(id: string) {
@@ -208,6 +306,7 @@ export default function AutoLogin() {
       </section>
 
       <section
+        id="demo-video"
         className="relative bg-gradient-to-b from-slate-900 to-slate-800 py-16 md:py-20 px-4 md:px-6"
         data-testid="section-demo-video"
       >
@@ -261,7 +360,7 @@ export default function AutoLogin() {
               Powerful tools designed specifically for auto repair professionals
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
@@ -291,6 +390,138 @@ export default function AutoLogin() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      <section id="deep-dives">
+        {deepDives.map((dive, index) => (
+          <div
+            key={index}
+            className={`${index % 2 === 0 ? "bg-background" : "bg-muted/30"} py-16 md:py-20 px-6`}
+            data-testid={`deep-dive-${index}`}
+          >
+            <div
+              className={`max-w-6xl mx-auto flex flex-col gap-8 md:gap-12 ${
+                dive.reversed ? "md:flex-row-reverse" : "md:flex-row"
+              } items-center`}
+            >
+              <div className="md:w-1/2 w-full">
+                <div className="rounded-md overflow-hidden shadow-lg">
+                  <img
+                    src={dive.image}
+                    alt={dive.headline}
+                    className="w-full h-full object-cover"
+                    data-testid={`img-deep-dive-${index}`}
+                  />
+                </div>
+              </div>
+              <div className="md:w-1/2 w-full space-y-5">
+                <h3
+                  className="text-2xl md:text-3xl font-bold"
+                  data-testid={`text-deep-dive-headline-${index}`}
+                >
+                  {dive.headline}
+                </h3>
+                <p
+                  className="text-muted-foreground leading-relaxed"
+                  data-testid={`text-deep-dive-body-${index}`}
+                >
+                  {dive.body}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {dive.badges.map((badge) => (
+                    <Badge
+                      key={badge}
+                      variant="secondary"
+                      data-testid={`badge-deep-dive-${index}`}
+                    >
+                      {badge}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section
+        id="integrations"
+        className="py-16 md:py-20 px-6 bg-muted/40"
+        data-testid="section-integrations"
+      >
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-muted-foreground text-sm uppercase tracking-wider mb-2">
+              Integrations
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold">
+              Connected to the Tools You Already Use
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {integrations.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Card
+                  key={item.name}
+                  className="text-center"
+                  data-testid={`card-integration-${index}`}
+                >
+                  <CardContent className="p-5 flex flex-col items-center gap-2">
+                    <Icon className="h-7 w-7 text-primary" />
+                    <span className="font-semibold text-sm">{item.name}</span>
+                    <span className="text-muted-foreground text-xs">{item.category}</span>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="cta"
+        className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-20 md:py-24 px-6"
+        data-testid="section-cta"
+      >
+        <div className="max-w-3xl mx-auto text-center">
+          <h2
+            className="text-3xl md:text-4xl font-bold text-white mb-5"
+            data-testid="text-cta-headline"
+          >
+            Stop Paying for Five Systems That Don't Talk to Each Other
+          </h2>
+          <p
+            className="text-lg text-slate-300 mb-10 leading-relaxed"
+            data-testid="text-cta-subheadline"
+          >
+            PCB Auto replaces your estimate tool, your inspection app, your parts catalog, your scheduler, and your payment system — with one platform that connects everything.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
+            <Button
+              size="lg"
+              onClick={() =>
+                (window.location.href =
+                  "mailto:hello@pcbancard.com?subject=PCB Auto Demo Request")
+              }
+              data-testid="button-cta-demo"
+            >
+              Schedule a Demo
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="backdrop-blur-md bg-background/10 text-white"
+              onClick={() => scrollTo("demo-video")}
+              data-testid="button-cta-video"
+            >
+              Watch the Video
+            </Button>
+          </div>
+          <p className="text-slate-400 text-sm" data-testid="text-cta-tagline">
+            Built for independent auto repair shops · Bundled with payment processing · Fraction of the cost of Tekmetric or Shop-Ware
+          </p>
         </div>
       </section>
 
