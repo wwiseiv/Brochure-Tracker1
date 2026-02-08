@@ -6,12 +6,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   LayoutDashboard, Users, Car, FileText, ClipboardCheck,
   Calendar, Settings, LogOut, Menu, X, Wrench, ChevronDown,
-  UserPlus, CreditCard, BarChart3, MoreHorizontal,
+  UserPlus, CreditCard, BarChart3, MoreHorizontal, HelpCircle,
+  DollarSign, Printer, Mail, Phone, Shield, Receipt,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 const NAV_ITEMS = [
   { path: "/auto/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
@@ -36,10 +42,109 @@ const MORE_SHEET_ITEMS = [
   { path: "/auto/settings", label: "Settings", icon: Settings },
 ];
 
+function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const helpSections = [
+    {
+      icon: Receipt,
+      title: "Invoice & Payments",
+      items: [
+        "Open any Repair Order and tap 'Invoice / Pay' to view the dual pricing invoice.",
+        "Choose Cash or Card payment method \u2014 card payments include the surcharge automatically.",
+        "Add an optional tip before processing the payment.",
+        "After payment, print or email the receipt directly to the customer.",
+      ],
+    },
+    {
+      icon: DollarSign,
+      title: "Dual Pricing",
+      items: [
+        "Cash and Card prices are calculated automatically based on your surcharge rate.",
+        "Adjust the surcharge rate in Invoice Settings (gear icon on the invoice page).",
+        "The surcharge is disclosed on all invoices, receipts, and emails.",
+        "Typical surcharge rates are between 3% and 4%.",
+      ],
+    },
+    {
+      icon: Mail,
+      title: "Email Invoices & Receipts",
+      items: [
+        "Tap 'Email Invoice' on the invoice page to send a professional email with PDF attachment.",
+        "After payment, tap 'Email Receipt' to send the receipt with payment confirmation.",
+        "Emails are sent from service@pcbisv.com with your shop name.",
+        "Customers must have an email address on file to receive emails.",
+      ],
+    },
+    {
+      icon: Phone,
+      title: "Customer Communication",
+      items: [
+        "Tap the phone, text, or email icons next to any customer to reach them instantly.",
+        "Pre-filled templates are available for estimates, invoices, and appointment reminders.",
+        "All communications are logged automatically in the customer's history.",
+      ],
+    },
+    {
+      icon: Shield,
+      title: "Repair Orders",
+      items: [
+        "Create ROs from the Repair Orders page \u2014 add customer, vehicle, and line items.",
+        "Send estimates for customer approval via text or email with one tap.",
+        "Track RO status from estimate through completion and payment.",
+        "Download PDF estimates, work orders, and invoices at any time.",
+      ],
+    },
+    {
+      icon: Printer,
+      title: "Printing",
+      items: [
+        "Tap 'Print' on any invoice or receipt to open your browser's print dialog.",
+        "Receipts are formatted for standard receipt printers.",
+        "Use your browser's 'Save as PDF' option for a digital copy.",
+      ],
+    },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] p-0" data-testid="dialog-help">
+        <DialogHeader className="px-5 pt-5 pb-0">
+          <DialogTitle className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-primary" />
+            Help & Guide
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="px-5 pb-5 max-h-[70vh]">
+          <div className="space-y-4 pt-2">
+            {helpSections.map((section, i) => (
+              <div key={i}>
+                {i > 0 && <Separator className="mb-4" />}
+                <div className="flex items-center gap-2 mb-2">
+                  <section.icon className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm">{section.title}</h3>
+                </div>
+                <ul className="space-y-1.5 ml-6">
+                  {section.items.map((item, j) => (
+                    <li key={j} className="text-sm text-muted-foreground leading-relaxed list-disc">{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <Separator />
+            <div className="text-center text-xs text-muted-foreground py-2">
+              Need more help? Contact support at <a href="mailto:hello@pcbancard.com" className="text-primary hover:underline">hello@pcbancard.com</a> or call <a href="tel:8885377332" className="text-primary hover:underline">(888) 537-7332</a>
+            </div>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AutoLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, logout } = useAutoAuth();
   const [location] = useLocation();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const isOwnerOrManager = user?.role === "owner" || user?.role === "manager";
 
@@ -135,6 +240,10 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               </Link>
             )}
+            <DropdownMenuItem onClick={() => setHelpOpen(true)} data-testid="menu-help">
+              <HelpCircle className="h-4 w-4 mr-2" />
+              Help & Guide
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
@@ -230,6 +339,17 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             </Link>
           )}
           <button
+            className="flex items-center gap-3 w-full px-3 py-3 rounded-md text-sm text-foreground"
+            onClick={() => {
+              setMoreSheetOpen(false);
+              setHelpOpen(true);
+            }}
+            data-testid="more-help"
+          >
+            <HelpCircle className="h-5 w-5" />
+            Help & Guide
+          </button>
+          <button
             className="flex items-center gap-3 w-full px-3 py-3 rounded-md text-sm text-destructive"
             onClick={() => {
               setMoreSheetOpen(false);
@@ -242,6 +362,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </div>
+      <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }

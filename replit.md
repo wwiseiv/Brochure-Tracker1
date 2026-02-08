@@ -56,6 +56,14 @@ Preferred communication style: Simple, everyday language.
   - Tablet (640-1024px): Compressed top nav with icon+short labels, no bottom tab bar.
   - Desktop (1024px+): Full top nav with icons and full text labels.
   - Customer phone/email are tappable tel:/mailto: links on mobile. Settings form grids responsive. Schedule has mobile date nav header + week strip.
+- **Invoice & Payment System (Feb 2026)**: Full dual pricing payment flow at `/auto/invoice/:roId` with 5 screens: professional invoice view (dual cash/card pricing), surcharge settings, take payment (cash/card with tip selection), processing animation, and printable receipt. "Invoice / Pay" button on RO detail page for completed/invoiced/in_progress ROs.
+  - New page: `client/src/pages/auto/AutoInvoice.tsx`.
+  - Route: `/auto/invoice/:roId` (authenticated).
+- **Resend Email Integration (Feb 2026)**: Backend email service sending invoice/receipt emails with jsPDF-generated PDF attachments via Resend. Professional HTML email templates with dual pricing display, line items, and payment confirmation.
+  - New file: `server/auto-email.ts` (PDF generation + email sending).
+  - New route: POST `/api/auto/email/invoice` (sends invoice or receipt email with PDF attachment).
+  - Dependencies: `jspdf`, `jspdf-autotable`.
+- **Help Menu (Feb 2026)**: Accessible from desktop user dropdown and mobile "More" sheet. Dialog with 6 categorized help sections: Invoice & Payments, Dual Pricing, Email, Customer Communication, Repair Orders, and Printing. Includes support contact info.
 
 ## External Dependencies
 

@@ -15,6 +15,7 @@ import AutoStaff from "./AutoStaff";
 import AutoPublicApproval from "./AutoPublicApproval";
 import AutoPublicInspection from "./AutoPublicInspection";
 import AutoReports from "./AutoReports";
+import AutoInvoice from "./AutoInvoice";
 import { Loader2 } from "lucide-react";
 
 function AutoAuthGuard({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,7 @@ function AuthenticatedAutoRoutes() {
         <Route path="/auto/customers/new" component={AutoCustomerForm} />
         <Route path="/auto/customers/:id" component={AutoCustomerDetail} />
         <Route path="/auto/customers" component={AutoCustomers} />
+        <Route path="/auto/invoice/:roId" component={AutoInvoice} />
         <Route path="/auto/repair-orders/new" component={AutoRepairOrderForm} />
         <Route path="/auto/repair-orders/:id" component={AutoRepairOrderForm} />
         <Route path="/auto/repair-orders" component={AutoRepairOrders} />

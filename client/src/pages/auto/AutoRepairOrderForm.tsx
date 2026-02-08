@@ -331,6 +331,13 @@ export default function AutoRepairOrderForm() {
                   Invoice PDF
                 </Button>
               )}
+              {ro && ["completed", "invoiced", "in_progress"].includes(ro.status) && (
+                <Link href={`/auto/invoice/${ro.id}`}>
+                  <Button size="sm" data-testid="button-take-payment">
+                    <DollarSign className="h-4 w-4 mr-1" /> Invoice / Pay
+                  </Button>
+                </Link>
+              )}
               {ro && form.customerId && (() => {
                 const selectedCustomer = customers.find(c => c.id.toString() === form.customerId);
                 const selectedVehicle = vehicles.find(v => v.id.toString() === form.vehicleId);

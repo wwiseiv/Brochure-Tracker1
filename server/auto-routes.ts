@@ -15,6 +15,7 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 import { generateROPdf, generateDviPdf } from "./auto-pdf";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
+import { sendAutoInvoiceEmail } from "./auto-email";
 
 const logoUpload = multer({
   storage: multer.memoryStorage(),
@@ -2503,6 +2504,92 @@ router.get("/communication/customer/:customerId", autoAuth, async (req: Request,
     res.json(logs);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/email/invoice", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { roId, type, paymentMethod, cardBrand, cardLast4, authCode, tipAmount, totalCharged, paidAt } = req.body;
+    if (!roId) return res.status(400).json({ error: "roId is required" });
+
+    const roResults = await db.select().from(autoRepairOrders).where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
+    const ro = roResults[0];
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    const customerResults = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+    const customer = customerResults[0];
+    if (!customer?.email) return res.status(400).json({ error: "Customer has no email address" });
+
+    const vehicleResults = ro.vehicleId
+      ? await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId))
+      : [];
+    const vehicle = vehicleResults[0] || null;
+
+    const lineItems = await db.select().from(autoLineItems).where(eq(autoLineItems.repairOrderId, roId));
+    const shopResults = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId));
+    const shop = shopResults[0];
+    if (!shop) return res.status(404).json({ error: "Shop not found" });
+
+    const result = await sendAutoInvoiceEmail({
+      shop: {
+        name: shop.name,
+        address: shop.address,
+        city: shop.city,
+        state: shop.state,
+        zip: shop.zip,
+        phone: shop.phone,
+        email: shop.email,
+        cardFeePercent: shop.cardFeePercent || "0",
+      },
+      customer: {
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        phone: customer.phone,
+        email: customer.email,
+      },
+      vehicle: vehicle ? {
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        vin: vehicle.vin,
+      } : null,
+      ro: {
+        roNumber: ro.roNumber,
+        mileageIn: ro.mileageIn,
+        subtotalCash: ro.subtotalCash || "0",
+        subtotalCard: ro.subtotalCard || "0",
+        taxAmount: ro.taxAmount || "0",
+        totalCash: ro.totalCash || "0",
+        totalCard: ro.totalCard || "0",
+        feeAmount: ro.feeAmount || "0",
+        shopSupplyAmountCash: ro.shopSupplyAmountCash || "0",
+        shopSupplyAmountCard: ro.shopSupplyAmountCard || "0",
+        discountAmountCash: ro.discountAmountCash || "0",
+        discountAmountCard: ro.discountAmountCard || "0",
+      },
+      lineItems: lineItems.map((li) => ({
+        description: li.description,
+        type: li.type,
+        quantity: li.quantity || "1",
+        unitPriceCash: li.unitPriceCash,
+        unitPriceCard: li.unitPriceCard,
+        totalCash: li.totalCash,
+        totalCard: li.totalCard,
+      })),
+      isPaid: type === "receipt",
+      paymentMethod,
+      cardBrand,
+      cardLast4,
+      authCode,
+      tipAmount,
+      totalCharged,
+      paidAt,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("Auto email error:", err);
+    res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
 

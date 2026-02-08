@@ -3,7 +3,7 @@ import { Resend } from "resend";
 // Resend connection settings cache (not the client - client is always fresh)
 let connectionSettings: any;
 
-async function getCredentials() {
+export async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
