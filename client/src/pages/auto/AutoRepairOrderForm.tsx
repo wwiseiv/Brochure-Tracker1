@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { DesktopNudge } from "./DesktopNudge";
 
 interface Customer { id: number; firstName: string; lastName: string; }
 interface Vehicle { id: number; year: number | null; make: string | null; model: string | null; vin: string | null; }
@@ -302,6 +303,11 @@ export default function AutoRepairOrderForm() {
               {STATUS_LABELS[ro.status] || ro.status}
             </Badge>
           )}
+        </div>
+
+        <DesktopNudge message="Building detailed estimates is easier on a tablet or desktop." dismissKey="ro-builder" />
+
+        <div className="flex items-center gap-3">
           {ro && (
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               <Button variant="outline" size="sm" onClick={() => downloadPdf("estimate")} disabled={downloadingPdf !== null} data-testid="button-download-estimate-pdf">

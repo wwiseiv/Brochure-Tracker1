@@ -213,12 +213,12 @@ export default function AutoSettings() {
               <Label>Address</Label>
               <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} disabled={!isOwner} />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-2"><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} disabled={!isOwner} /></div>
               <div className="space-y-2"><Label>State</Label><Input maxLength={2} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} disabled={!isOwner} /></div>
               <div className="space-y-2"><Label>ZIP</Label><Input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} disabled={!isOwner} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!isOwner} /></div>
               <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!isOwner} /></div>
             </div>
@@ -235,7 +235,7 @@ export default function AutoSettings() {
         <Card>
           <CardHeader><CardTitle className="text-base">Pricing & Rates</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Labor Rate ($/hr)</Label><Input type="number" step="0.01" value={form.laborRate} onChange={(e) => setForm({ ...form, laborRate: e.target.value })} disabled={!isOwner} data-testid="input-labor-rate" /></div>
               <div className="space-y-2"><Label>Card Fee (%)</Label><Input type="number" step="0.01" value={form.cardFeePercent} onChange={(e) => setForm({ ...form, cardFeePercent: e.target.value })} disabled={!isOwner} data-testid="input-card-fee" /></div>
             </div>
@@ -245,7 +245,7 @@ export default function AutoSettings() {
         <Card>
           <CardHeader><CardTitle className="text-base">Tax Configuration</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Parts Tax Rate (%)</Label>
                 <Input type="number" step="0.001" value={form.partsTaxRate} onChange={(e) => setForm({ ...form, partsTaxRate: e.target.value })} disabled={!isOwner} data-testid="input-parts-tax-rate" />
@@ -268,7 +268,7 @@ export default function AutoSettings() {
               <Label htmlFor="laborTaxable" className="cursor-pointer">Labor Taxable</Label>
               <p className="text-xs text-muted-foreground">When off, labor/sublet items are not taxed</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Default Parts Markup (%)</Label>
                 <Input type="number" step="0.01" value={form.defaultPartsMarkupPct} onChange={(e) => setForm({ ...form, defaultPartsMarkupPct: e.target.value })} disabled={!isOwner} data-testid="input-parts-markup" />

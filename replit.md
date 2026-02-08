@@ -44,6 +44,11 @@ Preferred communication style: Simple, everyday language.
 - **Schedule Page Redesign**: Two-panel layout with mini calendar sidebar (dots for days with appointments), technician availability panel, and list/grid view toggle. Default list view shows appointment cards; grid view shows bay-based time grid.
 - **Staff Management Enhancement**: Edit dialog for staff members with phone, pay type/rate, PIN, and active toggle. Staff list shows role and pay type badges.
 - **Landing Page**: Full professional landing page at /auto/login with hero section, 8 feature cards with generated illustrations, login form, and contact footer (hello@pcbancard.com, (888) 537-7332, 420 Boulevard Suite 206, Mountain Lakes, NJ 07046).
+- **Responsive Design (Feb 2026)**: Three-breakpoint responsive system across all pages.
+  - Phone (<640px): Fixed bottom tab bar (Home, ROs, Schedule, Cust, More), slim top bar (logo only), "More" bottom sheet menu (Inspections, Reports, Settings, Staff, Log Out). All form grids stack single-column. Tables remain scrollable. DesktopNudge banners on Schedule/Reports/RO builder pages.
+  - Tablet (640-1024px): Compressed top nav with icon+short labels, no bottom tab bar.
+  - Desktop (1024px+): Full top nav with icons and full text labels.
+  - Customer phone/email are tappable tel:/mailto: links on mobile. Settings form grids responsive. Schedule has mobile date nav header + week strip.
 
 ## External Dependencies
 

@@ -11,6 +11,7 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Clock, Users,
   Loader2, FileText, CheckCircle, XCircle, AlertCircle,
 } from "lucide-react";
+import { DesktopNudge } from "./DesktopNudge";
 
 function formatCurrency(val: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
@@ -132,6 +133,8 @@ export default function AutoReports() {
           <BarChart3 className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold" data-testid="text-reports-title">Reports</h1>
         </div>
+
+        <DesktopNudge message="Detailed reports with charts and tables are best viewed on a larger screen." dismissKey="reports-detail" />
 
         <Card>
           <CardContent className="pt-4 pb-4">

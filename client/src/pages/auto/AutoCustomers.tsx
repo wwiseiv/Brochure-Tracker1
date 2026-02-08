@@ -20,6 +20,7 @@ interface Customer {
 
 export default function AutoCustomers() {
   const { autoFetch } = useAutoAuth();
+  const [, navigate] = useLocation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -87,21 +88,25 @@ export default function AutoCustomers() {
         ) : (
           <div className="space-y-2">
             {filtered.map((customer) => (
-              <Link key={customer.id} href={`/auto/customers/${customer.id}`}>
-                <Card className="hover-elevate cursor-pointer" data-testid={`card-customer-${customer.id}`}>
+              <div
+                key={customer.id}
+                onClick={() => navigate(`/auto/customers/${customer.id}`)}
+                className="cursor-pointer"
+              >
+                <Card className="hover-elevate" data-testid={`card-customer-${customer.id}`}>
                   <CardContent className="flex items-center justify-between gap-3 p-4">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{customer.firstName} {customer.lastName}</p>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
                         {customer.phone && (
-                          <span className="flex items-center gap-1">
+                          <a href={`tel:${customer.phone}`} className="flex items-center gap-1 hover:underline" onClick={(e) => e.stopPropagation()}>
                             <Phone className="h-3 w-3" /> {customer.phone}
-                          </span>
+                          </a>
                         )}
                         {customer.email && (
-                          <span className="flex items-center gap-1">
+                          <a href={`mailto:${customer.email}`} className="flex items-center gap-1 hover:underline" onClick={(e) => e.stopPropagation()}>
                             <Mail className="h-3 w-3" /> {customer.email}
-                          </span>
+                          </a>
                         )}
                         {customer.city && customer.state && (
                           <span>{customer.city}, {customer.state}</span>
@@ -111,7 +116,7 @@ export default function AutoCustomers() {
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             ))}
           </div>
         )}
