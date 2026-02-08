@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 ### PCB Auto — Auto Repair Shop Management Subsystem
 - **Architecture**: Completely isolated from the main PCBancard Sales Suite.
 - **Authentication**: Separate email/password authentication using bcrypt+JWT.
-- **Database**: Separate set of `auto_` prefixed PostgreSQL tables (24 tables) using integer IDs.
+- **Database**: Separate set of `auto_` prefixed PostgreSQL tables (27 tables) using integer IDs.
 - **Frontend**: Dedicated pages under `/auto/`.
 - **Core Functionality**: Manages repair order lifecycle, customer and vehicle records, Digital Vehicle Inspections (DVI), appointments, payments, and integrations for multi-tenant auto repair shops.
 - **Key Design Decisions**: No storage of sensitive employee financial data, use of idempotency keys for payroll, encrypted storage of third-party API keys.
@@ -43,7 +43,14 @@ Preferred communication style: Simple, everyday language.
 - **Demo Data (Feb 2026)**: Comprehensive realistic demo data seeded on startup — 4 staff (3 techs + 1 service advisor), 8 customers, 9 vehicles, 10 ROs (3 paid, 7 active), 27 appointments across the week, DVI inspection, activity log. All linked to proper technicians, bays, and customers.
 - **Schedule Page Redesign**: Two-panel layout with mini calendar sidebar (dots for days with appointments), technician availability panel, and list/grid view toggle. Default list view shows appointment cards; grid view shows bay-based time grid.
 - **Staff Management Enhancement**: Edit dialog for staff members with phone, pay type/rate, PIN, and active toggle. Staff list shows role and pay type badges.
-- **Landing Page**: Full professional landing page at /auto/login with hero section, 8 feature cards with generated illustrations, login form, and contact footer (hello@pcbancard.com, (888) 537-7332, 420 Boulevard Suite 206, Mountain Lakes, NJ 07046).
+- **Customer Communication (Feb 2026)**: One-tap Call/Text/Email buttons across all customer touchpoints (customer list, customer detail, RO detail, schedule, dashboard). Pre-filled SMS and email templates for estimates, invoices, vehicle ready, appointment reminders, and follow-ups. Desktop SMS fallback with copy-to-clipboard modal. Communication log table (`auto_communication_log`) tracking all initiated communications with history display on customer detail page. "Contact Customer" dropdown on RO detail with context-specific actions (Text Estimate for Approval, Email Invoice, Copy Approval Link).
+  - New table: `auto_communication_log` (27th table).
+  - New API routes: POST `/api/auto/communication/log`, GET `/api/auto/communication/customer/:customerId`.
+  - New files: `client/src/lib/auto-communication.ts` (templates, helpers), `client/src/components/auto/CopyMessageModal.tsx` (desktop SMS fallback).
+- **DVI Enhancement (Feb 2026)**: 4 demo inspections with varied statuses (in_progress, sent, completed), enriched list API with vehicle/customer/technician/condition data, customer-facing public inspection report at `/auto/inspect/:token`, DVI PDF generation, and "Send to Customer" functionality.
+  - New routes: GET `/api/auto/dvi/public/:token`, GET `/api/auto/dvi/public/:token/pdf`, POST `/api/auto/dvi/inspections/:id/send`.
+  - New file: `client/src/pages/auto/AutoPublicInspection.tsx`.
+- **Landing Page**: Full professional landing page at /auto/login with hero section, 10 feature cards with generated illustrations (Repair Orders, DVI, Scheduling, Customers, Communication, Payments, PDFs, Approvals, Reports, Staff), login form, and contact footer (hello@pcbancard.com, (888) 537-7332, 420 Boulevard Suite 206, Mountain Lakes, NJ 07046).
 - **Responsive Design (Feb 2026)**: Three-breakpoint responsive system across all pages.
   - Phone (<640px): Fixed bottom tab bar (Home, ROs, Schedule, Cust, More), slim top bar (logo only), "More" bottom sheet menu (Inspections, Reports, Settings, Staff, Log Out). All form grids stack single-column. Tables remain scrollable. DesktopNudge banners on Schedule/Reports/RO builder pages.
   - Tablet (640-1024px): Compressed top nav with icon+short labels, no bottom tab bar.

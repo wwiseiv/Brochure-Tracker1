@@ -6,7 +6,7 @@ import {
   autoRepairOrders, autoLineItems, autoPayments, autoDviTemplates,
   autoDviInspections, autoDviItems, autoBays, autoAppointments,
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
-  autoCannedServices, autoCannedServiceItems,
+  autoCannedServices, autoCannedServiceItems, autoCommunicationLog,
 } from "@shared/schema";
 import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
@@ -2439,6 +2439,72 @@ router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: R
 // ============================================================================
 // MOUNT
 // ============================================================================
+
+// ============================================================================
+// COMMUNICATION LOG ROUTES
+// ============================================================================
+
+router.post("/communication/log", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.autoUser!;
+    const { customerId, repairOrderId, channel, templateUsed, recipientPhone, recipientEmail, subject, bodyPreview, invoiceUrl } = req.body;
+
+    if (!customerId || !channel) {
+      return res.status(400).json({ error: "customerId and channel are required" });
+    }
+
+    const [entry] = await db.insert(autoCommunicationLog).values({
+      shopId: user.shopId,
+      customerId: parseInt(customerId),
+      repairOrderId: repairOrderId ? parseInt(repairOrderId) : null,
+      channel,
+      direction: "outbound",
+      templateUsed: templateUsed || null,
+      recipientPhone: recipientPhone || null,
+      recipientEmail: recipientEmail || null,
+      subject: subject || null,
+      bodyPreview: bodyPreview ? bodyPreview.substring(0, 200) : null,
+      invoiceUrl: invoiceUrl || null,
+      initiatedBy: user.id,
+    }).returning();
+
+    res.json(entry);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/communication/customer/:customerId", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.autoUser!;
+    const customerId = parseInt(req.params.customerId);
+
+    const logs = await db.select({
+      id: autoCommunicationLog.id,
+      channel: autoCommunicationLog.channel,
+      direction: autoCommunicationLog.direction,
+      templateUsed: autoCommunicationLog.templateUsed,
+      recipientPhone: autoCommunicationLog.recipientPhone,
+      recipientEmail: autoCommunicationLog.recipientEmail,
+      subject: autoCommunicationLog.subject,
+      bodyPreview: autoCommunicationLog.bodyPreview,
+      createdAt: autoCommunicationLog.createdAt,
+      userName: sql<string>`concat(${autoUsers.firstName}, ' ', ${autoUsers.lastName})`,
+    })
+    .from(autoCommunicationLog)
+    .leftJoin(autoUsers, eq(autoCommunicationLog.initiatedBy, autoUsers.id))
+    .where(and(
+      eq(autoCommunicationLog.shopId, user.shopId),
+      eq(autoCommunicationLog.customerId, customerId),
+    ))
+    .orderBy(desc(autoCommunicationLog.createdAt))
+    .limit(50);
+
+    res.json(logs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);

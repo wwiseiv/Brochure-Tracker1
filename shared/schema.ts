@@ -4626,3 +4626,47 @@ export const insertAutoCannedServiceItemSchema = createInsertSchema(autoCannedSe
 });
 export type InsertAutoCannedServiceItem = z.infer<typeof insertAutoCannedServiceItemSchema>;
 export type AutoCannedServiceItem = typeof autoCannedServiceItems.$inferSelect;
+
+// 27. Auto Communication Log
+export const autoCommunicationLog = pgTable("auto_communication_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  customerId: integer("customer_id").notNull().references(() => autoCustomers.id),
+  repairOrderId: integer("repair_order_id").references(() => autoRepairOrders.id),
+  channel: varchar("channel", { length: 20 }).notNull(),
+  direction: varchar("direction", { length: 20 }).default("outbound"),
+  templateUsed: varchar("template_used", { length: 50 }),
+  recipientPhone: varchar("recipient_phone", { length: 30 }),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  subject: text("subject"),
+  bodyPreview: text("body_preview"),
+  invoiceUrl: text("invoice_url"),
+  initiatedBy: integer("initiated_by").references(() => autoUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoCommunicationLogRelations = relations(autoCommunicationLog, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoCommunicationLog.shopId],
+    references: [autoShops.id],
+  }),
+  customer: one(autoCustomers, {
+    fields: [autoCommunicationLog.customerId],
+    references: [autoCustomers.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoCommunicationLog.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoCommunicationLog.initiatedBy],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoCommunicationLogSchema = createInsertSchema(autoCommunicationLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoCommunicationLog = z.infer<typeof insertAutoCommunicationLogSchema>;
+export type AutoCommunicationLog = typeof autoCommunicationLog.$inferSelect;

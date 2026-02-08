@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Car, Phone, Mail, MapPin, Plus, FileText, Loader2, Save, Edit } from "lucide-react";
+import { ArrowLeft, Car, Phone, Mail, MapPin, Plus, FileText, Loader2, Save, Edit, MessageSquare, Link2 } from "lucide-react";
+import { handleCall, handleSms, handleEmail, SMS_TEMPLATES, EMAIL_TEMPLATES } from "@/lib/auto-communication";
+import CopyMessageModal from "@/components/auto/CopyMessageModal";
 
 interface Customer {
   id: number; firstName: string; lastName: string;
@@ -23,6 +25,19 @@ interface Vehicle {
   year: number | null; make: string | null; model: string | null;
   trim: string | null; engine: string | null; color: string | null;
   mileage: number | null; licensePlate: string | null;
+}
+
+interface CommLog {
+  id: number;
+  channel: string;
+  direction: string | null;
+  templateUsed: string | null;
+  recipientPhone: string | null;
+  recipientEmail: string | null;
+  subject: string | null;
+  bodyPreview: string | null;
+  createdAt: string;
+  userName: string | null;
 }
 
 export default function AutoCustomerDetail() {
@@ -46,13 +61,16 @@ export default function AutoCustomerDetail() {
     address: "", city: "", state: "", zip: "", notes: "",
   });
   const [decoding, setDecoding] = useState(false);
+  const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
+  const [commHistory, setCommHistory] = useState<CommLog[]>([]);
 
   const fetchData = useCallback(async () => {
     if (!customerId || customerId === "new") return;
     try {
-      const [custRes, vehRes] = await Promise.all([
+      const [custRes, vehRes, commRes] = await Promise.all([
         autoFetch(`/api/auto/customers/${customerId}`),
         autoFetch(`/api/auto/vehicles?customerId=${customerId}`),
+        autoFetch(`/api/auto/communication/customer/${customerId}`),
       ]);
       const custData = await custRes.json();
       const c = custData.customer;
@@ -64,6 +82,7 @@ export default function AutoCustomerDetail() {
         state: c.state || "", zip: c.zip || "", notes: c.notes || "",
       });
       setVehicles(await vehRes.json());
+      try { setCommHistory(await commRes.json()); } catch { setCommHistory([]); }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [customerId, autoFetch]);
@@ -175,6 +194,39 @@ export default function AutoCustomerDetail() {
                 {customer.phone && <p className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /> {customer.phone}</p>}
                 {customer.email && <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> {customer.email}</p>}
                 {customer.address && <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" /> {customer.address}, {customer.city} {customer.state} {customer.zip}</p>}
+                <div className="flex items-center gap-2 pt-2">
+                  {customer.phone && (
+                    <Button variant="outline" size="sm" onClick={() => handleCall(customer.phone!, customer.id, localStorage.getItem("pcb_auto_token") || "")} data-testid="button-call-customer">
+                      <Phone className="h-4 w-4 mr-1" /> Call
+                    </Button>
+                  )}
+                  {customer.phone && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const token = localStorage.getItem("pcb_auto_token") || "";
+                      const msg = SMS_TEMPLATES.general("Demo Auto Shop", `${customer.firstName} ${customer.lastName}`);
+                      const result = handleSms(customer.phone!, msg, customer.id, token);
+                      if (!result.isMobile) {
+                        setSmsModal({ phone: result.phone, message: result.body });
+                      }
+                    }} data-testid="button-text-customer">
+                      <MessageSquare className="h-4 w-4 mr-1" /> Text
+                    </Button>
+                  )}
+                  {customer.email && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const token = localStorage.getItem("pcb_auto_token") || "";
+                      handleEmail(
+                        customer.email!,
+                        `From Demo Auto Shop`,
+                        `Hi ${customer.firstName},\n\n`,
+                        customer.id,
+                        token
+                      );
+                    }} data-testid="button-email-customer">
+                      <Mail className="h-4 w-4 mr-1" /> Email
+                    </Button>
+                  )}
+                </div>
                 {customer.notes && <p className="text-muted-foreground mt-2">{customer.notes}</p>}
               </div>
             )}
@@ -245,6 +297,40 @@ export default function AutoCustomerDetail() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-base">Communication History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {commHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No communication history yet. Use the Call, Text, or Email buttons above to start.</p>
+            ) : (
+              <div className="space-y-2">
+                {commHistory.slice(0, 10).map(log => {
+                  const icon = log.channel === "call" ? Phone : log.channel === "sms" ? MessageSquare : log.channel === "email" ? Mail : Link2;
+                  const Icon = icon;
+                  const channelLabel = ({ call: "Called", sms: "Texted", email: "Emailed", link_copy: "Copied link" } as Record<string, string>)[log.channel] || log.channel;
+                  const templateLabel = log.templateUsed ? ` — ${log.templateUsed.replace(/_/g, " ")}` : "";
+                  const date = new Date(log.createdAt);
+                  const timeStr = date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+                  return (
+                    <div key={log.id} className="flex items-start gap-2 text-sm" data-testid={`comm-log-${log.id}`}>
+                      <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-medium">{channelLabel}</span>
+                        {templateLabel && <span className="text-muted-foreground">{templateLabel}</span>}
+                        <span className="text-muted-foreground"> — {timeStr}</span>
+                        {log.userName && <span className="text-muted-foreground"> (by {log.userName})</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex gap-2">
           <Link href={`/auto/repair-orders/new`}>
             <Button variant="outline" className="gap-2" data-testid="button-create-ro-from-customer">
@@ -253,6 +339,12 @@ export default function AutoCustomerDetail() {
           </Link>
         </div>
       </div>
+      <CopyMessageModal
+        open={!!smsModal}
+        onOpenChange={(o) => !o && setSmsModal(null)}
+        phone={smsModal?.phone || ""}
+        message={smsModal?.message || ""}
+      />
     </AutoLayout>
   );
 }

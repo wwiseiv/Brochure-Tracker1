@@ -11,12 +11,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { handleCall, handleSms, handleEmail, SMS_TEMPLATES, EMAIL_TEMPLATES, logCommunication } from "@/lib/auto-communication";
+import CopyMessageModal from "@/components/auto/CopyMessageModal";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { DesktopNudge } from "./DesktopNudge";
 
-interface Customer { id: number; firstName: string; lastName: string; }
+interface Customer { id: number; firstName: string; lastName: string; phone: string | null; email: string | null; }
 interface Vehicle { id: number; year: number | null; make: string | null; model: string | null; vin: string | null; }
 interface StaffMember { id: number; firstName: string; lastName: string; role: string; }
 interface LineItem {
@@ -77,6 +80,8 @@ export default function AutoRepairOrderForm() {
   const [paymentForm, setPaymentForm] = useState({
     method: "cash", amount: "", referenceNumber: "", notes: "",
   });
+
+  const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
   const [form, setForm] = useState({
     customerId: "", vehicleId: "", technicianId: "",
@@ -326,6 +331,76 @@ export default function AutoRepairOrderForm() {
                   Invoice PDF
                 </Button>
               )}
+              {ro && form.customerId && (() => {
+                const selectedCustomer = customers.find(c => c.id.toString() === form.customerId);
+                const selectedVehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+                const customerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "";
+                const vehicleStr = selectedVehicle ? [selectedVehicle.year, selectedVehicle.make, selectedVehicle.model].filter(Boolean).join(" ") : "";
+                const token = localStorage.getItem("pcb_auto_token") || "";
+                const approvalUrl = `${window.location.origin}/auto/approve/${ro.approvalToken || ""}`;
+
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-contact-customer">
+                        <Phone className="h-4 w-4 mr-1" /> Contact
+                        <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {selectedCustomer?.phone && (
+                        <DropdownMenuItem onClick={() => handleCall(selectedCustomer.phone!, parseInt(form.customerId), token, ro.id)} data-testid="menu-call-customer">
+                          <Phone className="h-4 w-4 mr-2" /> Call {selectedCustomer.firstName}
+                        </DropdownMenuItem>
+                      )}
+                      {selectedCustomer?.phone && (
+                        <DropdownMenuItem onClick={() => {
+                          const msg = SMS_TEMPLATES.general("Demo Auto Shop", customerName);
+                          const result = handleSms(selectedCustomer.phone!, msg, parseInt(form.customerId), token, { repairOrderId: ro.id });
+                          if (!result.isMobile) setSmsModal({ phone: result.phone, message: result.body });
+                        }} data-testid="menu-text-customer">
+                          <MessageSquare className="h-4 w-4 mr-2" /> Text {selectedCustomer.firstName}
+                        </DropdownMenuItem>
+                      )}
+                      {selectedCustomer?.email && (
+                        <DropdownMenuItem onClick={() => {
+                          handleEmail(selectedCustomer.email!, `From Demo Auto Shop — RO #${ro.roNumber}`, `Hi ${selectedCustomer.firstName},\n\n`, parseInt(form.customerId), token, { repairOrderId: ro.id });
+                        }} data-testid="menu-email-customer">
+                          <Mail className="h-4 w-4 mr-2" /> Email {selectedCustomer.firstName}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      {selectedCustomer?.phone && ro.approvalToken && (
+                        <DropdownMenuItem onClick={() => {
+                          const total = `$${parseFloat(ro.grandTotalCash || "0").toFixed(2)}`;
+                          const msg = SMS_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, ro.roNumber, total, approvalUrl);
+                          const result = handleSms(selectedCustomer.phone!, msg, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
+                          if (!result.isMobile) setSmsModal({ phone: result.phone, message: result.body });
+                        }} data-testid="menu-text-estimate">
+                          <MessageSquare className="h-4 w-4 mr-2" /> Text Estimate for Approval
+                        </DropdownMenuItem>
+                      )}
+                      {selectedCustomer?.email && ro.approvalToken && (
+                        <DropdownMenuItem onClick={() => {
+                          const total = `$${parseFloat(ro.grandTotalCash || "0").toFixed(2)}`;
+                          const tmpl = EMAIL_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, vehicleStr, ro.roNumber, total, approvalUrl, "(888) 537-7332");
+                          handleEmail(selectedCustomer.email!, tmpl.subject, tmpl.body, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
+                        }} data-testid="menu-email-estimate">
+                          <Mail className="h-4 w-4 mr-2" /> Email Estimate for Approval
+                        </DropdownMenuItem>
+                      )}
+                      {ro.approvalToken && (
+                        <DropdownMenuItem onClick={async () => {
+                          await navigator.clipboard.writeText(approvalUrl);
+                          logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: approvalUrl }, token);
+                        }} data-testid="menu-copy-approval-link">
+                          <Link2 className="h-4 w-4 mr-2" /> Copy Approval Link
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -659,6 +734,12 @@ export default function AutoRepairOrderForm() {
           </>
         )}
       </div>
+      <CopyMessageModal
+        open={smsModal !== null}
+        onOpenChange={(open) => { if (!open) setSmsModal(null); }}
+        phone={smsModal?.phone || ""}
+        message={smsModal?.message || ""}
+      />
     </AutoLayout>
   );
 }

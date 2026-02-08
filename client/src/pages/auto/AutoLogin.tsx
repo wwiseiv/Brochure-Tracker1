@@ -17,6 +17,8 @@ import {
   FileText,
   BarChart3,
   CheckCircle,
+  MessageSquare,
+  UserCog,
   Mail,
   Phone,
   MapPin,
@@ -33,6 +35,8 @@ import featurePayments from "@/assets/images/feature-payments.png";
 import featurePdf from "@/assets/images/feature-pdf.png";
 import featureReports from "@/assets/images/feature-reports.png";
 import featureApprovals from "@/assets/images/feature-approvals.png";
+import featureStaff from "@/assets/images/feature-staff.png";
+import featureCommunication from "@/assets/images/feature-communication.png";
 
 const features = [
   {
@@ -40,56 +44,70 @@ const features = [
     icon: Wrench,
     image: featureRepairOrders,
     description:
-      "Create, track, and manage repair orders from start to finish with dual pricing, line-item details, and complete lifecycle management.",
+      "Create, track, and manage repair orders from estimate to paid with dual cash/card pricing, canned services, shop supply auto-calculation, and complete lifecycle management.",
   },
   {
     title: "Digital Vehicle Inspection",
     icon: ClipboardCheck,
     image: featureDvi,
     description:
-      "Conduct thorough digital inspections with photo documentation, condition ratings, and instant customer sharing.",
+      "Conduct thorough multi-point inspections with condition ratings, photo documentation, shareable customer reports, and downloadable PDF results.",
   },
   {
     title: "Appointment Scheduling",
     icon: CalendarDays,
     image: featureScheduling,
     description:
-      "Manage your shop calendar with easy booking, technician assignment, and automated reminders for upcoming appointments.",
+      "Manage your shop calendar with bay-based scheduling, technician assignment, mini calendar sidebar, and list or grid views across desktop and mobile.",
   },
   {
     title: "Customer & Vehicle Database",
     icon: Users,
     image: featureCustomers,
     description:
-      "Maintain detailed customer profiles and complete vehicle service histories for personalized, efficient service.",
+      "Maintain detailed customer profiles with VIN decoding, complete vehicle histories, one-tap call/text/email, and communication tracking.",
+  },
+  {
+    title: "One-Tap Communication",
+    icon: MessageSquare,
+    image: featureCommunication,
+    description:
+      "Call, text, or email customers with one tap from anywhere. Pre-filled message templates for estimates, invoices, reminders, and follow-ups.",
   },
   {
     title: "Payment Processing",
     icon: CreditCard,
     image: featurePayments,
     description:
-      "Handle split payments, track balances, and generate professional invoices with cash and card pricing support.",
+      "Handle split payments, track balances, and manage invoices with separate cash and card pricing, discounts, and balance-due tracking.",
   },
   {
     title: "Professional PDF Documents",
     icon: FileText,
     image: featurePdf,
     description:
-      "Generate branded estimates, work orders, and invoices as professional PDFs with your shop logo and detailed line items.",
-  },
-  {
-    title: "Reports & Analytics",
-    icon: BarChart3,
-    image: featureReports,
-    description:
-      "Track job profitability, sales tax, technician productivity, and approval conversion rates with comprehensive dashboards.",
+      "Generate branded estimates, work orders, invoices, and DVI reports as professional PDFs with your shop logo and detailed line items.",
   },
   {
     title: "Customer Approval Workflow",
     icon: CheckCircle,
     image: featureApprovals,
     description:
-      "Send digital estimates for remote customer approval — customers can approve or decline individual service lines from their phone.",
+      "Send digital estimates for remote customer approval. Customers approve or decline individual service lines right from their phone.",
+  },
+  {
+    title: "Reports & Analytics",
+    icon: BarChart3,
+    image: featureReports,
+    description:
+      "Track job profitability, sales tax, technician productivity, and approval conversion rates with comprehensive reporting dashboards.",
+  },
+  {
+    title: "Staff Management",
+    icon: UserCog,
+    image: featureStaff,
+    description:
+      "Manage technicians, service advisors, and shop staff with role assignments, pay rates, PIN codes, and availability tracking.",
   },
 ];
 
@@ -164,7 +182,7 @@ export default function AutoLogin() {
             className="text-lg md:text-xl text-slate-300 mb-10 max-w-2xl mx-auto"
             data-testid="hero-subheadline"
           >
-            Streamline your repair orders, inspections, scheduling, and payments — all in one
+            Streamline repair orders, inspections, scheduling, payments, and customer communication — all in one
             powerful platform built for modern auto repair shops.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -206,7 +224,7 @@ export default function AutoLogin() {
               Powerful tools designed specifically for auto repair professionals
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (

@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Loader2, Trash2, Users, Wrench, LayoutList, LayoutGrid } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Loader2, Trash2, Users, Wrench, LayoutList, LayoutGrid, Phone, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DesktopNudge } from "./DesktopNudge";
+import { handleCall, handleSms, SMS_TEMPLATES } from "@/lib/auto-communication";
+import CopyMessageModal from "@/components/auto/CopyMessageModal";
 
 interface Appointment {
   id: number;
@@ -21,7 +23,7 @@ interface Appointment {
   endTime: string;
   bayId: number | null;
   technicianId: number | null;
-  customer?: { firstName: string; lastName: string } | null;
+  customer?: { firstName: string; lastName: string; phone?: string | null; id?: number } | null;
   vehicle?: { year: number | null; make: string | null; model: string | null } | null;
   color: string | null;
 }
@@ -86,6 +88,7 @@ export default function AutoSchedule() {
     title: "", description: "", date: "", startTime: "09:00",
     endTime: "10:00", bayId: "", technicianId: "",
   });
+  const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
   const dateStr = selectedDate.toISOString().split("T")[0];
   const dayLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -440,14 +443,59 @@ export default function AutoSchedule() {
                                 <p className="text-xs text-muted-foreground">{[apt.vehicle.year, apt.vehicle.make, apt.vehicle.model].filter(Boolean).join(" ")}</p>
                               )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0 invisible group-hover:visible"
-                              onClick={() => deleteAppointment(apt.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {apt.customer?.phone && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="invisible group-hover:visible"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const token = localStorage.getItem("pcb_auto_token") || "";
+                                      handleCall(apt.customer!.phone!, apt.customer!.id || 0, token);
+                                    }}
+                                    data-testid={`button-call-apt-${apt.id}`}
+                                  >
+                                    <Phone className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="invisible group-hover:visible"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const token = localStorage.getItem("pcb_auto_token") || "";
+                                      const customerName = `${apt.customer!.firstName} ${apt.customer!.lastName}`;
+                                      const msg = apt.description
+                                        ? SMS_TEMPLATES.appointmentReminder(
+                                            "Demo Auto Shop",
+                                            customerName,
+                                            new Date(apt.startTime).toLocaleDateString(),
+                                            formatTime(apt.startTime),
+                                            apt.description
+                                          )
+                                        : SMS_TEMPLATES.general("Demo Auto Shop", customerName);
+                                      const result = handleSms(apt.customer!.phone!, msg, apt.customer!.id || 0, token);
+                                      if (!result.isMobile) {
+                                        setSmsModal({ phone: result.phone, message: result.body });
+                                      }
+                                    }}
+                                    data-testid={`button-text-apt-${apt.id}`}
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="invisible group-hover:visible"
+                                onClick={() => deleteAppointment(apt.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -542,6 +590,12 @@ export default function AutoSchedule() {
           </div>
         </div>
       </div>
+      <CopyMessageModal
+        open={!!smsModal}
+        onOpenChange={(open) => { if (!open) setSmsModal(null); }}
+        phone={smsModal?.phone || ""}
+        message={smsModal?.message || ""}
+      />
     </AutoLayout>
   );
 }

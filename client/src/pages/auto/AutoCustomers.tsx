@@ -6,7 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Search, Phone, Mail, ChevronRight, Loader2 } from "lucide-react";
+import { Users, Plus, Search, Phone, Mail, ChevronRight, Loader2, MessageSquare } from "lucide-react";
+import { handleCall, handleSms, handleEmail, SMS_TEMPLATES } from "@/lib/auto-communication";
+import CopyMessageModal from "@/components/auto/CopyMessageModal";
 
 interface Customer {
   id: number;
@@ -24,6 +26,7 @@ export default function AutoCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -98,22 +101,70 @@ export default function AutoCustomers() {
                     <div className="min-w-0">
                       <p className="font-medium truncate">{customer.firstName} {customer.lastName}</p>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
-                        {customer.phone && (
-                          <a href={`tel:${customer.phone}`} className="flex items-center gap-1 hover:underline" onClick={(e) => e.stopPropagation()}>
-                            <Phone className="h-3 w-3" /> {customer.phone}
-                          </a>
-                        )}
-                        {customer.email && (
-                          <a href={`mailto:${customer.email}`} className="flex items-center gap-1 hover:underline" onClick={(e) => e.stopPropagation()}>
-                            <Mail className="h-3 w-3" /> {customer.email}
-                          </a>
-                        )}
+                        {customer.phone && <span>{customer.phone}</span>}
+                        {customer.phone && customer.email && <span>·</span>}
+                        {customer.email && <span>{customer.email}</span>}
+                        {(customer.phone || customer.email) && customer.city && customer.state && <span>·</span>}
                         {customer.city && customer.state && (
                           <span>{customer.city}, {customer.state}</span>
                         )}
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="flex items-center gap-1 shrink-0">
+                      {customer.phone && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const token = localStorage.getItem("pcb_auto_token") || "";
+                            handleCall(customer.phone!, customer.id, token);
+                          }}
+                          data-testid={`button-call-customer-${customer.id}`}
+                        >
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {customer.phone && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const token = localStorage.getItem("pcb_auto_token") || "";
+                            const msg = SMS_TEMPLATES.general("Demo Auto Shop", `${customer.firstName} ${customer.lastName}`);
+                            const result = handleSms(customer.phone!, msg, customer.id, token);
+                            if (!result.isMobile) {
+                              setSmsModal({ phone: result.phone, message: result.body });
+                            }
+                          }}
+                          data-testid={`button-text-customer-${customer.id}`}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {customer.email && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const token = localStorage.getItem("pcb_auto_token") || "";
+                            handleEmail(
+                              customer.email!,
+                              `From Demo Auto Shop`,
+                              `Hi ${customer.firstName},\n\n`,
+                              customer.id,
+                              token
+                            );
+                          }}
+                          data-testid={`button-email-customer-${customer.id}`}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -121,6 +172,12 @@ export default function AutoCustomers() {
           </div>
         )}
       </div>
+      <CopyMessageModal
+        open={!!smsModal}
+        onOpenChange={(o) => !o && setSmsModal(null)}
+        phone={smsModal?.phone || ""}
+        message={smsModal?.message || ""}
+      />
     </AutoLayout>
   );
 }
