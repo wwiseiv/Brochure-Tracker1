@@ -208,6 +208,43 @@ export default function AutoLogin() {
       </section>
 
       <section
+        className="relative bg-gradient-to-b from-slate-900 to-slate-800 py-16 md:py-20 px-4 md:px-6"
+        data-testid="section-demo-video"
+      >
+        <div className="max-w-4xl mx-auto text-center">
+          <h2
+            className="text-3xl md:text-4xl font-bold text-white mb-3"
+            data-testid="text-demo-heading"
+          >
+            See PCB Auto in Action
+          </h2>
+          <p
+            className="text-slate-300 text-lg mb-10"
+            data-testid="text-demo-subheading"
+          >
+            Everything your shop needs — in one 2-minute walkthrough
+          </p>
+          <div className="max-w-[960px] mx-auto rounded-md overflow-hidden shadow-lg">
+            <iframe
+              src="https://player.vimeo.com/video/1163077090?h=8af78ee4f6&title=0&byline=0&portrait=0"
+              className="w-full aspect-video"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              title="PCB Auto Demo"
+              data-testid="iframe-demo-video"
+            />
+          </div>
+          <p
+            className="text-slate-400 text-sm mt-8"
+            data-testid="text-demo-features"
+          >
+            Repair Orders · Digital Inspections · Parts Ordering · Scheduling · Payments · All Connected
+          </p>
+        </div>
+      </section>
+
+      <section
         id="features"
         className="py-20 px-6 bg-background"
         data-testid="section-features"

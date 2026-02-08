@@ -117,7 +117,7 @@ export default function AutoInvoice() {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | null>(null);
   const [tipAmount, setTipAmount] = useState(0);
   const [customTip, setCustomTip] = useState("");
-  const [surchargeRate, setSurchargeRate] = useState(3.5);
+  const [dualPricingRate, setDualPricingRate] = useState(3.5);
   const [cardBrand, setCardBrand] = useState("Visa");
   const [cardLast4, setCardLast4] = useState("4242");
   const [authCode, setAuthCode] = useState("");
@@ -147,7 +147,7 @@ export default function AutoInvoice() {
       setLineItems(roData.lineItems || []);
       setPayments(roData.payments || []);
       setShop(shopData);
-      setSurchargeRate(parseFloat(shopData.cardFeePercent || "3.5"));
+      setDualPricingRate(parseFloat(shopData.cardFeePercent || "3.5"));
     } catch {
       setError("Failed to load invoice data");
     } finally {
@@ -233,7 +233,7 @@ export default function AutoInvoice() {
     try {
       const res = await autoFetch("/api/auto/shop/settings", {
         method: "PATCH",
-        body: JSON.stringify({ cardFeePercent: surchargeRate.toString() }),
+        body: JSON.stringify({ cardFeePercent: dualPricingRate.toString() }),
       });
       if (!res.ok) throw new Error("Failed to save");
       const updated = await res.json();
@@ -338,7 +338,7 @@ export default function AutoInvoice() {
             vehicle={vehicle}
             lineItems={lineItems}
             shop={shop}
-            surchargeRate={surchargeRate}
+            dualPricingRate={dualPricingRate}
             subtotalCash={subtotalCash}
             subtotalCard={subtotalCard}
             taxPartsAmount={taxPartsAmount}
@@ -365,8 +365,8 @@ export default function AutoInvoice() {
 
         {screen === "settings" && (
           <SettingsScreen
-            surchargeRate={surchargeRate}
-            onRateChange={setSurchargeRate}
+            dualPricingRate={dualPricingRate}
+            onRateChange={setDualPricingRate}
             onSave={handleSaveSettings}
             onBack={() => setScreen("invoice")}
             saving={savingSettings}
@@ -383,7 +383,7 @@ export default function AutoInvoice() {
             tipAmount={tipAmount}
             customTip={customTip}
             totalWithTip={totalWithTip}
-            surchargeRate={surchargeRate}
+            dualPricingRate={dualPricingRate}
             feeAmount={feeAmount}
             cardBrand={cardBrand}
             cardLast4={cardLast4}
@@ -419,7 +419,7 @@ export default function AutoInvoice() {
             totalWithTip={totalWithTip}
             activeAmount={activeAmount}
             paidAt={paidAt}
-            surchargeRate={surchargeRate}
+            dualPricingRate={dualPricingRate}
             feeAmount={feeAmount}
             subtotalCash={subtotalCash}
             taxAmount={taxAmount}
@@ -436,14 +436,14 @@ export default function AutoInvoice() {
 }
 
 function InvoiceScreen({
-  ro, customer, vehicle, lineItems, shop, surchargeRate,
+  ro, customer, vehicle, lineItems, shop, dualPricingRate,
   subtotalCash, subtotalCard, taxPartsAmount, taxLaborAmount, taxAmount,
   shopSupplyCash, shopSupplyCard, discountCash, discountCard,
   totalCash, totalCard, feeAmount, paidAmount, balanceDue,
   emailSent, emailSending, onTakePayment, onSettings, onPrint, onEmail, roId,
 }: {
   ro: RepairOrder; customer: Customer | null; vehicle: Vehicle | null;
-  lineItems: LineItem[]; shop: Shop | null; surchargeRate: number;
+  lineItems: LineItem[]; shop: Shop | null; dualPricingRate: number;
   subtotalCash: number; subtotalCard: number;
   taxPartsAmount: number; taxLaborAmount: number; taxAmount: number;
   shopSupplyCash: number; shopSupplyCard: number;
@@ -645,9 +645,9 @@ function InvoiceScreen({
             )}
           </div>
 
-          {surchargeRate > 0 && (
-            <p className="text-xs text-muted-foreground text-center" data-testid="text-surcharge-disclosure">
-              Card price includes {surchargeRate}% service fee
+          {dualPricingRate > 0 && (
+            <p className="text-xs text-muted-foreground text-center" data-testid="text-dual-pricing-disclosure">
+              Card price includes {dualPricingRate}% service fee
             </p>
           )}
         </CardContent>
@@ -676,15 +676,15 @@ function InvoiceScreen({
 }
 
 function SettingsScreen({
-  surchargeRate, onRateChange, onSave, onBack, saving,
+  dualPricingRate, onRateChange, onSave, onBack, saving,
 }: {
-  surchargeRate: number;
+  dualPricingRate: number;
   onRateChange: (v: number) => void;
   onSave: () => void;
   onBack: () => void;
   saving: boolean;
 }) {
-  const [localRate, setLocalRate] = useState(surchargeRate);
+  const [localRate, setLocalRate] = useState(dualPricingRate);
 
   return (
     <>
@@ -692,13 +692,13 @@ function SettingsScreen({
         <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-settings-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold" data-testid="text-settings-title">Surcharge Settings</h1>
+        <h1 className="text-xl font-bold" data-testid="text-settings-title">Dual Pricing Settings</h1>
       </div>
 
       <Card>
         <CardContent className="p-5 space-y-6">
           <div className="space-y-3">
-            <Label>Card Surcharge Rate</Label>
+            <Label>Card Dual Pricing Rate</Label>
             <div className="flex items-center gap-4">
               <Slider
                 value={[localRate]}
@@ -707,9 +707,9 @@ function SettingsScreen({
                 max={4}
                 step={0.25}
                 className="flex-1"
-                data-testid="slider-surcharge-rate"
+                data-testid="slider-dual-pricing-rate"
               />
-              <span className="font-mono text-lg font-bold min-w-[4rem] text-right" data-testid="text-surcharge-value">
+              <span className="font-mono text-lg font-bold min-w-[4rem] text-right" data-testid="text-dual-pricing-value">
                 {localRate.toFixed(2)}%
               </span>
             </div>
@@ -723,7 +723,7 @@ function SettingsScreen({
               min={0}
               max={4}
               step={0.25}
-              data-testid="input-surcharge-rate"
+              data-testid="input-dual-pricing-rate"
             />
           </div>
 
@@ -736,7 +736,7 @@ function SettingsScreen({
                 <p className="text-sm text-muted-foreground" data-testid="text-disclosure-preview">
                   {localRate > 0
                     ? `Card price includes a ${localRate.toFixed(2)}% service fee. Cash/debit price reflects the base price.`
-                    : "No surcharge applied. Cash and card prices are the same."}
+                    : "No dual pricing applied. Cash and card prices are the same."}
                 </p>
               </CardContent>
             </Card>
@@ -760,7 +760,7 @@ function SettingsScreen({
 function PaymentScreen({
   paymentMethod, onSelectMethod, totalCash, totalCard,
   activeAmount, tipAmount, customTip, totalWithTip,
-  surchargeRate, feeAmount, cardBrand, cardLast4,
+  dualPricingRate, feeAmount, cardBrand, cardLast4,
   onCardBrandChange, onCardLast4Change,
   onTipSelect, onCustomTipChange, onProcess, onBack, balanceDue,
 }: {
@@ -769,7 +769,7 @@ function PaymentScreen({
   totalCash: number; totalCard: number;
   activeAmount: number; tipAmount: number;
   customTip: string; totalWithTip: number;
-  surchargeRate: number; feeAmount: number;
+  dualPricingRate: number; feeAmount: number;
   cardBrand: string; cardLast4: string;
   onCardBrandChange: (v: string) => void;
   onCardLast4Change: (v: string) => void;
@@ -839,9 +839,9 @@ function PaymentScreen({
                     <p className="text-3xl font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-card-price">
                       ${fmt(activeAmount)}
                     </p>
-                    {surchargeRate > 0 && (
-                      <p className="text-xs text-muted-foreground" data-testid="text-surcharge-info">
-                        Includes {surchargeRate}% surcharge (${fmt(feeAmount)})
+                    {dualPricingRate > 0 && (
+                      <p className="text-xs text-muted-foreground" data-testid="text-dual-pricing-info">
+                        Includes {dualPricingRate}% dual pricing fee (${fmt(feeAmount)})
                       </p>
                     )}
                   </div>
@@ -966,7 +966,7 @@ function ReceiptScreen({
   ro, customer, vehicle, lineItems, shop,
   paymentMethod, authCode, cardBrand, cardLast4,
   tipAmount, totalWithTip, activeAmount, paidAt,
-  surchargeRate, feeAmount, subtotalCash, taxAmount,
+  dualPricingRate, feeAmount, subtotalCash, taxAmount,
   onPrint, onEmail, onViewInvoice, onBackToRO, roId,
 }: {
   ro: RepairOrder; customer: Customer | null; vehicle: Vehicle | null;
@@ -975,7 +975,7 @@ function ReceiptScreen({
   authCode: string; cardBrand: string; cardLast4: string;
   tipAmount: number; totalWithTip: number; activeAmount: number;
   paidAt: Date | null;
-  surchargeRate: number; feeAmount: number;
+  dualPricingRate: number; feeAmount: number;
   subtotalCash: number; taxAmount: number;
   onPrint: () => void; onEmail: () => void;
   onViewInvoice: () => void; onBackToRO: () => void;
@@ -1100,7 +1100,7 @@ function ReceiptScreen({
               )}
               {isCard && feeAmount > 0 && (
                 <div className="flex justify-between gap-2">
-                  <span>Surcharge ({surchargeRate}%)</span>
+                  <span>Dual Pricing ({dualPricingRate}%)</span>
                   <span className="font-mono">${fmt(feeAmount)}</span>
                 </div>
               )}

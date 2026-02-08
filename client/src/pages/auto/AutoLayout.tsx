@@ -49,7 +49,7 @@ function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
       title: "Invoice & Payments",
       items: [
         "Open any Repair Order and tap 'Invoice / Pay' to view the dual pricing invoice.",
-        "Choose Cash or Card payment method \u2014 card payments include the surcharge automatically.",
+        "Choose Cash or Card payment method \u2014 card payments include the dual pricing fee automatically.",
         "Add an optional tip before processing the payment.",
         "After payment, print or email the receipt directly to the customer.",
       ],
@@ -58,10 +58,10 @@ function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
       icon: DollarSign,
       title: "Dual Pricing",
       items: [
-        "Cash and Card prices are calculated automatically based on your surcharge rate.",
-        "Adjust the surcharge rate in Invoice Settings (gear icon on the invoice page).",
-        "The surcharge is disclosed on all invoices, receipts, and emails.",
-        "Typical surcharge rates are between 3% and 4%.",
+        "Cash and Card prices are calculated automatically based on your dual pricing rate.",
+        "Adjust the dual pricing rate in Invoice Settings (gear icon on the invoice page).",
+        "The dual pricing fee is disclosed on all invoices, receipts, and emails.",
+        "Dual pricing rates are set by the business and typically run between 3 and 4%.",
       ],
     },
     {

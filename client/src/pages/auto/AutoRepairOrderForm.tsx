@@ -584,7 +584,7 @@ export default function AutoRepairOrderForm() {
                     <div className="flex justify-between" data-testid="text-parts-tax"><span className="text-muted-foreground">Parts Tax</span><span>${parseFloat(ro.taxPartsAmount || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between" data-testid="text-labor-tax"><span className="text-muted-foreground">Labor Tax</span><span>${parseFloat(ro.taxLaborAmount || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between" data-testid="text-total-tax"><span className="text-muted-foreground">Total Tax</span><span>${parseFloat(ro.taxAmount || "0").toFixed(2)}</span></div>
-                    <div className="flex justify-between" data-testid="text-fee-amount"><span className="text-muted-foreground">Fee Amount (card surcharge)</span><span>${parseFloat(ro.feeAmount || "0").toFixed(2)}</span></div>
+                    <div className="flex justify-between" data-testid="text-fee-amount"><span className="text-muted-foreground">Fee Amount (dual pricing)</span><span>${parseFloat(ro.feeAmount || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between font-bold text-base" data-testid="text-total-cash"><span>Total (Cash)</span><span>${parseFloat(ro.totalCash || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between font-bold text-base" data-testid="text-total-card"><span>Total (Card)</span><span>${parseFloat(ro.totalCard || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between text-muted-foreground" data-testid="text-adjustable"><span>Adjustable</span><span>${parseFloat(ro.totalAdjustable || "0").toFixed(2)}</span></div>
