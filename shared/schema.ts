@@ -3577,6 +3577,10 @@ export const autoShops = pgTable("auto_shops", {
   terminalFeeLock: boolean("terminal_fee_lock").default(true),
   defaultPartsMarkupPct: numeric("default_parts_markup_pct", { precision: 5, scale: 2 }).default("0"),
   shopSupplyMethod: varchar("shop_supply_method", { length: 20 }).default("none"),
+  shopSupplyEnabled: boolean("shop_supply_enabled").default(false),
+  shopSupplyRatePct: numeric("shop_supply_rate_pct", { precision: 5, scale: 2 }).default("0"),
+  shopSupplyMaxAmount: numeric("shop_supply_max_amount", { precision: 10, scale: 2 }).default("0"),
+  shopSupplyTaxable: boolean("shop_supply_taxable").default(true),
   brandingColors: jsonb("branding_colors").default({}),
   invoiceFooter: text("invoice_footer"),
   logoUrl: text("logo_url"),
@@ -3608,6 +3612,7 @@ export const autoShopsRelations = relations(autoShops, ({ many }) => ({
   paymentLinks: many(autoPaymentLinks),
   timeClock: many(autoTimeClock),
   payrollRuns: many(autoPayrollRuns),
+  cannedServices: many(autoCannedServices),
 }));
 
 export const insertAutoShopSchema = createInsertSchema(autoShops).omit({
@@ -3705,6 +3710,7 @@ export const autoCustomers = pgTable("auto_customers", {
   zip: varchar("zip", { length: 10 }),
   notes: text("notes"),
   tags: text("tags").array(),
+  preferredContactMethod: varchar("preferred_contact_method", { length: 20 }),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3830,6 +3836,12 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   paidAt: timestamp("paid_at"),
   mileageIn: integer("mileage_in"),
   mileageOut: integer("mileage_out"),
+  paidAmount: numeric("paid_amount", { precision: 10, scale: 2 }).default("0"),
+  balanceDue: numeric("balance_due", { precision: 10, scale: 2 }).default("0"),
+  shopSupplyAmountCash: numeric("shop_supply_amount_cash", { precision: 10, scale: 2 }).default("0"),
+  shopSupplyAmountCard: numeric("shop_supply_amount_card", { precision: 10, scale: 2 }).default("0"),
+  discountAmountCash: numeric("discount_amount_cash", { precision: 10, scale: 2 }).default("0"),
+  discountAmountCard: numeric("discount_amount_card", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -3899,6 +3911,17 @@ export const autoLineItems = pgTable("auto_line_items", {
   costPrice: numeric("cost_price", { precision: 10, scale: 2 }),
   sortOrder: integer("sort_order").default(0),
   status: varchar("status", { length: 20 }).default("pending"),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }),
+  discountAmountCash: numeric("discount_amount_cash", { precision: 10, scale: 2 }).default("0"),
+  discountAmountCard: numeric("discount_amount_card", { precision: 10, scale: 2 }).default("0"),
+  discountReason: text("discount_reason"),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending"),
+  approvedAt: timestamp("approved_at"),
+  declinedAt: timestamp("declined_at"),
+  declinedReason: text("declined_reason"),
+  isShopSupply: boolean("is_shop_supply").default(false),
+  warrantyMonths: integer("warranty_months"),
+  warrantyMiles: integer("warranty_miles"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -4534,3 +4557,71 @@ export const insertAutoRollfiWebhookLogSchema = createInsertSchema(autoRollfiWeb
 });
 export type InsertAutoRollfiWebhookLog = z.infer<typeof insertAutoRollfiWebhookLogSchema>;
 export type AutoRollfiWebhookLog = typeof autoRollfiWebhookLog.$inferSelect;
+
+// 20. Auto Canned Services (pre-configured service packages)
+export const autoCannedServices = pgTable("auto_canned_services", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  name: varchar("name", { length: 150 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  defaultLaborHours: numeric("default_labor_hours", { precision: 6, scale: 2 }),
+  defaultLaborRate: numeric("default_labor_rate", { precision: 8, scale: 2 }),
+  defaultPriceCash: numeric("default_price_cash", { precision: 10, scale: 2 }),
+  defaultPriceCard: numeric("default_price_card", { precision: 10, scale: 2 }),
+  isTaxable: boolean("is_taxable").default(true),
+  isAdjustable: boolean("is_adjustable").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const autoCannedServicesRelations = relations(autoCannedServices, ({ one, many }) => ({
+  shop: one(autoShops, {
+    fields: [autoCannedServices.shopId],
+    references: [autoShops.id],
+  }),
+  items: many(autoCannedServiceItems),
+}));
+
+export const insertAutoCannedServiceSchema = createInsertSchema(autoCannedServices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAutoCannedService = z.infer<typeof insertAutoCannedServiceSchema>;
+export type AutoCannedService = typeof autoCannedServices.$inferSelect;
+
+// 21. Auto Canned Service Items (line items within a canned service)
+export const autoCannedServiceItems = pgTable("auto_canned_service_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  cannedServiceId: integer("canned_service_id").notNull().references(() => autoCannedServices.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 20 }).notNull(),
+  description: text("description").notNull(),
+  partNumber: varchar("part_number", { length: 100 }),
+  quantity: numeric("quantity", { precision: 8, scale: 2 }).default("1"),
+  unitPriceCash: numeric("unit_price_cash", { precision: 10, scale: 2 }).notNull(),
+  unitPriceCard: numeric("unit_price_card", { precision: 10, scale: 2 }),
+  laborHours: numeric("labor_hours", { precision: 6, scale: 2 }),
+  laborRate: numeric("labor_rate", { precision: 8, scale: 2 }),
+  costPrice: numeric("cost_price", { precision: 10, scale: 2 }),
+  isTaxable: boolean("is_taxable").default(true),
+  isAdjustable: boolean("is_adjustable").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoCannedServiceItemsRelations = relations(autoCannedServiceItems, ({ one }) => ({
+  cannedService: one(autoCannedServices, {
+    fields: [autoCannedServiceItems.cannedServiceId],
+    references: [autoCannedServices.id],
+  }),
+}));
+
+export const insertAutoCannedServiceItemSchema = createInsertSchema(autoCannedServiceItems).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoCannedServiceItem = z.infer<typeof insertAutoCannedServiceItemSchema>;
+export type AutoCannedServiceItem = typeof autoCannedServiceItems.$inferSelect;

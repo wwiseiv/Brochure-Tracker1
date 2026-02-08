@@ -35,6 +35,10 @@ Preferred communication style: Simple, everyday language.
 - **Test Credentials**: owner@demo.com / password123 for "Demo Auto Shop".
 - **Key Files**: `server/auto-routes.ts` (API), `server/auto-auth.ts` (auth), `server/auto-pdf.ts` (PDFs), `client/src/pages/auto/` (frontend pages), `client/src/hooks/use-auto-auth.ts` (auth hook).
 - **Phase 1 Complete**: Dual pricing engine (split tax rates, is_adjustable/is_ntnf per line), public customer approval page (/auto/approve/:token), PDF generation, split payment recording with balance tracking, tax configuration (parts/labor rates, labor taxable toggle), reports (Job P&L, Sales Tax, Tech Productivity, Approval Conversion).
+- **Phase 1.1 Complete (Feb 2026)**: Schema v1.1 upgrades (26 tables now), enhanced dual pricing engine with per-line discounts/approval/shop supply auto-calc/balance tracking, canned services (pre-configured service packages with CRUD + apply-to-RO), per-line customer approval workflow (public endpoints for selective line approval/decline), `recalculateROTotals()` reusable helper function.
+  - New schema fields: `paidAmount`/`balanceDue`/`discountAmountCash`/`discountAmountCard`/`shopSupplyAmountCash`/`shopSupplyAmountCard` on repair orders; `discountPercent`/`discountAmountCash`/`discountAmountCard`/`approvalStatus`/`approvedAt`/`declinedAt`/`isShopSupply`/`warrantyMonths`/`warrantyMiles` on line items; `preferredContactMethod` on customers; `shopSupplyEnabled`/`shopSupplyRatePct`/`shopSupplyMaxAmount`/`shopSupplyTaxable` on shops.
+  - New tables: `auto_canned_services`, `auto_canned_service_items`.
+  - New API routes: GET/POST/PATCH/DELETE `/api/auto/canned-services`, POST `/api/auto/repair-orders/:roId/apply-canned-service/:serviceId`, GET `/api/auto/public/estimate/:token/lines`, POST `/api/auto/public/estimate/:token/line-approval`.
 
 ## External Dependencies
 

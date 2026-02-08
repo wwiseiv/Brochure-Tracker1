@@ -6,6 +6,7 @@ import {
   autoRepairOrders, autoLineItems, autoPayments, autoDviTemplates,
   autoDviInspections, autoDviItems, autoBays, autoAppointments,
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
+  autoCannedServices, autoCannedServiceItems,
 } from "@shared/schema";
 import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
@@ -646,6 +647,156 @@ router.patch("/repair-orders/:id", autoAuth, async (req: Request, res: Response)
   }
 });
 
+async function recalculateROTotals(roId: number, shopId: number) {
+  const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
+  if (!shop) throw new Error("Shop not found");
+
+  const partsTaxRate = parseFloat(shop.partsTaxRate || shop.taxRate || "0");
+  const laborTaxRate = parseFloat(shop.laborTaxRate || "0");
+  const laborTaxable = shop.laborTaxable === true;
+  const cardFeePercent = parseFloat(shop.cardFeePercent || "0");
+
+  const items = await db.select().from(autoLineItems)
+    .where(and(
+      eq(autoLineItems.repairOrderId, roId),
+      or(eq(autoLineItems.status, "pending"), eq(autoLineItems.status, "approved"))
+    ));
+
+  let subtotalCash = 0, subtotalCard = 0;
+  let taxablePartsCash = 0, taxableLaborCash = 0;
+  let totalAdjustable = 0, totalNonAdjustable = 0;
+  let totalDiscountCash = 0, totalDiscountCard = 0;
+
+  for (const item of items) {
+    if (item.isShopSupply) continue;
+
+    const qty = parseFloat(item.quantity || "1");
+    const unitCash = parseFloat(item.unitPriceCash || "0");
+    const unitCard = parseFloat(item.unitPriceCard || "0");
+    const baseCash = qty * unitCash;
+    const baseCard = qty * unitCard;
+
+    let lineDCash = parseFloat(item.discountAmountCash || "0");
+    let lineDCard = parseFloat(item.discountAmountCard || "0");
+    const discPct = parseFloat(item.discountPercent || "0");
+    if (discPct > 0) {
+      lineDCash = baseCash * discPct;
+      lineDCard = baseCard * discPct;
+      await db.update(autoLineItems).set({
+        discountAmountCash: lineDCash.toFixed(2),
+        discountAmountCard: lineDCard.toFixed(2),
+      }).where(eq(autoLineItems.id, item.id));
+    }
+
+    const netCash = baseCash - lineDCash;
+    const netCard = baseCard - lineDCard;
+    totalDiscountCash += lineDCash;
+    totalDiscountCard += lineDCard;
+
+    if (item.type === "discount") {
+      subtotalCash -= netCash;
+      subtotalCard -= netCard;
+    } else {
+      subtotalCash += netCash;
+      subtotalCard += netCard;
+
+      if (item.isTaxable) {
+        if (item.type === "parts" || item.type === "fee") {
+          taxablePartsCash += netCash;
+        } else if ((item.type === "labor" || item.type === "sublet") && laborTaxable) {
+          taxableLaborCash += netCash;
+        }
+      }
+
+      if (item.isNtnf) {
+        totalNonAdjustable += netCash;
+      } else if (item.isAdjustable) {
+        totalAdjustable += netCash;
+      }
+    }
+  }
+
+  let shopSupplyCash = 0, shopSupplyCard = 0;
+  if (shop.shopSupplyEnabled) {
+    const ratePct = parseFloat(shop.shopSupplyRatePct || "0");
+    const maxAmt = parseFloat(shop.shopSupplyMaxAmount || "0");
+    shopSupplyCash = Math.min(subtotalCash * ratePct, maxAmt > 0 ? maxAmt : Infinity);
+    if (shopSupplyCash < 0) shopSupplyCash = 0;
+    shopSupplyCard = shopSupplyCash * (1 + cardFeePercent);
+
+    const existingSupply = items.find(i => i.isShopSupply === true);
+    if (existingSupply) {
+      await db.update(autoLineItems).set({
+        unitPriceCash: shopSupplyCash.toFixed(2),
+        unitPriceCard: shopSupplyCard.toFixed(2),
+        totalCash: shopSupplyCash.toFixed(2),
+        totalCard: shopSupplyCard.toFixed(2),
+        quantity: "1",
+      }).where(eq(autoLineItems.id, existingSupply.id));
+    } else {
+      await db.insert(autoLineItems).values({
+        repairOrderId: roId,
+        type: "fee",
+        description: "Shop Supplies",
+        quantity: "1",
+        unitPriceCash: shopSupplyCash.toFixed(2),
+        unitPriceCard: shopSupplyCard.toFixed(2),
+        totalCash: shopSupplyCash.toFixed(2),
+        totalCard: shopSupplyCard.toFixed(2),
+        isTaxable: shop.shopSupplyTaxable ?? true,
+        isAdjustable: true,
+        isShopSupply: true,
+        status: "approved",
+        sortOrder: 9999,
+      });
+    }
+
+    subtotalCash += shopSupplyCash;
+    subtotalCard += shopSupplyCard;
+    if (shop.shopSupplyTaxable) {
+      taxablePartsCash += shopSupplyCash;
+    }
+    totalAdjustable += shopSupplyCash;
+  }
+
+  const taxPartsAmount = taxablePartsCash * partsTaxRate;
+  const taxLaborAmount = taxableLaborCash * laborTaxRate;
+  const taxAmount = taxPartsAmount + taxLaborAmount;
+  const feeAmount = totalAdjustable * cardFeePercent;
+  const totalCash = subtotalCash + taxAmount;
+  const totalCard = subtotalCard + taxAmount;
+
+  const payments = await db.select().from(autoPayments)
+    .where(and(eq(autoPayments.repairOrderId, roId), eq(autoPayments.status, "completed")));
+  let paidAmount = 0;
+  for (const p of payments) {
+    paidAmount += parseFloat(p.amount || "0");
+  }
+  const balanceDue = Math.max(0, totalCard - paidAmount);
+
+  const [updated] = await db.update(autoRepairOrders).set({
+    subtotalCash: subtotalCash.toFixed(2),
+    subtotalCard: subtotalCard.toFixed(2),
+    taxAmount: taxAmount.toFixed(2),
+    taxPartsAmount: taxPartsAmount.toFixed(2),
+    taxLaborAmount: taxLaborAmount.toFixed(2),
+    totalCash: totalCash.toFixed(2),
+    totalCard: totalCard.toFixed(2),
+    totalAdjustable: totalAdjustable.toFixed(2),
+    totalNonAdjustable: totalNonAdjustable.toFixed(2),
+    feeAmount: feeAmount.toFixed(2),
+    paidAmount: paidAmount.toFixed(2),
+    balanceDue: balanceDue.toFixed(2),
+    shopSupplyAmountCash: shopSupplyCash.toFixed(2),
+    shopSupplyAmountCard: shopSupplyCard.toFixed(2),
+    discountAmountCash: totalDiscountCash.toFixed(2),
+    discountAmountCard: totalDiscountCard.toFixed(2),
+    updatedAt: new Date(),
+  }).where(eq(autoRepairOrders.id, roId)).returning();
+
+  return updated;
+}
+
 router.post("/repair-orders/:id/recalculate", autoAuth, async (req: Request, res: Response) => {
   try {
     const roId = parseInt(req.params.id);
@@ -653,85 +804,10 @@ router.post("/repair-orders/:id/recalculate", autoAuth, async (req: Request, res
       .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
     if (!ro) return res.status(404).json({ error: "RO not found" });
 
-    const items = await db.select().from(autoLineItems)
-      .where(and(eq(autoLineItems.repairOrderId, roId), or(eq(autoLineItems.status, "pending"), eq(autoLineItems.status, "approved"))));
-
-    const shop = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId)).limit(1);
-    const s = shop[0];
-    const partsTaxRate = parseFloat(s?.partsTaxRate || s?.taxRate || "0");
-    const laborTaxRate = parseFloat(s?.laborTaxRate || "0");
-    const laborTaxable = s?.laborTaxable === true;
-    const cardFeePercent = parseFloat(s?.cardFeePercent || "0");
-
-    let subtotalCash = 0, subtotalCard = 0;
-    let taxablePartsCash = 0, taxableLaborCash = 0;
-    let totalAdjustable = 0, totalNonAdjustable = 0;
-
-    for (const item of items) {
-      const cashAmt = parseFloat(item.totalCash || "0");
-      const cardAmt = parseFloat(item.totalCard || "0");
-
-      if (item.type === "discount") {
-        subtotalCash -= cashAmt;
-        subtotalCard -= cardAmt;
-      } else {
-        subtotalCash += cashAmt;
-        subtotalCard += cardAmt;
-
-        if (item.isTaxable) {
-          if (item.type === "parts" || item.type === "fee") {
-            taxablePartsCash += cashAmt;
-          } else if ((item.type === "labor" || item.type === "sublet") && laborTaxable) {
-            taxableLaborCash += cashAmt;
-          }
-        }
-
-        if (item.isNtnf) {
-          totalNonAdjustable += cashAmt;
-        } else if (item.isAdjustable) {
-          totalAdjustable += cashAmt;
-        }
-      }
-    }
-
-    let discountAmount = 0;
-    for (const item of items) {
-      if (item.type === "discount") {
-        discountAmount += parseFloat(item.totalCash || "0");
-      }
-    }
-    if (discountAmount > 0) {
-      const preDiscountSubtotal = subtotalCash + discountAmount;
-      if (preDiscountSubtotal > 0) {
-        const discountRatio = discountAmount / preDiscountSubtotal;
-        taxablePartsCash *= (1 - discountRatio);
-        taxableLaborCash *= (1 - discountRatio);
-      }
-    }
-
-    const taxPartsAmount = taxablePartsCash * partsTaxRate;
-    const taxLaborAmount = taxableLaborCash * laborTaxRate;
-    const taxAmount = taxPartsAmount + taxLaborAmount;
-    const feeAmount = totalAdjustable * cardFeePercent;
-    const totalCash = subtotalCash + taxAmount;
-    const totalCard = subtotalCard + taxAmount;
-
-    const [updated] = await db.update(autoRepairOrders).set({
-      subtotalCash: subtotalCash.toFixed(2),
-      subtotalCard: subtotalCard.toFixed(2),
-      taxAmount: taxAmount.toFixed(2),
-      taxPartsAmount: taxPartsAmount.toFixed(2),
-      taxLaborAmount: taxLaborAmount.toFixed(2),
-      totalCash: totalCash.toFixed(2),
-      totalCard: totalCard.toFixed(2),
-      totalAdjustable: totalAdjustable.toFixed(2),
-      totalNonAdjustable: totalNonAdjustable.toFixed(2),
-      feeAmount: feeAmount.toFixed(2),
-      updatedAt: new Date(),
-    }).where(eq(autoRepairOrders.id, roId)).returning();
-
+    const updated = await recalculateROTotals(roId, req.autoUser!.shopId);
     res.json(updated);
   } catch (err: any) {
+    console.error("Recalculate error:", err);
     res.status(500).json({ error: "Failed to recalculate totals" });
   }
 });
@@ -1090,6 +1166,205 @@ router.post("/dvi/inspections/:id/complete", autoAuth, async (req: Request, res:
     res.json(inspection);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to complete inspection" });
+  }
+});
+
+// ============================================================================
+// CANNED SERVICES
+// ============================================================================
+
+router.get("/canned-services", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const services = await db.select().from(autoCannedServices)
+      .where(eq(autoCannedServices.shopId, req.autoUser!.shopId))
+      .orderBy(asc(autoCannedServices.sortOrder));
+
+    const serviceIds = services.map(s => s.id);
+    let allItems: any[] = [];
+    if (serviceIds.length > 0) {
+      allItems = await db.select().from(autoCannedServiceItems)
+        .where(inArray(autoCannedServiceItems.cannedServiceId, serviceIds))
+        .orderBy(asc(autoCannedServiceItems.sortOrder));
+    }
+
+    const result = services.map(s => ({
+      ...s,
+      items: allItems.filter(i => i.cannedServiceId === s.id),
+    }));
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("Fetch canned services error:", err);
+    res.status(500).json({ error: "Failed to fetch canned services" });
+  }
+});
+
+router.post("/canned-services", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
+  try {
+    const { items, ...data } = req.body;
+
+    const [service] = await db.insert(autoCannedServices).values({
+      shopId: req.autoUser!.shopId,
+      name: data.name,
+      description: data.description || null,
+      category: data.category || null,
+      isActive: data.isActive !== false,
+      defaultLaborHours: data.defaultLaborHours || null,
+      defaultLaborRate: data.defaultLaborRate || null,
+      defaultPriceCash: data.defaultPriceCash || null,
+      defaultPriceCard: data.defaultPriceCard || null,
+      isTaxable: data.isTaxable !== false,
+      isAdjustable: data.isAdjustable !== false,
+      sortOrder: data.sortOrder || 0,
+    }).returning();
+
+    let createdItems: any[] = [];
+    if (items?.length) {
+      for (const item of items) {
+        const [created] = await db.insert(autoCannedServiceItems).values({
+          cannedServiceId: service.id,
+          type: item.type,
+          description: item.description,
+          partNumber: item.partNumber || null,
+          quantity: item.quantity || "1",
+          unitPriceCash: item.unitPriceCash,
+          unitPriceCard: item.unitPriceCard || null,
+          laborHours: item.laborHours || null,
+          laborRate: item.laborRate || null,
+          costPrice: item.costPrice || null,
+          isTaxable: item.isTaxable !== false,
+          isAdjustable: item.isAdjustable !== false,
+          sortOrder: item.sortOrder || 0,
+        }).returning();
+        createdItems.push(created);
+      }
+    }
+
+    res.json({ ...service, items: createdItems });
+  } catch (err: any) {
+    console.error("Create canned service error:", err);
+    res.status(500).json({ error: "Failed to create canned service" });
+  }
+});
+
+router.patch("/canned-services/:id", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
+  try {
+    const serviceId = parseInt(req.params.id);
+    const data = req.body;
+
+    const [existing] = await db.select().from(autoCannedServices)
+      .where(and(eq(autoCannedServices.id, serviceId), eq(autoCannedServices.shopId, req.autoUser!.shopId)));
+    if (!existing) return res.status(404).json({ error: "Canned service not found" });
+
+    const updates: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.category !== undefined) updates.category = data.category;
+    if (data.isActive !== undefined) updates.isActive = data.isActive;
+    if (data.defaultLaborHours !== undefined) updates.defaultLaborHours = data.defaultLaborHours;
+    if (data.defaultLaborRate !== undefined) updates.defaultLaborRate = data.defaultLaborRate;
+    if (data.defaultPriceCash !== undefined) updates.defaultPriceCash = data.defaultPriceCash;
+    if (data.defaultPriceCard !== undefined) updates.defaultPriceCard = data.defaultPriceCard;
+    if (data.isTaxable !== undefined) updates.isTaxable = data.isTaxable;
+    if (data.isAdjustable !== undefined) updates.isAdjustable = data.isAdjustable;
+    if (data.sortOrder !== undefined) updates.sortOrder = data.sortOrder;
+
+    const [updated] = await db.update(autoCannedServices).set(updates)
+      .where(eq(autoCannedServices.id, serviceId)).returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Update canned service error:", err);
+    res.status(500).json({ error: "Failed to update canned service" });
+  }
+});
+
+router.delete("/canned-services/:id", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
+  try {
+    const serviceId = parseInt(req.params.id);
+    const [deleted] = await db.delete(autoCannedServices)
+      .where(and(eq(autoCannedServices.id, serviceId), eq(autoCannedServices.shopId, req.autoUser!.shopId)))
+      .returning();
+    if (!deleted) return res.status(404).json({ error: "Canned service not found" });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete canned service error:", err);
+    res.status(500).json({ error: "Failed to delete canned service" });
+  }
+});
+
+router.post("/repair-orders/:roId/apply-canned-service/:serviceId", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const roId = parseInt(req.params.roId);
+    const serviceId = parseInt(req.params.serviceId);
+    const shopId = req.autoUser!.shopId;
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    const [service] = await db.select().from(autoCannedServices)
+      .where(and(eq(autoCannedServices.id, serviceId), eq(autoCannedServices.shopId, shopId)));
+    if (!service) return res.status(404).json({ error: "Canned service not found" });
+
+    const serviceItems = await db.select().from(autoCannedServiceItems)
+      .where(eq(autoCannedServiceItems.cannedServiceId, serviceId))
+      .orderBy(asc(autoCannedServiceItems.sortOrder));
+
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
+    const cardFeePercent = parseFloat(shop?.cardFeePercent || "0");
+
+    const existingCount = await db.select({ cnt: count() }).from(autoLineItems)
+      .where(eq(autoLineItems.repairOrderId, roId));
+    let sortBase = (existingCount[0]?.cnt || 0) + 1;
+
+    const createdItems: any[] = [];
+    for (const si of serviceItems) {
+      const qty = parseFloat(si.quantity || "1");
+      const unitCash = parseFloat(si.unitPriceCash || "0");
+      const isAdj = si.isAdjustable !== false;
+      const isNtnf = false;
+
+      let unitCard: number;
+      if (si.unitPriceCard) {
+        unitCard = parseFloat(si.unitPriceCard);
+      } else if (isAdj) {
+        unitCard = unitCash * (1 + cardFeePercent);
+      } else {
+        unitCard = unitCash;
+      }
+
+      const totalCash = qty * unitCash;
+      const totalCard = qty * unitCard;
+
+      const [lineItem] = await db.insert(autoLineItems).values({
+        repairOrderId: roId,
+        type: si.type,
+        description: si.description,
+        partNumber: si.partNumber || null,
+        quantity: si.quantity || "1",
+        unitPriceCash: unitCash.toFixed(2),
+        unitPriceCard: unitCard.toFixed(2),
+        totalCash: totalCash.toFixed(2),
+        totalCard: totalCard.toFixed(2),
+        laborHours: si.laborHours || null,
+        laborRate: si.laborRate || null,
+        costPrice: si.costPrice || null,
+        isTaxable: si.isTaxable !== false,
+        isAdjustable: isAdj,
+        isNtnf,
+        sortOrder: sortBase++,
+        status: "pending",
+      }).returning();
+      createdItems.push(lineItem);
+    }
+
+    const updated = await recalculateROTotals(roId, shopId);
+
+    res.json({ repairOrder: updated, lineItems: createdItems });
+  } catch (err: any) {
+    console.error("Apply canned service error:", err);
+    res.status(500).json({ error: "Failed to apply canned service" });
   }
 });
 
@@ -1460,6 +1735,127 @@ router.post("/public/estimate/:token/question", async (req: Request, res: Respon
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to submit question" });
+  }
+});
+
+router.get("/public/estimate/:token/lines", async (req: Request, res: Response) => {
+  try {
+    const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
+    if (!ro) return res.status(404).json({ error: "Estimate not found" });
+
+    const [customer] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+    const [vehicle] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, ro.shopId));
+    const lineItems = await db.select().from(autoLineItems)
+      .where(and(
+        eq(autoLineItems.repairOrderId, ro.id),
+        or(eq(autoLineItems.status, "pending"), eq(autoLineItems.status, "approved"))
+      ))
+      .orderBy(asc(autoLineItems.sortOrder));
+
+    res.json({
+      repairOrder: ro,
+      customer,
+      vehicle,
+      shop,
+      lineItems: lineItems.map(li => ({
+        id: li.id,
+        type: li.type,
+        description: li.description,
+        partNumber: li.partNumber,
+        quantity: li.quantity,
+        unitPriceCash: li.unitPriceCash,
+        unitPriceCard: li.unitPriceCard,
+        totalCash: li.totalCash,
+        totalCard: li.totalCard,
+        laborHours: li.laborHours,
+        isTaxable: li.isTaxable,
+        isAdjustable: li.isAdjustable,
+        isNtnf: li.isNtnf,
+        isShopSupply: li.isShopSupply,
+        discountPercent: li.discountPercent,
+        discountAmountCash: li.discountAmountCash,
+        discountAmountCard: li.discountAmountCard,
+        approvalStatus: li.approvalStatus,
+        approvedAt: li.approvedAt,
+        declinedAt: li.declinedAt,
+        declinedReason: li.declinedReason,
+        sortOrder: li.sortOrder,
+        status: li.status,
+      })),
+    });
+  } catch (err: any) {
+    console.error("Public estimate lines error:", err);
+    res.status(500).json({ error: "Failed to fetch estimate lines" });
+  }
+});
+
+router.post("/public/estimate/:token/line-approval", async (req: Request, res: Response) => {
+  try {
+    const { lineItems } = req.body;
+    if (!lineItems?.length) return res.status(400).json({ error: "lineItems array is required" });
+
+    const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
+    if (!ro) return res.status(404).json({ error: "Estimate not found" });
+
+    if (ro.status !== "estimate" && ro.status !== "declined") {
+      return res.status(400).json({ error: "This estimate cannot be modified in its current state" });
+    }
+
+    const existingItems = await db.select().from(autoLineItems)
+      .where(eq(autoLineItems.repairOrderId, ro.id));
+    const existingIds = new Set(existingItems.map(i => i.id));
+
+    let hasApproved = false;
+    let hasDeclined = false;
+
+    for (const li of lineItems) {
+      if (!existingIds.has(li.id)) continue;
+
+      const existing = existingItems.find(i => i.id === li.id);
+      if (existing?.approvalStatus === "approved" || existing?.approvalStatus === "declined") {
+        continue;
+      }
+
+      if (li.approved) {
+        await db.update(autoLineItems).set({
+          approvalStatus: "approved",
+          approvedAt: new Date(),
+          status: "approved",
+        }).where(eq(autoLineItems.id, li.id));
+        hasApproved = true;
+      } else {
+        await db.update(autoLineItems).set({
+          approvalStatus: "declined",
+          declinedAt: new Date(),
+          declinedReason: li.declinedReason || null,
+          status: "voided",
+        }).where(eq(autoLineItems.id, li.id));
+        hasDeclined = true;
+      }
+    }
+
+    let newStatus = ro.status;
+    if (hasApproved && !hasDeclined) {
+      newStatus = "approved";
+    } else if (hasApproved && hasDeclined) {
+      newStatus = "approved";
+    } else if (!hasApproved && hasDeclined) {
+      newStatus = "declined";
+    }
+
+    await db.update(autoRepairOrders).set({
+      status: newStatus,
+      approvedAt: hasApproved ? new Date() : ro.approvedAt,
+      updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, ro.id));
+
+    const updated = await recalculateROTotals(ro.id, ro.shopId);
+
+    res.json({ success: true, repairOrder: updated });
+  } catch (err: any) {
+    console.error("Line approval error:", err);
+    res.status(500).json({ error: "Failed to process line approvals" });
   }
 });
 
