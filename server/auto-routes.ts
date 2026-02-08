@@ -1832,17 +1832,61 @@ router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: R
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);
 
-  // Ensure demo account password is always valid on startup
+  // Ensure demo shop and account exist with valid password on startup
   (async () => {
     try {
-      const demoUser = await db.select().from(autoUsers).where(eq(autoUsers.email, "owner@demo.com")).limit(1);
-      if (demoUser.length) {
-        const freshHash = await hashPassword("password123");
-        await db.update(autoUsers).set({ passwordHash: freshHash }).where(eq(autoUsers.id, demoUser[0].id));
-        console.log("[AutoInit] Demo account password refreshed");
+      const freshHash = await hashPassword("password123");
+
+      // Check if demo shop exists
+      const existingShop = await db.select().from(autoShops).where(eq(autoShops.slug, "demo-auto")).limit(1);
+      let shopId: number;
+
+      if (existingShop.length) {
+        shopId = existingShop[0].id;
+        console.log("[AutoInit] Demo shop exists (id:", shopId, ")");
+      } else {
+        // Create demo shop
+        const [shop] = await db.insert(autoShops).values({
+          name: "Demo Auto Shop",
+          slug: "demo-auto",
+          address: "123 Main St",
+          city: "Dallas",
+          state: "TX",
+          zip: "75001",
+          phone: "(214) 555-1234",
+          timezone: "America/New_York",
+        }).returning();
+        shopId = shop.id;
+        console.log("[AutoInit] Created demo shop (id:", shopId, ")");
+
+        // Create default bays
+        await db.insert(autoBays).values([
+          { shopId, name: "Bay 1", sortOrder: 1 },
+          { shopId, name: "Bay 2", sortOrder: 2 },
+          { shopId, name: "Bay 3", sortOrder: 3 },
+        ]);
+        console.log("[AutoInit] Created default bays");
+      }
+
+      // Check if demo user exists
+      const existingUser = await db.select().from(autoUsers).where(eq(autoUsers.email, "owner@demo.com")).limit(1);
+      if (existingUser.length) {
+        await db.update(autoUsers).set({ passwordHash: freshHash }).where(eq(autoUsers.id, existingUser[0].id));
+        console.log("[AutoInit] Demo user password refreshed");
+      } else {
+        await db.insert(autoUsers).values({
+          shopId,
+          email: "owner@demo.com",
+          passwordHash: freshHash,
+          firstName: "John",
+          lastName: "Smith",
+          role: "owner",
+          isActive: true,
+        });
+        console.log("[AutoInit] Created demo user owner@demo.com");
       }
     } catch (err) {
-      console.error("[AutoInit] Failed to refresh demo password:", err);
+      console.error("[AutoInit] Failed to seed demo data:", err);
     }
   })();
 }
