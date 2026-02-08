@@ -31,6 +31,10 @@ Preferred communication style: Simple, everyday language.
 - **Frontend**: Dedicated pages under `/auto/`.
 - **Core Functionality**: Manages repair order lifecycle, customer and vehicle records, Digital Vehicle Inspections (DVI), appointments, payments, and integrations for multi-tenant auto repair shops.
 - **Key Design Decisions**: No storage of sensitive employee financial data, use of idempotency keys for payroll, encrypted storage of third-party API keys.
+- **PDF Generation**: Server-side PDF via pdfkit (`server/auto-pdf.ts`) for estimates, work orders, invoices.
+- **Test Credentials**: owner@demo.com / password123 for "Demo Auto Shop".
+- **Key Files**: `server/auto-routes.ts` (API), `server/auto-auth.ts` (auth), `server/auto-pdf.ts` (PDFs), `client/src/pages/auto/` (frontend pages), `client/src/hooks/use-auto-auth.ts` (auth hook).
+- **Phase 1 Complete**: Dual pricing engine (split tax rates, is_adjustable/is_ntnf per line), public customer approval page (/auto/approve/:token), PDF generation, split payment recording with balance tracking, tax configuration (parts/labor rates, labor taxable toggle), reports (Job P&L, Sales Tax, Tech Productivity, Approval Conversion).
 
 ## External Dependencies
 
