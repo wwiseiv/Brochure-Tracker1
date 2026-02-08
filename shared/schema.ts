@@ -3570,6 +3570,15 @@ export const autoShops = pgTable("auto_shops", {
   taxRate: numeric("tax_rate", { precision: 5, scale: 4 }).default("0"),
   laborRate: numeric("labor_rate", { precision: 8, scale: 2 }).default("0"),
   cardFeePercent: numeric("card_fee_percent", { precision: 5, scale: 4 }).default("0"),
+  laborTaxable: boolean("labor_taxable").default(false),
+  partsTaxRate: numeric("parts_tax_rate", { precision: 5, scale: 3 }).default("0"),
+  laborTaxRate: numeric("labor_tax_rate", { precision: 5, scale: 3 }).default("0"),
+  debitPosture: varchar("debit_posture", { length: 20 }).default("signature"),
+  terminalFeeLock: boolean("terminal_fee_lock").default(true),
+  defaultPartsMarkupPct: numeric("default_parts_markup_pct", { precision: 5, scale: 2 }).default("0"),
+  shopSupplyMethod: varchar("shop_supply_method", { length: 20 }).default("none"),
+  brandingColors: jsonb("branding_colors").default({}),
+  invoiceFooter: text("invoice_footer"),
   logoUrl: text("logo_url"),
   settings: jsonb("settings").default({}),
   isActive: boolean("is_active").default(true),
@@ -3586,6 +3595,9 @@ export const autoShopsRelations = relations(autoShops, ({ many }) => ({
   bays: many(autoBays),
   appointments: many(autoAppointments),
   invitations: many(autoInvitations),
+  messageTemplates: many(autoMessageTemplates),
+  paymentLinks: many(autoPaymentLinks),
+  timeClock: many(autoTimeClock),
 }));
 
 export const insertAutoShopSchema = createInsertSchema(autoShops).omit({
@@ -3606,6 +3618,10 @@ export const autoUsers = pgTable("auto_users", {
   lastName: varchar("last_name", { length: 100 }).notNull(),
   phone: varchar("phone", { length: 20 }),
   role: varchar("role", { length: 50 }).notNull(),
+  pin: varchar("pin", { length: 10 }),
+  payType: varchar("pay_type", { length: 20 }).default("hourly"),
+  payRate: numeric("pay_rate", { precision: 8, scale: 2 }),
+  hoursPerWeek: numeric("hours_per_week", { precision: 5, scale: 2 }).default("40"),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3785,6 +3801,21 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   approvalToken: varchar("approval_token", { length: 100 }).unique(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by", { length: 100 }),
+  hideCashDiscount: boolean("hide_cash_discount").default(false),
+  taxPartsAmount: numeric("tax_parts_amount", { precision: 10, scale: 2 }).default("0"),
+  taxLaborAmount: numeric("tax_labor_amount", { precision: 10, scale: 2 }).default("0"),
+  totalAdjustable: numeric("total_adjustable", { precision: 10, scale: 2 }).default("0"),
+  totalNonAdjustable: numeric("total_non_adjustable", { precision: 10, scale: 2 }).default("0"),
+  feeAmount: numeric("fee_amount", { precision: 10, scale: 2 }).default("0"),
+  approvalDeclinedAt: timestamp("approval_declined_at"),
+  approvalDeclinedReason: text("approval_declined_reason"),
+  approvalQuestion: text("approval_question"),
+  approvalQuestionAt: timestamp("approval_question_at"),
+  invoiceNumber: varchar("invoice_number", { length: 20 }),
+  invoicedAt: timestamp("invoiced_at"),
+  paidAt: timestamp("paid_at"),
+  mileageIn: integer("mileage_in"),
+  mileageOut: integer("mileage_out"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -3821,6 +3852,8 @@ export const autoRepairOrdersRelations = relations(autoRepairOrders, ({ one, man
   lineItems: many(autoLineItems),
   payments: many(autoPayments),
   dviInspections: many(autoDviInspections),
+  paymentLinks: many(autoPaymentLinks),
+  roEvents: many(autoRoEvents),
 }));
 
 export const insertAutoRepairOrderSchema = createInsertSchema(autoRepairOrders).omit({
@@ -3847,6 +3880,9 @@ export const autoLineItems = pgTable("auto_line_items", {
   laborRate: numeric("labor_rate", { precision: 8, scale: 2 }),
   vendorId: varchar("vendor_id", { length: 100 }),
   isTaxable: boolean("is_taxable").default(true),
+  isAdjustable: boolean("is_adjustable").default(true),
+  isNtnf: boolean("is_ntnf").default(false),
+  costPrice: numeric("cost_price", { precision: 10, scale: 2 }),
   sortOrder: integer("sort_order").default(0),
   status: varchar("status", { length: 20 }).default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3875,6 +3911,13 @@ export const autoPayments = pgTable("auto_payments", {
   method: varchar("method", { length: 20 }).notNull(),
   status: varchar("status", { length: 20 }).default("pending"),
   transactionId: varchar("transaction_id", { length: 255 }),
+  cardBrand: varchar("card_brand", { length: 20 }),
+  cardLast4: varchar("card_last4", { length: 4 }),
+  authCode: varchar("auth_code", { length: 50 }),
+  tipAmount: numeric("tip_amount", { precision: 10, scale: 2 }),
+  refundedAmount: numeric("refunded_amount", { precision: 10, scale: 2 }),
+  refundedAt: timestamp("refunded_at"),
+  gatewayResponse: jsonb("gateway_response"),
   paymentToken: varchar("payment_token", { length: 100 }).unique(),
   notes: text("notes"),
   processedAt: timestamp("processed_at"),
@@ -3898,6 +3941,180 @@ export const insertAutoPaymentSchema = createInsertSchema(autoPayments).omit({
 });
 export type InsertAutoPayment = z.infer<typeof insertAutoPaymentSchema>;
 export type AutoPayment = typeof autoPayments.$inferSelect;
+
+// Auto Payment Links
+export const autoPaymentLinks = pgTable("auto_payment_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id),
+  token: varchar("token", { length: 100 }).notNull().unique(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  isCardPrice: boolean("is_card_price").default(true),
+  url: text("url").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  deliveryChannel: varchar("delivery_channel", { length: 10 }),
+  deliveredTo: varchar("delivered_to", { length: 255 }),
+  deliveryStatus: varchar("delivery_status", { length: 20 }).default("pending"),
+  deliverySid: varchar("delivery_sid", { length: 100 }),
+  openedAt: timestamp("opened_at"),
+  completedAt: timestamp("completed_at"),
+  paymentId: integer("payment_id").references(() => autoPayments.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoPaymentLinksRelations = relations(autoPaymentLinks, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoPaymentLinks.shopId],
+    references: [autoShops.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoPaymentLinks.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+  payment: one(autoPayments, {
+    fields: [autoPaymentLinks.paymentId],
+    references: [autoPayments.id],
+  }),
+}));
+
+export const insertAutoPaymentLinkSchema = createInsertSchema(autoPaymentLinks).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoPaymentLink = z.infer<typeof insertAutoPaymentLinkSchema>;
+export type AutoPaymentLink = typeof autoPaymentLinks.$inferSelect;
+
+// Auto Message Templates
+export const autoMessageTemplates = pgTable("auto_message_templates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  channel: varchar("channel", { length: 10 }).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  body: text("body").notNull(),
+  isSystem: boolean("is_system").default(false),
+  isActive: boolean("is_active").default(true),
+  category: varchar("category", { length: 50 }).default("transactional"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueShopNameChannel: unique().on(table.shopId, table.name, table.channel),
+}));
+
+export const autoMessageTemplatesRelations = relations(autoMessageTemplates, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoMessageTemplates.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoMessageTemplateSchema = createInsertSchema(autoMessageTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAutoMessageTemplate = z.infer<typeof insertAutoMessageTemplateSchema>;
+export type AutoMessageTemplate = typeof autoMessageTemplates.$inferSelect;
+
+// Auto RO Events (RO timeline)
+export const autoRoEvents = pgTable("auto_ro_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  userId: integer("user_id").references(() => autoUsers.id),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  description: text("description").notNull(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoRoEventsRelations = relations(autoRoEvents, ({ one }) => ({
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoRoEvents.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+  shop: one(autoShops, {
+    fields: [autoRoEvents.shopId],
+    references: [autoShops.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoRoEvents.userId],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoRoEventSchema = createInsertSchema(autoRoEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoRoEvent = z.infer<typeof insertAutoRoEventSchema>;
+export type AutoRoEvent = typeof autoRoEvents.$inferSelect;
+
+// Auto QBO Sync Log
+export const autoQboSyncLog = pgTable("auto_qbo_sync_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  entityType: varchar("entity_type", { length: 30 }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  qboEntityId: varchar("qbo_entity_id", { length: 50 }),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  attemptCount: integer("attempt_count").default(1),
+  errorMessage: text("error_message"),
+  requestPayload: jsonb("request_payload"),
+  responsePayload: jsonb("response_payload"),
+  nextRetryAt: timestamp("next_retry_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoQboSyncLogRelations = relations(autoQboSyncLog, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoQboSyncLog.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoQboSyncLogSchema = createInsertSchema(autoQboSyncLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoQboSyncLog = z.infer<typeof insertAutoQboSyncLogSchema>;
+export type AutoQboSyncLog = typeof autoQboSyncLog.$inferSelect;
+
+// Auto Time Clock (tech time clock)
+export const autoTimeClock = pgTable("auto_time_clock", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  userId: integer("user_id").notNull().references(() => autoUsers.id),
+  clockInAt: timestamp("clock_in_at").notNull(),
+  clockOutAt: timestamp("clock_out_at"),
+  repairOrderId: integer("repair_order_id").references(() => autoRepairOrders.id),
+  breakMinutes: integer("break_minutes").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoTimeClockRelations = relations(autoTimeClock, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoTimeClock.shopId],
+    references: [autoShops.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoTimeClock.userId],
+    references: [autoUsers.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoTimeClock.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+}));
+
+export const insertAutoTimeClockSchema = createInsertSchema(autoTimeClock).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoTimeClock = z.infer<typeof insertAutoTimeClockSchema>;
+export type AutoTimeClock = typeof autoTimeClock.$inferSelect;
 
 // 9. Auto DVI Templates
 export const autoDviTemplates = pgTable("auto_dvi_templates", {

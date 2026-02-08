@@ -1,0 +1,1099 @@
+Let me research the Rollfi API docs first so the integration spec is based on real endpoints, not guesses.Good — I have the full Rollfi API structure. Now let me build the payroll integration foundation.- **Rollfi** is a division of **Priority Technology Holdings (NASDAQ: PRTH)**
+- Priority already processes payments — same company that powers PCBancard's payment processing
+- This creates a single-vendor relationship: payments + payroll, both through Priority
+- Rollfi offers three integration tiers: white-label UI (fastest), embedded iframes, and full API (most control)
+- Rollfi handles all tax compliance, filings, and direct deposits in all 50 states
+- Revenue model: PCB Auto earns a per-employee-per-month (PEPM) or per-payroll-run fee
+
+### 1.3 What Rollfi Handles vs. What PCB Auto Handles
+
+| Responsibility | Rollfi (API) | PCB Auto (our code) |
+|---------------|-------------|---------------------|
+| Tax calculations (federal, state, local) | ✅ | |
+| Tax filings and payments | ✅ | |
+| Direct deposit / ACH | ✅ | |
+| W-2 / 1099 generation | ✅ | |
+| New hire reporting | ✅ | |
+| Garnishment processing | ✅ | |
+| Benefits enrollment | ✅ (optional module) | |
+| KYB (business verification) | ✅ | |
+| Employee self-service portal | ✅ (white-label or API) | |
+| Time clock / hours tracking | | ✅ (v1.3) |
+| Flagged hours / efficiency | | ✅ (v1.3) |
+| Pay rate configuration | | ✅ (v1.3) |
+| Pay period summaries | | ✅ (v1.3) |
+| Payroll initiation (send hours to Rollfi) | | ✅ (this addendum) |
+| Payroll approval UX | | ✅ (this addendum) |
+| Paystub display in PCB Auto | | ✅ (this addendum) |
+| Webhook ingestion | | ✅ (this addendum) |
+
+---
+
+## 2. Architecture
+
+### 2.1 System Boundary Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         PCB AUTO                                │
+│                                                                 │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐    │
+│  │ Time Clock    │   │ Payroll      │   │ Employee         │    │
+│  │ Module (v1.3) │──▶│ Bridge       │──▶│ Self-Service     │    │
+│  │               │   │ Service      │   │ (embedded UI)    │    │
+│  │ • Clock in/out│   │              │   │                  │    │
+│  │ • Flagged hrs │   │ • Map hours  │   │ • Paystubs       │    │
+│  │ • Pay rates   │   │ • Initiate   │   │ • W-4 / banking  │    │
+│  │ • OT calc     │   │ • Approve    │   │ • Tax forms      │    │
+│  └──────────────┘   │ • Sync       │   └──────────────────┘    │
+│                      └──────┬───────┘                           │
+│                             │                                   │
+│                             │ REST API calls                    │
+│                             │                                   │
+│  ┌──────────────────────────┴────────────────────────────────┐  │
+│  │              Rollfi Payroll Adapter                        │  │
+│  │  (services/payroll/rollfi-adapter.ts)                     │  │
+│  │                                                           │  │
+│  │  • Auth (API key + token management)                      │  │
+│  │  • Company onboarding (KYB)                               │  │
+│  │  • Employee onboarding                                    │  │
+│  │  • Payroll processing (initiate → run → confirm)          │  │
+│  │  • Webhook handler (signature verification + routing)     │  │
+│  │  • Idempotency layer (prevent duplicate payroll runs)     │  │
+│  └──────────────────────────┬────────────────────────────────┘  │
+│                             │                                   │
+└─────────────────────────────┼───────────────────────────────────┘
+                              │ HTTPS (TLS 1.2+)
+                              ▼
+                ┌──────────────────────────┐
+                │     ROLLFI API           │
+                │  (api.rollfi.xyz)        │
+                │                          │
+                │  Company Onboarding      │
+                │  Employee Onboarding     │
+                │  Employer Portal         │
+                │  Employee Portal         │
+                │  Payroll Processing      │
+                │  Webhooks ──────────────────▶ POST /api/pcbauto/v1/webhooks/rollfi
+                │                          │
+                │  Tax engine              │
+                │  ACH / Direct deposit    │
+                │  W-2 / 1099 generation   │
+                └──────────────────────────┘
+```
+
+### 2.2 Data Flow: PCB Auto Hours → Rollfi Payroll
+
+```
+1. PAY PERIOD CLOSES (v1.3)
+   pcb_payroll_periods status → 'pending_approval'
+   ┌─────────────────────────────────────┐
+   │ Mike T: 82.0 clock hrs, 94.5 flag  │
+   │ Dave R: 84.5 clock hrs, 76.0 flag  │
+   │ Sarah K: 78.0 clock hrs, 81.0 flag │
+   └───────────────┬─────────────────────┘
+                   │
+2. OWNER REVIEWS & APPROVES IN PCB AUTO
+   Owner sees payroll summary (v1.3 screen)
+   Clicks [RUN PAYROLL] button
+                   │
+3. PAYROLL BRIDGE MAPS HOURS → ROLLFI FORMAT
+   For each employee:
+   ┌─────────────────────────────────────┐
+   │ {                                   │
+   │   "employee_id": "rollfi_emp_123",  │
+   │   "pay_period_start": "2026-02-03", │
+   │   "pay_period_end": "2026-02-16",   │
+   │   "regular_hours": 80.0,            │
+   │   "overtime_hours": 2.0,            │
+   │   "additional_earnings": [          │
+   │     { "type": "flat_rate_bonus",    │
+   │       "amount": 285.00 }            │
+   │   ],                                │
+   │   "deductions": [],                 │
+   │   "memo": "PCB Auto pay period 2/3" │
+   │ }                                   │
+   └───────────────┬─────────────────────┘
+                   │
+4. INITIATE PAYROLL → ROLLFI API
+   POST /payroll/initiate
+   Returns: payroll_run_id, preview with tax calculations
+                   │
+5. OWNER REVIEWS TAX PREVIEW
+   PCB Auto shows: gross → taxes → deductions → net
+   Owner confirms [APPROVE & RUN]
+                   │
+6. RUN PAYROLL → ROLLFI API
+   POST /payroll/run/{payroll_run_id}
+   Rollfi processes: calculates taxes, initiates ACH, files taxes
+                   │
+7. WEBHOOKS RECEIVED
+   ├── payroll.processing    → update pcb_payroll_periods status
+   ├── payroll.completed     → update status, store paystub refs
+   ├── payroll.failed        → alert owner, enable retry
+   └── direct_deposit.sent   → update employee payment status
+                   │
+8. PAYSTUBS AVAILABLE
+   Employees view paystubs in PCB Auto (via Rollfi API or embedded UI)
+```
+
+---
+
+## 3. Schema
+
+### 3.1 Rollfi Integration Config (on tenants table)
+
+```sql
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS
+  pcb_rollfi_enabled BOOLEAN DEFAULT FALSE,
+  pcb_rollfi_company_id VARCHAR(100),         -- Rollfi's company ID after KYB
+  pcb_rollfi_api_key TEXT,                     -- encrypted at rest
+  pcb_rollfi_kyb_status VARCHAR(30) DEFAULT 'not_started'
+    CHECK (pcb_rollfi_kyb_status IN (
+      'not_started', 'pending', 'documents_needed',
+      'under_review', 'approved', 'rejected'
+    )),
+  pcb_rollfi_kyb_completed_at TIMESTAMPTZ,
+  pcb_rollfi_pay_frequency VARCHAR(20) DEFAULT 'biweekly'
+    CHECK (pcb_rollfi_pay_frequency IN (
+      'weekly', 'biweekly', 'semimonthly', 'monthly'
+    )),
+  pcb_rollfi_next_pay_date DATE,
+  pcb_rollfi_check_date DATE,                  -- when employees get paid
+  pcb_rollfi_bank_verified BOOLEAN DEFAULT FALSE;
+```
+
+### 3.2 Employee Rollfi Mapping
+
+```sql
+-- Map PCB Auto employees → Rollfi employee records
+ALTER TABLE pcb_employees ADD COLUMN IF NOT EXISTS
+  rollfi_employee_id VARCHAR(100),             -- Rollfi's employee ID
+  rollfi_onboard_status VARCHAR(30) DEFAULT 'not_started'
+    CHECK (rollfi_onboard_status IN (
+      'not_started', 'invited', 'in_progress',
+      'pending_review', 'active', 'terminated'
+    )),
+  rollfi_onboarded_at TIMESTAMPTZ,
+  rollfi_last_sync_at TIMESTAMPTZ;
+```
+
+### 3.3 Payroll Run Tracking
+
+```sql
+CREATE TABLE pcb_payroll_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  payroll_period_id UUID NOT NULL REFERENCES pcb_payroll_periods(id),
+
+  -- Rollfi references
+  rollfi_payroll_id VARCHAR(100),              -- Rollfi's payroll run ID
+  rollfi_batch_id VARCHAR(100),
+
+  -- Timing
+  pay_period_start DATE NOT NULL,
+  pay_period_end DATE NOT NULL,
+  check_date DATE NOT NULL,                    -- when employees get paid
+  submission_deadline TIMESTAMPTZ,             -- last time to submit for this check date
+
+  -- Status
+  status VARCHAR(30) DEFAULT 'draft'
+    CHECK (status IN (
+      'draft',              -- hours entered but not submitted
+      'previewing',         -- sent to Rollfi for tax preview
+      'preview_ready',      -- owner can review taxes/net pay
+      'submitted',          -- owner approved, sent to Rollfi for processing
+      'processing',         -- Rollfi is processing (ACH, tax calc)
+      'completed',          -- payroll done, deposits initiated
+      'failed',             -- error occurred
+      'voided'              -- reversed/cancelled
+    )),
+
+  -- Totals (populated after Rollfi preview/completion)
+  total_gross_pay DECIMAL(12,2),
+  total_employee_taxes DECIMAL(12,2),
+  total_employer_taxes DECIMAL(12,2),
+  total_deductions DECIMAL(12,2),
+  total_net_pay DECIMAL(12,2),
+  total_employer_cost DECIMAL(12,2),           -- gross + employer taxes + employer benefits
+  employee_count INTEGER,
+
+  -- Idempotency
+  idempotency_key VARCHAR(100) NOT NULL UNIQUE, -- prevents duplicate submissions
+  -- Format: {tenant_id}:{period_start}:{period_end}:{check_date}
+
+  -- Error handling
+  error_code VARCHAR(50),
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
+  max_retries INTEGER DEFAULT 3,
+
+  -- Audit
+  initiated_by UUID REFERENCES users(id),
+  approved_by UUID REFERENCES users(id),
+  approved_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_pcb_payroll_runs_tenant ON pcb_payroll_runs(tenant_id, check_date DESC);
+CREATE INDEX idx_pcb_payroll_runs_status ON pcb_payroll_runs(tenant_id, status);
+CREATE INDEX idx_pcb_payroll_runs_rollfi ON pcb_payroll_runs(rollfi_payroll_id);
+
+ALTER TABLE pcb_payroll_runs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON pcb_payroll_runs
+  USING (tenant_id::text = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
+```
+
+### 3.4 Per-Employee Payroll Line Items
+
+```sql
+CREATE TABLE pcb_payroll_run_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  payroll_run_id UUID NOT NULL REFERENCES pcb_payroll_runs(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES pcb_employees(id),
+
+  -- Hours submitted (from PCB Auto time clock)
+  regular_hours DECIMAL(6,2) DEFAULT 0,
+  overtime_hours DECIMAL(6,2) DEFAULT 0,
+  holiday_hours DECIMAL(6,2) DEFAULT 0,
+  pto_hours DECIMAL(6,2) DEFAULT 0,
+  flagged_hours DECIMAL(6,2) DEFAULT 0,        -- for flat-rate context
+
+  -- Earnings (calculated by Rollfi after preview)
+  gross_pay DECIMAL(10,2),
+  regular_pay DECIMAL(10,2),
+  overtime_pay DECIMAL(10,2),
+  flat_rate_pay DECIMAL(10,2),
+  bonus_pay DECIMAL(10,2),
+  additional_earnings JSONB DEFAULT '[]',       -- [{type, description, amount}]
+
+  -- Taxes (populated by Rollfi)
+  federal_income_tax DECIMAL(10,2),
+  state_income_tax DECIMAL(10,2),
+  local_income_tax DECIMAL(10,2),
+  social_security_employee DECIMAL(10,2),
+  medicare_employee DECIMAL(10,2),
+  social_security_employer DECIMAL(10,2),
+  medicare_employer DECIMAL(10,2),
+  futa DECIMAL(10,2),                          -- federal unemployment (employer)
+  suta DECIMAL(10,2),                          -- state unemployment (employer)
+  total_employee_taxes DECIMAL(10,2),
+  total_employer_taxes DECIMAL(10,2),
+
+  -- Deductions
+  deductions JSONB DEFAULT '[]',                -- [{type, description, amount, is_pretax}]
+  total_deductions DECIMAL(10,2) DEFAULT 0,
+
+  -- Net
+  net_pay DECIMAL(10,2),
+  payment_method VARCHAR(20) DEFAULT 'direct_deposit'
+    CHECK (payment_method IN ('direct_deposit', 'check', 'manual')),
+
+  -- Rollfi references
+  rollfi_item_id VARCHAR(100),
+  rollfi_paystub_url TEXT,                     -- link to paystub PDF
+
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_pcb_pri_tenant ON pcb_payroll_run_items(tenant_id, payroll_run_id);
+CREATE INDEX idx_pcb_pri_employee ON pcb_payroll_run_items(employee_id);
+
+ALTER TABLE pcb_payroll_run_items ENABLE ROW LEVEL SECURITY;
+```
+
+### 3.5 Webhook Event Log
+
+```sql
+CREATE TABLE pcb_rollfi_webhook_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type VARCHAR(100) NOT NULL,            -- 'payroll.completed', 'kyb.status_updated', etc.
+  event_id VARCHAR(100) NOT NULL UNIQUE,       -- Rollfi's event ID (for deduplication)
+  payload JSONB NOT NULL,
+  signature VARCHAR(255),                      -- webhook signature for verification
+  tenant_id UUID REFERENCES tenants(id),       -- resolved from payload
+  payroll_run_id UUID REFERENCES pcb_payroll_runs(id),
+  processed BOOLEAN DEFAULT FALSE,
+  processed_at TIMESTAMPTZ,
+  error TEXT,
+  received_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_pcb_rollfi_wh_event ON pcb_rollfi_webhook_log(event_id);
+CREATE INDEX idx_pcb_rollfi_wh_type ON pcb_rollfi_webhook_log(event_type, processed);
+```
+
+---
+
+## 4. Rollfi Adapter (TypeScript)
+
+### 4.1 Interface
+
+```typescript
+// interfaces/payroll.ts
+
+interface PayrollAdapter {
+  name: string;
+
+  // ─── Company Onboarding (KYB) ───
+  createBusiness(data: CompanyOnboardData): Promise<{ companyId: string; kybStatus: string }>;
+  getKYBStatus(companyId: string): Promise<KYBStatusResponse>;
+  submitKYBDocuments(companyId: string, docs: KYBDocument[]): Promise<void>;
+
+  // ─── Employee Onboarding ───
+  createEmployee(companyId: string, data: EmployeeOnboardData): Promise<{ employeeId: string }>;
+  getEmployee(companyId: string, employeeId: string): Promise<RollfiEmployee>;
+  updateEmployee(companyId: string, employeeId: string, data: Partial<EmployeeOnboardData>): Promise<void>;
+  terminateEmployee(companyId: string, employeeId: string, data: TerminationData): Promise<void>;
+  getEmployeeSelfServiceUrl(companyId: string, employeeId: string): Promise<string>;
+
+  // ─── Payroll Processing ───
+  initiatePayroll(companyId: string, data: PayrollInitiateData): Promise<PayrollPreview>;
+  runPayroll(companyId: string, payrollId: string): Promise<{ status: string }>;
+  getPayrollStatus(companyId: string, payrollId: string): Promise<PayrollStatusResponse>;
+  voidPayroll(companyId: string, payrollId: string, reason: string): Promise<void>;
+
+  // ─── Paystubs & Reports ───
+  getPaystubs(companyId: string, employeeId: string, options?: { limit?: number }): Promise<Paystub[]>;
+  getPayrollSummary(companyId: string, payrollId: string): Promise<PayrollSummary>;
+  getTaxForms(companyId: string, employeeId: string, year: number): Promise<TaxForm[]>;
+
+  // ─── Webhooks ───
+  verifyWebhookSignature(headers: Record<string, string>, body: string): boolean;
+  parseWebhookEvent(body: string): RollfiWebhookEvent;
+
+  // ─── Connection ───
+  testConnection(): Promise<{ connected: boolean; companyName?: string }>;
+}
+
+// ─── Data Types ───
+
+interface CompanyOnboardData {
+  legalName: string;
+  dba?: string;
+  ein: string;                              // Federal EIN (XX-XXXXXXX)
+  entityType: 'sole_proprietorship' | 'partnership' | 'llc' | 's_corp' | 'c_corp';
+  address: {
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;                          // 2-letter code
+    zip: string;
+  };
+  phone: string;
+  email: string;
+  bankAccount: {
+    routingNumber: string;
+    accountNumber: string;
+    accountType: 'checking' | 'savings';
+  };
+  payFrequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  signatoryFirstName: string;
+  signatoryLastName: string;
+  signatoryTitle: string;
+  signatoryEmail: string;
+  signatorySsn: string;                     // for KYB verification
+  signatoryDob: string;                     // YYYY-MM-DD
+}
+
+interface EmployeeOnboardData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  ssn: string;                              // encrypted, never stored in PCB Auto DB
+  dateOfBirth: string;
+  hireDate: string;
+  address: {
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  compensation: {
+    type: 'hourly' | 'salary';
+    amount: number;                         // hourly rate or annual salary
+    overtimeEligible: boolean;
+  };
+  federalTax: {
+    filingStatus: 'single' | 'married_filing_jointly' | 'head_of_household';
+    allowances?: number;                    // legacy W-4
+    additionalWithholding?: number;
+    w4Year?: number;                        // 2020+ uses new form
+  };
+  stateTax?: {
+    state: string;
+    filingStatus?: string;
+    allowances?: number;
+    additionalWithholding?: number;
+  };
+  bankAccount?: {
+    routingNumber: string;
+    accountNumber: string;
+    accountType: 'checking' | 'savings';
+  };
+}
+
+interface PayrollInitiateData {
+  payPeriodStart: string;                   // YYYY-MM-DD
+  payPeriodEnd: string;
+  checkDate: string;                        // when employees get paid
+  idempotencyKey: string;
+  employees: Array<{
+    employeeId: string;                     // Rollfi employee ID
+    regularHours: number;
+    overtimeHours: number;
+    additionalEarnings?: Array<{
+      type: string;                         // 'bonus', 'commission', 'flat_rate_premium'
+      amount: number;
+      description?: string;
+    }>;
+    deductions?: Array<{
+      type: string;
+      amount: number;
+      preTax: boolean;
+    }>;
+    memo?: string;
+  }>;
+}
+
+interface PayrollPreview {
+  payrollId: string;
+  checkDate: string;
+  employees: Array<{
+    employeeId: string;
+    employeeName: string;
+    grossPay: number;
+    taxes: {
+      federalIncomeTax: number;
+      stateIncomeTax: number;
+      localIncomeTax: number;
+      socialSecurity: number;
+      medicare: number;
+      totalEmployee: number;
+      totalEmployer: number;
+    };
+    deductions: Array<{ type: string; amount: number }>;
+    netPay: number;
+  }>;
+  totals: {
+    grossPay: number;
+    totalEmployeeTaxes: number;
+    totalEmployerTaxes: number;
+    totalDeductions: number;
+    totalNetPay: number;
+    totalEmployerCost: number;
+  };
+  submissionDeadline: string;               // last time owner can approve
+}
+
+interface RollfiWebhookEvent {
+  eventId: string;
+  eventType: string;
+  companyId: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+```
+
+### 4.2 Rollfi Adapter Implementation
+
+```typescript
+// adapters/rollfi-payroll.ts
+
+import crypto from 'crypto';
+
+class RollfiPayrollAdapter implements PayrollAdapter {
+  name = 'rollfi';
+  private baseUrl = 'https://api.rollfi.xyz/v1';  // TBD: confirm actual base URL
+  private apiKey: string;
+  private webhookSecret: string;
+
+  constructor(config: { apiKey: string; webhookSecret: string }) {
+    this.apiKey = config.apiKey;
+    this.webhookSecret = config.webhookSecret;
+  }
+
+  private async request(method: string, path: string, body?: unknown): Promise<any> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': body?.['idempotencyKey'] || undefined,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new RollfiAPIError(
+        response.status,
+        error.code || 'UNKNOWN',
+        error.message || `Rollfi API error: ${response.status}`
+      );
+    }
+
+    return response.json();
+  }
+
+  // ─── Company Onboarding ───
+
+  async createBusiness(data: CompanyOnboardData): Promise<{ companyId: string; kybStatus: string }> {
+    const result = await this.request('POST', '/companies', {
+      legal_name: data.legalName,
+      dba: data.dba,
+      ein: data.ein,
+      entity_type: data.entityType,
+      address: data.address,
+      phone: data.phone,
+      email: data.email,
+      bank_account: {
+        routing_number: data.bankAccount.routingNumber,
+        account_number: data.bankAccount.accountNumber,
+        account_type: data.bankAccount.accountType,
+      },
+      pay_frequency: data.payFrequency,
+      signatory: {
+        first_name: data.signatoryFirstName,
+        last_name: data.signatoryLastName,
+        title: data.signatoryTitle,
+        email: data.signatoryEmail,
+        ssn: data.signatorySsn,
+        date_of_birth: data.signatoryDob,
+      },
+    });
+
+    return {
+      companyId: result.company_id,
+      kybStatus: result.kyb_status,
+    };
+  }
+
+  async getKYBStatus(companyId: string): Promise<KYBStatusResponse> {
+    const result = await this.request('GET', `/companies/${companyId}/kyb`);
+    return {
+      status: result.status,
+      requiresDocuments: result.requires_documents || false,
+      requiredDocuments: result.required_documents || [],
+      message: result.message,
+    };
+  }
+
+  // ─── Employee Onboarding ───
+
+  async createEmployee(companyId: string, data: EmployeeOnboardData) {
+    const result = await this.request('POST', `/companies/${companyId}/employees`, {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      ssn: data.ssn,
+      date_of_birth: data.dateOfBirth,
+      hire_date: data.hireDate,
+      address: data.address,
+      compensation: {
+        type: data.compensation.type,
+        amount: data.compensation.amount,
+        overtime_eligible: data.compensation.overtimeEligible,
+      },
+      federal_tax: data.federalTax,
+      state_tax: data.stateTax,
+      bank_account: data.bankAccount,
+    });
+
+    return { employeeId: result.employee_id };
+  }
+
+  async getEmployeeSelfServiceUrl(companyId: string, employeeId: string): Promise<string> {
+    // Rollfi provides an embeddable URL or SSO link for employee self-service
+    const result = await this.request(
+      'POST',
+      `/companies/${companyId}/employees/${employeeId}/self-service-link`
+    );
+    return result.url;
+  }
+
+  // ─── Payroll Processing ───
+
+  async initiatePayroll(companyId: string, data: PayrollInitiateData): Promise<PayrollPreview> {
+    const result = await this.request('POST', `/companies/${companyId}/payroll`, {
+      pay_period_start: data.payPeriodStart,
+      pay_period_end: data.payPeriodEnd,
+      check_date: data.checkDate,
+      idempotency_key: data.idempotencyKey,
+      employees: data.employees.map(emp => ({
+        employee_id: emp.employeeId,
+        regular_hours: emp.regularHours,
+        overtime_hours: emp.overtimeHours,
+        additional_earnings: emp.additionalEarnings,
+        deductions: emp.deductions,
+        memo: emp.memo,
+      })),
+    });
+
+    // Rollfi returns a preview with tax calculations
+    return this.mapPayrollPreview(result);
+  }
+
+  async runPayroll(companyId: string, payrollId: string): Promise<{ status: string }> {
+    const result = await this.request(
+      'POST',
+      `/companies/${companyId}/payroll/${payrollId}/run`
+    );
+    return { status: result.status };
+  }
+
+  // ─── Webhooks ───
+
+  verifyWebhookSignature(headers: Record<string, string>, body: string): boolean {
+    const signature = headers['x-rollfi-signature'] || headers['x-webhook-signature'];
+    if (!signature) return false;
+
+    const expected = crypto
+      .createHmac('sha256', this.webhookSecret)
+      .update(body)
+      .digest('hex');
+
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expected)
+    );
+  }
+
+  parseWebhookEvent(body: string): RollfiWebhookEvent {
+    const parsed = JSON.parse(body);
+    return {
+      eventId: parsed.event_id || parsed.webhook_id,
+      eventType: parsed.event_type,
+      companyId: parsed.company_id,
+      timestamp: parsed.created_at || parsed.timestamp,
+      data: parsed.data || parsed,
+    };
+  }
+
+  // ─── Private Helpers ───
+
+  private mapPayrollPreview(raw: any): PayrollPreview {
+    return {
+      payrollId: raw.payroll_id,
+      checkDate: raw.check_date,
+      employees: (raw.employees || []).map((emp: any) => ({
+        employeeId: emp.employee_id,
+        employeeName: `${emp.first_name} ${emp.last_name}`,
+        grossPay: emp.gross_pay,
+        taxes: {
+          federalIncomeTax: emp.taxes?.federal_income_tax || 0,
+          stateIncomeTax: emp.taxes?.state_income_tax || 0,
+          localIncomeTax: emp.taxes?.local_income_tax || 0,
+          socialSecurity: emp.taxes?.social_security || 0,
+          medicare: emp.taxes?.medicare || 0,
+          totalEmployee: emp.taxes?.total_employee || 0,
+          totalEmployer: emp.taxes?.total_employer || 0,
+        },
+        deductions: emp.deductions || [],
+        netPay: emp.net_pay,
+      })),
+      totals: {
+        grossPay: raw.totals?.gross_pay || 0,
+        totalEmployeeTaxes: raw.totals?.total_employee_taxes || 0,
+        totalEmployerTaxes: raw.totals?.total_employer_taxes || 0,
+        totalDeductions: raw.totals?.total_deductions || 0,
+        totalNetPay: raw.totals?.total_net_pay || 0,
+        totalEmployerCost: raw.totals?.total_employer_cost || 0,
+      },
+      submissionDeadline: raw.submission_deadline,
+    };
+  }
+}
+
+class RollfiAPIError extends Error {
+  constructor(
+    public statusCode: number,
+    public code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'RollfiAPIError';
+  }
+}
+```
+
+---
+
+## 5. API Endpoints (PCB Auto)
+
+```
+── /api/pcbauto/v1/payroll (additions to v1.3)
+
+  COMPANY SETUP (one-time per shop)
+  POST   /setup/create-business         Initiate KYB with Rollfi
+  GET    /setup/kyb-status              Check KYB verification status
+  POST   /setup/kyb-documents           Upload KYB documents if requested
+  POST   /setup/verify-bank             Verify company bank account
+  GET    /setup/status                  Overall payroll setup status
+
+  EMPLOYEE SYNC
+  POST   /employees/:id/onboard         Push employee to Rollfi
+  GET    /employees/:id/rollfi-status    Check onboarding status
+  POST   /employees/:id/terminate        Terminate employee in Rollfi
+  GET    /employees/:id/self-service     Get employee self-service URL
+  POST   /employees/sync-all            Batch sync all active employees
+
+  PAYROLL RUNS
+  POST   /runs/preview                   Send hours to Rollfi, get tax preview
+  GET    /runs/:id                       Get payroll run details
+  POST   /runs/:id/approve              Owner approves → triggers Rollfi run
+  POST   /runs/:id/void                 Void/cancel a payroll run
+  GET    /runs                           List payroll runs (date range filter)
+
+  PAYSTUBS & TAX FORMS
+  GET    /employees/:id/paystubs         List paystubs for employee
+  GET    /employees/:id/paystubs/:pid    Get specific paystub
+  GET    /employees/:id/tax-forms        Get W-2 / tax forms
+
+  WEBHOOKS (internal endpoint, no auth — verified by signature)
+  POST   /webhooks/rollfi                Receive Rollfi webhook events
+```
+
+---
+
+## 6. Webhook Handler
+
+```typescript
+// routes/webhooks/rollfi.ts
+
+const WEBHOOK_EVENTS = {
+  // KYB
+  'kyb.status_updated': handleKYBStatusUpdate,
+  'kyb.documents_required': handleKYBDocumentsRequired,
+  'kyb.approved': handleKYBApproved,
+  'kyb.rejected': handleKYBRejected,
+
+  // Employee
+  'employee.onboarding_complete': handleEmployeeOnboarded,
+  'employee.bank_account_updated': handleEmployeeBankUpdate,
+  'employee.tax_info_updated': handleEmployeeTaxUpdate,
+
+  // Payroll
+  'payroll.processing': handlePayrollProcessing,
+  'payroll.completed': handlePayrollCompleted,
+  'payroll.failed': handlePayrollFailed,
+  'payroll.taxes_filed': handleTaxesFiled,
+
+  // Deposits
+  'direct_deposit.initiated': handleDepositInitiated,
+  'direct_deposit.completed': handleDepositCompleted,
+  'direct_deposit.failed': handleDepositFailed,
+
+  // Tax forms
+  'tax_form.w2_ready': handleW2Ready,
+};
+
+async function handleRollfiWebhook(req: Request, res: Response) {
+  const adapter = getRollfiAdapter(/* config from PCBISV settings */);
+
+  // 1. Verify signature
+  if (!adapter.verifyWebhookSignature(req.headers, req.body)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // 2. Parse event
+  const event = adapter.parseWebhookEvent(req.body);
+
+  // 3. Deduplicate (check event_id in webhook log)
+  const existing = await db.query(
+    'SELECT id FROM pcb_rollfi_webhook_log WHERE event_id = $1',
+    [event.eventId]
+  );
+  if (existing.rows.length > 0) {
+    return res.status(200).json({ status: 'already_processed' });
+  }
+
+  // 4. Log the webhook
+  await db.query(
+    `INSERT INTO pcb_rollfi_webhook_log
+     (event_type, event_id, payload, signature, tenant_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [event.eventType, event.eventId, event.data, req.headers['x-rollfi-signature'],
+     await resolveTenantFromCompanyId(event.companyId)]
+  );
+
+  // 5. Route to handler
+  const handler = WEBHOOK_EVENTS[event.eventType];
+  if (handler) {
+    try {
+      await handler(event);
+      await db.query(
+        `UPDATE pcb_rollfi_webhook_log SET processed = TRUE, processed_at = NOW()
+         WHERE event_id = $1`,
+        [event.eventId]
+      );
+    } catch (err) {
+      await db.query(
+        `UPDATE pcb_rollfi_webhook_log SET error = $1 WHERE event_id = $2`,
+        [err.message, event.eventId]
+      );
+      // Don't return 500 — Rollfi would retry. Log and investigate.
+    }
+  }
+
+  // 6. Always return 200 (acknowledge receipt)
+  res.status(200).json({ status: 'received' });
+}
+```
+
+---
+
+## 7. Idempotency & Safety
+
+Payroll is the highest-stakes operation in the system. A duplicate payroll run means paying employees twice, which is extremely difficult to reverse.
+
+### 7.1 Idempotency Key Format
+
+```
+{tenant_id}:{pay_period_start}:{pay_period_end}:{check_date}
+```
+
+Example: `a1b2c3d4:2026-02-03:2026-02-16:2026-02-20`
+
+This ensures the same pay period + check date can only be submitted once. The key is stored on `pcb_payroll_runs` with a UNIQUE constraint and sent to Rollfi's API as well.
+
+### 7.2 Safety Checks Before Payroll Submission
+
+```typescript
+async function validatePayrollSubmission(tenantId: string, data: PayrollInitiateData) {
+  const checks = [];
+
+  // 1. KYB must be approved
+  const tenant = await getTenant(tenantId);
+  if (tenant.pcb_rollfi_kyb_status !== 'approved') {
+    checks.push('Company KYB verification not complete');
+  }
+
+  // 2. All employees must be onboarded in Rollfi
+  const employees = await getEmployeesForPayroll(tenantId, data);
+  const notOnboarded = employees.filter(e => e.rollfi_onboard_status !== 'active');
+  if (notOnboarded.length > 0) {
+    checks.push(`${notOnboarded.length} employee(s) not yet onboarded in payroll`);
+  }
+
+  // 3. No duplicate run for same period
+  const existingRun = await db.query(
+    `SELECT id, status FROM pcb_payroll_runs
+     WHERE tenant_id = $1 AND pay_period_start = $2 AND pay_period_end = $3
+     AND status NOT IN ('voided', 'failed')`,
+    [tenantId, data.payPeriodStart, data.payPeriodEnd]
+  );
+  if (existingRun.rows.length > 0) {
+    checks.push(`Payroll already exists for this period (status: ${existingRun.rows[0].status})`);
+  }
+
+  // 4. All time entries approved
+  const unapproved = await db.query(
+    `SELECT COUNT(*) FROM pcb_time_clock
+     WHERE tenant_id = $1 AND clock_in >= $2 AND clock_in <= $3 AND approved = FALSE`,
+    [tenantId, data.payPeriodStart, data.payPeriodEnd]
+  );
+  if (parseInt(unapproved.rows[0].count) > 0) {
+    checks.push(`${unapproved.rows[0].count} unapproved time entries for this period`);
+  }
+
+  // 5. Check date is in the future
+  if (new Date(data.checkDate) <= new Date()) {
+    checks.push('Check date must be in the future');
+  }
+
+  return { valid: checks.length === 0, errors: checks };
+}
+```
+
+---
+
+## 8. UX Screens
+
+### 8.1 Payroll Setup Wizard (one-time)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Set Up Payroll                                          │
+│──────────────────────────────────────────────────────────│
+│                                                          │
+│  Step 1 of 4: Business Information                       │
+│  ━━━━━━━━━━━━━━━○─────────────────────                  │
+│  Business  ·  Bank  ·  Schedule  ·  Verify               │
+│                                                          │
+│  Legal Business Name: [_________________________]        │
+│  DBA (if different):  [_________________________]        │
+│  EIN:                 [__-_______]                        │
+│  Entity Type:         [LLC ▾]                            │
+│                                                          │
+│  Business Address:                                       │
+│  [_________________________]                              │
+│  [_________________________]                              │
+│  [City________] [State ▾] [Zip____]                     │
+│                                                          │
+│  Authorized Signer (for tax filings):                    │
+│  First: [____________] Last: [____________]              │
+│  Title: [____________] Email: [___________]              │
+│                                                          │
+│                                    [NEXT: Bank Account →]│
+└──────────────────────────────────────────────────────────┘
+```
+
+Steps: Business Info → Bank Account → Pay Schedule → Review & Submit (triggers KYB)
+
+### 8.2 Run Payroll Screen (recurring)
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Run Payroll: Feb 3–16, 2026              Check Date: Feb 20, 2026      │
+│  Status: 🟡 Preview Ready — Review and approve below                    │
+│──────────────────────────────────────────────────────────────────────────│
+│                                                                         │
+│  Employee      Reg Hrs  OT Hrs  Gross     Taxes    Deduct   NET PAY    │
+│  ───────────────────────────────────────────────────────────────────    │
+│  Mike T.       80.0     2.0     $2,916.50 $728.14  $125.00  $2,063.36  │
+│    Flat rate: 94.5 flagged hrs × $30/hr                                │
+│  Dave R.       80.0     4.5     $2,383.75 $595.40  $85.00   $1,703.35  │
+│    Hourly: $27/hr + OT $40.50/hr                                       │
+│  Sarah K.      78.0     0.0     $2,106.00 $526.50  $150.00  $1,429.50  │
+│    Hourly: $27/hr                                                       │
+│  Tom L.        80.0     0.0     $2,650.00 $662.50  $100.00  $1,887.50  │
+│    Salary: $2,400 + bonus (8.5 hrs over threshold × $50)               │
+│  ───────────────────────────────────────────────────────────────────    │
+│  TOTALS        318.0    6.5     $10,056.25                             │
+│                                                                         │
+│  Employee Taxes:   $2,512.54                                           │
+│  Employer Taxes:   $1,206.75  (FICA + FUTA + SUTA)                     │
+│  Total Deductions: $460.00                                             │
+│  ──────────────────────────────────                                    │
+│  TOTAL NET PAY:    $7,083.71                                           │
+│  TOTAL COST:       $11,263.00  (gross + employer taxes)                │
+│                                                                         │
+│  ⚠️ Submit by Feb 18 at 5:00 PM EST for Feb 20 check date             │
+│                                                                         │
+│  [← Edit Hours]                    [APPROVE & RUN PAYROLL]             │
+│                                                                         │
+│  By approving, you authorize Rollfi to debit your bank account         │
+│  for $11,263.00 and distribute funds to employees.                     │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Employee Self-Service (embedded)
+
+Two options for implementation:
+
+**Option A: White-label iframe (fastest)**
+Embed Rollfi's white-label employee portal in an iframe within PCB Auto. Employee clicks "My Pay" → sees Rollfi UI branded as the shop.
+
+**Option B: API-driven (full control)**
+Build our own paystub viewer, W-4 editor, and banking forms. Pull data via Rollfi API. More work but seamless UX.
+
+**Recommendation:** Start with Option A (iframe) for MVP, migrate to Option B in Phase 3.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  My Pay                                                  │
+│──────────────────────────────────────────────────────────│
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  [Rollfi embedded portal — white-labeled]          │  │
+│  │                                                    │  │
+│  │  RECENT PAYSTUBS                                   │  │
+│  │  Feb 20, 2026    $2,063.36 net    [View PDF]       │  │
+│  │  Feb 6, 2026     $1,980.22 net    [View PDF]       │  │
+│  │  Jan 23, 2026    $2,150.00 net    [View PDF]       │  │
+│  │                                                    │  │
+│  │  BANKING           ████ 4521 (Checking)  [Edit]    │  │
+│  │  TAX WITHHOLDING   Single, 0 allowances  [Edit]    │  │
+│  │  TAX FORMS         2025 W-2 available    [Download]│  │
+│  │                                                    │  │
+│  └────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 9. Security
+
+### 9.1 Sensitive Data Handling
+
+| Data | Where it lives | PCB Auto stores? |
+|------|---------------|-----------------|
+| SSN | Rollfi only | ❌ NEVER stored — passed through and discarded |
+| Bank routing/account | Rollfi only | ❌ NEVER stored — passed through to Rollfi |
+| EIN | Rollfi + encrypted tenant config | ✅ Encrypted at rest |
+| Rollfi API key | Tenant config | ✅ Encrypted at rest (AES-256) |
+| Tax calculations | Rollfi | ❌ We store the result amounts, not the calc logic |
+| Paystub PDFs | Rollfi CDN | ❌ We store URL references only |
+| Webhook payloads | pcb_rollfi_webhook_log | ✅ Retained 90 days, then purged |
+
+### 9.2 PCI/Security Principles
+
+- SSNs and bank accounts are **never written to our database** — they're collected in the frontend and sent directly to Rollfi's API (or via their secure iframe)
+- Rollfi handles PCI compliance for payroll bank data
+- Webhook signatures verified on every inbound event (HMAC-SHA256)
+- Payroll approval requires owner role (RBAC enforced)
+- All payroll operations logged in `pcb_audit_log`
+
+---
+
+## 10. Priority/Rollfi Onboarding Steps (For William)
+
+Before building, you need Rollfi API access. Here's the playbook:
+
+### 10.1 Contact Rollfi
+
+**Email:** partnerships@rollfi.xyz (or via cal.com/team/rollfi/embedded-payroll)
+**Phone:** Book a call via their website
+
+**What to tell them:**
+> "I'm building PCB Auto, a vertical SaaS platform for auto repair shops, deployed on PCBISV.com. We already have a relationship with Priority Commerce for payment processing (PCBancard). We want to embed Rollfi payroll into our platform so shop owners can run payroll directly from our app. We need API access + sandbox credentials."
+
+### 10.2 What to request:
+1. **Sandbox API credentials** (API key + webhook secret)
+2. **Sandbox base URL** (likely `api.sandbox.rollfi.xyz`)
+3. **Full API reference** (the developer.rollfi.xyz docs require credentials for complete endpoint details)
+4. **White-label employee portal** URL format for iframe embedding
+5. **Webhook event catalog** (all event types + payload schemas)
+6. **Revenue share terms** (PEPM or per-run pricing)
+7. **KYB requirements** (what documents are needed for auto repair shops)
+
+### 10.3 Leverage the Priority relationship:
+Since PCBancard already works with Priority for payments, mention this. Ask PCBancard to intro you to the Rollfi team — same parent company, they'll fast-track you.
+
+---
+
+## 11. Phase Assignment
+
+| Feature | Phase | Week | Notes |
+|---------|-------|------|-------|
+| Rollfi sandbox access & integration testing | Phase 2 | Week 7 | Concurrent with time clock build |
+| Company setup wizard (KYB flow) | Phase 3 | Week 11 | After time clock + payroll summaries work |
+| Employee onboarding sync | Phase 3 | Week 11 | Batch push existing employees |
+| Payroll preview & approval UX | Phase 3 | Week 12 | Core payroll run flow |
+| Webhook handler + status sync | Phase 3 | Week 12 | Real-time updates |
+| Employee self-service (iframe) | Phase 3 | Week 13 | White-label embed |
+| Paystub viewer (API-driven) | Phase 4 | Future | Replace iframe with native UI |
+| Benefits enrollment | Phase 4 | Future | Rollfi optional module |
+
+---
+
+## 12. Isolation Guarantee
+
+All payroll features are **PCB Auto module only**. Zero impact on PCBISV.com sales suite.
+
+- All new tables prefixed `pcb_`
+- All endpoints under `/api/pcbauto/v1/payroll/`
+- All gated by `portal: 'pcbauto'` JWT claim
+- Rollfi credentials stored per-tenant in existing tenants table
+- Webhook endpoint rate-limited and signature-verified
+- Employee SSNs and bank data never touch our database
+</parameter>
+<parameter name="path">/home/claude/pcbauto-addendum-v1.4.md</parameter>
