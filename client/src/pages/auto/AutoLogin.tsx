@@ -35,7 +35,7 @@ export default function AutoLogin() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <img src={pcbAutoLogo} alt="PCB Auto" className="mx-auto h-16 object-contain mb-3" />
+          <img src={pcbAutoLogo} alt="PCB Auto" className="mx-auto h-24 object-contain mb-3" />
           <CardDescription>Sign in to your shop account</CardDescription>
         </CardHeader>
         <CardContent>
