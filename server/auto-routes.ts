@@ -1832,9 +1832,10 @@ router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: R
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);
 
-  // Ensure demo shop and account exist with valid password on startup
+  // Ensure demo shop, account, and sample data exist on startup
   (async () => {
     try {
+      const { seedDemoData } = await import("./auto-seed-demo");
       const freshHash = await hashPassword("password123");
 
       // Check if demo shop exists
@@ -1845,7 +1846,6 @@ export function registerAutoRoutes(app: Express) {
         shopId = existingShop[0].id;
         console.log("[AutoInit] Demo shop exists (id:", shopId, ")");
       } else {
-        // Create demo shop
         const [shop] = await db.insert(autoShops).values({
           name: "Demo Auto Shop",
           slug: "demo-auto",
@@ -1859,7 +1859,6 @@ export function registerAutoRoutes(app: Express) {
         shopId = shop.id;
         console.log("[AutoInit] Created demo shop (id:", shopId, ")");
 
-        // Create default bays
         await db.insert(autoBays).values([
           { shopId, name: "Bay 1", sortOrder: 1 },
           { shopId, name: "Bay 2", sortOrder: 2 },
@@ -1869,12 +1868,14 @@ export function registerAutoRoutes(app: Express) {
       }
 
       // Check if demo user exists
+      let ownerId: number;
       const existingUser = await db.select().from(autoUsers).where(eq(autoUsers.email, "owner@demo.com")).limit(1);
       if (existingUser.length) {
-        await db.update(autoUsers).set({ passwordHash: freshHash }).where(eq(autoUsers.id, existingUser[0].id));
+        ownerId = existingUser[0].id;
+        await db.update(autoUsers).set({ passwordHash: freshHash }).where(eq(autoUsers.id, ownerId));
         console.log("[AutoInit] Demo user password refreshed");
       } else {
-        await db.insert(autoUsers).values({
+        const [newUser] = await db.insert(autoUsers).values({
           shopId,
           email: "owner@demo.com",
           passwordHash: freshHash,
@@ -1882,9 +1883,13 @@ export function registerAutoRoutes(app: Express) {
           lastName: "Smith",
           role: "owner",
           isActive: true,
-        });
+        }).returning();
+        ownerId = newUser.id;
         console.log("[AutoInit] Created demo user owner@demo.com");
       }
+
+      // Seed sample data for demo
+      await seedDemoData(shopId, ownerId);
     } catch (err) {
       console.error("[AutoInit] Failed to seed demo data:", err);
     }
