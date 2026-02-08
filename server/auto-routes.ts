@@ -737,7 +737,7 @@ async function recalculateROTotals(roId: number, shopId: number) {
 
   let shopSupplyCash = 0, shopSupplyCard = 0;
   if (shop.shopSupplyEnabled) {
-    const ratePct = parseFloat(shop.shopSupplyRatePct || "0");
+    const ratePct = parseFloat(shop.shopSupplyRatePct || "0") / 100;
     const maxAmt = parseFloat(shop.shopSupplyMaxAmount || "0");
     shopSupplyCash = Math.min(subtotalCash * ratePct, maxAmt > 0 ? maxAmt : Infinity);
     if (shopSupplyCash < 0) shopSupplyCash = 0;
