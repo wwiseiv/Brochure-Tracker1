@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Save, Loader2, Plus, Trash2 } from "lucide-react";
 
@@ -26,7 +27,9 @@ export default function AutoSettings() {
   const [form, setForm] = useState({
     name: "", address: "", city: "", state: "", zip: "",
     phone: "", email: "", timezone: "America/New_York",
-    taxRate: "0", laborRate: "0", cardFeePercent: "3.5",
+    laborRate: "0", cardFeePercent: "3.5",
+    partsTaxRate: "0", laborTaxRate: "0", laborTaxable: true,
+    defaultPartsMarkupPct: "0", shopSupplyMethod: "none",
   });
 
   const isOwner = user?.role === "owner";
@@ -43,8 +46,13 @@ export default function AutoSettings() {
         name: s.name || "", address: s.address || "", city: s.city || "",
         state: s.state || "", zip: s.zip || "", phone: s.phone || "",
         email: s.email || "", timezone: s.timezone || "America/New_York",
-        taxRate: s.taxRate || "0", laborRate: s.laborRate || "0",
+        laborRate: s.laborRate || "0",
         cardFeePercent: s.cardFeePercent || "3.5",
+        partsTaxRate: s.partsTaxRate || "0",
+        laborTaxRate: s.laborTaxRate || "0",
+        laborTaxable: s.laborTaxable !== false,
+        defaultPartsMarkupPct: s.defaultPartsMarkupPct || "0",
+        shopSupplyMethod: s.shopSupplyMethod || "none",
       });
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -131,10 +139,55 @@ export default function AutoSettings() {
         <Card>
           <CardHeader><CardTitle className="text-base">Pricing & Rates</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Labor Rate ($/hr)</Label><Input type="number" step="0.01" value={form.laborRate} onChange={(e) => setForm({ ...form, laborRate: e.target.value })} disabled={!isOwner} data-testid="input-labor-rate" /></div>
-              <div className="space-y-2"><Label>Tax Rate (%)</Label><Input type="number" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} disabled={!isOwner} data-testid="input-tax-rate" /></div>
               <div className="space-y-2"><Label>Card Fee (%)</Label><Input type="number" step="0.01" value={form.cardFeePercent} onChange={(e) => setForm({ ...form, cardFeePercent: e.target.value })} disabled={!isOwner} data-testid="input-card-fee" /></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Tax Configuration</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Parts Tax Rate (%)</Label>
+                <Input type="number" step="0.001" value={form.partsTaxRate} onChange={(e) => setForm({ ...form, partsTaxRate: e.target.value })} disabled={!isOwner} data-testid="input-parts-tax-rate" />
+                <p className="text-xs text-muted-foreground">e.g., 0.085 = 8.5%</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Labor Tax Rate (%)</Label>
+                <Input type="number" step="0.001" value={form.laborTaxRate} onChange={(e) => setForm({ ...form, laborTaxRate: e.target.value })} disabled={!isOwner} data-testid="input-labor-tax-rate" />
+                <p className="text-xs text-muted-foreground">e.g., 0.085 = 8.5%</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="laborTaxable"
+                checked={form.laborTaxable}
+                onCheckedChange={(checked) => setForm({ ...form, laborTaxable: !!checked })}
+                disabled={!isOwner}
+                data-testid="checkbox-labor-taxable"
+              />
+              <Label htmlFor="laborTaxable" className="cursor-pointer">Labor Taxable</Label>
+              <p className="text-xs text-muted-foreground">When off, labor/sublet items are not taxed</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Default Parts Markup (%)</Label>
+                <Input type="number" step="0.01" value={form.defaultPartsMarkupPct} onChange={(e) => setForm({ ...form, defaultPartsMarkupPct: e.target.value })} disabled={!isOwner} data-testid="input-parts-markup" />
+              </div>
+              <div className="space-y-2">
+                <Label>Shop Supply Method</Label>
+                <Select value={form.shopSupplyMethod} onValueChange={(v) => setForm({ ...form, shopSupplyMethod: v })} disabled={!isOwner}>
+                  <SelectTrigger data-testid="select-shop-supply-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="percent">% of Labor</SelectItem>
+                    <SelectItem value="flat">Flat Fee per RO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>

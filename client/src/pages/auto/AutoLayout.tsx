@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   LayoutDashboard, Users, Car, FileText, ClipboardCheck,
   Calendar, Settings, LogOut, Menu, X, Wrench, ChevronDown,
-  UserPlus, CreditCard,
+  UserPlus, CreditCard, BarChart3,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { path: "/auto/repair-orders", label: "Repair Orders", icon: FileText },
   { path: "/auto/inspections", label: "Inspections", icon: ClipboardCheck },
   { path: "/auto/schedule", label: "Schedule", icon: Calendar },
+  { path: "/auto/reports", label: "Reports", icon: BarChart3 },
   { path: "/auto/settings", label: "Settings", icon: Settings },
 ];
 

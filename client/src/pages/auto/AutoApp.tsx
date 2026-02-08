@@ -12,6 +12,8 @@ import AutoInspections from "./AutoInspections";
 import AutoSchedule from "./AutoSchedule";
 import AutoSettings from "./AutoSettings";
 import AutoStaff from "./AutoStaff";
+import AutoPublicApproval from "./AutoPublicApproval";
+import AutoReports from "./AutoReports";
 import { Loader2 } from "lucide-react";
 
 function AutoAuthGuard({ children }: { children: React.ReactNode }) {
@@ -48,6 +50,7 @@ function AuthenticatedAutoRoutes() {
         <Route path="/auto/repair-orders" component={AutoRepairOrders} />
         <Route path="/auto/inspections" component={AutoInspections} />
         <Route path="/auto/schedule" component={AutoSchedule} />
+        <Route path="/auto/reports" component={AutoReports} />
         <Route path="/auto/settings" component={AutoSettings} />
         <Route path="/auto/staff" component={AutoStaff} />
         <Route>
@@ -63,6 +66,7 @@ export default function AutoApp() {
     <Switch>
       <Route path="/auto/login" component={AutoLogin} />
       <Route path="/auto/register" component={AutoRegister} />
+      <Route path="/auto/approve/:token" component={AutoPublicApproval} />
       <Route path="/auto/public/*">
         {() => <div className="p-6 text-center">Public page - Coming soon</div>}
       </Route>

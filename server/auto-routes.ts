@@ -7,9 +7,10 @@ import {
   autoDviInspections, autoDviItems, autoBays, autoAppointments,
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
 } from "@shared/schema";
-import { eq, and, desc, asc, or, sql, count } from "drizzle-orm";
+import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
 import crypto from "crypto";
+import { generateROPdf } from "./auto-pdf";
 
 const router = Router();
 
@@ -649,30 +650,81 @@ router.post("/repair-orders/:id/recalculate", autoAuth, async (req: Request, res
       .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
     if (!ro) return res.status(404).json({ error: "RO not found" });
 
-    const lineItems = await db.select().from(autoLineItems)
+    const items = await db.select().from(autoLineItems)
       .where(and(eq(autoLineItems.repairOrderId, roId), or(eq(autoLineItems.status, "pending"), eq(autoLineItems.status, "approved"))));
 
     const shop = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId)).limit(1);
-    const taxRate = parseFloat(shop[0]?.taxRate || "0");
+    const s = shop[0];
+    const partsTaxRate = parseFloat(s?.partsTaxRate || s?.taxRate || "0");
+    const laborTaxRate = parseFloat(s?.laborTaxRate || "0");
+    const laborTaxable = s?.laborTaxable === true;
+    const cardFeePercent = parseFloat(s?.cardFeePercent || "0");
 
     let subtotalCash = 0, subtotalCard = 0;
-    let taxableCash = 0, taxableCard = 0;
-    for (const item of lineItems) {
+    let taxablePartsCash = 0, taxableLaborCash = 0;
+    let totalAdjustable = 0, totalNonAdjustable = 0;
+
+    for (const item of items) {
       const cashAmt = parseFloat(item.totalCash || "0");
       const cardAmt = parseFloat(item.totalCard || "0");
+
       if (item.type === "discount") {
-        subtotalCash -= cashAmt; subtotalCard -= cardAmt;
+        subtotalCash -= cashAmt;
+        subtotalCard -= cardAmt;
       } else {
-        subtotalCash += cashAmt; subtotalCard += cardAmt;
-        if (item.isTaxable) { taxableCash += cashAmt; taxableCard += cardAmt; }
+        subtotalCash += cashAmt;
+        subtotalCard += cardAmt;
+
+        if (item.isTaxable) {
+          if (item.type === "parts" || item.type === "fee") {
+            taxablePartsCash += cashAmt;
+          } else if ((item.type === "labor" || item.type === "sublet") && laborTaxable) {
+            taxableLaborCash += cashAmt;
+          }
+        }
+
+        if (item.isNtnf) {
+          totalNonAdjustable += cashAmt;
+        } else if (item.isAdjustable) {
+          totalAdjustable += cashAmt;
+        }
       }
     }
 
-    const taxAmount = taxableCash * taxRate;
+    let discountAmount = 0;
+    for (const item of items) {
+      if (item.type === "discount") {
+        discountAmount += parseFloat(item.totalCash || "0");
+      }
+    }
+    if (discountAmount > 0) {
+      const preDiscountSubtotal = subtotalCash + discountAmount;
+      if (preDiscountSubtotal > 0) {
+        const discountRatio = discountAmount / preDiscountSubtotal;
+        taxablePartsCash *= (1 - discountRatio);
+        taxableLaborCash *= (1 - discountRatio);
+      }
+    }
+
+    const taxPartsAmount = taxablePartsCash * partsTaxRate;
+    const taxLaborAmount = taxableLaborCash * laborTaxRate;
+    const taxAmount = taxPartsAmount + taxLaborAmount;
+    const feeAmount = totalAdjustable * cardFeePercent;
+    const totalCash = subtotalCash + taxAmount;
+    const totalCard = subtotalCard + taxAmount;
+
     const [updated] = await db.update(autoRepairOrders).set({
-      subtotalCash: subtotalCash.toFixed(2), subtotalCard: subtotalCard.toFixed(2),
-      taxAmount: taxAmount.toFixed(2), totalCash: (subtotalCash + taxAmount).toFixed(2),
-      totalCard: (subtotalCard + taxableCard * taxRate).toFixed(2), updatedAt: new Date(),
+      subtotalCash: subtotalCash.toFixed(2),
+      subtotalCard: subtotalCard.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      taxPartsAmount: taxPartsAmount.toFixed(2),
+      taxLaborAmount: taxLaborAmount.toFixed(2),
+      totalCash: totalCash.toFixed(2),
+      totalCard: totalCard.toFixed(2),
+      totalAdjustable: totalAdjustable.toFixed(2),
+      totalNonAdjustable: totalNonAdjustable.toFixed(2),
+      feeAmount: feeAmount.toFixed(2),
+      updatedAt: new Date(),
     }).where(eq(autoRepairOrders.id, roId)).returning();
 
     res.json(updated);
@@ -695,7 +747,20 @@ router.post("/repair-orders/:roId/line-items", autoAuth, async (req: Request, re
 
     const quantity = parseFloat(data.quantity || "1");
     const unitPriceCash = parseFloat(data.unitPriceCash || "0");
-    const unitPriceCard = data.unitPriceCard ? parseFloat(data.unitPriceCard) : unitPriceCash * (1 + cardFeePercent);
+    const isNtnf = data.isNtnf === true;
+    const isAdjustable = data.isAdjustable !== false;
+
+    let unitPriceCard: number;
+    if (data.unitPriceCard) {
+      unitPriceCard = parseFloat(data.unitPriceCard);
+    } else if (isNtnf) {
+      unitPriceCard = unitPriceCash;
+    } else if (isAdjustable) {
+      unitPriceCard = unitPriceCash * (1 + cardFeePercent);
+    } else {
+      unitPriceCard = unitPriceCash;
+    }
+
     const totalCash = quantity * unitPriceCash;
     const totalCard = quantity * unitPriceCard;
 
@@ -706,6 +771,8 @@ router.post("/repair-orders/:roId/line-items", autoAuth, async (req: Request, re
       totalCash: totalCash.toFixed(2), totalCard: totalCard.toFixed(2),
       laborHours: data.laborHours?.toString() || null, laborRate: data.laborRate?.toString() || null,
       vendorId: data.vendorId || null, isTaxable: data.isTaxable !== false,
+      isAdjustable, isNtnf,
+      costPrice: data.costPrice != null ? parseFloat(data.costPrice).toFixed(2) : null,
       sortOrder: data.sortOrder || 0, status: data.status || "pending",
     }).returning();
 
@@ -722,12 +789,39 @@ router.patch("/line-items/:id", autoAuth, async (req: Request, res: Response) =>
     const updates: any = { ...data };
     delete updates.id; delete updates.createdAt;
 
-    if (data.quantity || data.unitPriceCash) {
-      const quantity = parseFloat(data.quantity || "1");
-      const unitPriceCash = parseFloat(data.unitPriceCash || "0");
-      const unitPriceCard = data.unitPriceCard ? parseFloat(data.unitPriceCard) : unitPriceCash;
+    if (data.quantity != null || data.unitPriceCash != null || data.isAdjustable != null || data.isNtnf != null) {
+      const existing = await db.select().from(autoLineItems).where(eq(autoLineItems.id, parseInt(req.params.id))).limit(1);
+      if (!existing.length) return res.status(404).json({ error: "Line item not found" });
+      const cur = existing[0];
+
+      const shop = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId)).limit(1);
+      const cardFeePercent = parseFloat(shop[0]?.cardFeePercent || "0");
+
+      const quantity = parseFloat(data.quantity ?? cur.quantity ?? "1");
+      const unitPriceCash = parseFloat(data.unitPriceCash ?? cur.unitPriceCash ?? "0");
+      const isNtnf = data.isNtnf ?? cur.isNtnf ?? false;
+      const isAdjustable = data.isAdjustable ?? cur.isAdjustable ?? true;
+
+      let unitPriceCard: number;
+      if (data.unitPriceCard) {
+        unitPriceCard = parseFloat(data.unitPriceCard);
+      } else if (isNtnf) {
+        unitPriceCard = unitPriceCash;
+      } else if (isAdjustable) {
+        unitPriceCard = unitPriceCash * (1 + cardFeePercent);
+      } else {
+        unitPriceCard = unitPriceCash;
+      }
+
+      updates.unitPriceCash = unitPriceCash.toFixed(2);
+      updates.unitPriceCard = unitPriceCard.toFixed(2);
       updates.totalCash = (quantity * unitPriceCash).toFixed(2);
       updates.totalCard = (quantity * unitPriceCard).toFixed(2);
+      updates.quantity = quantity.toString();
+    }
+
+    if (data.costPrice != null) {
+      updates.costPrice = parseFloat(data.costPrice).toFixed(2);
     }
 
     const [item] = await db.update(autoLineItems).set(updates).where(eq(autoLineItems.id, parseInt(req.params.id))).returning();
@@ -751,29 +845,135 @@ router.delete("/line-items/:id", autoAuth, async (req: Request, res: Response) =
 // PAYMENTS
 // ============================================================================
 
+router.get("/repair-orders/:roId/payments", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const roId = parseInt(req.params.roId);
+    const payments = await db.select().from(autoPayments)
+      .where(and(eq(autoPayments.repairOrderId, roId), eq(autoPayments.shopId, req.autoUser!.shopId)))
+      .orderBy(desc(autoPayments.processedAt));
+
+    const roData = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)))
+      .limit(1);
+
+    if (!roData.length) return res.status(404).json({ error: "Repair order not found" });
+
+    const completedPayments = payments.filter(p => p.status === "completed");
+    const totalPaid = completedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const totalCash = parseFloat(roData[0].totalCash || "0");
+    const totalCard = parseFloat(roData[0].totalCard || "0");
+    const balanceDue = Math.max(0, totalCash - totalPaid);
+
+    res.json({ payments, totalPaid, balanceDue, totalCash, totalCard });
+  } catch (err: any) {
+    console.error("List payments error:", err);
+    res.status(500).json({ error: "Failed to fetch payments" });
+  }
+});
+
 router.post("/repair-orders/:roId/payments", autoAuth, async (req: Request, res: Response) => {
   try {
     const roId = parseInt(req.params.roId);
-    const data = req.body;
+    const { amount, method, notes, referenceNumber } = req.body;
+
+    if (!amount || !method) {
+      return res.status(400).json({ error: "Amount and method are required" });
+    }
+
+    const validMethods = ["cash", "card", "check", "financing", "other"];
+    if (!validMethods.includes(method)) {
+      return res.status(400).json({ error: "Invalid payment method" });
+    }
+
     const paymentToken = crypto.randomBytes(32).toString("hex");
 
     const [payment] = await db.insert(autoPayments).values({
       repairOrderId: roId, shopId: req.autoUser!.shopId,
-      amount: data.amount.toString(), method: data.method,
-      status: data.status || "completed", transactionId: data.transactionId || null,
-      paymentToken, notes: data.notes || null, processedAt: new Date(),
+      amount: amount.toString(), method,
+      status: "completed", transactionId: referenceNumber || null,
+      paymentToken, notes: notes || null, processedAt: new Date(),
     }).returning();
 
     await db.insert(autoActivityLog).values({
       shopId: req.autoUser!.shopId, userId: req.autoUser!.id,
       entityType: "payment", entityId: payment.id, action: "payment_received",
-      details: { amount: data.amount, method: data.method, roId },
+      details: { amount, method, roId, referenceNumber },
     });
 
-    res.json(payment);
+    const allPayments = await db.select().from(autoPayments)
+      .where(and(eq(autoPayments.repairOrderId, roId), eq(autoPayments.status, "completed")));
+    const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const roData = await db.select().from(autoRepairOrders)
+      .where(eq(autoRepairOrders.id, roId)).limit(1);
+
+    if (roData.length) {
+      const totalCash = parseFloat(roData[0].totalCash || "0");
+      const totalCard = parseFloat(roData[0].totalCard || "0");
+      const balanceDue = Math.max(0, totalCash - totalPaid);
+
+      if (totalPaid >= totalCash && totalCash > 0) {
+        await db.update(autoRepairOrders).set({ status: "paid", paidAt: new Date() })
+          .where(eq(autoRepairOrders.id, roId));
+      }
+
+      res.json({ payment, totalPaid, balanceDue, totalCash, totalCard });
+    } else {
+      res.json({ payment, totalPaid, balanceDue: 0, totalCash: 0, totalCard: 0 });
+    }
   } catch (err: any) {
     console.error("Create payment error:", err);
     res.status(500).json({ error: "Failed to record payment" });
+  }
+});
+
+router.post("/payments/:id/void", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const paymentId = parseInt(req.params.id);
+    const userRole = req.autoUser!.role;
+
+    if (userRole !== "owner" && userRole !== "manager") {
+      return res.status(403).json({ error: "Only owners and managers can void payments" });
+    }
+
+    const payment = await db.select().from(autoPayments)
+      .where(and(eq(autoPayments.id, paymentId), eq(autoPayments.shopId, req.autoUser!.shopId)))
+      .limit(1);
+
+    if (!payment.length) return res.status(404).json({ error: "Payment not found" });
+    if (payment[0].status === "voided") return res.status(400).json({ error: "Payment already voided" });
+
+    await db.update(autoPayments).set({ status: "voided" }).where(eq(autoPayments.id, paymentId));
+
+    const roId = payment[0].repairOrderId;
+    const remainingPayments = await db.select().from(autoPayments)
+      .where(and(eq(autoPayments.repairOrderId, roId), eq(autoPayments.status, "completed")));
+
+    const totalPaidAfterVoid = remainingPayments
+      .filter(p => p.id !== paymentId)
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const roData = await db.select().from(autoRepairOrders)
+      .where(eq(autoRepairOrders.id, roId)).limit(1);
+
+    if (roData.length) {
+      const totalCash = parseFloat(roData[0].totalCash || "0");
+      if (totalPaidAfterVoid < totalCash && roData[0].status === "paid") {
+        await db.update(autoRepairOrders).set({ status: "invoiced", paidAt: null })
+          .where(eq(autoRepairOrders.id, roId));
+      }
+    }
+
+    await db.insert(autoActivityLog).values({
+      shopId: req.autoUser!.shopId, userId: req.autoUser!.id,
+      entityType: "payment", entityId: paymentId, action: "payment_voided",
+      details: { amount: payment[0].amount, method: payment[0].method, roId },
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Void payment error:", err);
+    res.status(500).json({ error: "Failed to void payment" });
   }
 });
 
@@ -1114,8 +1314,66 @@ router.get("/dashboard/stats", autoAuth, async (req: Request, res: Response) => 
 });
 
 // ============================================================================
+// PDF GENERATION (authenticated)
+// ============================================================================
+
+router.get("/repair-orders/:id/pdf", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const roId = parseInt(req.params.id);
+    const type = (req.query.type as string) || "estimate";
+    if (!["estimate", "work_order", "invoice"].includes(type)) {
+      return res.status(400).json({ error: "Invalid PDF type" });
+    }
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    const [customer] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+    const [vehicle] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, ro.shopId));
+    const lineItems = await db.select().from(autoLineItems).where(eq(autoLineItems.repairOrderId, roId)).orderBy(asc(autoLineItems.sortOrder));
+    const payments = type === "invoice"
+      ? await db.select().from(autoPayments).where(eq(autoPayments.repairOrderId, roId))
+      : [];
+
+    await generateROPdf(res, {
+      type: type as "estimate" | "work_order" | "invoice",
+      shop, customer, vehicle, repairOrder: ro, lineItems, payments,
+    });
+  } catch (err: any) {
+    console.error("PDF generation error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  }
+});
+
+// ============================================================================
 // PUBLIC ROUTES (no auth - token-based)
 // ============================================================================
+
+router.get("/public/estimate/:token/pdf", async (req: Request, res: Response) => {
+  try {
+    const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
+    if (!ro) return res.status(404).json({ error: "Estimate not found" });
+
+    const [customer] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+    const [vehicle] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+    const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, ro.shopId));
+    const lineItems = await db.select().from(autoLineItems).where(eq(autoLineItems.repairOrderId, ro.id)).orderBy(asc(autoLineItems.sortOrder));
+
+    await generateROPdf(res, {
+      type: "estimate",
+      shop, customer, vehicle, repairOrder: ro, lineItems,
+    });
+  } catch (err: any) {
+    console.error("Public PDF generation error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  }
+});
 
 router.get("/public/estimate/:token", async (req: Request, res: Response) => {
   try {
@@ -1139,6 +1397,10 @@ router.post("/public/estimate/:token/approve", async (req: Request, res: Respons
     const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
     if (!ro) return res.status(404).json({ error: "Estimate not found" });
 
+    if (ro.status !== "estimate" && ro.status !== "declined") {
+      return res.status(400).json({ error: "This estimate has already been approved" });
+    }
+
     if (approvedItemIds?.length) {
       for (const itemId of approvedItemIds) {
         await db.update(autoLineItems).set({ status: "approved" }).where(eq(autoLineItems.id, itemId));
@@ -1153,6 +1415,48 @@ router.post("/public/estimate/:token/approve", async (req: Request, res: Respons
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to approve estimate" });
+  }
+});
+
+router.post("/public/estimate/:token/decline", async (req: Request, res: Response) => {
+  try {
+    const { reason } = req.body;
+    const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
+    if (!ro) return res.status(404).json({ error: "Estimate not found" });
+
+    if (ro.status !== "estimate") {
+      return res.status(400).json({ error: "This estimate cannot be declined in its current state" });
+    }
+
+    await db.update(autoRepairOrders).set({
+      approvalDeclinedAt: new Date(),
+      approvalDeclinedReason: reason || null,
+      updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, ro.id));
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to decline estimate" });
+  }
+});
+
+router.post("/public/estimate/:token/question", async (req: Request, res: Response) => {
+  try {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ error: "Question is required" });
+
+    const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
+    if (!ro) return res.status(404).json({ error: "Estimate not found" });
+
+    await db.update(autoRepairOrders).set({
+      approvalQuestion: question,
+      approvalQuestionAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, ro.id));
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to submit question" });
   }
 });
 
@@ -1191,6 +1495,330 @@ router.get("/public/pay/:token", async (req: Request, res: Response) => {
     res.json({ payment, repairOrder: ro, shop });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch payment info" });
+  }
+});
+
+// ============================================================================
+// REPORTS
+// ============================================================================
+
+function getDefaultDateRange() {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { startDate, endDate: now };
+}
+
+function parseDateRange(startDateStr?: string, endDateStr?: string) {
+  if (startDateStr && endDateStr) {
+    const startDate = new Date(startDateStr + "T00:00:00");
+    const endDate = new Date(endDateStr + "T23:59:59");
+    return { startDate, endDate };
+  }
+  return getDefaultDateRange();
+}
+
+router.get("/reports/job-profitability", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = parseDateRange(
+      req.query.startDate as string,
+      req.query.endDate as string
+    );
+
+    const ros = await db
+      .select({
+        roId: autoRepairOrders.id,
+        roNumber: autoRepairOrders.roNumber,
+        status: autoRepairOrders.status,
+        totalCash: autoRepairOrders.totalCash,
+        createdAt: autoRepairOrders.createdAt,
+        customerFirstName: autoCustomers.firstName,
+        customerLastName: autoCustomers.lastName,
+        vehicleYear: autoVehicles.year,
+        vehicleMake: autoVehicles.make,
+        vehicleModel: autoVehicles.model,
+      })
+      .from(autoRepairOrders)
+      .innerJoin(autoCustomers, eq(autoRepairOrders.customerId, autoCustomers.id))
+      .innerJoin(autoVehicles, eq(autoRepairOrders.vehicleId, autoVehicles.id))
+      .where(
+        and(
+          eq(autoRepairOrders.shopId, shopId),
+          gte(autoRepairOrders.createdAt, startDate),
+          lte(autoRepairOrders.createdAt, endDate),
+          or(
+            eq(autoRepairOrders.status, "paid"),
+            eq(autoRepairOrders.status, "invoiced"),
+            eq(autoRepairOrders.status, "completed")
+          )
+        )
+      )
+      .orderBy(desc(autoRepairOrders.createdAt));
+
+    const roIds = ros.map((r) => r.roId);
+    let lineItemsByRo: Record<number, { totalCash: string; costPrice: string | null }[]> = {};
+
+    if (roIds.length > 0) {
+      const lineItems = await db
+        .select({
+          repairOrderId: autoLineItems.repairOrderId,
+          totalCash: autoLineItems.totalCash,
+          costPrice: autoLineItems.costPrice,
+        })
+        .from(autoLineItems)
+        .where(inArray(autoLineItems.repairOrderId, roIds));
+
+      for (const li of lineItems) {
+        if (!lineItemsByRo[li.repairOrderId]) lineItemsByRo[li.repairOrderId] = [];
+        lineItemsByRo[li.repairOrderId].push(li);
+      }
+    }
+
+    let totalRevenue = 0;
+    let totalCost = 0;
+    const details = ros.map((ro) => {
+      const items = lineItemsByRo[ro.roId] || [];
+      const revenue = items.reduce((sum, i) => sum + parseFloat(i.totalCash || "0"), 0);
+      const cost = items.reduce((sum, i) => sum + parseFloat(i.costPrice || "0"), 0);
+      const profit = revenue - cost;
+      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+      totalRevenue += revenue;
+      totalCost += cost;
+
+      return {
+        roId: ro.roId,
+        roNumber: ro.roNumber,
+        customerName: `${ro.customerFirstName} ${ro.customerLastName}`,
+        vehicleInfo: `${ro.vehicleYear || ""} ${ro.vehicleMake || ""} ${ro.vehicleModel || ""}`.trim(),
+        revenue: Math.round(revenue * 100) / 100,
+        cost: Math.round(cost * 100) / 100,
+        profit: Math.round(profit * 100) / 100,
+        margin: Math.round(margin * 100) / 100,
+        date: ro.createdAt,
+      };
+    });
+
+    const totalProfit = totalRevenue - totalCost;
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    res.json({
+      details,
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalCost: Math.round(totalCost * 100) / 100,
+        totalProfit: Math.round(totalProfit * 100) / 100,
+        avgMargin: Math.round(avgMargin * 100) / 100,
+      },
+    });
+  } catch (err: any) {
+    console.error("Job profitability report error:", err);
+    res.status(500).json({ error: "Failed to generate job profitability report" });
+  }
+});
+
+router.get("/reports/sales-tax", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = parseDateRange(
+      req.query.startDate as string,
+      req.query.endDate as string
+    );
+
+    const ros = await db
+      .select({
+        roNumber: autoRepairOrders.roNumber,
+        createdAt: autoRepairOrders.createdAt,
+        taxPartsAmount: autoRepairOrders.taxPartsAmount,
+        taxLaborAmount: autoRepairOrders.taxLaborAmount,
+        subtotalCash: autoRepairOrders.subtotalCash,
+        totalCash: autoRepairOrders.totalCash,
+      })
+      .from(autoRepairOrders)
+      .where(
+        and(
+          eq(autoRepairOrders.shopId, shopId),
+          gte(autoRepairOrders.createdAt, startDate),
+          lte(autoRepairOrders.createdAt, endDate),
+          or(
+            eq(autoRepairOrders.status, "invoiced"),
+            eq(autoRepairOrders.status, "paid")
+          )
+        )
+      )
+      .orderBy(desc(autoRepairOrders.createdAt));
+
+    let totalPartsTax = 0;
+    let totalLaborTax = 0;
+
+    const details = ros.map((ro) => {
+      const partsTax = parseFloat(ro.taxPartsAmount || "0");
+      const laborTax = parseFloat(ro.taxLaborAmount || "0");
+      const roTotalTax = partsTax + laborTax;
+      totalPartsTax += partsTax;
+      totalLaborTax += laborTax;
+
+      return {
+        roNumber: ro.roNumber,
+        date: ro.createdAt,
+        subtotal: parseFloat(ro.subtotalCash || "0"),
+        partsTax: Math.round(partsTax * 100) / 100,
+        laborTax: Math.round(laborTax * 100) / 100,
+        totalTax: Math.round(roTotalTax * 100) / 100,
+        total: parseFloat(ro.totalCash || "0"),
+      };
+    });
+
+    res.json({
+      totalPartsTax: Math.round(totalPartsTax * 100) / 100,
+      totalLaborTax: Math.round(totalLaborTax * 100) / 100,
+      totalTax: Math.round((totalPartsTax + totalLaborTax) * 100) / 100,
+      roCount: ros.length,
+      details,
+    });
+  } catch (err: any) {
+    console.error("Sales tax report error:", err);
+    res.status(500).json({ error: "Failed to generate sales tax report" });
+  }
+});
+
+router.get("/reports/tech-productivity", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = parseDateRange(
+      req.query.startDate as string,
+      req.query.endDate as string
+    );
+
+    const laborItems = await db
+      .select({
+        technicianId: autoRepairOrders.technicianId,
+        repairOrderId: autoLineItems.repairOrderId,
+        laborHours: autoLineItems.laborHours,
+        totalCash: autoLineItems.totalCash,
+        techFirstName: autoUsers.firstName,
+        techLastName: autoUsers.lastName,
+      })
+      .from(autoLineItems)
+      .innerJoin(autoRepairOrders, eq(autoLineItems.repairOrderId, autoRepairOrders.id))
+      .leftJoin(autoUsers, eq(autoRepairOrders.technicianId, autoUsers.id))
+      .where(
+        and(
+          eq(autoRepairOrders.shopId, shopId),
+          gte(autoRepairOrders.createdAt, startDate),
+          lte(autoRepairOrders.createdAt, endDate),
+          eq(autoLineItems.type, "labor"),
+          isNotNull(autoRepairOrders.technicianId)
+        )
+      );
+
+    const techMap: Record<number, {
+      id: number;
+      name: string;
+      totalHours: number;
+      totalRevenue: number;
+      roSet: Set<number>;
+    }> = {};
+
+    for (const item of laborItems) {
+      const techId = item.technicianId!;
+      if (!techMap[techId]) {
+        techMap[techId] = {
+          id: techId,
+          name: `${item.techFirstName || "Unknown"} ${item.techLastName || ""}`.trim(),
+          totalHours: 0,
+          totalRevenue: 0,
+          roSet: new Set(),
+        };
+      }
+      techMap[techId].totalHours += parseFloat(item.laborHours || "0");
+      techMap[techId].totalRevenue += parseFloat(item.totalCash || "0");
+      techMap[techId].roSet.add(item.repairOrderId);
+    }
+
+    const technicians = Object.values(techMap).map((t) => ({
+      id: t.id,
+      name: t.name,
+      totalHours: Math.round(t.totalHours * 100) / 100,
+      totalRevenue: Math.round(t.totalRevenue * 100) / 100,
+      roCount: t.roSet.size,
+      effectiveRate: t.totalHours > 0
+        ? Math.round((t.totalRevenue / t.totalHours) * 100) / 100
+        : 0,
+    }));
+
+    res.json({ technicians });
+  } catch (err: any) {
+    console.error("Tech productivity report error:", err);
+    res.status(500).json({ error: "Failed to generate tech productivity report" });
+  }
+});
+
+router.get("/reports/approval-conversion", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = parseDateRange(
+      req.query.startDate as string,
+      req.query.endDate as string
+    );
+
+    const ros = await db
+      .select({
+        id: autoRepairOrders.id,
+        status: autoRepairOrders.status,
+        approvedAt: autoRepairOrders.approvedAt,
+        approvalDeclinedAt: autoRepairOrders.approvalDeclinedAt,
+        createdAt: autoRepairOrders.createdAt,
+      })
+      .from(autoRepairOrders)
+      .where(
+        and(
+          eq(autoRepairOrders.shopId, shopId),
+          gte(autoRepairOrders.createdAt, startDate),
+          lte(autoRepairOrders.createdAt, endDate)
+        )
+      );
+
+    const totalEstimates = ros.length;
+    let approved = 0;
+    let declined = 0;
+    let pending = 0;
+    let totalApprovalTimeHours = 0;
+    let approvalCount = 0;
+
+    for (const ro of ros) {
+      if (ro.approvedAt) {
+        approved++;
+        if (ro.createdAt) {
+          const diffMs = new Date(ro.approvedAt).getTime() - new Date(ro.createdAt).getTime();
+          totalApprovalTimeHours += diffMs / (1000 * 60 * 60);
+          approvalCount++;
+        }
+      } else if (ro.approvalDeclinedAt) {
+        declined++;
+      } else if (ro.status === "estimate") {
+        pending++;
+      }
+    }
+
+    const conversionRate = totalEstimates > 0
+      ? Math.round((approved / totalEstimates) * 10000) / 100
+      : 0;
+    const avgApprovalTimeHours = approvalCount > 0
+      ? Math.round((totalApprovalTimeHours / approvalCount) * 100) / 100
+      : 0;
+
+    res.json({
+      totalEstimates,
+      approved,
+      declined,
+      pending,
+      conversionRate,
+      avgApprovalTimeHours,
+    });
+  } catch (err: any) {
+    console.error("Approval conversion report error:", err);
+    res.status(500).json({ error: "Failed to generate approval conversion report" });
   }
 });
 
