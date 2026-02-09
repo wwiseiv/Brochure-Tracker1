@@ -15,6 +15,10 @@ const QUICK_ACTIONS: Record<string, string[]> = {
   "reports": ["What reports are available?", "Daily revenue", "What is fees saved?"],
   "invoice": ["How does cash vs card work?", "How do I email a receipt?", "How do I process a refund?"],
   "staff": ["How do I add an employee?", "How do pay rates work?", "How do I set a PIN?"],
+  "quickbooks": ["How do I sync with QuickBooks?", "What data gets synced?", "How do I reconnect?"],
+  "payment-processor": ["How do I set up my processor?", "What are my processing rates?", "How do settlements work?"],
+  "esign": ["How do I send a document for signing?", "What documents can I upload?", "How do I check signing status?"],
+  "pipeline": ["How do I add a prospect?", "What are the pipeline stages?", "How do I move a deal forward?"],
   "default": ["How do I create an RO?", "Walk me through an inspection", "How does dual pricing work?"],
 };
 
@@ -29,6 +33,10 @@ const PAGE_LABELS: Record<string, string> = {
   "reports": "Reports",
   "invoice": "Invoice",
   "staff": "Staff",
+  "quickbooks": "QuickBooks",
+  "payment-processor": "Payment Processor",
+  "esign": "E-Signatures",
+  "pipeline": "Pipeline",
   "unknown": "PCB Auto",
 };
 
@@ -57,6 +65,9 @@ const NAV_TARGETS: Record<string, { label: string; route: string; highlightId?: 
   "settings-quickbooks": { label: "QuickBooks", route: "/auto/quickbooks", toast: "QuickBooks Integration" },
   "new-ro": { label: "New Work Order", route: "/auto/repair-orders/new", toast: "Create New Work Order" },
   "payment-processor": { label: "Payment Processor", route: "/auto/processor", toast: "Payment Processor Setup" },
+  "esign": { label: "E-Signatures", route: "/auto/esign", toast: "E-Signature Documents" },
+  "pipeline": { label: "Pipeline", route: "/auto/pipeline", toast: "Prospect Pipeline" },
+  "quickbooks": { label: "QuickBooks", route: "/auto/quickbooks", toast: "QuickBooks Integration" },
 };
 
 function getPageKey(): string {
@@ -70,6 +81,10 @@ function getPageKey(): string {
   if (path.includes("/auto/setting")) return "settings";
   if (path.includes("/auto/staff")) return "staff";
   if (path.includes("/auto/invoice")) return "invoice";
+  if (path.includes("/auto/quickbooks")) return "quickbooks";
+  if (path.includes("/auto/processor")) return "payment-processor";
+  if (path.includes("/auto/esign")) return "esign";
+  if (path.includes("/auto/pipeline")) return "pipeline";
   if (path.includes("/auto/dashboard") || path === "/auto") return "dashboard";
   return "unknown";
 }
@@ -322,10 +337,15 @@ function renderAssistantContent(content: string, onNavigate: (key: string) => vo
 function ChatPanel() {
   const { isOpen, close, messages, sendMessage, isLoading, clearMessages } = useAutoAssistant();
   const [input, setInput] = useState("");
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pageKey = getPageKey();
+  const [pageKey, setPageKey] = useState(getPageKey);
+
+  useEffect(() => {
+    setPageKey(getPageKey());
+  }, [location]);
+
   const quickActions = QUICK_ACTIONS[pageKey] || QUICK_ACTIONS["default"];
   const pageLabel = PAGE_LABELS[pageKey] || "PCB Auto";
 
@@ -414,9 +434,10 @@ function ChatPanel() {
               right: 0 !important;
               bottom: 0 !important;
               left: 0 !important;
+              top: 0 !important;
               width: 100% !important;
-              height: 85vh !important;
-              border-radius: 12px 12px 0 0 !important;
+              height: 100dvh !important;
+              border-radius: 0 !important;
             }
           }
           @keyframes bounce-dot {
@@ -441,16 +462,17 @@ function ChatPanel() {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {messages.length > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); clearMessages(); }}
-                className="p-2 rounded-md hover:bg-white/10 transition-colors"
-                data-testid="button-clear-chat"
-                aria-label="Clear chat"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); clearMessages(); }}
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/10 transition-colors ${
+                messages.length === 0 ? "opacity-50" : ""
+              }`}
+              data-testid="button-clear-chat"
+              aria-label="New chat"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="text-xs font-medium sm:hidden">New Chat</span>
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); close(); }}
               className="p-2 rounded-md hover:bg-white/10 transition-colors"
@@ -462,7 +484,13 @@ function ChatPanel() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <div
+          className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+          style={{
+            WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
+          }}
+        >
           {messages.length === 0 && (
             <div className="flex flex-col items-center text-center pt-6 pb-4 space-y-3">
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
@@ -554,7 +582,10 @@ function ChatPanel() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="shrink-0 border-t bg-background">
+        <div
+          className="shrink-0 border-t bg-background"
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
           {dictation.interimTranscript && (
             <div className="px-4 py-1.5 text-xs text-muted-foreground bg-muted/50 border-b flex items-center gap-2">
               <Mic className="h-3 w-3 text-red-500 shrink-0" />

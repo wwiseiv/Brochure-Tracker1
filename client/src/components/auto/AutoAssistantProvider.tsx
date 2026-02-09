@@ -62,6 +62,10 @@ function getPageName(path: string): string {
   if (path.includes("/auto/setting")) return "settings";
   if (path.includes("/auto/staff")) return "staff";
   if (path.includes("/auto/invoice")) return "invoice";
+  if (path.includes("/auto/quickbooks")) return "quickbooks";
+  if (path.includes("/auto/processor")) return "payment-processor";
+  if (path.includes("/auto/esign")) return "esign";
+  if (path.includes("/auto/pipeline")) return "pipeline";
   if (path.includes("/auto/dashboard") || path === "/auto") return "dashboard";
   return "unknown";
 }
