@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
     - **Invoice & Payment System**: Dual pricing payment flow with professional invoice view, tip selection, and printable receipt.
     - **Email Integration**: Backend email service (Resend) for invoices/receipts with PDF attachments.
     - **Help Menu**: In-app help sections.
-    - **AI Assistant**: Floating, context-aware chat assistant (Anthropic Claude, ElevenLabs TTS) with voice dictation.
+    - **AI Assistant**: Floating, context-aware chat assistant (Anthropic Claude, ElevenLabs TTS) with voice dictation. Provider lives at AuthenticatedAutoRoutes level in AutoApp.tsx (not in AutoLayout) so chat state persists across page navigations. Messages backed by localStorage.
     - **Parts Lookup & Labor Guide**: Simulated integrations (PartsTech, MOTOR) for adding line items.
     - **QuickBooks Integration**: Simulated integration page for investor demo.
     - **Dual Pricing Compliance**: Full compliance across all customer-facing screens, avoiding "surcharge" terminology.

@@ -20,6 +20,8 @@ import AutoQuickBooks from "./AutoQuickBooks";
 import AutoPaymentProcessor from "./AutoPaymentProcessor";
 import AutoForgotPassword from "./AutoForgotPassword";
 import AutoResetPassword from "./AutoResetPassword";
+import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
+import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
 import { Loader2 } from "lucide-react";
 
 function AutoAuthGuard({ children }: { children: React.ReactNode }) {
@@ -46,26 +48,29 @@ function AutoAuthGuard({ children }: { children: React.ReactNode }) {
 function AuthenticatedAutoRoutes() {
   return (
     <AutoAuthGuard>
-      <Switch>
-        <Route path="/auto/dashboard" component={AutoDashboard} />
-        <Route path="/auto/customers/new" component={AutoCustomerForm} />
-        <Route path="/auto/customers/:id" component={AutoCustomerDetail} />
-        <Route path="/auto/customers" component={AutoCustomers} />
-        <Route path="/auto/invoice/:roId" component={AutoInvoice} />
-        <Route path="/auto/repair-orders/new" component={AutoRepairOrderForm} />
-        <Route path="/auto/repair-orders/:id" component={AutoRepairOrderForm} />
-        <Route path="/auto/repair-orders" component={AutoRepairOrders} />
-        <Route path="/auto/inspections" component={AutoInspections} />
-        <Route path="/auto/schedule" component={AutoSchedule} />
-        <Route path="/auto/reports" component={AutoReports} />
-        <Route path="/auto/settings" component={AutoSettings} />
-        <Route path="/auto/quickbooks" component={AutoQuickBooks} />
-        <Route path="/auto/processor" component={AutoPaymentProcessor} />
-        <Route path="/auto/staff" component={AutoStaff} />
-        <Route>
-          <Redirect to="/auto/dashboard" />
-        </Route>
-      </Switch>
+      <AutoAssistantProvider>
+        <Switch>
+          <Route path="/auto/dashboard" component={AutoDashboard} />
+          <Route path="/auto/customers/new" component={AutoCustomerForm} />
+          <Route path="/auto/customers/:id" component={AutoCustomerDetail} />
+          <Route path="/auto/customers" component={AutoCustomers} />
+          <Route path="/auto/invoice/:roId" component={AutoInvoice} />
+          <Route path="/auto/repair-orders/new" component={AutoRepairOrderForm} />
+          <Route path="/auto/repair-orders/:id" component={AutoRepairOrderForm} />
+          <Route path="/auto/repair-orders" component={AutoRepairOrders} />
+          <Route path="/auto/inspections" component={AutoInspections} />
+          <Route path="/auto/schedule" component={AutoSchedule} />
+          <Route path="/auto/reports" component={AutoReports} />
+          <Route path="/auto/settings" component={AutoSettings} />
+          <Route path="/auto/quickbooks" component={AutoQuickBooks} />
+          <Route path="/auto/processor" component={AutoPaymentProcessor} />
+          <Route path="/auto/staff" component={AutoStaff} />
+          <Route>
+            <Redirect to="/auto/dashboard" />
+          </Route>
+        </Switch>
+        <AutoAssistantChat />
+      </AutoAssistantProvider>
     </AutoAuthGuard>
   );
 }

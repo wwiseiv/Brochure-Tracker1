@@ -21,8 +21,6 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
-import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
 import { AIHelpChat } from "@/components/ai-help";
 
 const NAV_ITEMS = [
@@ -332,7 +330,6 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
   const isOwnerOrManager = user?.role === "owner" || user?.role === "manager";
 
   return (
-    <AutoAssistantProvider>
     <div className="flex flex-col h-screen bg-background" data-testid="auto-layout">
       {/* Phone top bar: slim logo + avatar */}
       <header className="sm:hidden sticky top-0 z-50 flex items-center justify-between gap-2 px-4 py-2 border-b bg-background">
@@ -629,9 +626,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
-      <AutoAssistantChat />
       <AIHelpChat />
     </div>
-    </AutoAssistantProvider>
   );
 }
