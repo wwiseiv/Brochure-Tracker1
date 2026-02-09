@@ -49,8 +49,19 @@ export default function AutoRegister() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-sm">
-          <CardContent className="pt-6 text-center">
-            <p className="text-destructive">{inviteError}</p>
+          <CardHeader className="text-center">
+            <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-lg bg-primary mb-3">
+              <Wrench className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-xl">Registration</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {token ? "This invitation link is invalid or has expired." : "Registration is by invitation only. Ask your shop owner to send you an invite."}
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setLocation("/auto/login")} data-testid="button-back-to-login">
+              Back to Login
+            </Button>
           </CardContent>
         </Card>
       </div>

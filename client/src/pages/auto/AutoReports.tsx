@@ -157,7 +157,7 @@ export default function AutoReports() {
   }
 
   const maxRevenue = techProd?.technicians?.length
-    ? Math.max(...techProd.technicians.map((t) => t.totalRevenue), 1)
+    ? Math.max(...techProd.technicians.map((t) => t.totalRevenue ?? 0), 1)
     : 1;
 
   return (
@@ -223,7 +223,7 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-revenue">{formatCurrency(jobPL.summary.totalRevenue)}</div>
+                      <div className="text-2xl font-bold" data-testid="text-total-revenue">{formatCurrency(jobPL.summary.totalRevenue ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -232,7 +232,7 @@ export default function AutoReports() {
                       <TrendingDown className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-total-cost">{formatCurrency(jobPL.summary.totalCost)}</div>
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-total-cost">{formatCurrency(jobPL.summary.totalCost ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -241,8 +241,8 @@ export default function AutoReports() {
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className={`text-2xl font-bold ${jobPL.summary.totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-total-profit">
-                        {formatCurrency(jobPL.summary.totalProfit)}
+                      <div className={`text-2xl font-bold ${(jobPL.summary.totalProfit ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-total-profit">
+                        {formatCurrency(jobPL.summary.totalProfit ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -252,8 +252,8 @@ export default function AutoReports() {
                       <BarChart3 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className={`text-2xl font-bold ${jobPL.summary.avgMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-avg-margin">
-                        {jobPL.summary.avgMargin.toFixed(1)}%
+                      <div className={`text-2xl font-bold ${(jobPL.summary.avgMargin ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-avg-margin">
+                        {(jobPL.summary.avgMargin ?? 0).toFixed(1)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -278,13 +278,13 @@ export default function AutoReports() {
                           <td className="py-2 px-2 font-mono">{row.roNumber}</td>
                           <td className="py-2 px-2">{row.customerName}</td>
                           <td className="py-2 px-2 hidden md:table-cell text-muted-foreground">{row.vehicleInfo}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(row.revenue)}</td>
-                          <td className="py-2 px-2 text-right text-red-600 dark:text-red-400">{formatCurrency(row.cost)}</td>
-                          <td className={`py-2 px-2 text-right ${row.profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                            {formatCurrency(row.profit)}
+                          <td className="py-2 px-2 text-right">{formatCurrency(row.revenue ?? 0)}</td>
+                          <td className="py-2 px-2 text-right text-red-600 dark:text-red-400">{formatCurrency(row.cost ?? 0)}</td>
+                          <td className={`py-2 px-2 text-right ${(row.profit ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {formatCurrency(row.profit ?? 0)}
                           </td>
-                          <td className={`py-2 px-2 text-right ${row.margin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                            {row.margin.toFixed(1)}%
+                          <td className={`py-2 px-2 text-right ${(row.margin ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {(row.margin ?? 0).toFixed(1)}%
                           </td>
                         </tr>
                       ))}
@@ -308,7 +308,7 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-parts-tax">{formatCurrency(salesTax.totalPartsTax)}</div>
+                      <div className="text-2xl font-bold" data-testid="text-parts-tax">{formatCurrency(salesTax.totalPartsTax ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -317,7 +317,7 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-labor-tax">{formatCurrency(salesTax.totalLaborTax)}</div>
+                      <div className="text-2xl font-bold" data-testid="text-labor-tax">{formatCurrency(salesTax.totalLaborTax ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -326,7 +326,7 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-tax">{formatCurrency(salesTax.totalTax)}</div>
+                      <div className="text-2xl font-bold" data-testid="text-total-tax">{formatCurrency(salesTax.totalTax ?? 0)}</div>
                       <p className="text-xs text-muted-foreground mt-1">{salesTax.roCount} repair orders</p>
                     </CardContent>
                   </Card>
@@ -350,11 +350,11 @@ export default function AutoReports() {
                         <tr key={idx} className="border-b" data-testid={`row-sales-tax-${idx}`}>
                           <td className="py-2 px-2 font-mono">{row.roNumber}</td>
                           <td className="py-2 px-2 text-muted-foreground">{formatDate(row.date)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(row.subtotal)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(row.partsTax)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(row.laborTax)}</td>
-                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(row.totalTax)}</td>
-                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(row.total)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(row.subtotal ?? 0)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(row.partsTax ?? 0)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(row.laborTax ?? 0)}</td>
+                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(row.totalTax ?? 0)}</td>
+                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(row.total ?? 0)}</td>
                         </tr>
                       ))}
                       {salesTax.details.length === 0 && (
@@ -395,22 +395,22 @@ export default function AutoReports() {
                           </div>
                           <div>
                             <p className="text-muted-foreground">Revenue</p>
-                            <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(tech.totalRevenue)}</p>
+                            <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(tech.totalRevenue ?? 0)}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Rate</p>
-                            <p className="font-semibold">{formatCurrency(tech.effectiveRate)}/hr</p>
+                            <p className="font-semibold">{formatCurrency(tech.effectiveRate ?? 0)}/hr</p>
                           </div>
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>Revenue</span>
-                            <span>{formatCurrency(tech.totalRevenue)}</span>
+                            <span>{formatCurrency(tech.totalRevenue ?? 0)}</span>
                           </div>
                           <div className="w-full bg-muted rounded-md h-2.5 overflow-hidden">
                             <div
                               className="bg-primary h-full rounded-md transition-all"
-                              style={{ width: `${Math.min((tech.totalRevenue / maxRevenue) * 100, 100)}%` }}
+                              style={{ width: `${Math.min(((tech.totalRevenue ?? 0) / maxRevenue) * 100, 100)}%` }}
                             />
                           </div>
                         </div>
@@ -468,7 +468,7 @@ export default function AutoReports() {
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-conversion-rate">{approvals.conversionRate}%</div>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-conversion-rate">{approvals.conversionRate ?? 0}%</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -482,12 +482,12 @@ export default function AutoReports() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Approved</span>
-                          <span className="font-semibold">{approvals.conversionRate}%</span>
+                          <span className="font-semibold">{approvals.conversionRate ?? 0}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-md h-4 overflow-hidden">
                           <div
                             className="bg-green-500 h-full rounded-md transition-all"
-                            style={{ width: `${Math.min(approvals.conversionRate, 100)}%` }}
+                            style={{ width: `${Math.min(approvals.conversionRate ?? 0, 100)}%` }}
                           />
                         </div>
                       </div>
@@ -502,9 +502,9 @@ export default function AutoReports() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-3xl font-bold" data-testid="text-avg-approval-time">
-                        {approvals.avgApprovalTimeHours < 24
-                          ? `${approvals.avgApprovalTimeHours.toFixed(1)} hrs`
-                          : `${(approvals.avgApprovalTimeHours / 24).toFixed(1)} days`}
+                        {(approvals.avgApprovalTimeHours ?? 0) < 24
+                          ? `${(approvals.avgApprovalTimeHours ?? 0).toFixed(1)} hrs`
+                          : `${((approvals.avgApprovalTimeHours ?? 0) / 24).toFixed(1)} days`}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">From estimate creation to approval</p>
                     </CardContent>
@@ -549,7 +549,7 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-dp-total-collected">{formatCurrency(dualPricing.summary.totalCollected)}</div>
+                      <div className="text-2xl font-bold" data-testid="text-dp-total-collected">{formatCurrency(dualPricing.summary.totalCollected ?? 0)}</div>
                       <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.totalTransactions} transactions</p>
                     </CardContent>
                   </Card>
@@ -559,7 +559,7 @@ export default function AutoReports() {
                       <BarChart3 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-dp-split">{dualPricing.summary.cashPercent}% / {dualPricing.summary.cardPercent}%</div>
+                      <div className="text-2xl font-bold" data-testid="text-dp-split">{dualPricing.summary.cashPercent ?? 0}% / {dualPricing.summary.cardPercent ?? 0}%</div>
                       <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.cashTransactions} cash, {dualPricing.summary.cardTransactions} card</p>
                     </CardContent>
                   </Card>
@@ -569,8 +569,8 @@ export default function AutoReports() {
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-dp-earned">{formatCurrency(dualPricing.summary.totalDualPricingCollected)}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Rate: {dualPricing.summary.dualPricingRate.toFixed(2)}%</p>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-dp-earned">{formatCurrency(dualPricing.summary.totalDualPricingCollected ?? 0)}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Rate: {(dualPricing.summary.dualPricingRate ?? 0).toFixed(2)}%</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -579,8 +579,8 @@ export default function AutoReports() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-sm font-semibold" data-testid="text-dp-avg-cash">Cash: {formatCurrency(dualPricing.summary.avgTransactionCash)}</div>
-                      <div className="text-sm font-semibold" data-testid="text-dp-avg-card">Card: {formatCurrency(dualPricing.summary.avgTransactionCard)}</div>
+                      <div className="text-sm font-semibold" data-testid="text-dp-avg-cash">Cash: {formatCurrency(dualPricing.summary.avgTransactionCash ?? 0)}</div>
+                      <div className="text-sm font-semibold" data-testid="text-dp-avg-card">Card: {formatCurrency(dualPricing.summary.avgTransactionCard ?? 0)}</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -588,12 +588,12 @@ export default function AutoReports() {
                 <Card>
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2 text-sm">
-                      <span>Cash {dualPricing.summary.cashPercent}%</span>
+                      <span>Cash {dualPricing.summary.cashPercent ?? 0}%</span>
                       <div className="flex-1 bg-muted rounded-md h-4 overflow-hidden flex">
-                        <div className="bg-green-500 h-full" style={{ width: `${dualPricing.summary.cashPercent}%` }} />
-                        <div className="bg-blue-500 h-full" style={{ width: `${dualPricing.summary.cardPercent}%` }} />
+                        <div className="bg-green-500 h-full" style={{ width: `${dualPricing.summary.cashPercent ?? 0}%` }} />
+                        <div className="bg-blue-500 h-full" style={{ width: `${dualPricing.summary.cardPercent ?? 0}%` }} />
                       </div>
-                      <span>Card {dualPricing.summary.cardPercent}%</span>
+                      <span>Card {dualPricing.summary.cardPercent ?? 0}%</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -625,11 +625,11 @@ export default function AutoReports() {
                               {tx.method}
                             </Badge>
                           </td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cashPrice)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cardPrice)}</td>
-                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(tx.amountPaid)}</td>
-                          <td className={`py-2 px-2 text-right ${tx.dpAmount > 0 ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
-                            {tx.dpAmount > 0 ? formatCurrency(tx.dpAmount) : "-"}
+                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cashPrice ?? 0)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(tx.cardPrice ?? 0)}</td>
+                          <td className="py-2 px-2 text-right font-medium">{formatCurrency(tx.amountPaid ?? 0)}</td>
+                          <td className={`py-2 px-2 text-right ${(tx.dpAmount ?? 0) > 0 ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
+                            {(tx.dpAmount ?? 0) > 0 ? formatCurrency(tx.dpAmount ?? 0) : "-"}
                           </td>
                         </tr>
                       ))}
