@@ -64,8 +64,18 @@ Preferred communication style: Simple, everyday language.
         - **Advanced Analytics**: Three-tab reports page at `/auto/reports-v2` with Monthly Summary (KPIs, revenue breakdown, pay type, add-on metrics), Advisor Performance (per-advisor ROs/revenue/approval rates), Tech Efficiency (sessions, hours, efficiency %). CSV export on all tabs.
         - **Dashboard Active Tech Sessions Widget**: Real-time display of clocked-in technicians with elapsed time.
         - **Employee Number**: Added to staff management for tech portal identification.
+    - **RO V2 Enhancements** (Feb 2026 Phase 2):
+        - **Tech Portal PIN Login**: Employee number + optional PIN authentication for shop floor tablets via `/api/auto/tech-portal/login`. Separate from main auth flow.
+        - **Add-On Auto-Detection**: Lines added >5 minutes after RO creation auto-flagged as 'addon'. DVI-sourced lines flagged as 'inspection'.
+        - **Service Line Editor V2**: Pay type dropdowns (Customer Pay/Internal/Warranty) per line for parts and labor. Conditional warranty vendor/claim number fields. Retail value override for internal/warranty tax records. Line origin badges (ADD-ON yellow, DVI blue). Authorization status badges with approve/decline actions. Internal & Warranty summary section.
+        - **RO Close Validation**: Pre-close validation endpoint checks for active tech sessions, unsigned ROs, missing mileage, pending add-on lines. Confirmation dialog with warnings. Auto-declines pending add-ons on close.
+        - **Quick RO Creation**: Streamlined dialog for rapid RO creation - customer search, vehicle auto-populate, mileage, common service selection. POST to `/api/auto/repair-orders/quick`.
+        - **Add-On Metrics Dashboard Card**: Real-time today's add-on/upsell performance (presented, approved, declined, approval rate).
+        - **Enhanced Campaign Settings**: Editable follow-up day intervals, channel selection (email/SMS/both), email and SMS template editors with merge field insertion ({customer_name}, {vehicle_year_make_model}, {service_description}, {shop_name}, {shop_phone}), SMS character counter.
+        - **Declined Follow-Up Scheduler**: Runs every 4 hours, auto-sends follow-up emails via Resend to customers with declined services based on campaign settings and day intervals.
+        - **Line Item Approval Handling**: Declining a line auto-creates declined service record. Approving a line auto-sets authorization timestamp and method.
     - **RO V2 Schema Tables**: autoLocations, autoRoSequences, autoEstimateSequences, autoTechSessions, autoDeclinedServices, autoCampaignSettings, autoRoCloseSnapshots (7 new tables, 37 total auto_ tables).
-    - **RO V2 Key API Routes**: /estimates (CRUD + convert), /locations (CRUD), /tech-sessions (clock-in/out/active/history), /repair-orders/:id/authorize-line, /decline-line, /present-lines, /signature, /close, /declined-services, /campaign-settings, /reports/monthly-summary, /reports/advisor-performance, /reports/tech-efficiency.
+    - **RO V2 Key API Routes**: /estimates (CRUD + convert), /locations (CRUD), /tech-sessions (clock-in/out/active/history), /repair-orders/:id/authorize-line, /decline-line, /present-lines, /signature, /close, /close/validate, /declined-services, /declined-services/pending-followup, /campaign-settings, /reports/monthly-summary, /reports/advisor-performance, /reports/tech-efficiency, /repair-orders/quick, /tech-portal/login.
 
 ## External Dependencies
 

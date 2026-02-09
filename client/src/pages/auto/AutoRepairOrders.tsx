@@ -6,13 +6,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   FileText, Plus, Loader2, Search, Eye, Pencil, Printer,
-  Wrench, ChevronLeft, ChevronRight, Download, ArrowRightLeft, ExternalLink,
+  Wrench, ChevronLeft, ChevronRight, Download, ArrowRightLeft, ExternalLink, Zap,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -209,6 +213,105 @@ export default function AutoRepairOrders() {
   const [printingId, setPrintingId] = useState<number | null>(null);
   const [convertingId, setConvertingId] = useState<number | null>(null);
 
+  const [quickRoOpen, setQuickRoOpen] = useState(false);
+  const [quickRoCustomerSearch, setQuickRoCustomerSearch] = useState("");
+  const [quickRoCustomers, setQuickRoCustomers] = useState<Customer[]>([]);
+  const [quickRoCustomerLoading, setQuickRoCustomerLoading] = useState(false);
+  const [quickRoSelectedCustomer, setQuickRoSelectedCustomer] = useState<Customer | null>(null);
+  const [quickRoVehicles, setQuickRoVehicles] = useState<Vehicle[]>([]);
+  const [quickRoSelectedVehicleId, setQuickRoSelectedVehicleId] = useState<string>("");
+  const [quickRoMileageIn, setQuickRoMileageIn] = useState("");
+  const [quickRoService, setQuickRoService] = useState("");
+  const [quickRoCustomService, setQuickRoCustomService] = useState("");
+  const [quickRoSubmitting, setQuickRoSubmitting] = useState(false);
+  const customerSearchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  const QUICK_RO_SERVICES = [
+    "Vehicle Inspection",
+    "Oil Change",
+    "Tire Rotation",
+    "Diagnostic",
+    "Custom...",
+  ];
+
+  const handleQuickRoCustomerSearch = useCallback((value: string) => {
+    setQuickRoCustomerSearch(value);
+    clearTimeout(customerSearchTimeoutRef.current);
+    if (value.length < 2) {
+      setQuickRoCustomers([]);
+      return;
+    }
+    customerSearchTimeoutRef.current = setTimeout(async () => {
+      setQuickRoCustomerLoading(true);
+      try {
+        const res = await autoFetch(`/api/auto/customers?search=${encodeURIComponent(value)}`);
+        const data = await res.json();
+        setQuickRoCustomers(data.customers || data || []);
+      } catch {
+        setQuickRoCustomers([]);
+      } finally {
+        setQuickRoCustomerLoading(false);
+      }
+    }, 300);
+  }, [autoFetch]);
+
+  const handleSelectQuickRoCustomer = useCallback(async (customer: Customer) => {
+    setQuickRoSelectedCustomer(customer);
+    setQuickRoCustomerSearch(`${customer.firstName} ${customer.lastName}`);
+    setQuickRoCustomers([]);
+    try {
+      const res = await autoFetch(`/api/auto/customers/${customer.id}/vehicles`);
+      const data = await res.json();
+      const vehicles = data.vehicles || data || [];
+      setQuickRoVehicles(vehicles);
+      if (vehicles.length === 1) {
+        setQuickRoSelectedVehicleId(String(vehicles[0].id));
+      } else {
+        setQuickRoSelectedVehicleId("");
+      }
+    } catch {
+      setQuickRoVehicles([]);
+    }
+  }, [autoFetch]);
+
+  const handleQuickRoSubmit = useCallback(async () => {
+    if (!quickRoSelectedCustomer || !quickRoSelectedVehicleId) return;
+    const serviceDescription = quickRoService === "Custom..." ? quickRoCustomService : quickRoService;
+    if (!serviceDescription) return;
+
+    setQuickRoSubmitting(true);
+    try {
+      const res = await autoFetch("/api/auto/repair-orders/quick", {
+        method: "POST",
+        body: JSON.stringify({
+          customerId: quickRoSelectedCustomer.id,
+          vehicleId: parseInt(quickRoSelectedVehicleId),
+          mileageIn: quickRoMileageIn ? parseInt(quickRoMileageIn) : undefined,
+          serviceDescription,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create RO");
+      const data = await res.json();
+      setQuickRoOpen(false);
+      setLocation(`/auto/repair-orders/${data.id}`);
+    } catch (err) {
+      console.error("Quick RO error:", err);
+    } finally {
+      setQuickRoSubmitting(false);
+    }
+  }, [autoFetch, quickRoSelectedCustomer, quickRoSelectedVehicleId, quickRoService, quickRoCustomService, quickRoMileageIn, setLocation]);
+
+  const resetQuickRoDialog = useCallback(() => {
+    setQuickRoCustomerSearch("");
+    setQuickRoCustomers([]);
+    setQuickRoSelectedCustomer(null);
+    setQuickRoVehicles([]);
+    setQuickRoSelectedVehicleId("");
+    setQuickRoMileageIn("");
+    setQuickRoService("");
+    setQuickRoCustomService("");
+  }, []);
+
   const handlePrintPdf = useCallback(async (roId: number) => {
     setPrintingId(roId);
     try {
@@ -393,6 +496,14 @@ export default function AutoRepairOrders() {
                 <Plus className="h-4 w-4" /> New Estimate
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => { resetQuickRoDialog(); setQuickRoOpen(true); }}
+              data-testid="button-quick-ro"
+            >
+              <Zap className="h-4 w-4" /> Quick RO
+            </Button>
             <Link href="/auto/repair-orders/new">
               <Button className="gap-2" data-testid="button-new-ro">
                 <Plus className="h-4 w-4" /> New RO
@@ -874,6 +985,147 @@ export default function AutoRepairOrders() {
           </>
         )}
       </div>
+
+      <Dialog open={quickRoOpen} onOpenChange={(open) => { setQuickRoOpen(open); if (!open) resetQuickRoDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle data-testid="text-quick-ro-title">Quick RO</DialogTitle>
+            <DialogDescription>Create a repair order quickly by selecting a customer and service.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search customers..."
+                  value={quickRoCustomerSearch}
+                  onChange={(e) => handleQuickRoCustomerSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-quick-ro-customer-search"
+                />
+              </div>
+              {quickRoCustomerLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Searching...
+                </div>
+              )}
+              {quickRoCustomers.length > 0 && !quickRoSelectedCustomer && (
+                <div className="border rounded-md max-h-40 overflow-y-auto">
+                  {quickRoCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      className="w-full text-left px-3 py-2 text-sm hover-elevate"
+                      onClick={() => handleSelectQuickRoCustomer(c)}
+                      data-testid={`button-quick-ro-customer-${c.id}`}
+                    >
+                      <span className="font-medium">{c.firstName} {c.lastName}</span>
+                      {c.phone && <span className="text-muted-foreground ml-2">{c.phone}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {quickRoSelectedCustomer && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-quick-ro-selected-customer">
+                    {quickRoSelectedCustomer.firstName} {quickRoSelectedCustomer.lastName}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setQuickRoSelectedCustomer(null);
+                      setQuickRoCustomerSearch("");
+                      setQuickRoVehicles([]);
+                      setQuickRoSelectedVehicleId("");
+                    }}
+                    data-testid="button-quick-ro-clear-customer"
+                  >
+                    Change
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {quickRoSelectedCustomer && (
+              <div className="space-y-2">
+                <Label>Vehicle</Label>
+                {quickRoVehicles.length > 0 ? (
+                  <Select value={quickRoSelectedVehicleId} onValueChange={setQuickRoSelectedVehicleId}>
+                    <SelectTrigger data-testid="select-quick-ro-vehicle">
+                      <SelectValue placeholder="Select vehicle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quickRoVehicles.map((v) => (
+                        <SelectItem key={v.id} value={String(v.id)} data-testid={`select-item-vehicle-${v.id}`}>
+                          {[v.year, v.make, v.model].filter(Boolean).join(" ")} {v.vin ? `(${v.vin})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-vehicles">No vehicles found for this customer.</p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Mileage In</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 45000"
+                value={quickRoMileageIn}
+                onChange={(e) => setQuickRoMileageIn(e.target.value)}
+                data-testid="input-quick-ro-mileage"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Service</Label>
+              <Select value={quickRoService} onValueChange={setQuickRoService}>
+                <SelectTrigger data-testid="select-quick-ro-service">
+                  <SelectValue placeholder="Select service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUICK_RO_SERVICES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {quickRoService === "Custom..." && (
+                <Input
+                  placeholder="Enter custom service description"
+                  value={quickRoCustomService}
+                  onChange={(e) => setQuickRoCustomService(e.target.value)}
+                  data-testid="input-quick-ro-custom-service"
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setQuickRoOpen(false)}
+              data-testid="button-quick-ro-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                quickRoSubmitting ||
+                !quickRoSelectedCustomer ||
+                !quickRoSelectedVehicleId ||
+                (!quickRoService || (quickRoService === "Custom..." && !quickRoCustomService))
+              }
+              onClick={handleQuickRoSubmit}
+              data-testid="button-quick-ro-create"
+            >
+              {quickRoSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create RO
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AutoLayout>
   );
 }

@@ -4,9 +4,11 @@ import { AutoLayout } from "./AutoLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Clock, Play, Square, Wrench, ChevronDown, ChevronUp,
-  Loader2, History, Car, AlertCircle, RefreshCw,
+  Loader2, History, Car, AlertCircle, RefreshCw, KeyRound, LogIn,
 } from "lucide-react";
 
 interface TechSession {
@@ -85,8 +87,16 @@ function vehicleLabel(v: { year: number | null; make: string | null; model: stri
   return [v.year, v.make, v.model].filter(Boolean).join(" ") || "No vehicle";
 }
 
+interface PinTechInfo {
+  id: number;
+  firstName: string;
+  lastName: string;
+  employeeNumber: string;
+  role: string;
+}
+
 export default function AutoTechPortal() {
-  const { autoFetch, user } = useAutoAuth();
+  const { autoFetch, user, shop } = useAutoAuth();
 
   const [activeSession, setActiveSession] = useState<TechSession | null>(null);
   const [repairOrders, setRepairOrders] = useState<RepairOrder[]>([]);
@@ -102,6 +112,51 @@ export default function AutoTechPortal() {
 
   const [elapsedTime, setElapsedTime] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [showPinLogin, setShowPinLogin] = useState(false);
+  const [pinEmployeeNumber, setPinEmployeeNumber] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [pinLoggingIn, setPinLoggingIn] = useState(false);
+  const [pinError, setPinError] = useState("");
+  const [pinTechInfo, setPinTechInfo] = useState<PinTechInfo | null>(null);
+
+  const handlePinLogin = useCallback(async () => {
+    if (!pinEmployeeNumber.trim()) {
+      setPinError("Employee number is required");
+      return;
+    }
+    setPinLoggingIn(true);
+    setPinError("");
+    try {
+      const res = await fetch("/api/auto/tech-portal/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeNumber: pinEmployeeNumber.trim(),
+          pin: pinCode || undefined,
+          shopId: shop?.id || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPinError(data.error || "Login failed");
+        return;
+      }
+      setPinTechInfo(data.tech || data.user || data);
+      setShowPinLogin(false);
+      setPinEmployeeNumber("");
+      setPinCode("");
+    } catch (err: any) {
+      setPinError(err.message || "Login failed");
+    } finally {
+      setPinLoggingIn(false);
+    }
+  }, [pinEmployeeNumber, pinCode, shop]);
+
+  const handlePinLogout = useCallback(() => {
+    setPinTechInfo(null);
+    setShowPinLogin(false);
+  }, []);
 
   const fetchActiveSession = useCallback(async () => {
     if (!user) return;
@@ -271,17 +326,90 @@ export default function AutoTechPortal() {
             <Wrench className="h-5 w-5" /> Tech Portal
           </h1>
           <div className="flex items-center gap-2">
+            {pinTechInfo && (
+              <Badge variant="outline" className="gap-1 no-default-hover-elevate no-default-active-elevate" data-testid="badge-pin-user">
+                <KeyRound className="h-3 w-3" />
+                {pinTechInfo.firstName} {pinTechInfo.lastName}
+              </Badge>
+            )}
             {activeSession && (
               <Badge variant="outline" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 no-default-hover-elevate no-default-active-elevate" data-testid="badge-active-timer">
                 <Clock className="h-3 w-3" />
                 {elapsedTime}
               </Badge>
             )}
+            {pinTechInfo ? (
+              <Button size="sm" variant="ghost" onClick={handlePinLogout} data-testid="button-pin-logout">
+                Switch User
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setShowPinLogin(!showPinLogin)} data-testid="button-pin-login-toggle">
+                <KeyRound className="h-4 w-4 mr-1" />
+                PIN Login
+              </Button>
+            )}
             <Button size="icon" variant="ghost" onClick={fetchAll} data-testid="button-refresh">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
+
+        {showPinLogin && (
+          <Card data-testid="card-pin-login">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Quick PIN Login
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                For shop floor tablets. Sign in with your employee number and optional PIN.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="pin-emp-number" className="text-sm">Employee Number</Label>
+                  <Input
+                    id="pin-emp-number"
+                    placeholder="e.g. 104"
+                    value={pinEmployeeNumber}
+                    onChange={(e) => setPinEmployeeNumber(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handlePinLogin(); }}
+                    data-testid="input-pin-employee-number"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="pin-code" className="text-sm">PIN (optional)</Label>
+                  <Input
+                    id="pin-code"
+                    type="password"
+                    placeholder="4-6 digits"
+                    maxLength={6}
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => { if (e.key === "Enter") handlePinLogin(); }}
+                    data-testid="input-pin-code"
+                  />
+                </div>
+              </div>
+              {pinError && (
+                <div className="flex items-center gap-2 text-sm text-destructive" data-testid="text-pin-error">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {pinError}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button onClick={handlePinLogin} disabled={pinLoggingIn} className="gap-2" data-testid="button-pin-submit">
+                  {pinLoggingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                  Sign In
+                </Button>
+                <Button variant="ghost" onClick={() => { setShowPinLogin(false); setPinError(""); }} data-testid="button-pin-cancel">
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Active Session Card */}
         {activeSession && (

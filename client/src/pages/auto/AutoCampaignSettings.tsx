@@ -1,15 +1,39 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { AutoLayout } from "./AutoLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Save, Loader2, ShieldAlert } from "lucide-react";
+import { Settings, Save, Loader2, ShieldAlert, Plus, X } from "lucide-react";
+
+const DEFAULT_EMAIL_TEMPLATE = `Hi {customer_name},
+
+During your recent visit to {shop_name}, our technician recommended the following service for your {vehicle_year_make_model}:
+
+\u2022 {service_description}
+
+This recommendation was made to help keep your vehicle running safely and reliably. We wanted to follow up in case you'd like to schedule this service.
+
+Give us a call at {shop_phone} or reply to this email to set up an appointment.
+
+Thank you,
+{shop_name}`;
+
+const DEFAULT_SMS_TEMPLATE = `Hi {customer_name}, {shop_name} here. We recommended {service_description} for your {vehicle_year_make_model}. Ready to schedule? Call {shop_phone}. Reply STOP to opt out.`;
+
+const MERGE_FIELDS = [
+  "{customer_name}",
+  "{vehicle_year_make_model}",
+  "{service_description}",
+  "{shop_name}",
+  "{shop_phone}",
+];
 
 interface CampaignSettings {
   declinedFollowupEnabled: boolean;
@@ -31,8 +55,53 @@ export default function AutoCampaignSettings() {
     declinedFollowupEmailTemplate: "",
     declinedFollowupSmsTemplate: "",
   });
+  const [newDayValue, setNewDayValue] = useState("");
+
+  const emailTemplateRef = useRef<HTMLTextAreaElement>(null);
+  const smsTemplateRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwnerOrManager = user?.role === "owner" || user?.role === "manager";
+
+  const dayIntervals = form.declinedFollowupDays
+    .split(",")
+    .map((d) => d.trim())
+    .filter((d) => d && !isNaN(Number(d)))
+    .map(Number);
+
+  const setDayIntervals = (days: number[]) => {
+    setForm({ ...form, declinedFollowupDays: days.join(",") });
+  };
+
+  const addDayInterval = () => {
+    const val = parseInt(newDayValue);
+    if (!val || val <= 0 || dayIntervals.includes(val)) return;
+    const updated = [...dayIntervals, val].sort((a, b) => a - b);
+    setDayIntervals(updated);
+    setNewDayValue("");
+  };
+
+  const removeDayInterval = (day: number) => {
+    setDayIntervals(dayIntervals.filter((d) => d !== day));
+  };
+
+  const insertMergeField = (field: string, target: "email" | "sms") => {
+    const ref = target === "email" ? emailTemplateRef : smsTemplateRef;
+    const templateKey = target === "email" ? "declinedFollowupEmailTemplate" : "declinedFollowupSmsTemplate";
+    const textarea = ref.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentValue = form[templateKey];
+    const newValue = currentValue.substring(0, start) + field + currentValue.substring(end);
+    setForm({ ...form, [templateKey]: newValue });
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const newCursorPos = start + field.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    });
+  };
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -42,8 +111,8 @@ export default function AutoCampaignSettings() {
         declinedFollowupEnabled: data.declinedFollowupEnabled ?? false,
         declinedFollowupDays: data.declinedFollowupDays ?? "3,7,14",
         declinedFollowupChannel: data.declinedFollowupChannel ?? "email",
-        declinedFollowupEmailTemplate: data.declinedFollowupEmailTemplate ?? "",
-        declinedFollowupSmsTemplate: data.declinedFollowupSmsTemplate ?? "",
+        declinedFollowupEmailTemplate: data.declinedFollowupEmailTemplate || DEFAULT_EMAIL_TEMPLATE,
+        declinedFollowupSmsTemplate: data.declinedFollowupSmsTemplate || DEFAULT_SMS_TEMPLATE,
       });
     } catch (err) {
       console.error(err);
@@ -103,6 +172,9 @@ export default function AutoCampaignSettings() {
     );
   }
 
+  const smsLength = form.declinedFollowupSmsTemplate.length;
+  const smsOverLimit = smsLength > 160;
+
   return (
     <AutoLayout>
       <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
@@ -131,16 +203,46 @@ export default function AutoCampaignSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="followup-days">Follow-up Schedule (days)</Label>
-              <Input
-                id="followup-days"
-                placeholder="3,7,14"
-                value={form.declinedFollowupDays}
-                onChange={(e) => setForm({ ...form, declinedFollowupDays: e.target.value })}
-                data-testid="input-followup-days"
-              />
+              <Label>Follow-up Day Intervals</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                {dayIntervals.map((day) => (
+                  <div key={day} className="flex items-center gap-1">
+                    <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate gap-1" data-testid={`badge-day-${day}`}>
+                      Day {day}
+                      <button
+                        onClick={() => removeDayInterval(day)}
+                        className="ml-0.5"
+                        data-testid={`button-remove-day-${day}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    placeholder="Days"
+                    value={newDayValue}
+                    onChange={(e) => setNewDayValue(e.target.value)}
+                    className="w-20"
+                    min={1}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDayInterval(); } }}
+                    data-testid="input-new-day-interval"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={addDayInterval}
+                    disabled={!newDayValue || parseInt(newDayValue) <= 0}
+                    data-testid="button-add-day-interval"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Comma-separated days after decline to send follow-ups (e.g., 3,7,14)
+                Number of days after decline to send follow-up messages
               </p>
             </div>
 
@@ -164,32 +266,61 @@ export default function AutoCampaignSettings() {
             <div className="space-y-2">
               <Label htmlFor="email-template">Email Template</Label>
               <Textarea
+                ref={emailTemplateRef}
                 id="email-template"
-                rows={5}
-                placeholder={"Hi {{customerName}},\n\nDuring your recent visit, we recommended {{serviceName}} for your {{vehicleInfo}}. We wanted to follow up and let you know this service is still available.\n\nPlease contact us to schedule at your convenience."}
+                rows={12}
                 value={form.declinedFollowupEmailTemplate}
                 onChange={(e) => setForm({ ...form, declinedFollowupEmailTemplate: e.target.value })}
                 data-testid="textarea-email-template"
               />
-              <p className="text-xs text-muted-foreground">
-                {"Available variables: {{customerName}}, {{serviceName}}, {{vehicleInfo}}"}
-              </p>
+              <div className="flex flex-wrap gap-1">
+                <span className="text-xs text-muted-foreground mr-1">Merge fields:</span>
+                {MERGE_FIELDS.map((field) => (
+                  <Badge
+                    key={`email-${field}`}
+                    variant="outline"
+                    className="cursor-pointer text-xs"
+                    onClick={() => insertMergeField(field, "email")}
+                    data-testid={`badge-email-merge-${field.replace(/[{}]/g, "")}`}
+                  >
+                    {field}
+                  </Badge>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="sms-template">SMS Template</Label>
               <Textarea
+                ref={smsTemplateRef}
                 id="sms-template"
-                rows={3}
-                placeholder={"Hi {{customerName}}, your {{vehicleInfo}} may still need {{serviceName}}. Reply or call us to schedule!"}
+                rows={4}
                 value={form.declinedFollowupSmsTemplate}
                 onChange={(e) => setForm({ ...form, declinedFollowupSmsTemplate: e.target.value })}
-                maxLength={160}
                 data-testid="textarea-sms-template"
               />
-              <p className="text-xs text-muted-foreground">
-                {form.declinedFollowupSmsTemplate.length}/160 characters suggested limit
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1">
+                  <span className="text-xs text-muted-foreground mr-1">Merge fields:</span>
+                  {MERGE_FIELDS.map((field) => (
+                    <Badge
+                      key={`sms-${field}`}
+                      variant="outline"
+                      className="cursor-pointer text-xs"
+                      onClick={() => insertMergeField(field, "sms")}
+                      data-testid={`badge-sms-merge-${field.replace(/[{}]/g, "")}`}
+                    >
+                      {field}
+                    </Badge>
+                  ))}
+                </div>
+                <span
+                  className={`text-xs font-medium ${smsOverLimit ? "text-destructive" : "text-muted-foreground"}`}
+                  data-testid="text-sms-char-count"
+                >
+                  Characters: {smsLength}/160
+                </span>
+              </div>
             </div>
 
             <Button

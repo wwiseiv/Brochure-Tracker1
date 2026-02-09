@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown, Search, Clock, Wrench, Send } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown, ChevronUp, Search, Clock, Wrench, Send, Check, XCircle, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { handleCall, handleSms, handleEmail, SMS_TEMPLATES, EMAIL_TEMPLATES, logCommunication } from "@/lib/auto-communication";
 import CopyMessageModal from "@/components/auto/CopyMessageModal";
@@ -27,6 +27,10 @@ interface LineItem {
   quantity: string; unitPriceCash: string; unitPriceCard: string;
   totalCash: string; totalCard: string; status: string;
   isAdjustable: boolean; isNtnf: boolean; costPrice: string | null; isTaxable: boolean;
+  partsPayType: string | null; laborPayType: string | null;
+  warrantyVendor: string | null; warrantyClaimNumber: string | null;
+  retailValueOverride: string | null;
+  lineOrigin: string | null; approvalStatus: string | null;
 }
 interface Payment {
   id: number;
@@ -82,6 +86,7 @@ export default function AutoRepairOrderForm() {
   const [totalCard, setTotalCard] = useState(0);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [showInternalSummary, setShowInternalSummary] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     method: "cash", amount: "", referenceNumber: "", notes: "",
   });
@@ -109,6 +114,11 @@ export default function AutoRepairOrderForm() {
   const [sendMethod, setSendMethod] = useState<"sms" | "email" | "both">("both");
   const [sendingEstimate, setSendingEstimate] = useState(false);
   const [convertingToWO, setConvertingToWO] = useState(false);
+
+  const [closeValidationOpen, setCloseValidationOpen] = useState(false);
+  const [closeWarnings, setCloseWarnings] = useState<string[]>([]);
+  const [validatingClose, setValidatingClose] = useState(false);
+  const [closingRO, setClosingRO] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "", vehicleId: "", technicianId: "",
@@ -141,6 +151,8 @@ export default function AutoRepairOrderForm() {
     type: "labor", description: "", partNumber: "", quantity: "1",
     unitPriceCash: "", laborHours: "", isAdjustable: true, isNtnf: false,
     costPrice: "", isTaxable: true,
+    partsPayType: "customer_pay", laborPayType: "customer_pay",
+    warrantyVendor: "", warrantyClaimNumber: "", retailValueOverride: "",
   });
 
   const fetchData = useCallback(async () => {
@@ -251,6 +263,50 @@ export default function AutoRepairOrderForm() {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === "completed" && ro && ro.status !== "completed") {
+      setValidatingClose(true);
+      try {
+        const res = await autoFetch(`/api/auto/repair-orders/${roId}/close/validate`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (data.warnings && data.warnings.length > 0) {
+          setCloseWarnings(data.warnings);
+          setCloseValidationOpen(true);
+          return;
+        }
+        await handleUpdateRO({ status: newStatus });
+      } catch {
+        await handleUpdateRO({ status: newStatus });
+      } finally {
+        setValidatingClose(false);
+      }
+    } else {
+      await handleUpdateRO({ status: newStatus });
+    }
+  };
+
+  const handleConfirmClose = async () => {
+    setClosingRO(true);
+    try {
+      const res = await autoFetch(`/api/auto/repair-orders/${roId}/close`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setRo(data.repairOrder || data);
+      toast({ title: "Repair Order Closed" });
+      fetchRO();
+    } catch {
+      await handleUpdateRO({ status: "completed" });
+    } finally {
+      setClosingRO(false);
+      setCloseValidationOpen(false);
+      setCloseWarnings([]);
+    }
+  };
+
   const handleSendEstimate = async () => {
     if (!roId || !ro) return;
     setSendingEstimate(true);
@@ -321,7 +377,7 @@ export default function AutoRepairOrderForm() {
       const item = await res.json();
       if (!res.ok) throw new Error(item.error);
       setLineItems([...lineItems, item]);
-      setNewItem({ type: "labor", description: "", partNumber: "", quantity: "1", unitPriceCash: "", laborHours: "", isAdjustable: true, isNtnf: false, costPrice: "", isTaxable: true });
+      setNewItem({ type: "labor", description: "", partNumber: "", quantity: "1", unitPriceCash: "", laborHours: "", isAdjustable: true, isNtnf: false, costPrice: "", isTaxable: true, partsPayType: "customer_pay", laborPayType: "customer_pay", warrantyVendor: "", warrantyClaimNumber: "", retailValueOverride: "" });
       await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
       fetchPayments();
     } catch (err: any) {
@@ -337,6 +393,20 @@ export default function AutoRepairOrderForm() {
         await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
         fetchPayments();
       }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleApprovalStatus = async (itemId: number, status: string) => {
+    try {
+      const res = await autoFetch(`/api/auto/line-items/${itemId}`, {
+        method: "PATCH", body: JSON.stringify({ approvalStatus: status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setLineItems(lineItems.map(i => i.id === itemId ? { ...i, approvalStatus: status } : i));
+      toast({ title: status === "approved" ? "Line Approved" : "Line Declined" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -878,7 +948,7 @@ export default function AutoRepairOrderForm() {
                 <CardTitle className="text-base">Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <Select value={ro.status} onValueChange={(v) => handleUpdateRO({ status: v })}>
+                <Select value={ro.status} onValueChange={(v) => handleStatusChange(v)} disabled={validatingClose}>
                   <SelectTrigger data-testid="select-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(STATUS_LABELS).map(([k, v]) => (
@@ -902,25 +972,61 @@ export default function AutoRepairOrderForm() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {lineItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 p-3 rounded-md border" data-testid={`line-item-${item.id}`}>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs capitalize">{item.type}</Badge>
-                        <span className="text-sm font-medium truncate">{item.description}</span>
-                        {item.isNtnf && <Badge variant="secondary" className="text-xs" data-testid={`badge-ntnf-${item.id}`}>NTNF</Badge>}
-                        {item.isAdjustable === false && <Badge variant="secondary" className="text-xs" data-testid={`badge-fixed-${item.id}`}>Fixed</Badge>}
-                        {item.isTaxable === false && <Badge variant="secondary" className="text-xs" data-testid={`badge-notax-${item.id}`}>No Tax</Badge>}
+                {lineItems.map((item) => {
+                  const hasInternal = item.partsPayType === "internal" || item.laborPayType === "internal";
+                  const hasWarranty = item.partsPayType === "warranty" || item.laborPayType === "warranty";
+                  const isNonCustomerPay = hasInternal || hasWarranty;
+                  const payTypeBg = hasWarranty
+                    ? "bg-blue-50 dark:bg-blue-950/30"
+                    : hasInternal
+                    ? "bg-yellow-50 dark:bg-yellow-950/30"
+                    : "";
+                  const showApproval = item.lineOrigin && item.lineOrigin !== "original";
+                  return (
+                    <div key={item.id} className={`flex items-start justify-between gap-3 p-3 rounded-md border ${payTypeBg}`} data-testid={`line-item-${item.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs capitalize">{item.type}</Badge>
+                          {item.lineOrigin === "addon" && (
+                            <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-origin-${item.id}`}>ADD-ON</Badge>
+                          )}
+                          {item.lineOrigin === "inspection" && (
+                            <Badge className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-origin-${item.id}`}>DVI</Badge>
+                          )}
+                          <span className="text-sm font-medium truncate">{item.description}</span>
+                          {item.isNtnf && <Badge variant="secondary" className="text-xs" data-testid={`badge-ntnf-${item.id}`}>NTNF</Badge>}
+                          {item.isAdjustable === false && <Badge variant="secondary" className="text-xs" data-testid={`badge-fixed-${item.id}`}>Fixed</Badge>}
+                          {item.isTaxable === false && <Badge variant="secondary" className="text-xs" data-testid={`badge-notax-${item.id}`}>No Tax</Badge>}
+                          {hasInternal && <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-internal-${item.id}`}>Internal</Badge>}
+                          {hasWarranty && <Badge className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-warranty-${item.id}`}>Warranty</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Qty: {item.quantity} &middot; Cash: ${parseFloat(item.totalCash).toFixed(2)} &middot; Card: ${parseFloat(item.totalCard).toFixed(2)}
+                        </div>
+                        {showApproval && (
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            {item.approvalStatus === "pending" && <Badge className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-approval-${item.id}`}>Pending</Badge>}
+                            {item.approvalStatus === "approved" && <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-approval-${item.id}`}>Approved</Badge>}
+                            {item.approvalStatus === "declined" && <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate" data-testid={`badge-approval-${item.id}`}>Declined</Badge>}
+                            {item.lineOrigin === "addon" && item.approvalStatus !== "approved" && (
+                              <Button variant="outline" size="sm" onClick={() => handleApprovalStatus(item.id, "approved")} data-testid={`button-approve-${item.id}`}>
+                                <Check className="h-3 w-3 mr-1" /> Approve
+                              </Button>
+                            )}
+                            {item.lineOrigin === "addon" && item.approvalStatus !== "declined" && (
+                              <Button variant="outline" size="sm" onClick={() => handleApprovalStatus(item.id, "declined")} data-testid={`button-decline-${item.id}`}>
+                                <XCircle className="h-3 w-3 mr-1" /> Decline
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Qty: {item.quantity} &middot; Cash: ${parseFloat(item.totalCash).toFixed(2)} &middot; Card: ${parseFloat(item.totalCard).toFixed(2)}
-                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => deleteLineItem(item.id)} data-testid={`button-delete-item-${item.id}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => deleteLineItem(item.id)} data-testid={`button-delete-item-${item.id}`}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <div className="border-t pt-3 space-y-3">
                   <p className="text-sm font-medium">Add Line Item</p>
@@ -943,6 +1049,50 @@ export default function AutoRepairOrderForm() {
                     <div className="grid grid-cols-2 gap-2">
                       <Input placeholder="Part Number" value={newItem.partNumber} onChange={(e) => setNewItem({ ...newItem, partNumber: e.target.value })} data-testid="input-part-number" />
                       <Input placeholder="Cost" type="number" step="0.01" value={newItem.costPrice} onChange={(e) => setNewItem({ ...newItem, costPrice: e.target.value })} data-testid="input-cost-price" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Parts Pay Type</Label>
+                      <Select value={newItem.partsPayType} onValueChange={(v) => setNewItem({ ...newItem, partsPayType: v })}>
+                        <SelectTrigger data-testid="select-parts-pay-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="customer_pay">Customer Pay</SelectItem>
+                          <SelectItem value="internal">Internal</SelectItem>
+                          <SelectItem value="warranty">Warranty</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Labor Pay Type</Label>
+                      <Select value={newItem.laborPayType} onValueChange={(v) => setNewItem({ ...newItem, laborPayType: v })}>
+                        <SelectTrigger data-testid="select-labor-pay-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="customer_pay">Customer Pay</SelectItem>
+                          <SelectItem value="internal">Internal</SelectItem>
+                          <SelectItem value="warranty">Warranty</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {(newItem.partsPayType !== "customer_pay" || newItem.laborPayType !== "customer_pay") && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Retail Value</Label>
+                        <Input placeholder="Retail value" type="number" step="0.01" value={newItem.retailValueOverride} onChange={(e) => setNewItem({ ...newItem, retailValueOverride: e.target.value })} data-testid="input-retail-value" />
+                      </div>
+                      {(newItem.partsPayType === "warranty" || newItem.laborPayType === "warranty") && (
+                        <>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Warranty Vendor</Label>
+                            <Input placeholder="Vendor name" value={newItem.warrantyVendor} onChange={(e) => setNewItem({ ...newItem, warrantyVendor: e.target.value })} data-testid="input-warranty-vendor" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Claim Number</Label>
+                            <Input placeholder="Claim #" value={newItem.warrantyClaimNumber} onChange={(e) => setNewItem({ ...newItem, warrantyClaimNumber: e.target.value })} data-testid="input-claim-number" />
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center gap-4 flex-wrap">
@@ -974,6 +1124,37 @@ export default function AutoRepairOrderForm() {
                     <div className="flex justify-between font-bold text-base" data-testid="text-total-card"><span>Total (Card)</span><span>${parseFloat(ro.totalCard || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between text-muted-foreground" data-testid="text-adjustable"><span>Adjustable</span><span>${parseFloat(ro.totalAdjustable || "0").toFixed(2)}</span></div>
                     <div className="flex justify-between text-muted-foreground" data-testid="text-non-adjustable"><span>Non-Adjustable (NTNF)</span><span>${parseFloat(ro.totalNonAdjustable || "0").toFixed(2)}</span></div>
+                    {(() => {
+                      const nonCustomerLines = lineItems.filter(i => i.partsPayType !== "customer_pay" || i.laborPayType !== "customer_pay");
+                      if (nonCustomerLines.length === 0) return null;
+                      const internalWarrantyTotal = nonCustomerLines.reduce((sum, i) => sum + parseFloat(i.retailValueOverride || i.totalCash || "0"), 0);
+                      return (
+                        <div className="pt-2 mt-2 border-t border-dashed" data-testid="summary-internal-warranty">
+                          <button
+                            type="button"
+                            className="flex items-center justify-between w-full text-sm text-muted-foreground"
+                            onClick={() => setShowInternalSummary(!showInternalSummary)}
+                            data-testid="button-toggle-internal-summary"
+                          >
+                            <span>Internal & Warranty Charges</span>
+                            <span className="flex items-center gap-1">
+                              ${internalWarrantyTotal.toFixed(2)}
+                              {showInternalSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </span>
+                          </button>
+                          {showInternalSummary && (
+                            <div className="mt-1 space-y-1 pl-2 text-xs text-muted-foreground">
+                              {nonCustomerLines.map(i => (
+                                <div key={i.id} className="flex justify-between" data-testid={`summary-line-${i.id}`}>
+                                  <span className="truncate mr-2">{i.description}</span>
+                                  <span>${parseFloat(i.retailValueOverride || i.totalCash || "0").toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </CardContent>
@@ -1452,6 +1633,52 @@ export default function AutoRepairOrderForm() {
             <Button onClick={handleSendEstimate} disabled={sendingEstimate} data-testid="button-confirm-send">
               {sendingEstimate ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
               Send Estimate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeValidationOpen} onOpenChange={setCloseValidationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Close Repair Order
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              The following issues were found. Please review before closing:
+            </p>
+            <div className="space-y-2">
+              {closeWarnings.map((warning, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 rounded-md border p-3 text-sm"
+                  data-testid={`text-close-warning-${idx}`}
+                >
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                  <span>{warning}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setCloseValidationOpen(false); setCloseWarnings([]); }}
+              data-testid="button-cancel-close"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmClose}
+              disabled={closingRO}
+              data-testid="button-close-anyway"
+            >
+              {closingRO ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Close Anyway
             </Button>
           </DialogFooter>
         </DialogContent>

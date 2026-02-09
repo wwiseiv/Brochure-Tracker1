@@ -19,6 +19,8 @@ import multer from "multer";
 import { generateROPdf, generateDviPdf } from "./auto-pdf";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { sendAutoInvoiceEmail } from "./auto-email";
+import { getCredentials } from "./email";
+import { Resend } from "resend";
 import Anthropic from "@anthropic-ai/sdk";
 
 const logoUpload = multer({
@@ -348,6 +350,40 @@ router.get("/auth/invitation/:token", async (req: Request, res: Response) => {
     res.json({ email: inv[0].email, role: inv[0].role, shopName: shop[0]?.name || "Unknown Shop" });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to validate invitation" });
+  }
+});
+
+router.post("/tech-portal/login", async (req: Request, res: Response) => {
+  try {
+    const { employeeNumber, pin, shopId } = req.body;
+    if (!employeeNumber || !shopId) {
+      return res.status(400).json({ error: "Employee number and shop ID required" });
+    }
+
+    const [user] = await db.select().from(autoUsers)
+      .where(and(
+        eq(autoUsers.employeeNumber, employeeNumber),
+        eq(autoUsers.shopId, parseInt(shopId))
+      ));
+
+    if (!user) return res.status(404).json({ error: "Employee not found" });
+    if (user.role !== "tech") return res.status(403).json({ error: "Tech portal access is for technicians only" });
+
+    if (user.pin && user.pin !== pin) {
+      return res.status(401).json({ error: "Invalid PIN" });
+    }
+
+    res.json({
+      id: user.id,
+      shopId: user.shopId,
+      employeeNumber: user.employeeNumber,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    });
+  } catch (err: any) {
+    console.error("Tech portal login error:", err);
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
@@ -1036,6 +1072,70 @@ router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.post("/repair-orders/quick", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { customerId, vehicleId, mileageIn, serviceDescription, locationId } = req.body;
+
+    if (!customerId || !vehicleId) {
+      return res.status(400).json({ error: "Customer and vehicle are required" });
+    }
+
+    const roResult = await generateRoNumber(shopId, locationId);
+    const roNumber = roResult.roNumber;
+    const approvalToken = crypto.randomBytes(32).toString("hex");
+    const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const [ro] = await db.insert(autoRepairOrders).values({
+      shopId,
+      roNumber,
+      customerId,
+      vehicleId,
+      status: "in_progress",
+      serviceAdvisorId: req.autoUser!.id,
+      mileageIn: mileageIn ? parseInt(mileageIn) : null,
+      locationId: roResult.locationId,
+      isEstimate: false,
+      approvalToken,
+      approvalShortCode,
+    }).returning();
+
+    if (serviceDescription) {
+      const shop = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
+      const cardFeePercent = parseFloat(shop[0]?.cardFeePercent || "0");
+
+      await db.insert(autoLineItems).values({
+        repairOrderId: ro.id,
+        type: "labor",
+        description: serviceDescription,
+        quantity: "1",
+        unitPriceCash: "0.00",
+        unitPriceCard: "0.00",
+        totalCash: "0.00",
+        totalCard: "0.00",
+        lineOrigin: "original",
+        addedByUserId: req.autoUser!.id,
+        addedAt: new Date(),
+        status: "pending",
+      });
+    }
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "repair_order",
+      entityId: ro.id,
+      action: "quick_ro_created",
+      details: { roNumber },
+    });
+
+    res.json(ro);
+  } catch (err: any) {
+    console.error("Quick RO creation error:", err);
+    res.status(500).json({ error: "Failed to create quick repair order" });
+  }
+});
+
 router.get("/repair-orders/:id", autoAuth, async (req: Request, res: Response) => {
   try {
     const roId = parseInt(req.params.id);
@@ -1295,6 +1395,21 @@ router.post("/repair-orders/:roId/line-items", autoAuth, async (req: Request, re
     const roId = parseInt(req.params.roId);
     const data = req.body;
 
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    let lineOrigin = data.lineOrigin || 'original';
+    if (!data.lineOrigin && ro.createdAt) {
+      const secondsSinceCreation = (Date.now() - new Date(ro.createdAt).getTime()) / 1000;
+      if (secondsSinceCreation > 300) {
+        lineOrigin = 'addon';
+      }
+    }
+    if (data.lineOrigin === 'inspection' || data.lineOrigin === 'dvi') {
+      lineOrigin = 'inspection';
+    }
+
     const shop = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId)).limit(1);
     const cardFeePercent = parseFloat(shop[0]?.cardFeePercent || "0");
 
@@ -1327,6 +1442,14 @@ router.post("/repair-orders/:roId/line-items", autoAuth, async (req: Request, re
       isAdjustable, isNtnf,
       costPrice: data.costPrice != null ? parseFloat(data.costPrice).toFixed(2) : null,
       sortOrder: data.sortOrder || 0, status: data.status || "pending",
+      lineOrigin,
+      addedByUserId: req.autoUser!.id,
+      addedAt: new Date(),
+      partsPayType: data.partsPayType || 'customer_pay',
+      laborPayType: data.laborPayType || 'customer_pay',
+      retailValueOverride: data.retailValueOverride || null,
+      warrantyVendor: data.warrantyVendor || null,
+      warrantyClaimNumber: data.warrantyClaimNumber || null,
     }).returning();
 
     res.json(item);
@@ -1342,9 +1465,10 @@ router.patch("/line-items/:id", autoAuth, async (req: Request, res: Response) =>
     const updates: any = { ...data };
     delete updates.id; delete updates.createdAt;
 
+    const existing = await db.select().from(autoLineItems).where(eq(autoLineItems.id, parseInt(req.params.id))).limit(1);
+    if (!existing.length) return res.status(404).json({ error: "Line item not found" });
+
     if (data.quantity != null || data.unitPriceCash != null || data.isAdjustable != null || data.isNtnf != null) {
-      const existing = await db.select().from(autoLineItems).where(eq(autoLineItems.id, parseInt(req.params.id))).limit(1);
-      if (!existing.length) return res.status(404).json({ error: "Line item not found" });
       const cur = existing[0];
 
       const shop = await db.select().from(autoShops).where(eq(autoShops.id, req.autoUser!.shopId)).limit(1);
@@ -1377,8 +1501,32 @@ router.patch("/line-items/:id", autoAuth, async (req: Request, res: Response) =>
       updates.costPrice = parseFloat(data.costPrice).toFixed(2);
     }
 
+    if (data.approvalStatus === 'approved') {
+      updates.authorizationTimestamp = new Date();
+      updates.customerRespondedAt = new Date();
+      updates.authorizationMethod = data.authorizationMethod || 'in_person';
+    }
+
     const [item] = await db.update(autoLineItems).set(updates).where(eq(autoLineItems.id, parseInt(req.params.id))).returning();
     if (!item) return res.status(404).json({ error: "Line item not found" });
+
+    if (data.approvalStatus === 'declined' && (!existing[0]?.approvalStatus || existing[0].approvalStatus !== 'declined')) {
+      const lineRo = await db.select().from(autoRepairOrders)
+        .where(eq(autoRepairOrders.id, existing[0].repairOrderId)).limit(1);
+      if (lineRo.length) {
+        await db.insert(autoDeclinedServices).values({
+          shopId: req.autoUser!.shopId,
+          customerId: lineRo[0].customerId,
+          vehicleId: lineRo[0].vehicleId,
+          repairOrderId: lineRo[0].id,
+          serviceLineId: parseInt(req.params.id),
+          serviceDescription: existing[0].description,
+          estimatedCost: existing[0].totalCash,
+          declinedAt: new Date(),
+        });
+      }
+    }
+
     res.json(item);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update line item" });
@@ -6290,6 +6438,56 @@ async function generateCloseSnapshot(shopId: number, roId: number) {
   return snapshot;
 }
 
+router.post("/repair-orders/:id/close/validate", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    const warnings: { type: string; message: string; count?: number }[] = [];
+
+    const activeSessions = await db.select().from(autoTechSessions)
+      .where(and(eq(autoTechSessions.repairOrderId, roId), eq(autoTechSessions.isActive, true)));
+    if (activeSessions.length > 0) {
+      warnings.push({
+        type: "active_sessions",
+        message: `${activeSessions.length} technician(s) still clocked in. They will be auto-clocked out.`,
+        count: activeSessions.length,
+      });
+    }
+
+    if (!ro.customerSignatureData) {
+      warnings.push({ type: "unsigned", message: "Customer has not signed this repair order." });
+    }
+
+    if (!ro.mileageIn) {
+      warnings.push({ type: "no_mileage", message: "Mileage was not recorded." });
+    }
+
+    const pendingAddons = await db.select().from(autoLineItems)
+      .where(and(
+        eq(autoLineItems.repairOrderId, roId),
+        sql`${autoLineItems.lineOrigin} != 'original'`,
+        eq(autoLineItems.approvalStatus, 'pending')
+      ));
+    if (pendingAddons.length > 0) {
+      warnings.push({
+        type: "pending_addons",
+        message: `${pendingAddons.length} add-on line(s) still pending customer approval. They will be marked as declined.`,
+        count: pendingAddons.length,
+      });
+    }
+
+    res.json({ warnings, canClose: true });
+  } catch (err: any) {
+    console.error("RO close validation error:", err);
+    res.status(500).json({ error: "Failed to validate" });
+  }
+});
+
 router.post("/repair-orders/:id/close", autoAuth, async (req: Request, res: Response) => {
   try {
     const shopId = req.autoUser!.shopId;
@@ -6315,6 +6513,30 @@ router.post("/repair-orders/:id/close", autoAuth, async (req: Request, res: Resp
       await db.update(autoTechSessions).set({
         clockOut: now, durationMinutes, isActive: false, autoClockOut: true,
       }).where(eq(autoTechSessions.id, session.id));
+    }
+
+    const pendingAddons = await db.select().from(autoLineItems)
+      .where(and(
+        eq(autoLineItems.repairOrderId, roId),
+        sql`${autoLineItems.lineOrigin} != 'original'`,
+        eq(autoLineItems.approvalStatus, 'pending')
+      ));
+    for (const addon of pendingAddons) {
+      await db.update(autoLineItems).set({
+        approvalStatus: 'declined',
+        declinedAt: new Date(),
+      }).where(eq(autoLineItems.id, addon.id));
+
+      await db.insert(autoDeclinedServices).values({
+        shopId,
+        customerId: ro.customerId,
+        vehicleId: ro.vehicleId,
+        repairOrderId: roId,
+        serviceLineId: addon.id,
+        serviceDescription: addon.description,
+        estimatedCost: addon.totalCash,
+        declinedAt: new Date(),
+      });
     }
 
     const snapshot = await generateCloseSnapshot(shopId, roId);
@@ -6389,6 +6611,33 @@ router.get("/declined-services/customer/:customerId", autoAuth, async (req: Requ
   } catch (err: any) {
     console.error("Customer declined services error:", err);
     res.status(500).json({ error: "Failed to fetch customer declined services" });
+  }
+});
+
+router.get("/declined-services/pending-followup", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+
+    const results = await db.select({
+      declined: autoDeclinedServices,
+      customerName: sql<string>`${autoCustomers.firstName} || ' ' || ${autoCustomers.lastName}`,
+      customerEmail: autoCustomers.email,
+      customerPhone: autoCustomers.phone,
+      vehicleInfo: sql<string>`${autoVehicles.year} || ' ' || ${autoVehicles.make} || ' ' || ${autoVehicles.model}`,
+    }).from(autoDeclinedServices)
+      .leftJoin(autoCustomers, eq(autoDeclinedServices.customerId, autoCustomers.id))
+      .leftJoin(autoVehicles, eq(autoDeclinedServices.vehicleId, autoVehicles.id))
+      .where(and(
+        eq(autoDeclinedServices.shopId, shopId),
+        eq(autoDeclinedServices.followUpSent, false),
+        sql`${autoDeclinedServices.convertedToRoId} IS NULL`
+      ))
+      .orderBy(autoDeclinedServices.declinedAt);
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("Pending follow-up error:", err);
+    res.status(500).json({ error: "Failed to fetch pending follow-ups" });
   }
 });
 
@@ -6865,4 +7114,199 @@ export function registerAutoRoutes(app: Express) {
       console.error("Auto clock-out error:", err);
     }
   }, 15 * 60 * 1000); // Every 15 minutes
+
+  // Declined repair follow-up scheduler - runs every 4 hours
+  setInterval(async () => {
+    try {
+      // Get all shops with declined followup enabled
+      const campaignSettings = await db.select()
+        .from(autoCampaignSettings)
+        .where(eq(autoCampaignSettings.declinedFollowupEnabled, true));
+
+      if (campaignSettings.length === 0) {
+        return;
+      }
+
+      let totalFollowupsSent = 0;
+
+      for (const settings of campaignSettings) {
+        try {
+          // Parse follow-up day intervals (e.g., "3,7,14")
+          const followupDays = (settings.declinedFollowupDays || "3,7,14")
+            .split(",")
+            .map(d => parseInt(d.trim()))
+            .filter(d => !isNaN(d) && d > 0);
+
+          if (followupDays.length === 0) {
+            continue;
+          }
+
+          // Get shop details
+          const shop = await db.select().from(autoShops)
+            .where(eq(autoShops.id, settings.shopId))
+            .limit(1);
+
+          if (!shop.length) {
+            continue;
+          }
+
+          const shopRecord = shop[0];
+
+          // For each follow-up day interval, find matching declined services
+          for (const dayInterval of followupDays) {
+            const followupDueDate = new Date();
+            followupDueDate.setDate(followupDueDate.getDate() - dayInterval);
+
+            // Get declined services that are due for follow-up
+            const declinedServicesToFollowUp = await db.select({
+              declinedService: autoDeclinedServices,
+              customer: autoCustomers,
+              vehicle: autoVehicles,
+            })
+              .from(autoDeclinedServices)
+              .innerJoin(autoCustomers, eq(autoDeclinedServices.customerId, autoCustomers.id))
+              .innerJoin(autoVehicles, eq(autoDeclinedServices.vehicleId, autoVehicles.id))
+              .where(and(
+                eq(autoDeclinedServices.shopId, settings.shopId),
+                eq(autoDeclinedServices.followUpSent, false),
+                isNull(autoDeclinedServices.convertedToRoId),
+                lte(autoDeclinedServices.declinedAt, followupDueDate)
+              ));
+
+            // Send follow-up emails
+            for (const record of declinedServicesToFollowUp) {
+              try {
+                const { declinedService, customer, vehicle } = record;
+
+                // Build merge fields
+                const customerName = `${customer.firstName} ${customer.lastName}`;
+                const vehicleYearMakeModel = [vehicle.year, vehicle.make, vehicle.model]
+                  .filter(Boolean)
+                  .join(" ");
+
+                // Get email template (use default if not configured)
+                let emailTemplate = settings.declinedFollowupEmailTemplate;
+                if (!emailTemplate) {
+                  emailTemplate = `Subject: Recommended Service for Your {vehicle_year_make_model}
+
+Hi {customer_name},
+
+During your recent visit to {shop_name}, our technician recommended the following service for your {vehicle_year_make_model}:
+
+• {service_description}
+
+This recommendation was made to help keep your vehicle running safely and reliably. We wanted to follow up in case you'd like to schedule this service.
+
+Give us a call at {shop_phone} or reply to this email to set up an appointment.
+
+Thank you,
+{shop_name}`;
+                }
+
+                // Parse subject and body
+                const [subjectLine, ...bodyLines] = emailTemplate.split("\n");
+                const subject = (subjectLine.startsWith("Subject: ") 
+                  ? subjectLine.replace("Subject: ", "") 
+                  : subjectLine)
+                  .replace("{customer_name}", customerName)
+                  .replace("{vehicle_year_make_model}", vehicleYearMakeModel)
+                  .replace("{service_description}", declinedService.serviceDescription)
+                  .replace("{shop_name}", shopRecord.name)
+                  .replace("{shop_phone}", shopRecord.phone || "");
+
+                const body = bodyLines
+                  .join("\n")
+                  .replace("{customer_name}", customerName)
+                  .replace("{vehicle_year_make_model}", vehicleYearMakeModel)
+                  .replace("{service_description}", declinedService.serviceDescription)
+                  .replace("{shop_name}", shopRecord.name)
+                  .replace("{shop_phone}", shopRecord.phone || "");
+
+                // Send email via Resend
+                if (customer.email) {
+                  const { apiKey, fromEmail } = await getCredentials();
+                  const resend = new Resend(apiKey);
+
+                  // Convert plain text to HTML
+                  const htmlBody = body
+                    .split("\n\n")
+                    .map(para => `<p style="margin: 12px 0; color: #333; font-family: Arial, sans-serif;">${para.replace(/\n/g, "<br>")}</p>`)
+                    .join("");
+
+                  const emailHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; background: #f5f5f5;">
+  <div style="background: #111827; padding: 20px; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 20px;">${shopRecord.name}</h1>
+  </div>
+  <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none;">
+    ${htmlBody}
+  </div>
+  <div style="background: #f9fafb; padding: 20px; text-align: center; border: 1px solid #ddd; border-top: none;">
+    <p style="margin: 0; font-size: 12px; color: #999;">
+      ${shopRecord.name}${shopRecord.phone ? ` | ${shopRecord.phone}` : ""}
+    </p>
+  </div>
+</body>
+</html>`;
+
+                  const { data: result, error } = await resend.emails.send({
+                    from: `${shopRecord.name} <service@pcbisv.com>`,
+                    to: [customer.email],
+                    subject,
+                    html: emailHtml,
+                  });
+
+                  if (error) {
+                    console.error(`[DeclinedFollowup] Failed to send to ${customer.email}:`, error);
+                    continue;
+                  }
+
+                  // Update declined service record
+                  await db.update(autoDeclinedServices)
+                    .set({
+                      followUpSent: true,
+                      followUpSentAt: new Date(),
+                      followUpCampaignId: settings.id,
+                    })
+                    .where(eq(autoDeclinedServices.id, declinedService.id));
+
+                  // Log activity
+                  await db.insert(autoActivityLog).values({
+                    shopId: settings.shopId,
+                    entityType: "declined_service",
+                    entityId: declinedService.id,
+                    action: "followup_sent",
+                    details: {
+                      customerId: customer.id,
+                      vehicleId: vehicle.id,
+                      serviceDescription: declinedService.serviceDescription,
+                      dayInterval,
+                      emailSentTo: customer.email,
+                    },
+                  });
+
+                  totalFollowupsSent++;
+                  console.log(`[DeclinedFollowup] Sent to ${customer.email} for ${vehicleYearMakeModel} - ID: ${result?.id}`);
+                } else {
+                  console.warn(`[DeclinedFollowup] No email for customer ${customer.id}`);
+                }
+              } catch (err: any) {
+                console.error(`[DeclinedFollowup] Error sending follow-up:`, err?.message || err);
+              }
+            }
+          }
+        } catch (err: any) {
+          console.error(`[DeclinedFollowup] Error processing shop ${settings.shopId}:`, err?.message || err);
+        }
+      }
+
+      if (totalFollowupsSent > 0) {
+        console.log(`[DeclinedFollowup] Sent ${totalFollowupsSent} follow-up emails`);
+      }
+    } catch (err) {
+      console.error("[DeclinedFollowup] Scheduler error:", err);
+    }
+  }, 4 * 60 * 60 * 1000); // Every 4 hours
 }

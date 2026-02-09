@@ -9,7 +9,7 @@ import {
   DollarSign, TrendingUp, CheckCircle, ShieldCheck,
   FileText, Users, Calendar, Plus, ClipboardCheck,
   Phone, MessageSquare, Clock, Loader2, ArrowRight,
-  Wrench, UserCheck, AlertCircle, Timer
+  Wrench, UserCheck, AlertCircle, Timer, TrendingDown
 } from "lucide-react";
 import { AutoLayout } from "./AutoLayout";
 import { handleCall, handleSms, SMS_TEMPLATES } from "@/lib/auto-communication";
@@ -110,6 +110,14 @@ function getStatusColor(status: string): string {
   }
 }
 
+interface AddOnMetrics {
+  presented: number;
+  approved: number;
+  declined: number;
+  pending: number;
+  approvalRate: number;
+}
+
 export default function AutoDashboard() {
   const { autoFetch, user } = useAutoAuth();
   const [data, setData] = useState<EnhancedDashboardData | null>(null);
@@ -119,6 +127,46 @@ export default function AutoDashboard() {
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
   const [techSessions, setTechSessions] = useState<ActiveTechSession[]>([]);
   const [techSessionsLoading, setTechSessionsLoading] = useState(true);
+  const [addOnMetrics, setAddOnMetrics] = useState<AddOnMetrics | null>(null);
+  const [addOnLoading, setAddOnLoading] = useState(true);
+
+  const fetchAddOnMetrics = useCallback(() => {
+    setAddOnLoading(true);
+    const today = new Date();
+    const from = today.toISOString().split("T")[0];
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const to = tomorrow.toISOString().split("T")[0];
+
+    autoFetch(`/api/auto/repair-orders?from=${from}&to=${to}&includeLineItems=true`)
+      .then((res) => res.json())
+      .then((d) => {
+        const ros = d.repairOrders || d || [];
+        let presented = 0;
+        let approved = 0;
+        let declined = 0;
+        let pending = 0;
+
+        for (const ro of ros) {
+          const items = ro.lineItems || [];
+          for (const item of items) {
+            if (item.lineOrigin === "addon" || item.lineOrigin === "inspection") {
+              presented++;
+              if (item.approvalStatus === "approved") approved++;
+              else if (item.approvalStatus === "declined") declined++;
+              else pending++;
+            }
+          }
+        }
+
+        const rate = presented > 0 ? Math.round((approved / presented) * 100) : 0;
+        setAddOnMetrics({ presented, approved, declined, pending, approvalRate: rate });
+      })
+      .catch(() => {
+        setAddOnMetrics({ presented: 0, approved: 0, declined: 0, pending: 0, approvalRate: 0 });
+      })
+      .finally(() => setAddOnLoading(false));
+  }, [autoFetch]);
 
   const fetchTechSessions = useCallback(() => {
     setTechSessionsLoading(true);
@@ -147,7 +195,8 @@ export default function AutoDashboard() {
   useEffect(() => {
     fetchDashboard();
     fetchTechSessions();
-  }, [fetchDashboard, fetchTechSessions]);
+    fetchAddOnMetrics();
+  }, [fetchDashboard, fetchTechSessions, fetchAddOnMetrics]);
 
   const visibility = data?.visibility ?? {};
 
@@ -571,6 +620,61 @@ export default function AutoDashboard() {
                 </CardContent>
               </Card>
             )}
+
+            <Card data-testid="card-todays-addons">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4" />
+                  Today's Add-Ons
+                </CardTitle>
+                {addOnMetrics && addOnMetrics.presented > 0 && (
+                  <Badge variant="secondary" data-testid="badge-addon-rate">
+                    {addOnMetrics.approvalRate}%
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent>
+                {addOnLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : addOnMetrics && addOnMetrics.presented > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Presented</span>
+                      <span className="font-medium" data-testid="text-addon-presented">
+                        {addOnMetrics.presented}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Approved</span>
+                      <span className="font-medium text-green-600 dark:text-green-400" data-testid="text-addon-approved">
+                        {addOnMetrics.approved} ({addOnMetrics.approvalRate}%)
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Declined</span>
+                      <span className="font-medium text-destructive" data-testid="text-addon-declined">
+                        {addOnMetrics.declined}
+                      </span>
+                    </div>
+                    {addOnMetrics.pending > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Pending</span>
+                        <span className="font-medium text-yellow-600 dark:text-yellow-400" data-testid="text-addon-pending">
+                          {addOnMetrics.pending}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <ClipboardCheck className="h-8 w-8 mb-2" />
+                    <p className="text-sm" data-testid="text-no-addons">No add-ons presented today</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
