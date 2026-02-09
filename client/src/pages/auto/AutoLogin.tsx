@@ -335,24 +335,24 @@ export default function AutoLogin() {
       </nav>
 
       <section
-        className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-24 px-6"
+        className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-12 sm:py-16 px-6"
         data-testid="section-hero"
       >
         <div className="max-w-4xl mx-auto text-center">
           <img
             src={pcbAutoLogo}
             alt="PCB Auto"
-            className="mx-auto h-56 sm:h-64 md:h-80 lg:h-96 object-contain mb-8"
+            className="mx-auto h-56 sm:h-64 md:h-80 lg:h-96 object-contain mb-4"
             data-testid="hero-logo"
           />
           <h1
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight"
             data-testid="hero-headline"
           >
             The Complete Auto Repair Shop Management Platform
           </h1>
           <p
-            className="text-lg md:text-xl text-slate-300 mb-10 max-w-2xl mx-auto"
+            className="text-lg md:text-xl text-slate-300 mb-6 max-w-2xl mx-auto"
             data-testid="hero-subheadline"
           >
             Streamline repair orders, inspections, scheduling, payments, and customer communication — all in one
