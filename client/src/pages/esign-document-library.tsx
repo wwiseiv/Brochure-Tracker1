@@ -121,6 +121,7 @@ export default function ESignDocumentLibrary() {
   const searchString = useSearch();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("templates");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showNewRequestDialog, setShowNewRequestDialog] = useState(false);
@@ -351,7 +352,11 @@ export default function ESignDocumentLibrary() {
 
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              <Card className="bg-blue-50 dark:bg-blue-950">
+              <Card 
+                className={`cursor-pointer hover-elevate transition-all ${statusFilter === 'sent' ? 'ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900' : 'bg-blue-50 dark:bg-blue-950'}`}
+                onClick={() => { setStatusFilter(statusFilter === 'sent' ? null : 'sent'); setActiveTab('requests'); }}
+                data-testid="stat-card-sent"
+              >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-2">
                     <Send className="w-4 h-4 text-blue-600" />
@@ -360,7 +365,11 @@ export default function ESignDocumentLibrary() {
                   <p className="text-2xl font-bold text-blue-600">{stats.sent}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-green-50 dark:bg-green-950">
+              <Card 
+                className={`cursor-pointer hover-elevate transition-all ${statusFilter === 'completed' ? 'ring-2 ring-green-500 bg-green-100 dark:bg-green-900' : 'bg-green-50 dark:bg-green-950'}`}
+                onClick={() => { setStatusFilter(statusFilter === 'completed' ? null : 'completed'); setActiveTab('requests'); }}
+                data-testid="stat-card-completed"
+              >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -369,7 +378,11 @@ export default function ESignDocumentLibrary() {
                   <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-yellow-50 dark:bg-yellow-950">
+              <Card 
+                className={`cursor-pointer hover-elevate transition-all ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500 bg-yellow-100 dark:bg-yellow-900' : 'bg-yellow-50 dark:bg-yellow-950'}`}
+                onClick={() => { setStatusFilter(statusFilter === 'pending' ? null : 'pending'); setActiveTab('requests'); }}
+                data-testid="stat-card-pending"
+              >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-yellow-600" />
@@ -378,7 +391,11 @@ export default function ESignDocumentLibrary() {
                   <p className="text-2xl font-bold text-yellow-600">{stats.draft}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-gray-50 dark:bg-gray-900">
+              <Card 
+                className={`cursor-pointer hover-elevate transition-all ${statusFilter === null && activeTab === 'requests' ? 'ring-2 ring-gray-400' : ''} bg-gray-50 dark:bg-gray-900`}
+                onClick={() => { setStatusFilter(null); setActiveTab('requests'); }}
+                data-testid="stat-card-total"
+              >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-gray-600" />
@@ -582,37 +599,69 @@ export default function ESignDocumentLibrary() {
           </div>
         )}
 
-        {activeTab === "requests" && (
+        {activeTab === "requests" && (() => {
+          const filteredRequests = statusFilter
+            ? requests.filter(r => {
+                if (statusFilter === 'sent') return ['sent', 'viewed', 'partially_signed'].includes(r.status);
+                if (statusFilter === 'completed') return r.status === 'completed';
+                if (statusFilter === 'pending') return ['draft', 'pending_send'].includes(r.status);
+                return true;
+              })
+            : requests;
+          
+          return (
           <div className="space-y-4">
-            <Button
-              onClick={() => setShowNewRequestDialog(true)}
-              data-testid="button-new-request"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Request
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                onClick={() => setShowNewRequestDialog(true)}
+                data-testid="button-new-request"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Request
+              </Button>
+              {statusFilter && (
+                <Badge 
+                  variant="secondary" 
+                  className="cursor-pointer gap-1"
+                  onClick={() => setStatusFilter(null)}
+                  data-testid="badge-clear-filter"
+                >
+                  Showing: {statusFilter === 'pending' ? 'Pending' : statusFilter === 'sent' ? 'Sent' : 'Completed'}
+                  <XCircle className="w-3 h-3 ml-1" />
+                </Badge>
+              )}
+            </div>
 
             {loadingRequests ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center">
                   <FileSignature className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-medium mb-2">No E-Signature Requests</h3>
+                  <h3 className="font-medium mb-2">{statusFilter ? `No ${statusFilter} requests` : 'No E-Signature Requests'}</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Create your first e-signature request to send documents for signing
+                    {statusFilter 
+                      ? 'Try clearing the filter to see all requests' 
+                      : 'Create your first e-signature request to send documents for signing'
+                    }
                   </p>
-                  <Button onClick={() => setShowNewRequestDialog(true)} data-testid="button-create-first">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Request
-                  </Button>
+                  {statusFilter ? (
+                    <Button variant="outline" onClick={() => setStatusFilter(null)} data-testid="button-clear-filter">
+                      Show All Requests
+                    </Button>
+                  ) : (
+                    <Button onClick={() => setShowNewRequestDialog(true)} data-testid="button-create-first">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Request
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3">
-                {requests.map(request => (
+                {filteredRequests.map(request => (
                   <Card
                     key={request.id}
                     className="hover-elevate cursor-pointer"
@@ -652,7 +701,8 @@ export default function ESignDocumentLibrary() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
       </div>
 
       <Dialog open={showNewRequestDialog} onOpenChange={setShowNewRequestDialog}>
