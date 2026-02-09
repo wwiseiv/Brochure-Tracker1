@@ -2228,8 +2228,9 @@ router.get("/repair-orders/:id/pdf", autoAuth, async (req: Request, res: Respons
 });
 
 router.get("/public/approve-short/:code", async (req, res) => {
-  const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalShortCode, req.params.code));
-  if (!ro) return res.status(404).json({ error: "Not found" });
+  const code = req.params.code.toUpperCase();
+  const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalShortCode, code));
+  if (!ro || !ro.approvalToken) return res.status(404).json({ error: "Not found" });
   res.json({ token: ro.approvalToken });
 });
 
