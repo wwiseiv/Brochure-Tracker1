@@ -220,6 +220,56 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/auth/forgot-password", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const users = await db.select().from(autoUsers)
+      .where(and(eq(autoUsers.email, email.toLowerCase()), eq(autoUsers.isActive, true)))
+      .limit(1);
+
+    if (users.length) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      await db.update(autoUsers).set({ resetToken, resetTokenExpiresAt }).where(eq(autoUsers.id, users[0].id));
+    }
+
+    res.json({ message: "If an account exists with that email, a reset link has been generated." });
+  } catch (err: any) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
+router.post("/auth/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: "Token and password are required" });
+    if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
+
+    const users = await db.select().from(autoUsers)
+      .where(eq(autoUsers.resetToken, token))
+      .limit(1);
+
+    if (!users.length) return res.status(400).json({ error: "Invalid or expired reset token" });
+
+    const user = users[0];
+    if (!user.resetTokenExpiresAt || new Date() > user.resetTokenExpiresAt) {
+      await db.update(autoUsers).set({ resetToken: null, resetTokenExpiresAt: null }).where(eq(autoUsers.id, user.id));
+      return res.status(400).json({ error: "Reset token has expired" });
+    }
+
+    const passwordHash = await hashPassword(password);
+    await db.update(autoUsers).set({ passwordHash, resetToken: null, resetTokenExpiresAt: null, updatedAt: new Date() }).where(eq(autoUsers.id, user.id));
+
+    res.json({ message: "Password has been reset successfully" });
+  } catch (err: any) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "Failed to reset password" });
+  }
+});
+
 router.post("/auth/register", async (req: Request, res: Response) => {
   try {
     const { token, firstName, lastName, password, phone } = req.body;
@@ -509,7 +559,12 @@ router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async 
     }
 
     const updates: any = {};
-    if (role !== undefined) updates.role = role;
+    if (role !== undefined) {
+      if (role === "owner" && req.autoUser!.role !== "owner") {
+        return res.status(403).json({ error: "Only owners can set the owner role" });
+      }
+      updates.role = role;
+    }
     if (isActive !== undefined) updates.isActive = isActive;
     if (phone !== undefined) updates.phone = phone;
     if (pin !== undefined) updates.pin = pin;
@@ -521,6 +576,33 @@ router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async 
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update staff member" });
+  }
+});
+
+router.post("/staff/:id/reset-password", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const user = await db.select().from(autoUsers)
+      .where(and(eq(autoUsers.id, userId), eq(autoUsers.shopId, req.autoUser!.shopId)))
+      .limit(1);
+    if (!user.length) return res.status(404).json({ error: "User not found" });
+
+    if (user[0].role === "owner" && req.autoUser!.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can reset other owners' passwords" });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(autoUsers).set({ passwordHash, updatedAt: new Date() }).where(eq(autoUsers.id, userId));
+
+    res.json({ message: "Password reset successfully" });
+  } catch (err: any) {
+    console.error("Staff reset password error:", err);
+    res.status(500).json({ error: "Failed to reset password" });
   }
 });
 

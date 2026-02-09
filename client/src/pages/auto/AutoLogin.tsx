@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -672,6 +672,13 @@ export default function AutoLogin() {
                         )}
                       </button>
                     </div>
+                  </div>
+                  <div className="text-right">
+                    <Link href="/auto/forgot-password">
+                      <span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer" data-testid="link-forgot-password">
+                        Forgot Password?
+                      </span>
+                    </Link>
                   </div>
                   <Button
                     type="submit"

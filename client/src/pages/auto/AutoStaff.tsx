@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Mail, Loader2, Shield, Users, Pencil } from "lucide-react";
+import { UserPlus, Mail, Loader2, Shield, Users, Pencil, Check, Copy, KeyRound } from "lucide-react";
 
 interface StaffUser {
   id: number; firstName: string; lastName: string;
@@ -38,7 +38,7 @@ const PAY_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AutoStaff() {
-  const { autoFetch } = useAutoAuth();
+  const { autoFetch, user } = useAutoAuth();
   const { toast } = useToast();
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -46,10 +46,15 @@ export default function AutoStaff() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "technician", phone: "", payType: "" });
   const [sending, setSending] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editMember, setEditMember] = useState<StaffUser | null>(null);
   const [editForm, setEditForm] = useState({ phone: "", role: "", payType: "", payRate: "", pin: "", isActive: true });
   const [saving, setSaving] = useState(false);
+  const [resetPasswordMode, setResetPasswordMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -72,13 +77,53 @@ export default function AutoStaff() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setDialogOpen(false);
-      setInviteForm({ email: "", role: "technician", phone: "", payType: "" });
-      toast({ title: "Invitation Sent", description: `Invitation sent to ${inviteForm.email}` });
+      const fullUrl = `${window.location.origin}${data.inviteUrl}`;
+      setInviteSuccess(fullUrl);
+      setCopied(false);
       fetchData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally { setSending(false); }
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteSuccess) return;
+    try {
+      await navigator.clipboard.writeText(inviteSuccess);
+      setCopied(true);
+      toast({ title: "Copied", description: "Invite link copied to clipboard" });
+    } catch {
+      toast({ title: "Error", description: "Failed to copy link", variant: "destructive" });
+    }
+  };
+
+  const closeInviteDialog = () => {
+    setDialogOpen(false);
+    setInviteSuccess(null);
+    setCopied(false);
+    setInviteForm({ email: "", role: "technician", phone: "", payType: "" });
+  };
+
+  const resetStaffPassword = async () => {
+    if (!editMember || !newPassword) return;
+    if (newPassword.length < 8) {
+      toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      const res = await autoFetch(`/api/auto/staff/${editMember.id}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResetPasswordMode(false);
+      setNewPassword("");
+      toast({ title: "Password Reset", description: `Password reset for ${editMember.firstName} ${editMember.lastName}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setResettingPassword(false); }
   };
 
   const openEditDialog = (member: StaffUser) => {
@@ -91,6 +136,8 @@ export default function AutoStaff() {
       pin: member.pin || "",
       isActive: member.isActive,
     });
+    setResetPasswordMode(false);
+    setNewPassword("");
     setEditDialogOpen(true);
   };
 
@@ -139,65 +186,91 @@ export default function AutoStaff() {
           <h1 className="text-xl font-bold flex items-center gap-2" data-testid="text-staff-title">
             <Users className="h-5 w-5" /> Staff Management
           </h1>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeInviteDialog(); else setDialogOpen(true); }}>
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-invite-staff">
                 <UserPlus className="h-4 w-4" /> Invite Staff
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Invite Staff Member</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={inviteForm.email}
-                    onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                    placeholder="staff@example.com"
-                    data-testid="input-invite-email"
-                  />
+              <DialogHeader><DialogTitle>{inviteSuccess ? "Invitation Sent" : "Invite Staff Member"}</DialogTitle></DialogHeader>
+              {inviteSuccess ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <Check className="h-5 w-5" />
+                    <p className="text-sm font-medium" data-testid="text-invite-success">Invitation sent successfully!</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Invite Link</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        readOnly
+                        value={inviteSuccess}
+                        className="text-xs"
+                        data-testid="input-invite-link"
+                      />
+                      <Button variant="outline" size="icon" onClick={copyInviteLink} data-testid="button-copy-invite-link">
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Share this link with the staff member to complete their registration.</p>
+                  </div>
+                  <Button className="w-full" onClick={closeInviteDialog} data-testid="button-invite-done">Done</Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <Select value={inviteForm.role} onValueChange={(v) => setInviteForm({ ...inviteForm, role: v })}>
-                    <SelectTrigger data-testid="select-invite-role"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="service_advisor">Service Advisor</SelectItem>
-                      <SelectItem value="technician">Technician</SelectItem>
-                    </SelectContent>
-                  </Select>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={inviteForm.email}
+                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                      placeholder="staff@example.com"
+                      data-testid="input-invite-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select value={inviteForm.role} onValueChange={(v) => setInviteForm({ ...inviteForm, role: v })}>
+                      <SelectTrigger data-testid="select-invite-role"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {user?.role === "owner" && <SelectItem value="owner">Owner</SelectItem>}
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="service_advisor">Service Advisor</SelectItem>
+                        <SelectItem value="technician">Technician</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone (optional)</Label>
+                    <Input
+                      type="text"
+                      value={inviteForm.phone}
+                      onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
+                      placeholder="(555) 123-4567"
+                      data-testid="input-invite-phone"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pay Type (optional)</Label>
+                    <Select value={inviteForm.payType} onValueChange={(v) => setInviteForm({ ...inviteForm, payType: v })}>
+                      <SelectTrigger data-testid="select-invite-pay-type"><SelectValue placeholder="Select pay type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly</SelectItem>
+                        <SelectItem value="flat_rate">Flat Rate</SelectItem>
+                        <SelectItem value="salary">Salary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                    Additional details like pay rate, PIN, and bay assignment can be configured after the staff member registers.
+                  </p>
+                  <Button className="w-full" onClick={sendInvite} disabled={sending} data-testid="button-send-invite">
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                    Send Invitation
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Phone (optional)</Label>
-                  <Input
-                    type="text"
-                    value={inviteForm.phone}
-                    onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
-                    placeholder="(555) 123-4567"
-                    data-testid="input-invite-phone"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Pay Type (optional)</Label>
-                  <Select value={inviteForm.payType} onValueChange={(v) => setInviteForm({ ...inviteForm, payType: v })}>
-                    <SelectTrigger data-testid="select-invite-pay-type"><SelectValue placeholder="Select pay type" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hourly">Hourly</SelectItem>
-                      <SelectItem value="flat_rate">Flat Rate</SelectItem>
-                      <SelectItem value="salary">Salary</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                  Additional details like pay rate, PIN, and bay assignment can be configured after the staff member registers.
-                </p>
-                <Button className="w-full" onClick={sendInvite} disabled={sending} data-testid="button-send-invite">
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
-                  Send Invitation
-                </Button>
-              </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -292,6 +365,7 @@ export default function AutoStaff() {
                 <Select value={editForm.role} onValueChange={(v) => setEditForm({ ...editForm, role: v })}>
                   <SelectTrigger data-testid="select-staff-role"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    {user?.role === "owner" && <SelectItem value="owner">Owner</SelectItem>}
                     <SelectItem value="manager">Manager</SelectItem>
                     <SelectItem value="service_advisor">Service Advisor</SelectItem>
                     <SelectItem value="technician">Technician</SelectItem>
@@ -345,6 +419,50 @@ export default function AutoStaff() {
                   data-testid="switch-staff-active"
                 />
               </div>
+
+              {(user?.role === "owner" || user?.role === "manager") && (
+                <div className="space-y-2 border-t pt-3">
+                  {!resetPasswordMode ? (
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      onClick={() => setResetPasswordMode(true)}
+                      data-testid="button-reset-password-toggle"
+                    >
+                      <KeyRound className="h-4 w-4" /> Reset Password
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>New Password</Label>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Min 8 characters"
+                        data-testid="input-reset-password"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          onClick={resetStaffPassword}
+                          disabled={resettingPassword || newPassword.length < 8}
+                          data-testid="button-confirm-reset-password"
+                        >
+                          {resettingPassword && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                          Set Password
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => { setResetPasswordMode(false); setNewPassword(""); }}
+                          data-testid="button-cancel-reset-password"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Button className="w-full" onClick={saveStaffEdit} disabled={saving} data-testid="button-save-staff">
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

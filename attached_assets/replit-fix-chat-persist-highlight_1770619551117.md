@@ -1,0 +1,5 @@
+Two issues with the AI Help Assistant:
+
+**1. Chat history is not persisting across page navigation.** When a user navigates to a different page in the app, the chat history disappears. It should persist until the user manually clears it (via the trash/delete button). Store the conversation in state management or localStorage so it survives route changes. The user should be able to open the AI chat on any page and see their full conversation history from that session.
+
+**2. Nav link clicks need a visual highlight on the target element.** When the user taps a navigation link in the AI chat (like "Fees Saved" or "Work Orders"), the app navigates to the correct section — but there's no visual indicator showing the user WHERE to look. After navigation, the target element should briefly highlight with a pulse animation (blue outline or glow, 2-3 seconds) so the user's eye is immediately drawn to it. Then the highlight fades out. This is the entire point of the nav links — the AI walks the user to the thing they're looking for, and the highlight says "here it is."

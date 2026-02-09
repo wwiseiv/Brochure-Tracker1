@@ -18,6 +18,8 @@ import AutoReports from "./AutoReports";
 import AutoInvoice from "./AutoInvoice";
 import AutoQuickBooks from "./AutoQuickBooks";
 import AutoPaymentProcessor from "./AutoPaymentProcessor";
+import AutoForgotPassword from "./AutoForgotPassword";
+import AutoResetPassword from "./AutoResetPassword";
 import { Loader2 } from "lucide-react";
 
 function AutoAuthGuard({ children }: { children: React.ReactNode }) {
@@ -74,6 +76,8 @@ export default function AutoApp() {
       <Switch>
         <Route path="/auto/login" component={AutoLogin} />
         <Route path="/auto/register" component={AutoRegister} />
+        <Route path="/auto/forgot-password" component={AutoForgotPassword} />
+        <Route path="/auto/reset-password" component={AutoResetPassword} />
         <Route path="/auto/approve/:token" component={AutoPublicApproval} />
         <Route path="/auto/inspect/:token" component={AutoPublicInspection} />
         <Route path="/auto/public/*">

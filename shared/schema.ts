@@ -3641,6 +3641,8 @@ export const autoUsers = pgTable("auto_users", {
   rollfiOnboardStatus: varchar("rollfi_onboard_status", { length: 30 }).default("not_started"),
   rollfiOnboardedAt: timestamp("rollfi_onboarded_at"),
   rollfiLastSyncAt: timestamp("rollfi_last_sync_at"),
+  resetToken: text("reset_token"),
+  resetTokenExpiresAt: timestamp("reset_token_expires_at"),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
