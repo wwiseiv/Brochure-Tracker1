@@ -3831,6 +3831,8 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   approvalDeclinedReason: text("approval_declined_reason"),
   approvalQuestion: text("approval_question"),
   approvalQuestionAt: timestamp("approval_question_at"),
+  approvalCustomerNote: text("approval_customer_note"),
+  approvalSignatureData: text("approval_signature_data"),
   invoiceNumber: varchar("invoice_number", { length: 20 }),
   invoicedAt: timestamp("invoiced_at"),
   paidAt: timestamp("paid_at"),
