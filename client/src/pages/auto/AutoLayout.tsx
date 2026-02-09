@@ -371,7 +371,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.slice(0, 5).map((item) => {
             const isActive = location.startsWith(item.path);
             return (
               <Link key={item.path} href={item.path}>
@@ -388,6 +388,51 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {NAV_ITEMS.slice(5).map((item) => {
+            const isActive = location.startsWith(item.path);
+            return (
+              <Link key={item.path} href={item.path} className="hidden lg:flex">
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, "-")}`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Button>
+              </Link>
+            );
+          })}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 lg:hidden"
+                data-testid="nav-more-dropdown"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+                <span>More</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {NAV_ITEMS.slice(5).map((item) => {
+                const isActive = location.startsWith(item.path);
+                return (
+                  <Link key={item.path} href={item.path}>
+                    <DropdownMenuItem
+                      className={isActive ? "bg-secondary" : ""}
+                      data-testid={`nav-more-${item.label.toLowerCase().replace(/\s/g, "-")}`}
+                    >
+                      <item.icon className="h-4 w-4 mr-2" />
+                      {item.label}
+                    </DropdownMenuItem>
+                  </Link>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
 
         <DropdownMenu>

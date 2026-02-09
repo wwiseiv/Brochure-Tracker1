@@ -334,7 +334,7 @@ export default function AutoRepairOrders() {
 
         {/* Filter Row */}
         <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[160px]">
+          <div className="flex-1 min-w-[140px]">
             <Select value={dateRange} onValueChange={(v) => { setDateRange(v); setPage(1); }}>
               <SelectTrigger data-testid="select-date-range">
                 <SelectValue placeholder="Date Range" />
@@ -368,7 +368,7 @@ export default function AutoRepairOrders() {
             </>
           )}
 
-          <div className="min-w-[180px]">
+          <div className="min-w-[150px]">
             <Select value={sortKey} onValueChange={(v) => { setSortKey(v); setPage(1); }}>
               <SelectTrigger data-testid="select-sort">
                 <SelectValue placeholder="Sort" />
@@ -382,12 +382,12 @@ export default function AutoRepairOrders() {
           </div>
 
           <Button variant="outline" className="gap-2" onClick={exportCsv} data-testid="button-export-csv">
-            <Download className="h-4 w-4" /> CSV
+            <Download className="h-4 w-4" /><span className="hidden sm:inline">CSV</span>
           </Button>
         </div>
 
         {/* Summary Stats */}
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {[
             { label: "Total ROs", value: String(stats.totalRos), testId: "stat-total-ros" },
             { label: "Total Billed", value: formatMoney(parseFloat(String(stats.totalBilled)) || 0), testId: "stat-total-billed" },
@@ -395,7 +395,7 @@ export default function AutoRepairOrders() {
             { label: "Outstanding", value: formatMoney(parseFloat(String(stats.outstanding)) || 0), testId: "stat-outstanding" },
             { label: "Avg Ticket", value: formatMoney(parseFloat(String(stats.avgTicket)) || 0), testId: "stat-avg-ticket" },
           ].map((stat) => (
-            <Card key={stat.testId} className="flex-1 min-w-[130px]" data-testid={stat.testId}>
+            <Card key={stat.testId} data-testid={stat.testId}>
               <CardContent className="p-3">
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <p className="text-lg font-bold">{stat.value}</p>

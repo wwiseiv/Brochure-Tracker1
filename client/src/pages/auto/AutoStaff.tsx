@@ -209,7 +209,7 @@ export default function AutoStaff() {
               <p className="text-sm text-muted-foreground">No staff members yet</p>
             ) : (
               staff.map(member => (
-                <div key={member.id} className="flex items-center justify-between gap-3 p-3 rounded-md border" data-testid={`staff-${member.id}`}>
+                <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-md border" data-testid={`staff-${member.id}`}>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">{member.firstName} {member.lastName}</p>
                     <p className="text-xs text-muted-foreground">{member.email}</p>
@@ -217,7 +217,7 @@ export default function AutoStaff() {
                       <p className="text-xs text-muted-foreground" data-testid={`text-staff-phone-${member.id}`}>{member.phone}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="outline" className={ROLE_BADGES[member.role] || ""}>
                       <Shield className="h-3 w-3 mr-1" />
                       {member.role.replace("_", " ")}

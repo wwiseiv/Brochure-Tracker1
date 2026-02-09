@@ -261,7 +261,7 @@ export default function AutoDashboard() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="invisible group-hover:visible"
+                        className="sm:invisible sm:group-hover:visible"
                         onClick={(e) => {
                           e.stopPropagation();
                           const token = localStorage.getItem("pcb_auto_token") || "";
@@ -274,7 +274,7 @@ export default function AutoDashboard() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="invisible group-hover:visible"
+                        className="sm:invisible sm:group-hover:visible"
                         onClick={(e) => {
                           e.stopPropagation();
                           const token = localStorage.getItem("pcb_auto_token") || "";

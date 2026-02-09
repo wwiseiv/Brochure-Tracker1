@@ -241,12 +241,12 @@ export default function AutoReports() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="flex flex-wrap">
-            <TabsTrigger value="job-pl" data-testid="tab-job-pl">Job P&L</TabsTrigger>
-            <TabsTrigger value="sales-tax" data-testid="tab-sales-tax">Sales Tax</TabsTrigger>
-            <TabsTrigger value="tech-productivity" data-testid="tab-tech-productivity">Tech Productivity</TabsTrigger>
-            <TabsTrigger value="approvals" data-testid="tab-approvals">Approvals</TabsTrigger>
-            <TabsTrigger value="dual-pricing" data-testid="tab-dual-pricing">Dual Pricing</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto">
+            <TabsTrigger value="job-pl" className="whitespace-nowrap" data-testid="tab-job-pl">Job P&L</TabsTrigger>
+            <TabsTrigger value="sales-tax" className="whitespace-nowrap" data-testid="tab-sales-tax">Sales Tax</TabsTrigger>
+            <TabsTrigger value="tech-productivity" className="whitespace-nowrap" data-testid="tab-tech-productivity">Tech Productivity</TabsTrigger>
+            <TabsTrigger value="approvals" className="whitespace-nowrap" data-testid="tab-approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="dual-pricing" className="whitespace-nowrap" data-testid="tab-dual-pricing">Dual Pricing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="job-pl" className="space-y-4 mt-4">

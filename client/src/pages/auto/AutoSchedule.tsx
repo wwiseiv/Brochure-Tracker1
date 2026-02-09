@@ -293,17 +293,6 @@ export default function AutoSchedule() {
 
         <DesktopNudge message="The bay grid view works best on a tablet or desktop." dismissKey="schedule-grid" />
 
-        {/* Mobile date navigation header */}
-        <div className="sm:hidden flex items-center justify-between gap-2 px-1 mb-2">
-          <Button variant="ghost" size="icon" onClick={prevDay}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium">{selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-          <Button variant="ghost" size="icon" onClick={nextDay}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
         {/* Mobile date picker bar */}
         <div className="lg:hidden flex items-center gap-1 overflow-x-auto pb-2">
           {mobileWeekDays.map((d) => {
@@ -463,7 +452,7 @@ export default function AutoSchedule() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="invisible group-hover:visible"
+                                    className="sm:invisible sm:group-hover:visible"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const token = localStorage.getItem("pcb_auto_token") || "";
@@ -476,7 +465,7 @@ export default function AutoSchedule() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="invisible group-hover:visible"
+                                    className="sm:invisible sm:group-hover:visible"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const token = localStorage.getItem("pcb_auto_token") || "";
@@ -504,7 +493,7 @@ export default function AutoSchedule() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="invisible group-hover:visible"
+                                className="sm:invisible sm:group-hover:visible"
                                 onClick={(e) => { e.stopPropagation(); deleteAppointment(apt.id); }}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -590,7 +579,7 @@ export default function AutoSchedule() {
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-5 w-5 invisible group-hover:visible shrink-0"
+                                          className="h-5 w-5 sm:invisible sm:group-hover:visible shrink-0"
                                           onClick={(e) => { e.stopPropagation(); deleteAppointment(apt.id); }}
                                         >
                                           <Trash2 className="h-3 w-3" />
