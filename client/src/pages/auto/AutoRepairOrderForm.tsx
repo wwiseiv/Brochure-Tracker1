@@ -261,7 +261,7 @@ export default function AutoRepairOrderForm() {
       const customerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "";
       const vehicleStr = selectedVehicle ? [selectedVehicle.year, selectedVehicle.make, selectedVehicle.model].filter(Boolean).join(" ") : "";
       const total = `$${parseFloat(ro.totalCash || "0").toFixed(2)}`;
-      const approvalUrl = `${window.location.origin}/auto/approve/${ro.approvalToken || ""}`;
+      const approvalUrl = `${window.location.origin}/auto/a/${ro.approvalShortCode || ro.approvalToken || ""}`;
 
       if ((sendMethod === "sms" || sendMethod === "both") && selectedCustomer?.phone) {
         const msg = SMS_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, ro.roNumber, total, approvalUrl);
@@ -607,7 +607,7 @@ export default function AutoRepairOrderForm() {
                 const customerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "";
                 const vehicleStr = selectedVehicle ? [selectedVehicle.year, selectedVehicle.make, selectedVehicle.model].filter(Boolean).join(" ") : "";
                 const token = localStorage.getItem("pcb_auto_token") || "";
-                const approvalUrl = `${window.location.origin}/auto/approve/${ro.approvalToken || ""}`;
+                const approvalUrl = `${window.location.origin}/auto/a/${ro.approvalShortCode || ro.approvalToken || ""}`;
 
                 return (
                   <DropdownMenu>

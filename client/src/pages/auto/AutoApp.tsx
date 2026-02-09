@@ -20,6 +20,7 @@ import AutoQuickBooks from "./AutoQuickBooks";
 import AutoPaymentProcessor from "./AutoPaymentProcessor";
 import AutoForgotPassword from "./AutoForgotPassword";
 import AutoResetPassword from "./AutoResetPassword";
+import AutoShortApproval from "./AutoShortApproval";
 import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
 import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
 import { Loader2 } from "lucide-react";
@@ -83,6 +84,7 @@ export default function AutoApp() {
         <Route path="/auto/register" component={AutoRegister} />
         <Route path="/auto/forgot-password" component={AutoForgotPassword} />
         <Route path="/auto/reset-password" component={AutoResetPassword} />
+        <Route path="/auto/a/:code" component={AutoShortApproval} />
         <Route path="/auto/approve/:token" component={AutoPublicApproval} />
         <Route path="/auto/inspect/:token" component={AutoPublicInspection} />
         <Route path="/auto/public/*">

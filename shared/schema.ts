@@ -3821,6 +3821,7 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   totalCash: numeric("total_cash", { precision: 10, scale: 2 }).default("0"),
   totalCard: numeric("total_card", { precision: 10, scale: 2 }).default("0"),
   approvalToken: varchar("approval_token", { length: 100 }).unique(),
+  approvalShortCode: varchar("approval_short_code", { length: 12 }).unique(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by", { length: 100 }),
   estimateSentAt: timestamp("estimate_sent_at"),

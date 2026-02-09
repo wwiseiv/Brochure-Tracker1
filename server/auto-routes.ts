@@ -888,6 +888,7 @@ router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
     const data = req.body;
     const roNumber = await generateRONumber(req.autoUser!.shopId);
     const approvalToken = crypto.randomBytes(32).toString("hex");
+    const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
 
     const [ro] = await db.insert(autoRepairOrders).values({
       shopId: req.autoUser!.shopId, roNumber, customerId: data.customerId,
@@ -897,6 +898,7 @@ router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
       internalNotes: data.internalNotes || null,
       promisedDate: data.promisedDate ? new Date(data.promisedDate) : null,
       approvalToken,
+      approvalShortCode,
     }).returning();
 
     await db.insert(autoActivityLog).values({
@@ -2223,6 +2225,12 @@ router.get("/repair-orders/:id/pdf", autoAuth, async (req: Request, res: Respons
       res.status(500).json({ error: "Failed to generate PDF" });
     }
   }
+});
+
+router.get("/public/approve-short/:code", async (req, res) => {
+  const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalShortCode, req.params.code));
+  if (!ro) return res.status(404).json({ error: "Not found" });
+  res.json({ token: ro.approvalToken });
 });
 
 // ============================================================================
