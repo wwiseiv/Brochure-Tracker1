@@ -53,8 +53,12 @@ async function fetchSuggestions(page: string, token?: string | null) {
   return res.json() as Promise<{ suggestions: Suggestion[] }>;
 }
 
-export function AIHelpChat() {
-  const [isOpen, setIsOpen] = useState(false);
+interface AIHelpChatProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function AIHelpChat({ isOpen, onOpenChange }: AIHelpChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -117,7 +121,7 @@ export function AIHelpChat() {
 
   const handleNavigate = useCallback(
     (key: string) => {
-      setIsOpen(false);
+      onOpenChange(false);
       setTimeout(() => navigateTo(key), 300);
     },
     [navigateTo]
@@ -177,28 +181,6 @@ export function AIHelpChat() {
         <span>{toast.message}</span>
       </div>
 
-      {/* Floating Trigger Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        data-testid="button-ai-help"
-        className={`
-          fixed bottom-20 left-4 sm:bottom-6 sm:left-6 z-50 w-14 h-14 rounded-2xl
-          bg-gradient-to-br from-indigo-500 to-purple-600
-          shadow-lg shadow-indigo-500/30
-          flex items-center justify-center
-          transition-all duration-300 hover:scale-105 active:scale-95
-          ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100'}
-        `}
-        aria-label="Open AI Help"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-      </button>
-
       {/* Chat Overlay */}
       <div
         className={`
@@ -211,7 +193,7 @@ export function AIHelpChat() {
         `}
         style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)' }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) setIsOpen(false);
+          if (e.target === e.currentTarget) onOpenChange(false);
         }}
       >
         <div
@@ -243,7 +225,7 @@ export function AIHelpChat() {
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => onOpenChange(false)}
               className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm transition-colors"
               data-testid="button-close-ai-help"
             >

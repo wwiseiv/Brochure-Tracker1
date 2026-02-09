@@ -238,31 +238,7 @@ function useReadAloud() {
 }
 
 function FloatingButton() {
-  const { toggle, isOpen } = useAutoAssistant();
-
-  if (isOpen) return null;
-
-  return (
-    <button
-      onClick={toggle}
-      className="fixed right-4 z-[9990] flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 hover:scale-105 active:scale-95"
-      style={{
-        width: 56,
-        height: 56,
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
-      }}
-      data-testid="button-auto-assistant"
-    >
-      <Sparkles className="h-6 w-6" />
-      <style>{`
-        @media (max-width: 639px) {
-          [data-testid="button-auto-assistant"] {
-            bottom: 64px !important;
-          }
-        }
-      `}</style>
-    </button>
-  );
+  return null;
 }
 
 function renderAssistantContent(content: string, onNavigate: (key: string) => void): ReactNode {

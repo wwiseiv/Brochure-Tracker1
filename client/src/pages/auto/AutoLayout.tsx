@@ -22,6 +22,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { AIHelpChat } from "@/components/ai-help";
+import { useAutoAssistant } from "@/components/auto/AutoAssistantProvider";
 
 const NAV_ITEMS = [
   { path: "/auto/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
@@ -326,6 +327,8 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [aiHelpOpen, setAiHelpOpen] = useState(false);
+  const { toggle: toggleAssistant } = useAutoAssistant();
 
   const isOwnerOrManager = user?.role === "owner" || user?.role === "manager";
 
@@ -344,11 +347,19 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </Link>
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="text-xs">
-            {user?.firstName?.[0]}{user?.lastName?.[0]}
-          </AvatarFallback>
-        </Avatar>
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" onClick={() => setAiHelpOpen(true)} data-testid="header-help-btn-mobile">
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={toggleAssistant} data-testid="header-ai-assistant-btn-mobile">
+            <Sparkles className="h-5 w-5" />
+          </Button>
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs">
+              {user?.firstName?.[0]}{user?.lastName?.[0]}
+            </AvatarFallback>
+          </Avatar>
+        </div>
       </header>
 
       {/* Tablet + Desktop top bar */}
@@ -432,6 +443,13 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
           </DropdownMenu>
         </nav>
 
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" onClick={() => setAiHelpOpen(true)} data-testid="header-help-btn">
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={toggleAssistant} data-testid="header-ai-assistant-btn">
+            <Sparkles className="h-5 w-5" />
+          </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2" data-testid="button-user-menu">
@@ -485,6 +503,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto pb-16 sm:pb-0">
@@ -626,7 +645,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
-      <AIHelpChat />
+      <AIHelpChat isOpen={aiHelpOpen} onOpenChange={setAiHelpOpen} />
     </div>
   );
 }
