@@ -13,6 +13,7 @@ import {
   Loader2, FileText, CheckCircle, XCircle, AlertCircle, Download,
 } from "lucide-react";
 import { DesktopNudge } from "./DesktopNudge";
+import { useToast } from "@/hooks/use-toast";
 
 function formatCurrency(val: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
@@ -119,12 +120,14 @@ const TAB_MAP: Record<string, string> = {
 
 export default function AutoReports() {
   const { autoFetch } = useAutoAuth();
+  const { toast } = useToast();
   const searchString = useSearch();
   const urlTab = new URLSearchParams(searchString).get("tab");
   const defaults = getQuickDates("thisMonth");
   const [startDate, setStartDate] = useState(defaults.start);
   const [endDate, setEndDate] = useState(defaults.end);
   const [activeTab, setActiveTab] = useState(urlTab && TAB_MAP[urlTab] ? TAB_MAP[urlTab] : "job-pl");
+  const [exporting, setExporting] = useState(false);
 
   const [jobPL, setJobPL] = useState<JobPLData | null>(null);
   const [salesTax, setSalesTax] = useState<SalesTaxData | null>(null);
@@ -160,6 +163,28 @@ export default function AutoReports() {
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
+
+  const exportReport = async (reportType: string, data: any) => {
+    if (!data) return;
+    setExporting(true);
+    try {
+      const res = await autoFetch("/api/auto/reports/export", {
+        method: "POST",
+        body: JSON.stringify({ reportType, reportData: data, startDate, endDate }),
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `PCB_Auto_${reportType}_${startDate}_to_${endDate}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err: any) {
+      toast({ title: "Export Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   function applyQuickDate(preset: string) {
     const dates = getQuickDates(preset);
@@ -227,6 +252,12 @@ export default function AutoReports() {
           <TabsContent value="job-pl" className="space-y-4 mt-4">
             {jobPL && (
               <>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => exportReport("job-pl", jobPL)} disabled={exporting} data-testid="button-export-job-pl">
+                    {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Export to Excel
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -312,6 +343,12 @@ export default function AutoReports() {
           <TabsContent value="sales-tax" className="space-y-4 mt-4">
             {salesTax && (
               <>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => exportReport("sales-tax", salesTax)} disabled={exporting} data-testid="button-export-sales-tax">
+                    {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Export to Excel
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -381,6 +418,12 @@ export default function AutoReports() {
           <TabsContent value="tech-productivity" className="space-y-4 mt-4">
             {techProd && (
               <>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => exportReport("tech-productivity", techProd)} disabled={exporting} data-testid="button-export-tech-productivity">
+                    {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Export to Excel
+                  </Button>
+                </div>
                 {techProd.technicians.length === 0 && (
                   <Card>
                     <CardContent className="py-8 text-center text-muted-foreground">
@@ -436,6 +479,12 @@ export default function AutoReports() {
           <TabsContent value="approvals" className="space-y-4 mt-4">
             {approvals && (
               <>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => exportReport("approvals", approvals)} disabled={exporting} data-testid="button-export-approvals">
+                    {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Export to Excel
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">

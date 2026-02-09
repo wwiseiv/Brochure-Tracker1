@@ -2834,6 +2834,254 @@ router.get("/reports/dual-pricing/export", autoAuth, async (req: Request, res: R
   }
 });
 
+router.post("/reports/export", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.autoUser!;
+    const { reportType, reportData, startDate, endDate } = req.body;
+
+    if (!reportType || !reportData || !startDate || !endDate) {
+      return res.status(400).json({ error: "reportType, reportData, startDate, and endDate are required" });
+    }
+
+    if (reportType === "dual-pricing") {
+      return res.status(400).json({ error: "Use the dedicated dual-pricing export endpoint" });
+    }
+
+    const shop = await db.select().from(autoShops).where(eq(autoShops.id, user.shopId)).limit(1);
+    if (!shop.length) return res.status(404).json({ error: "Shop not found" });
+    const shopName = shop[0].name;
+
+    let aiSummary = "";
+    try {
+      let prompt = "";
+      if (reportType === "job-pl") {
+        prompt = `Write a brief professional executive summary (2-3 sentences) for an auto repair shop owner about their Job Profitability report for ${startDate} to ${endDate}. Data: Total Revenue: $${reportData.summary?.totalRevenue?.toFixed(2) || "0"}, Total Cost: $${reportData.summary?.totalCost?.toFixed(2) || "0"}, Total Profit: $${reportData.summary?.totalProfit?.toFixed(2) || "0"}, Average Margin: ${reportData.summary?.avgMargin?.toFixed(1) || "0"}%, Number of Jobs: ${reportData.details?.length || 0}. Include the actual numbers.`;
+      } else if (reportType === "sales-tax") {
+        prompt = `Write a brief professional executive summary (2-3 sentences) for an auto repair shop owner about their Sales Tax report for ${startDate} to ${endDate}. Data: Total Parts Tax: $${reportData.totalPartsTax?.toFixed(2) || "0"}, Total Labor Tax: $${reportData.totalLaborTax?.toFixed(2) || "0"}, Total Tax Collected: $${reportData.totalTax?.toFixed(2) || "0"}, Number of ROs: ${reportData.roCount || 0}. Include the actual numbers.`;
+      } else if (reportType === "tech-productivity") {
+        const techNames = reportData.technicians?.map((t: any) => `${t.name} (${t.roCount} ROs, $${t.totalRevenue?.toFixed(2)} revenue, ${t.totalHours} hrs)`).join("; ") || "none";
+        prompt = `Write a brief professional executive summary (2-3 sentences) for an auto repair shop owner about their Technician Productivity report for ${startDate} to ${endDate}. Technicians: ${techNames}. Include the actual numbers.`;
+      } else if (reportType === "approvals") {
+        prompt = `Write a brief professional executive summary (2-3 sentences) for an auto repair shop owner about their Estimate Approval report for ${startDate} to ${endDate}. Data: Total Estimates: ${reportData.totalEstimates || 0}, Approved: ${reportData.approved || 0}, Declined: ${reportData.declined || 0}, Pending: ${reportData.pending || 0}, Conversion Rate: ${reportData.conversionRate || 0}%, Avg Approval Time: ${reportData.avgApprovalTimeHours?.toFixed(1) || "0"} hours. Include the actual numbers.`;
+      }
+
+      if (prompt) {
+        const response = await anthropicClient.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 500,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const block = response.content[0];
+        if (block.type === "text") {
+          aiSummary = block.text;
+        }
+      }
+    } catch (aiErr) {
+      console.error("AI summary generation failed (continuing without):", aiErr);
+    }
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "PCB Auto";
+    workbook.created = new Date();
+
+    const reportTitles: Record<string, string> = {
+      "job-pl": "Job Profitability Report",
+      "sales-tax": "Sales Tax Report",
+      "tech-productivity": "Technician Productivity Report",
+      "approvals": "Estimate Approval Report",
+    };
+
+    const sumSheet = workbook.addWorksheet("Summary");
+    sumSheet.columns = [
+      { header: "Field", key: "field", width: 32 },
+      { header: "Value", key: "value", width: 40 },
+    ];
+
+    const sumHeader = sumSheet.getRow(1);
+    sumHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    sumHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+    sumHeader.alignment = { vertical: "middle", horizontal: "center" };
+    sumHeader.height = 28;
+
+    const summaryRows: Array<{ field: string; value: string }> = [
+      { field: "Shop Name", value: shopName },
+      { field: "Report", value: reportTitles[reportType] || reportType },
+      { field: "Period", value: `${startDate} to ${endDate}` },
+      { field: "Generated", value: new Date().toLocaleString() },
+    ];
+
+    if (aiSummary) {
+      summaryRows.push({ field: "", value: "" });
+      summaryRows.push({ field: "AI Executive Summary", value: aiSummary });
+    }
+
+    summaryRows.push({ field: "", value: "" });
+
+    if (reportType === "job-pl") {
+      summaryRows.push({ field: "Total Revenue", value: `$${(reportData.summary?.totalRevenue ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Total Cost", value: `$${(reportData.summary?.totalCost ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Total Profit", value: `$${(reportData.summary?.totalProfit ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Average Margin", value: `${(reportData.summary?.avgMargin ?? 0).toFixed(1)}%` });
+      summaryRows.push({ field: "Number of Jobs", value: `${reportData.details?.length ?? 0}` });
+    } else if (reportType === "sales-tax") {
+      summaryRows.push({ field: "Total Parts Tax", value: `$${(reportData.totalPartsTax ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Total Labor Tax", value: `$${(reportData.totalLaborTax ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Total Tax Collected", value: `$${(reportData.totalTax ?? 0).toFixed(2)}` });
+      summaryRows.push({ field: "Repair Orders", value: `${reportData.roCount ?? 0}` });
+    } else if (reportType === "tech-productivity") {
+      const techs = reportData.technicians || [];
+      summaryRows.push({ field: "Total Technicians", value: `${techs.length}` });
+      summaryRows.push({ field: "Total ROs", value: `${techs.reduce((s: number, t: any) => s + (t.roCount || 0), 0)}` });
+      summaryRows.push({ field: "Total Revenue", value: `$${techs.reduce((s: number, t: any) => s + (t.totalRevenue || 0), 0).toFixed(2)}` });
+      summaryRows.push({ field: "Total Hours", value: `${techs.reduce((s: number, t: any) => s + (t.totalHours || 0), 0)}` });
+    } else if (reportType === "approvals") {
+      summaryRows.push({ field: "Total Estimates", value: `${reportData.totalEstimates ?? 0}` });
+      summaryRows.push({ field: "Approved", value: `${reportData.approved ?? 0}` });
+      summaryRows.push({ field: "Declined", value: `${reportData.declined ?? 0}` });
+      summaryRows.push({ field: "Pending", value: `${reportData.pending ?? 0}` });
+      summaryRows.push({ field: "Conversion Rate", value: `${reportData.conversionRate ?? 0}%` });
+      summaryRows.push({ field: "Avg Approval Time", value: `${(reportData.avgApprovalTimeHours ?? 0).toFixed(1)} hours` });
+    }
+
+    summaryRows.forEach((row, i) => {
+      const r = sumSheet.addRow(row);
+      r.getCell("field").font = { bold: true };
+      if (row.field === "AI Executive Summary") {
+        r.getCell("value").alignment = { wrapText: true };
+        r.height = 60;
+      }
+      if (i % 2 === 1) {
+        r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+    });
+
+    const detSheet = workbook.addWorksheet("Details");
+
+    if (reportType === "job-pl") {
+      detSheet.columns = [
+        { header: "RO #", key: "roNumber", width: 12 },
+        { header: "Customer", key: "customerName", width: 24 },
+        { header: "Vehicle", key: "vehicleInfo", width: 28 },
+        { header: "Revenue", key: "revenue", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Cost", key: "cost", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Profit", key: "profit", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Margin %", key: "margin", width: 12, style: { numFmt: "0.0%" } },
+      ];
+
+      (reportData.details || []).forEach((row: any, i: number) => {
+        const r = detSheet.addRow({
+          roNumber: row.roNumber,
+          customerName: row.customerName,
+          vehicleInfo: row.vehicleInfo,
+          revenue: row.revenue ?? 0,
+          cost: row.cost ?? 0,
+          profit: row.profit ?? 0,
+          margin: (row.margin ?? 0) / 100,
+        });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        }
+      });
+    } else if (reportType === "sales-tax") {
+      detSheet.columns = [
+        { header: "RO #", key: "roNumber", width: 12 },
+        { header: "Date", key: "date", width: 14 },
+        { header: "Subtotal", key: "subtotal", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Parts Tax", key: "partsTax", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Labor Tax", key: "laborTax", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Total Tax", key: "totalTax", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Total", key: "total", width: 14, style: { numFmt: "$#,##0.00" } },
+      ];
+
+      (reportData.details || []).forEach((row: any, i: number) => {
+        const r = detSheet.addRow({
+          roNumber: row.roNumber,
+          date: row.date || "",
+          subtotal: row.subtotal ?? 0,
+          partsTax: row.partsTax ?? 0,
+          laborTax: row.laborTax ?? 0,
+          totalTax: row.totalTax ?? 0,
+          total: row.total ?? 0,
+        });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        }
+      });
+    } else if (reportType === "tech-productivity") {
+      detSheet.columns = [
+        { header: "Technician", key: "name", width: 24 },
+        { header: "RO Count", key: "roCount", width: 12 },
+        { header: "Total Hours", key: "totalHours", width: 14 },
+        { header: "Total Revenue", key: "totalRevenue", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Effective Rate", key: "effectiveRate", width: 16, style: { numFmt: "$#,##0.00" } },
+      ];
+
+      (reportData.technicians || []).forEach((row: any, i: number) => {
+        const r = detSheet.addRow({
+          name: row.name,
+          roCount: row.roCount ?? 0,
+          totalHours: row.totalHours ?? 0,
+          totalRevenue: row.totalRevenue ?? 0,
+          effectiveRate: row.effectiveRate ?? 0,
+        });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        }
+      });
+    } else if (reportType === "approvals") {
+      detSheet.columns = [
+        { header: "Metric", key: "metric", width: 28 },
+        { header: "Value", key: "value", width: 20 },
+      ];
+
+      const approvalDetails = [
+        { metric: "Total Estimates", value: `${reportData.totalEstimates ?? 0}` },
+        { metric: "Approved", value: `${reportData.approved ?? 0}` },
+        { metric: "Declined", value: `${reportData.declined ?? 0}` },
+        { metric: "Pending", value: `${reportData.pending ?? 0}` },
+        { metric: "Conversion Rate", value: `${reportData.conversionRate ?? 0}%` },
+        { metric: "Avg Approval Time", value: `${(reportData.avgApprovalTimeHours ?? 0).toFixed(1)} hours` },
+      ];
+
+      approvalDetails.forEach((row, i) => {
+        const r = detSheet.addRow(row);
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        }
+      });
+    }
+
+    const detHeader = detSheet.getRow(1);
+    detHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    detHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+    detHeader.alignment = { vertical: "middle", horizontal: "center" };
+    detHeader.height = 28;
+
+    detSheet.views = [{ state: "frozen", ySplit: 1 }];
+    const lastCol = detSheet.columns.length;
+    const lastRow = detSheet.rowCount;
+    if (lastRow > 1) {
+      detSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: lastRow, column: lastCol },
+      };
+    }
+
+    const filename = `PCB_Auto_${reportType}_${startDate}_to_${endDate}.xlsx`;
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error("Report export error:", err);
+    res.status(500).json({ error: "Failed to generate report" });
+  }
+});
+
 // ============================================================================
 // MOUNT
 // ============================================================================
