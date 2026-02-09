@@ -83,6 +83,10 @@ export default function AutoRepairOrderForm() {
 
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
+  const [receiptPromptOpen, setReceiptPromptOpen] = useState(false);
+  const [receiptPaymentInfo, setReceiptPaymentInfo] = useState<{ amount: string; method: string } | null>(null);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+
   const [partsDialogOpen, setPartsDialogOpen] = useState(false);
   const [partsSearch, setPartsSearch] = useState("");
   const [partsResults, setPartsResults] = useState<any[]>([]);
@@ -263,12 +267,59 @@ export default function AutoRepairOrderForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast({ title: "Payment Recorded", description: `$${parseFloat(paymentForm.amount).toFixed(2)} via ${METHOD_LABELS[paymentForm.method]}` });
+      setReceiptPaymentInfo({ amount: paymentForm.amount, method: paymentForm.method });
       setPaymentDialogOpen(false);
       setPaymentForm({ method: "cash", amount: "", referenceNumber: "", notes: "" });
       await Promise.all([fetchPayments(), fetchRO()]);
+      setReceiptPromptOpen(true);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally { setSubmittingPayment(false); }
+  };
+
+  const handleEmailReceipt = async () => {
+    if (!roId) return;
+    setSendingReceipt(true);
+    try {
+      const res = await autoFetch(`/api/auto/email/invoice`, {
+        method: "POST",
+        body: JSON.stringify({
+          roId: parseInt(roId as string),
+          type: "receipt",
+          paymentMethod: receiptPaymentInfo?.method || "cash",
+          paidAt: new Date().toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast({ title: "Receipt Sent", description: "Receipt emailed to customer successfully." });
+      setReceiptPromptOpen(false);
+      setReceiptPaymentInfo(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
+
+  const handleTextReceipt = () => {
+    const selectedCustomer = customers.find(c => c.id.toString() === form.customerId);
+    if (!selectedCustomer?.phone || !ro) return;
+    const token = localStorage.getItem("pcb_auto_token") || "";
+    const invoiceUrl = `${window.location.origin}/auto/invoice/${ro.id}`;
+    const msg = `Hi ${selectedCustomer.firstName}, your receipt from Demo Auto Shop for RO #${ro.roNumber} ($${parseFloat(receiptPaymentInfo?.amount || "0").toFixed(2)}) is ready. View it here: ${invoiceUrl}`;
+    const result = handleSms(selectedCustomer.phone, msg, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "payment_receipt" });
+    if (!result.isMobile) {
+      setSmsModal({ phone: result.phone, message: result.body });
+    }
+    setReceiptPromptOpen(false);
+    setReceiptPaymentInfo(null);
+  };
+
+  const handlePrintReceipt = () => {
+    downloadPdf("invoice");
+    setReceiptPromptOpen(false);
+    setReceiptPaymentInfo(null);
   };
 
   const handleVoidPayment = async (paymentId: number) => {
@@ -1057,6 +1108,49 @@ export default function AutoRepairOrderForm() {
           </>
         )}
       </div>
+      <Dialog open={receiptPromptOpen} onOpenChange={(open) => { if (!open) { setReceiptPromptOpen(false); setReceiptPaymentInfo(null); } }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-receipt-prompt">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Send Receipt
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Payment of {receiptPaymentInfo ? `$${parseFloat(receiptPaymentInfo.amount).toFixed(2)}` : ""} recorded. How would you like to share the receipt?
+          </p>
+          <div className="flex flex-col gap-2 mt-2">
+            {(() => {
+              const selectedCustomer = customers.find(c => c.id.toString() === form.customerId);
+              return (
+                <>
+                  {selectedCustomer?.email && (
+                    <Button onClick={handleEmailReceipt} disabled={sendingReceipt} className="justify-start gap-2" data-testid="button-email-receipt">
+                      {sendingReceipt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      Email Receipt to {selectedCustomer.firstName}
+                    </Button>
+                  )}
+                  {selectedCustomer?.phone && (
+                    <Button variant="outline" onClick={handleTextReceipt} className="justify-start gap-2" data-testid="button-text-receipt">
+                      <MessageSquare className="h-4 w-4" />
+                      Text Receipt Link to {selectedCustomer.firstName}
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={handlePrintReceipt} className="justify-start gap-2" data-testid="button-print-receipt">
+                    <Download className="h-4 w-4" />
+                    Download / Print Receipt PDF
+                  </Button>
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setReceiptPromptOpen(false); setReceiptPaymentInfo(null); }} data-testid="button-skip-receipt">
+              Skip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CopyMessageModal
         open={smsModal !== null}
         onOpenChange={(open) => { if (!open) setSmsModal(null); }}
