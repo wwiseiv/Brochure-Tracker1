@@ -41,7 +41,7 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 
 setInterval(() => {
   const now = Date.now();
-  for (const [id, session] of assistantSessions) {
+  for (const [id, session] of Array.from(assistantSessions)) {
     if (now - session.lastAccess > SESSION_TTL) assistantSessions.delete(id);
   }
 }, 60 * 60 * 1000);

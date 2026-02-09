@@ -80,7 +80,7 @@ function AlertTriangleIcon({ size = 14, color = "#DC2626" }: { size?: number; co
   );
 }
 
-function SignaturePad({ onSign, canvasRef }: { onSign: (signed: boolean) => void; canvasRef: React.RefObject<HTMLCanvasElement | null> }) {
+function SignaturePad({ onSign, canvasRef }: { onSign: (signed: boolean) => void; canvasRef: React.RefObject<HTMLCanvasElement> }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
 
@@ -350,7 +350,7 @@ export default function AutoPublicApproval() {
   const [showChat, setShowChat] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement>(null!);
 
   useEffect(() => {
     fetchEstimate();

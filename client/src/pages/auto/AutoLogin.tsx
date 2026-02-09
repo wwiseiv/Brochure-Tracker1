@@ -668,7 +668,7 @@ export default function AutoLogin() {
             <ul className="space-y-3 text-sm text-slate-400">
               <li>
                 <Button
-                  variant="link"
+                  variant="ghost"
                   className="p-0 h-auto text-slate-400"
                   onClick={() => scrollTo("features")}
                   data-testid="footer-link-features"
@@ -678,7 +678,7 @@ export default function AutoLogin() {
               </li>
               <li>
                 <Button
-                  variant="link"
+                  variant="ghost"
                   className="p-0 h-auto text-slate-400"
                   onClick={() => scrollTo("login")}
                   data-testid="footer-link-signin"

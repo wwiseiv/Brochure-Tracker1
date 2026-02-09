@@ -85,14 +85,10 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
 
   if (logoBuffer) {
     try {
-      const logoImg = doc.openImage(logoBuffer);
-      const origW = logoImg.width;
-      const origH = logoImg.height;
-      const scale = Math.min(LOGO_MAX_WIDTH / origW, LOGO_MAX_HEIGHT / origH, 1);
-      const drawW = origW * scale;
-      const drawH = origH * scale;
+      const drawW = LOGO_MAX_WIDTH;
+      const drawH = LOGO_MAX_HEIGHT;
       const logoY = MARGIN + (LOGO_MAX_HEIGHT - drawH) / 2;
-      doc.image(logoBuffer, MARGIN, logoY, { width: drawW, height: drawH });
+      doc.image(logoBuffer, MARGIN, logoY, { fit: [LOGO_MAX_WIDTH, LOGO_MAX_HEIGHT] });
       textStartX = MARGIN + drawW + 12;
     } catch (err) {
       console.error("[PDF] Failed to render logo:", err);
@@ -412,14 +408,10 @@ export async function generateDviPdf(res: Response, data: DviPdfData): Promise<v
 
   if (logoBuffer) {
     try {
-      const logoImg = doc.openImage(logoBuffer);
-      const origW = logoImg.width;
-      const origH = logoImg.height;
-      const scale = Math.min(LOGO_MAX_WIDTH / origW, LOGO_MAX_HEIGHT / origH, 1);
-      const drawW = origW * scale;
-      const drawH = origH * scale;
+      const drawW = LOGO_MAX_WIDTH;
+      const drawH = LOGO_MAX_HEIGHT;
       const logoY = MARGIN + (LOGO_MAX_HEIGHT - drawH) / 2;
-      doc.image(logoBuffer, MARGIN, logoY, { width: drawW, height: drawH });
+      doc.image(logoBuffer, MARGIN, logoY, { fit: [LOGO_MAX_WIDTH, LOGO_MAX_HEIGHT] });
       textStartX = MARGIN + drawW + 12;
     } catch (err) {
       console.error("[PDF] Failed to render logo:", err);
@@ -544,7 +536,7 @@ export async function generateDviPdf(res: Response, data: DviPdfData): Promise<v
     categories.get(cat)!.push(item);
   }
 
-  for (const [categoryName, categoryItems] of categories) {
+  for (const [categoryName, categoryItems] of Array.from(categories)) {
     if (y > PAGE_HEIGHT - 120) {
       doc.addPage();
       y = MARGIN;
