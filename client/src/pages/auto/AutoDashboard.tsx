@@ -73,10 +73,10 @@ export default function AutoDashboard() {
   }, [autoFetch]);
 
   const statCards = [
-    { label: "Open ROs", value: stats?.openRepairOrders ?? 0, icon: FileText, color: "text-blue-500", href: "/auto/repair-orders" },
-    { label: "Total Customers", value: stats?.totalCustomers ?? 0, icon: Users, color: "text-green-500", href: "/auto/customers" },
-    { label: "Today's Appointments", value: stats?.todayAppointments ?? 0, icon: Calendar, color: "text-purple-500", href: "/auto/schedule" },
-    { label: "Revenue (Month)", value: `$${(stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-500", href: "/auto/reports?tab=revenue" },
+    { label: "Open ROs", id: "stat-open-ros", value: stats?.openRepairOrders ?? 0, icon: FileText, color: "text-blue-500", href: "/auto/repair-orders" },
+    { label: "Total Customers", id: "stat-total-customers", value: stats?.totalCustomers ?? 0, icon: Users, color: "text-green-500", href: "/auto/customers" },
+    { label: "Today's Appointments", id: "stat-appointments", value: stats?.todayAppointments ?? 0, icon: Calendar, color: "text-purple-500", href: "/auto/schedule" },
+    { label: "Revenue (Month)", id: "stat-revenue", value: `$${(stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-500", href: "/auto/reports?tab=revenue" },
   ];
 
   return (
@@ -108,7 +108,7 @@ export default function AutoDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {statCards.map((stat) => (
             <Link key={stat.label} href={stat.href}>
-              <Card className="hover-elevate cursor-pointer" data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
+              <Card className="hover-elevate cursor-pointer" id={stat.id} data-testid={stat.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -122,7 +122,7 @@ export default function AutoDashboard() {
         </div>
 
         {dpStats && dpStats.totalPayments > 0 && (
-          <Card data-testid="card-dual-pricing-widget">
+          <Card id="card-dual-pricing-widget" data-testid="card-dual-pricing-widget">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
               <CardTitle className="text-base font-semibold">Today's Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />

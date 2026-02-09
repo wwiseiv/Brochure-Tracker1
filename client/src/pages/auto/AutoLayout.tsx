@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
 import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
+import { AIHelpChat } from "@/components/ai-help";
 
 const NAV_ITEMS = [
   { path: "/auto/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
@@ -584,6 +585,7 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
       </div>
       <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <AutoAssistantChat />
+      <AIHelpChat />
     </div>
     </AutoAssistantProvider>
   );

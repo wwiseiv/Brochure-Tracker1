@@ -3414,6 +3414,199 @@ router.post("/assistant/tts", autoAuth, async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// AI HELP WITH SMART NAVIGATION
+// ============================================================================
+
+const AI_HELP_NAV_MAP = [
+  { key: 'revenue', label: 'Revenue', route: '/auto/dashboard' },
+  { key: 'open-ros', label: 'Open ROs', route: '/auto/dashboard' },
+  { key: 'total-customers', label: 'Total Customers', route: '/auto/dashboard' },
+  { key: 'appointments', label: "Today's Appointments", route: '/auto/dashboard' },
+  { key: 'fees-saved', label: 'Fees Saved', route: '/auto/dashboard' },
+  { key: 'work-orders', label: 'Work Orders', route: '/auto/repair-orders' },
+  { key: 'estimates', label: 'Estimates', route: '/auto/repair-orders' },
+  { key: 'customers', label: 'Customers', route: '/auto/customers' },
+  { key: 'vehicles', label: 'Vehicles', route: '/auto/customers' },
+  { key: 'schedule', label: 'Schedule', route: '/auto/schedule' },
+  { key: 'inspections', label: 'Inspections (DVI)', route: '/auto/inspections' },
+  { key: 'invoices', label: 'Invoices', route: '/auto/repair-orders' },
+  { key: 'parts', label: 'Parts', route: '/auto/repair-orders' },
+  { key: 'reports', label: 'Reports', route: '/auto/reports' },
+  { key: 'report-cash-card', label: 'Cash vs Card Report', route: '/auto/reports' },
+  { key: 'report-revenue', label: 'Revenue Report', route: '/auto/reports' },
+  { key: 'report-tech', label: 'Tech Productivity', route: '/auto/reports' },
+  { key: 'report-customers', label: 'Customer Report', route: '/auto/reports' },
+  { key: 'settings', label: 'Settings', route: '/auto/settings' },
+  { key: 'settings-dual-pricing', label: 'Dual Pricing Settings', route: '/auto/settings' },
+  { key: 'settings-staff', label: 'Staff Management', route: '/auto/staff' },
+  { key: 'settings-quickbooks', label: 'QuickBooks', route: '/auto/quickbooks' },
+  { key: 'new-ro', label: 'New Work Order', route: '/auto/repair-orders/new' },
+  { key: 'payment-processor', label: 'Payment Processor', route: '/auto/processor' },
+];
+
+function buildAIHelpNavPrompt(): string {
+  const sections = AI_HELP_NAV_MAP.map(t => `- [[nav:${t.key}]] -> "${t.label}" (${t.route})`).join('\n');
+  return `
+## Navigation Links
+
+You can embed tappable navigation links in your responses that take the user directly
+to specific sections of the app. Use the format [[nav:key]] where key is from this list:
+
+${sections}
+
+RULES FOR NAVIGATION LINKS:
+1. When explaining a feature, ALWAYS include a nav link so the user can jump there
+2. Use them naturally in sentences like: "You can see this on your [[nav:fees-saved]] card"
+3. Include multiple links when discussing related features
+4. For "where is X" questions, lead with the nav link
+5. For "what is X" questions, explain first, then provide the nav link
+6. When giving a shop overview, link every metric you mention
+
+The user will see these rendered as tappable blue pills with an arrow icon.
+When tapped, the app navigates to that section and highlights it.
+`.trim();
+}
+
+function buildAIHelpSystemPrompt(shopContext?: any): string {
+  const navSection = buildAIHelpNavPrompt();
+
+  const contextSection = shopContext
+    ? `
+## Current Shop Data
+Use this real-time data when the user asks about their shop:
+- Today's Revenue: $${shopContext.revenue?.toLocaleString() ?? 'N/A'}
+- Cars In Shop: ${shopContext.carsInShop ?? 'N/A'}
+- Average Repair Order: $${shopContext.aro?.toLocaleString() ?? 'N/A'}
+- Approval Rate: ${shopContext.approvalRate ?? 'N/A'}%
+- Active Work Orders: ${shopContext.activeWorkOrders ?? 'N/A'}
+- Pending Estimates: ${shopContext.pendingEstimates ?? 'N/A'}
+` : '';
+
+  return `You are the AI Help Assistant for PCB Auto, an auto repair shop management platform.
+
+## Your Role
+- Answer questions about platform features, terminology, and navigation
+- Explain metrics, reports, and business concepts in plain language
+- Help users find things in the app by embedding navigation links
+- Provide shop performance insights using real-time data when available
+- Be concise, friendly, and action-oriented
+
+## Tone & Style
+- Speak like a knowledgeable colleague, not a manual
+- Lead with the answer, then explain
+- Use short paragraphs (2-3 sentences max)
+- Bold key terms with **double asterisks**
+- Use bullet points for lists
+
+${navSection}
+
+${contextSection}
+
+## Key Platform Concepts
+
+**Dual Pricing / Cash Discount**: Shows customers two prices - Cash Price (base) and
+Card Price (base + adjustment). Customers who pay by card cover the difference. The
+shop's [[nav:fees-saved]] card tracks total savings.
+
+**DVI (Digital Vehicle Inspection)**: Technicians photograph and document findings
+during inspections. Photos are sent to customers with [[nav:estimates]] to build trust
+and increase estimate approval.
+
+**ARO (Average Repair Order)**: The average dollar amount per completed work order.
+A key profitability metric. View your shop metrics on the [[nav:revenue]] dashboard.
+
+**Fees Saved**: Running total of credit card processing costs the shop avoided
+through dual pricing. Tracked on [[nav:fees-saved]].
+
+## Important
+- ALWAYS include at least one [[nav:key]] link when discussing a feature or section
+- For "where is X" questions, put the nav link FIRST in your response
+- For "what is X" questions, explain briefly then link
+- Never say "go to the menu" or "click on" - use nav links instead
+- If unsure which section to link, suggest the closest match
+`.trim();
+}
+
+const aiHelpSessions = new Map<string, { messages: Array<{role: string; content: string}>, lastAccess: number }>();
+
+router.post("/ai-help/chat", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { message, history = [], shopContext } = req.body;
+    if (!message?.trim()) return res.status(400).json({ error: "Message is required" });
+
+    const messages = [
+      ...history.slice(-10).map((msg: any) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      })),
+      { role: "user" as const, content: message },
+    ];
+
+    const response = await anthropicClient.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 1024,
+      system: buildAIHelpSystemPrompt(shopContext),
+      messages,
+    });
+
+    const text = response.content
+      .filter((block: any) => block.type === "text")
+      .map((block: any) => block.text)
+      .join("\n");
+
+    res.json({ response: text });
+  } catch (err: any) {
+    console.error("[AI Help] Error:", err);
+    res.status(500).json({
+      error: "Failed to get AI response",
+      response: "I'm having trouble connecting right now. Try asking again in a moment, or check the section directly using the navigation menu.",
+    });
+  }
+});
+
+router.get("/ai-help/suggestions", autoAuth, (req: Request, res: Response) => {
+  const { page } = req.query;
+
+  const baseSuggestions = [
+    { text: "How is my shop doing?", icon: "chart" },
+    { text: "What is fees saved?", icon: "dollar" },
+    { text: "Where are my work orders?", icon: "wrench" },
+    { text: "Show me reports", icon: "bar-chart" },
+  ];
+
+  const contextSuggestions: Record<string, Array<{ text: string; icon: string }>> = {
+    "/auto/dashboard": [
+      { text: "Explain my approval rate", icon: "check" },
+      { text: "What is ARO?", icon: "chart" },
+      { text: "How does dual pricing work?", icon: "credit-card" },
+    ],
+    "/auto/repair-orders": [
+      { text: "How do I create a work order?", icon: "wrench" },
+      { text: "How do I assign a tech?", icon: "user" },
+      { text: "Where are estimates?", icon: "clipboard" },
+    ],
+    "/auto/inspections": [
+      { text: "How do DVIs work?", icon: "search" },
+      { text: "How to send photos to customer?", icon: "camera" },
+      { text: "What improves approval rates?", icon: "check" },
+    ],
+    "/auto/reports": [
+      { text: "What reports are available?", icon: "bar-chart" },
+      { text: "Explain cash vs card report", icon: "credit-card" },
+      { text: "Show tech productivity", icon: "wrench" },
+    ],
+    "/auto/schedule": [
+      { text: "Add an appointment", icon: "calendar" },
+      { text: "How do bays work?", icon: "layout" },
+      { text: "Can I drag to reschedule?", icon: "move" },
+    ],
+  };
+
+  const pageSuggestions = contextSuggestions[page as string] || [];
+  res.json({ suggestions: [...pageSuggestions, ...baseSuggestions].slice(0, 6) });
+});
+
+// ============================================================================
 // PARTS LOOKUP (PartsTech Simulation)
 // ============================================================================
 
