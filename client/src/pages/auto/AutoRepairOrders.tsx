@@ -16,17 +16,19 @@ import {
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
-  estimate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  approved: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  in_progress: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  quote: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+  estimate: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  approved: "bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100",
+  in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
   completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  invoiced: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  invoiced: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
   void: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
+  { value: "quote", label: "Quote" },
   { value: "estimate", label: "Estimate" },
   { value: "approved", label: "Approved" },
   { value: "in_progress", label: "In Progress" },
@@ -525,7 +527,7 @@ export default function AutoRepairOrders() {
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(`/auto/repair-orders/${ro.id}`, "_blank");
+                              window.open(`/api/auto/repair-orders/${ro.id}/pdf`, "_blank");
                             }}
                             data-testid={`button-print-ro-${ro.id}`}
                           >
@@ -606,7 +608,7 @@ export default function AutoRepairOrders() {
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`/auto/repair-orders/${ro.id}`, "_blank");
+                            window.open(`/api/auto/repair-orders/${ro.id}/pdf`, "_blank");
                           }}
                           data-testid={`button-print-ro-mobile-${ro.id}`}
                         >

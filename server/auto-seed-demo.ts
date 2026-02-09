@@ -396,7 +396,99 @@ export async function seedDemoData(shopId: number, ownerId: number): Promise<voi
       { repairOrderId: ro1007.id, type: "parts", description: "ATF Fluid 12qt", partNumber: "VAL-822405", quantity: "1", unitPriceCash: "89.99", unitPriceCard: "93.59", totalCash: "89.99", totalCard: "93.59", costPrice: "52.00", isTaxable: true, isAdjustable: true, sortOrder: 2 },
     ]);
 
-    console.log("[AutoInit] Created 7 active ROs with line items");
+    // RO-1008: Michelle Torres / Rogue — Quote (timing belt)
+    const [ro1008] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber: "RO-1008", customerId: michelleTorres.id, vehicleId: rogue.id,
+      status: "quote", serviceAdvisorId: jessica.id,
+      customerConcern: "Customer requesting quote for timing belt replacement",
+      subtotalCash: "850.00", subtotalCard: "884.00",
+      taxAmount: "0.00", totalCash: "850.00", totalCard: "884.00",
+      paidAmount: "0.00", balanceDue: "850.00",
+      createdAt: daysAgo(5), updatedAt: daysAgo(5),
+    }).returning();
+
+    await db.insert(autoLineItems).values([
+      { repairOrderId: ro1008.id, type: "labor", description: "Timing Belt Replacement", laborHours: "3.0", laborRate: "150.00", unitPriceCash: "450.00", unitPriceCard: "468.00", totalCash: "450.00", totalCard: "468.00", isTaxable: true, isAdjustable: true, sortOrder: 1 },
+      { repairOrderId: ro1008.id, type: "parts", description: "Timing Belt Kit", partNumber: "GAT-TCK329", quantity: "1", unitPriceCash: "189.99", unitPriceCard: "197.59", totalCash: "189.99", totalCard: "197.59", costPrice: "105.00", isTaxable: true, isAdjustable: true, sortOrder: 2 },
+      { repairOrderId: ro1008.id, type: "parts", description: "Water Pump (recommended)", partNumber: "GMB-130-2080", quantity: "1", unitPriceCash: "149.99", unitPriceCard: "155.99", totalCash: "149.99", totalCard: "155.99", costPrice: "82.00", isTaxable: true, isAdjustable: true, sortOrder: 3 },
+      { repairOrderId: ro1008.id, type: "parts", description: "Coolant 1gal", partNumber: "PRE-AF2100", quantity: "1", unitPriceCash: "14.99", unitPriceCard: "15.59", totalCash: "14.99", totalCard: "15.59", costPrice: "8.00", isTaxable: true, isAdjustable: true, sortOrder: 4 },
+    ]);
+
+    // RO-1009: David Brown / Grand Cherokee — Invoiced (trans flush)
+    const [ro1009] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber: "RO-1009", customerId: davidBrown.id, vehicleId: grandCherokee.id,
+      status: "invoiced", serviceAdvisorId: jessica.id, technicianId: dave.id,
+      customerConcern: "Transmission fluid flush and filter replacement",
+      subtotalCash: "425.00", subtotalCard: "442.00",
+      taxAmount: "0.00", totalCash: "425.00", totalCard: "442.00",
+      paidAmount: "0.00", balanceDue: "442.00",
+      invoicedAt: daysAgo(2),
+      createdAt: daysAgo(4), updatedAt: daysAgo(2),
+    }).returning();
+
+    await db.insert(autoLineItems).values([
+      { repairOrderId: ro1009.id, type: "labor", description: "Transmission Fluid Flush", laborHours: "1.5", laborRate: "116.67", unitPriceCash: "175.00", unitPriceCard: "182.00", totalCash: "175.00", totalCard: "182.00", isTaxable: true, isAdjustable: true, sortOrder: 1 },
+      { repairOrderId: ro1009.id, type: "parts", description: "ATF Fluid 12qt", partNumber: "VAL-ATF-12", quantity: "1", unitPriceCash: "119.99", unitPriceCard: "124.79", totalCash: "119.99", totalCard: "124.79", costPrice: "68.00", isTaxable: true, isAdjustable: true, sortOrder: 2 },
+      { repairOrderId: ro1009.id, type: "parts", description: "Transmission Filter", partNumber: "WIX-58010", quantity: "1", unitPriceCash: "34.99", unitPriceCard: "36.39", totalCash: "34.99", totalCard: "36.39", costPrice: "19.00", isTaxable: true, isAdjustable: true, sortOrder: 3 },
+      { repairOrderId: ro1009.id, type: "labor", description: "Filter Replacement", laborHours: "0.75", laborRate: "126.67", unitPriceCash: "95.00", unitPriceCard: "98.80", totalCash: "95.00", totalCard: "98.80", isTaxable: true, isAdjustable: true, sortOrder: 4 },
+    ]);
+
+    // RO-1010: Amy Parker / Tucson — Invoiced (tires + alignment)
+    const [ro1010] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber: "RO-1010", customerId: amyParker.id, vehicleId: tucson.id,
+      status: "invoiced", serviceAdvisorId: jessica.id, technicianId: sarah.id,
+      customerConcern: "New tires and alignment",
+      subtotalCash: "1280.00", subtotalCard: "1331.20",
+      taxAmount: "0.00", totalCash: "1280.00", totalCard: "1331.20",
+      paidAmount: "0.00", balanceDue: "1331.20",
+      invoicedAt: daysAgo(1),
+      createdAt: daysAgo(3), updatedAt: daysAgo(1),
+    }).returning();
+
+    await db.insert(autoLineItems).values([
+      { repairOrderId: ro1010.id, type: "parts", description: "Tires (4) Michelin Defender", partNumber: "MICH-DEF-2355518", quantity: "4", unitPriceCash: "189.99", unitPriceCard: "197.59", totalCash: "759.96", totalCard: "790.36", costPrice: "440.00", isTaxable: true, isAdjustable: true, sortOrder: 1 },
+      { repairOrderId: ro1010.id, type: "labor", description: "Tire Installation & Balance", laborHours: "2.0", laborRate: "80.00", unitPriceCash: "160.00", unitPriceCard: "166.40", totalCash: "160.00", totalCard: "166.40", isTaxable: true, isAdjustable: true, sortOrder: 2 },
+      { repairOrderId: ro1010.id, type: "labor", description: "Four-Wheel Alignment", laborHours: "1.0", laborRate: "120.00", unitPriceCash: "120.00", unitPriceCard: "124.80", totalCash: "120.00", totalCard: "124.80", isTaxable: true, isAdjustable: true, sortOrder: 3 },
+      { repairOrderId: ro1010.id, type: "parts", description: "Valve Stems (4)", partNumber: "TIR-VS-4PK", quantity: "1", unitPriceCash: "24.99", unitPriceCard: "25.99", totalCash: "24.99", totalCard: "25.99", costPrice: "12.00", isTaxable: true, isAdjustable: true, sortOrder: 4 },
+      { repairOrderId: ro1010.id, type: "labor", description: "TPMS Reset", laborHours: "0.3", laborRate: "150.00", unitPriceCash: "45.00", unitPriceCard: "46.80", totalCash: "45.00", totalCard: "46.80", isTaxable: true, isAdjustable: true, sortOrder: 5 },
+    ]);
+
+    // RO-1011: Robert Smith / Ram — Void (customer cancelled)
+    const [ro1011] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber: "RO-1011", customerId: robertSmith.id, vehicleId: ram.id,
+      status: "void", serviceAdvisorId: jessica.id,
+      customerConcern: "Customer cancelled — decided to trade in vehicle",
+      subtotalCash: "350.00", subtotalCard: "364.00",
+      taxAmount: "0.00", totalCash: "350.00", totalCard: "364.00",
+      paidAmount: "0.00", balanceDue: "0.00",
+      createdAt: daysAgo(10), updatedAt: daysAgo(8),
+    }).returning();
+
+    await db.insert(autoLineItems).values([
+      { repairOrderId: ro1011.id, type: "labor", description: "Diagnostic - Check Engine Light", laborHours: "1.0", laborRate: "150.00", unitPriceCash: "150.00", unitPriceCard: "156.00", totalCash: "150.00", totalCard: "156.00", isTaxable: true, isAdjustable: true, sortOrder: 1 },
+      { repairOrderId: ro1011.id, type: "parts", description: "O2 Sensor (Upstream)", partNumber: "DEN-234-4209", quantity: "1", unitPriceCash: "129.99", unitPriceCard: "135.19", totalCash: "129.99", totalCard: "135.19", costPrice: "72.00", isTaxable: true, isAdjustable: true, sortOrder: 2 },
+      { repairOrderId: ro1011.id, type: "labor", description: "O2 Sensor Replacement", laborHours: "0.5", laborRate: "140.00", unitPriceCash: "70.00", unitPriceCard: "72.80", totalCash: "70.00", totalCard: "72.80", isTaxable: true, isAdjustable: true, sortOrder: 3 },
+    ]);
+
+    // RO-1012: James Williams / Silverado — Quote (engine rebuild)
+    const [ro1012] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber: "RO-1012", customerId: jamesWilliams.id, vehicleId: silverado.id,
+      status: "quote", serviceAdvisorId: jessica.id,
+      customerConcern: "Quote for engine rebuild estimate",
+      subtotalCash: "4500.00", subtotalCard: "4680.00",
+      taxAmount: "0.00", totalCash: "4500.00", totalCard: "4680.00",
+      paidAmount: "0.00", balanceDue: "4500.00",
+      createdAt: daysAgo(1), updatedAt: daysAgo(1),
+    }).returning();
+
+    await db.insert(autoLineItems).values([
+      { repairOrderId: ro1012.id, type: "labor", description: "Engine Rebuild Labor", laborHours: "24.0", laborRate: "133.33", unitPriceCash: "3200.00", unitPriceCard: "3328.00", totalCash: "3200.00", totalCard: "3328.00", isTaxable: true, isAdjustable: true, sortOrder: 1 },
+      { repairOrderId: ro1012.id, type: "parts", description: "Engine Rebuild Kit", partNumber: "MAH-MK-5500", quantity: "1", unitPriceCash: "899.99", unitPriceCard: "935.99", totalCash: "899.99", totalCard: "935.99", costPrice: "520.00", isTaxable: true, isAdjustable: true, sortOrder: 2 },
+      { repairOrderId: ro1012.id, type: "parts", description: "Gasket Set Complete", partNumber: "FEL-KS2600", quantity: "1", unitPriceCash: "189.99", unitPriceCard: "197.59", totalCash: "189.99", totalCard: "197.59", costPrice: "105.00", isTaxable: true, isAdjustable: true, sortOrder: 3 },
+      { repairOrderId: ro1012.id, type: "parts", description: "Machine Shop Services", quantity: "1", unitPriceCash: "210.00", unitPriceCard: "218.40", totalCash: "210.00", totalCard: "218.40", costPrice: "210.00", isTaxable: true, isAdjustable: true, sortOrder: 4 },
+    ]);
+
+    console.log("[AutoInit] Created 12 active ROs with line items (incl. quote, invoiced, void)");
 
     // ── DVI Inspection for RO-1001 (Robert Smith's brake job) ──
     const [dvi] = await db.insert(autoDviInspections).values({
