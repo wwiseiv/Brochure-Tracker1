@@ -2230,8 +2230,24 @@ router.get("/public/estimate/:token/lines", async (req: Request, res: Response) 
 
 router.post("/public/estimate/:token/line-approval", async (req: Request, res: Response) => {
   try {
-    const { lineItems } = req.body;
-    if (!lineItems?.length) return res.status(400).json({ error: "lineItems array is required" });
+    const { lineItems, customerNote, signatureData, customerName } = req.body;
+    if (!Array.isArray(lineItems) || !lineItems.length) {
+      return res.status(400).json({ error: "lineItems array is required" });
+    }
+    for (const li of lineItems) {
+      if (typeof li.id !== "number" || typeof li.approved !== "boolean") {
+        return res.status(400).json({ error: "Each lineItem must have a numeric id and boolean approved" });
+      }
+    }
+    if (customerNote !== undefined && typeof customerNote !== "string") {
+      return res.status(400).json({ error: "customerNote must be a string" });
+    }
+    if (signatureData !== undefined && typeof signatureData !== "string") {
+      return res.status(400).json({ error: "signatureData must be a string" });
+    }
+    if (customerName !== undefined && typeof customerName !== "string") {
+      return res.status(400).json({ error: "customerName must be a string" });
+    }
 
     const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
     if (!ro) return res.status(404).json({ error: "Estimate not found" });
@@ -2252,6 +2268,8 @@ router.post("/public/estimate/:token/line-approval", async (req: Request, res: R
 
       const existing = existingItems.find(i => i.id === li.id);
       if (existing?.approvalStatus === "approved" || existing?.approvalStatus === "declined") {
+        if (existing.approvalStatus === "approved") hasApproved = true;
+        if (existing.approvalStatus === "declined") hasDeclined = true;
         continue;
       }
 
@@ -2282,11 +2300,16 @@ router.post("/public/estimate/:token/line-approval", async (req: Request, res: R
       newStatus = "declined";
     }
 
-    await db.update(autoRepairOrders).set({
+    const roUpdate: any = {
       status: newStatus,
       approvedAt: hasApproved ? new Date() : ro.approvedAt,
       updatedAt: new Date(),
-    }).where(eq(autoRepairOrders.id, ro.id));
+    };
+    if (customerNote) roUpdate.approvalCustomerNote = customerNote;
+    if (signatureData) roUpdate.approvalSignatureData = signatureData;
+    if (customerName) roUpdate.approvedBy = customerName;
+
+    await db.update(autoRepairOrders).set(roUpdate).where(eq(autoRepairOrders.id, ro.id));
 
     const updated = await recalculateROTotals(ro.id, ro.shopId);
 
