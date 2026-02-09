@@ -254,7 +254,7 @@ function FloatingButton() {
 function renderAssistantContent(content: string, onNavigate: (route: string) => void): ReactNode {
   const navPattern = /\*{0,2}\[\[nav:([a-z0-9-]+)\]\]\*{0,2}/g;
   if (!navPattern.test(content)) {
-    return <ReactMarkdown>{content}</ReactMarkdown>;
+    return <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"><ReactMarkdown>{content}</ReactMarkdown></div>;
   }
 
   navPattern.lastIndex = 0;
@@ -276,7 +276,7 @@ function renderAssistantContent(content: string, onNavigate: (route: string) => 
     const hasNav = navKeys.some(n => para.includes(n.placeholder));
     if (!hasNav) {
       result.push(
-        <div key={`p-${pIdx}`}>
+        <div key={`p-${pIdx}`} className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
           <ReactMarkdown>{para}</ReactMarkdown>
         </div>
       );
@@ -288,7 +288,7 @@ function renderAssistantContent(content: string, onNavigate: (route: string) => 
       const lineNavs = navKeys.filter(n => line.includes(n.placeholder));
       if (lineNavs.length === 0) {
         result.push(
-          <div key={`p-${pIdx}-l-${lIdx}`}>
+          <div key={`p-${pIdx}-l-${lIdx}`} className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
             <ReactMarkdown>{line}</ReactMarkdown>
           </div>
         );
@@ -522,7 +522,7 @@ function ChatPanel() {
                   data-testid={`message-${msg.role}-${msg.id}`}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+                    <div className="max-w-none">
                       {renderAssistantContent(msg.content, handleNavigation)}
                     </div>
                   ) : (

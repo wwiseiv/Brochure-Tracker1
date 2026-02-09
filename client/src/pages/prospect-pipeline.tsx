@@ -1262,7 +1262,7 @@ export default function DealPipelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 safe-area-bottom overflow-x-hidden" data-testid="pipeline-page">
+    <div className={`min-h-screen bg-background pb-24 safe-area-bottom ${viewMode !== 'kanban' ? 'overflow-x-hidden' : ''}`} data-testid="pipeline-page">
       <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1368,7 +1368,7 @@ export default function DealPipelinePage() {
         </div>
       )}
 
-      <main className={`${viewMode === 'kanban' ? 'w-full max-w-full px-4 overflow-hidden' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
+      <main className={`${viewMode === 'kanban' ? 'w-full max-w-full px-4' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />

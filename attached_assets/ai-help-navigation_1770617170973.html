@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PCB Auto — AI Help with Smart Navigation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --slate-50: #F8FAFC; --slate-100: #F1F5F9; --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1; --slate-400: #94A3B8; --slate-500: #64748B;
+  --slate-600: #475569; --slate-700: #334155; --slate-800: #1E293B; --slate-900: #0F172A;
+  --blue-50: #EFF6FF; --blue-100: #DBEAFE; --blue-400: #60A5FA;
+  --blue-500: #3B82F6; --blue-600: #2563EB; --blue-700: #1D4ED8;
+  --green-500: #10B981; --green-600: #059669;
+  --purple-500: #8B5CF6; --purple-600: #7C3AED;
+  --amber-500: #F59E0B;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+}
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-body); background: var(--slate-50);
+  color: var(--slate-900); min-height: 100vh; -webkit-font-smoothing: antialiased;
+}
+
+/* ── Simulated App Shell ── */
+.app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: #fff; position: relative; overflow: hidden; box-shadow: 0 0 60px rgba(0,0,0,0.08); }
+
+/* ── Top Nav ── */
+.top-nav {
+  background: linear-gradient(135deg, var(--slate-900), var(--slate-800));
+  padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 40;
+}
+.nav-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #fff; }
+.nav-sub { font-size: 11px; color: var(--slate-400); margin-top: 1px; }
+.nav-right { display: flex; gap: 8px; align-items: center; }
+.nav-icon {
+  width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  transition: all 0.15s;
+}
+.nav-icon.ai-btn {
+  background: linear-gradient(135deg, var(--purple-500), var(--blue-600));
+  box-shadow: 0 2px 8px rgba(139,92,246,0.4);
+  position: relative;
+}
+.nav-icon.ai-btn::after {
+  content: ''; position: absolute; top: -2px; right: -2px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--green-500); border: 2px solid var(--slate-900);
+}
+.nav-icon.settings { background: rgba(255,255,255,0.1); }
+
+/* ── Dashboard Content (Simulated) ── */
+.dashboard { padding: 16px; padding-bottom: 80px; }
+.section-anchor { scroll-margin-top: 60px; }
+
+.dash-greeting { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.dash-date { font-size: 13px; color: var(--slate-500); margin-bottom: 16px; }
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat-card {
+  background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px;
+  padding: 14px; transition: all 0.3s ease;
+}
+.stat-card.highlight {
+  border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  background: var(--blue-50);
+}
+.stat-label { font-size: 11px; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-val { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin-top: 4px; }
+.stat-delta { font-size: 11px; margin-top: 2px; font-weight: 500; }
+.stat-delta.up { color: var(--green-500); }
+.stat-delta.down { color: #EF4444; }
+
+.dash-section-title {
+  font-size: 14px; font-weight: 700; color: var(--slate-900);
+  margin: 20px 0 10px; display: flex; align-items: center; gap: 8px;
+}
+.dash-section-title .icon { font-size: 16px; }
+
+/* Simulated sections */
+.sim-card {
+  background: #fff; border: 1px solid var(--slate-200); border-radius: 12px;
+  padding: 14px; margin-bottom: 8px; transition: all 0.3s ease;
+}
+.sim-card.highlight {
+  border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  background: var(--blue-50);
+}
+.sim-card-title { font-size: 14px; font-weight: 600; }
+.sim-card-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+.sim-card-row { display: flex; justify-content: space-between; align-items: center; }
+.sim-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.sim-badge.progress { background: #FEF3C7; color: #92400E; }
+.sim-badge.waiting { background: #DBEAFE; color: #1E40AF; }
+.sim-badge.complete { background: #D1FAE5; color: #065F46; }
+
+.fees-saved-card {
+  background: linear-gradient(135deg, #065F46, #047857);
+  border-radius: 12px; padding: 16px; color: #fff; margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+.fees-saved-card.highlight { box-shadow: 0 0 0 3px rgba(16,185,129,0.4); }
+.fees-label { font-size: 11px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
+.fees-val { font-family: var(--font-display); font-size: 28px; font-weight: 700; margin-top: 4px; }
+.fees-sub { font-size: 12px; opacity: 0.75; margin-top: 4px; }
+
+.reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.report-card {
+  background: var(--slate-50); border: 1px solid var(--slate-200);
+  border-radius: 10px; padding: 12px; text-align: center;
+  cursor: pointer; transition: all 0.3s ease;
+}
+.report-card.highlight {
+  border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  background: var(--blue-50);
+}
+.report-icon { font-size: 20px; margin-bottom: 4px; }
+.report-name { font-size: 12px; font-weight: 600; }
+
+/* ── Chat Overlay ── */
+.chat-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(15,23,42,0.5); backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  max-width: 430px; margin: 0 auto;
+}
+.chat-overlay.open { opacity: 1; pointer-events: all; }
+.chat-panel {
+  background: #fff; border-radius: 20px 20px 0 0; max-height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.chat-overlay.open .chat-panel { transform: translateY(0); }
+
+.chat-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--slate-200);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.chat-header-left { display: flex; align-items: center; gap: 10px; }
+.chat-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple-500), var(--blue-600));
+  display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px;
+}
+.chat-name { font-weight: 600; font-size: 14px; }
+.chat-status { font-size: 11px; color: var(--green-500); }
+.btn-close {
+  background: var(--slate-100); border: none; border-radius: 50%;
+  width: 30px; height: 30px; cursor: pointer; font-size: 15px; color: var(--slate-500);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.chat-messages { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+
+.msg { max-width: 88%; animation: msgIn 0.25s ease; }
+.msg.assistant { align-self: flex-start; }
+.msg.user { align-self: flex-end; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.msg-bubble { padding: 10px 14px; font-size: 13.5px; line-height: 1.55; }
+.msg.assistant .msg-bubble { background: var(--slate-100); color: var(--slate-800); border-radius: 14px 14px 14px 4px; }
+.msg.user .msg-bubble { background: linear-gradient(135deg, var(--blue-500), var(--blue-600)); color: #fff; border-radius: 14px 14px 4px 14px; }
+
+/* ── SMART NAV LINKS ── */
+.nav-link {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--blue-600); font-weight: 600; cursor: pointer;
+  text-decoration: none; border-bottom: 1.5px solid rgba(37,99,235,0.3);
+  padding-bottom: 0px; transition: all 0.15s;
+  background: rgba(59,130,246,0.06); padding: 1px 5px; border-radius: 4px;
+  margin: 0 1px; white-space: nowrap;
+}
+.nav-link:hover, .nav-link:active {
+  background: rgba(59,130,246,0.15); border-bottom-color: var(--blue-600);
+}
+.nav-link .link-icon { font-size: 11px; opacity: 0.7; }
+
+/* ── Typing ── */
+.typing-indicator { align-self: flex-start; display: none; }
+.typing-indicator.visible { display: block; }
+.typing-dots { padding: 10px 18px; border-radius: 14px 14px 14px 4px; background: var(--slate-100); display: flex; gap: 4px; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--slate-400); animation: bounce 1.2s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
+
+/* ── Suggestions ── */
+.chat-suggestions { padding: 6px 18px 2px; display: flex; gap: 6px; overflow-x: auto; flex-wrap: wrap; }
+.suggest-btn {
+  white-space: nowrap; padding: 6px 11px; border-radius: 18px;
+  border: 1px solid var(--slate-200); background: #fff; color: var(--slate-600);
+  font-size: 12px; cursor: pointer; font-family: var(--font-body); flex-shrink: 0;
+  transition: all 0.15s;
+}
+.suggest-btn:hover { background: var(--slate-50); border-color: var(--blue-400); color: var(--blue-600); }
+.suggest-btn .icon { margin-right: 3px; }
+
+/* ── Input ── */
+.chat-input-row {
+  padding: 10px 18px 22px; display: flex; gap: 8px; border-top: 1px solid var(--slate-100);
+}
+.chat-input {
+  flex: 1; padding: 9px 14px; border-radius: 22px;
+  border: 1.5px solid var(--slate-200); outline: none; font-size: 13.5px;
+  font-family: var(--font-body); background: var(--slate-50);
+}
+.chat-input:focus { border-color: var(--blue-500); background: #fff; }
+.btn-send {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--slate-200); border: none; cursor: default;
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.btn-send.active { background: linear-gradient(135deg, var(--blue-500), var(--blue-600)); cursor: pointer; }
+.btn-send svg { stroke: var(--slate-400); }
+.btn-send.active svg { stroke: #fff; }
+
+/* ── Navigation Toast ── */
+.nav-toast {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-20px);
+  background: var(--slate-900); color: #fff; padding: 10px 18px; border-radius: 12px;
+  font-size: 13px; font-weight: 500; z-index: 2000;
+  display: flex; align-items: center; gap: 8px;
+  opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2); max-width: 380px;
+}
+.nav-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: all; }
+.nav-toast .toast-icon { font-size: 16px; }
+.nav-toast .toast-text { flex: 1; }
+
+/* ── Bottom Nav (Simulated) ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 430px; background: #fff;
+  border-top: 1px solid var(--slate-200); padding: 8px 16px 22px;
+  display: flex; justify-content: space-around; z-index: 30;
+}
+.bnav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; color: var(--slate-400); font-weight: 500;
+  cursor: pointer; padding: 4px 12px; border-radius: 8px; transition: all 0.15s;
+  border: none; background: none; font-family: var(--font-body);
+}
+.bnav-item.active { color: var(--blue-600); }
+.bnav-item .bnav-icon { font-size: 18px; }
+</style>
+</head>
+<body>
+
+<!-- Navigation Toast -->
+<div class="nav-toast" id="navToast">
+  <span class="toast-icon">📍</span>
+  <span class="toast-text" id="toastText"></span>
+</div>
+
+<div class="app-shell">
+  <!-- Top Nav -->
+  <div class="top-nav">
+    <div>
+      <div class="nav-title">PCB Auto</div>
+      <div class="nav-sub">Dashboard · Today</div>
+    </div>
+    <div class="nav-right">
+      <button class="nav-icon ai-btn" onclick="openChat()" title="AI Assistant">🤖</button>
+      <button class="nav-icon settings" style="color:#94A3B8">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <div class="dash-greeting">Good evening, William 👋</div>
+    <div class="dash-date">Saturday, February 8, 2026</div>
+
+    <!-- Stats -->
+    <div class="stat-grid" id="sec-stats">
+      <div class="stat-card section-anchor" id="sec-revenue">
+        <div class="stat-label">Today's Revenue</div>
+        <div class="stat-val">$4,285</div>
+        <div class="stat-delta up">↑ 12% vs last Sat</div>
+      </div>
+      <div class="stat-card section-anchor" id="sec-cars">
+        <div class="stat-label">Cars In Shop</div>
+        <div class="stat-val">7</div>
+        <div class="stat-delta">3 in progress · 4 waiting</div>
+      </div>
+      <div class="stat-card section-anchor" id="sec-aro">
+        <div class="stat-label">Avg Repair Order</div>
+        <div class="stat-val">$612</div>
+        <div class="stat-delta up">↑ 8% this week</div>
+      </div>
+      <div class="stat-card section-anchor" id="sec-approval">
+        <div class="stat-label">Approval Rate</div>
+        <div class="stat-val">78%</div>
+        <div class="stat-delta up">↑ from 64% last month</div>
+      </div>
+    </div>
+
+    <!-- Fees Saved -->
+    <div class="fees-saved-card section-anchor" id="sec-fees-saved">
+      <div class="fees-label">💰 Fees Saved (Dual Pricing)</div>
+      <div class="fees-val">$2,847</div>
+      <div class="fees-sub">This month · 3.49% rate · $81,574 card volume</div>
+    </div>
+
+    <!-- Active Work Orders -->
+    <div class="dash-section-title section-anchor" id="sec-work-orders"><span class="icon">🔧</span> Active Work Orders</div>
+    <div class="sim-card section-anchor" id="sec-ro-1042">
+      <div class="sim-card-row">
+        <div>
+          <div class="sim-card-title">RO #1042 — 2019 Honda Civic</div>
+          <div class="sim-card-sub">Brake job + alignment · Tech: Mike D.</div>
+        </div>
+        <div class="sim-badge progress">In Progress</div>
+      </div>
+    </div>
+    <div class="sim-card section-anchor" id="sec-ro-1043">
+      <div class="sim-card-row">
+        <div>
+          <div class="sim-card-title">RO #1043 — 2021 Toyota Camry</div>
+          <div class="sim-card-sub">Oil change + filters · Tech: Sarah K.</div>
+        </div>
+        <div class="sim-badge waiting">Waiting Parts</div>
+      </div>
+    </div>
+    <div class="sim-card section-anchor" id="sec-ro-1044">
+      <div class="sim-card-row">
+        <div>
+          <div class="sim-card-title">RO #1044 — 2017 Ford F-150</div>
+          <div class="sim-card-sub">Transmission flush + coolant · Tech: Mike D.</div>
+        </div>
+        <div class="sim-badge progress">In Progress</div>
+      </div>
+    </div>
+
+    <!-- Estimates Pending Approval -->
+    <div class="dash-section-title section-anchor" id="sec-estimates"><span class="icon">📋</span> Estimates Pending Approval</div>
+    <div class="sim-card section-anchor" id="sec-est-2087">
+      <div class="sim-card-row">
+        <div>
+          <div class="sim-card-title">EST #2087 — 2020 Subaru Outback</div>
+          <div class="sim-card-sub">Sent 2 hrs ago · $1,240 · 4 services</div>
+        </div>
+        <div class="sim-badge waiting">Pending</div>
+      </div>
+    </div>
+    <div class="sim-card section-anchor" id="sec-est-2088">
+      <div class="sim-card-row">
+        <div>
+          <div class="sim-card-title">EST #2088 — 2022 Chevy Malibu</div>
+          <div class="sim-card-sub">Sent 45 min ago · $680 · 2 services</div>
+        </div>
+        <div class="sim-badge waiting">Pending</div>
+      </div>
+    </div>
+
+    <!-- Scheduling -->
+    <div class="dash-section-title section-anchor" id="sec-schedule"><span class="icon">📅</span> Today's Schedule</div>
+    <div class="sim-card section-anchor" id="sec-bay-schedule">
+      <div class="sim-card-title">Bay Utilization</div>
+      <div class="sim-card-sub" style="margin-top:4px">Bay 1: Mike D. — RO #1042 (est. done 3:30 PM)<br>Bay 2: Sarah K. — RO #1043 (waiting parts)<br>Bay 3: Open — next appointment 2:00 PM</div>
+    </div>
+
+    <!-- Reports -->
+    <div class="dash-section-title section-anchor" id="sec-reports"><span class="icon">📊</span> Reports</div>
+    <div class="reports-grid">
+      <div class="report-card section-anchor" id="sec-report-cash-card">
+        <div class="report-icon">💳</div>
+        <div class="report-name">Cash vs Card</div>
+      </div>
+      <div class="report-card section-anchor" id="sec-report-revenue">
+        <div class="report-icon">📈</div>
+        <div class="report-name">Revenue</div>
+      </div>
+      <div class="report-card section-anchor" id="sec-report-tech">
+        <div class="report-icon">🔧</div>
+        <div class="report-name">Tech Productivity</div>
+      </div>
+      <div class="report-card section-anchor" id="sec-report-customers">
+        <div class="report-icon">👥</div>
+        <div class="report-name">Customers</div>
+      </div>
+    </div>
+
+    <!-- DVI -->
+    <div class="dash-section-title section-anchor" id="sec-inspections"><span class="icon">🔍</span> Inspections (DVI)</div>
+    <div class="sim-card section-anchor" id="sec-dvi">
+      <div class="sim-card-title">3 DVIs completed today</div>
+      <div class="sim-card-sub">2 sent to customers · 1 awaiting review · 14 photos captured</div>
+    </div>
+
+    <!-- Customers -->
+    <div class="dash-section-title section-anchor" id="sec-customers"><span class="icon">👥</span> Recent Customers</div>
+    <div class="sim-card">
+      <div class="sim-card-title">Sarah Mitchell</div>
+      <div class="sim-card-sub">2021 Toyota Camry · Last visit: Today · 4 visits total</div>
+    </div>
+    <div class="sim-card">
+      <div class="sim-card-title">James Rodriguez</div>
+      <div class="sim-card-sub">2019 Honda Civic · Last visit: Today · 7 visits total</div>
+    </div>
+
+    <div style="height:40px"></div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="bnav-item active"><span class="bnav-icon">🏠</span>Home</button>
+    <button class="bnav-item"><span class="bnav-icon">🔧</span>Work Orders</button>
+    <button class="bnav-item"><span class="bnav-icon">📋</span>Estimates</button>
+    <button class="bnav-item"><span class="bnav-icon">👥</span>Customers</button>
+    <button class="bnav-item" onclick="openChat()"><span class="bnav-icon">🤖</span>AI Help</button>
+  </div>
+</div>
+
+<!-- ═══════════════ CHAT OVERLAY ═══════════════ -->
+<div class="chat-overlay" id="chatOverlay" onclick="if(event.target===this)closeChat()">
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <div class="chat-avatar">🤖</div>
+        <div>
+          <div class="chat-name">PCB Auto AI</div>
+          <div class="chat-status">● Online</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="closeChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg assistant">
+        <div class="msg-bubble">Hey William! 👋 How can I help? Ask me anything about your shop — I can explain features and take you right to them.</div>
+      </div>
+      <div class="typing-indicator" id="typingIndicator">
+        <div class="typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+      </div>
+    </div>
+    <div class="chat-suggestions" id="chatSuggestions">
+      <button class="suggest-btn" onclick="askQuestion('What is fees saved?')"><span class="icon">💰</span> What is fees saved?</button>
+      <button class="suggest-btn" onclick="askQuestion('Where are my work orders?')"><span class="icon">🔧</span> Where are work orders?</button>
+      <button class="suggest-btn" onclick="askQuestion('How do estimates work?')"><span class="icon">📋</span> How do estimates work?</button>
+      <button class="suggest-btn" onclick="askQuestion('Show me reports')"><span class="icon">📊</span> Show me reports</button>
+      <button class="suggest-btn" onclick="askQuestion('How is my shop doing today?')"><span class="icon">📈</span> How am I doing today?</button>
+      <button class="suggest-btn" onclick="askQuestion('What is dual pricing?')"><span class="icon">💳</span> What is dual pricing?</button>
+    </div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chatInput" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendChat()" oninput="updateSendBtn()">
+      <button class="btn-send" id="btnSend" onclick="sendChat()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════ NAV LINK SYSTEM ═══════════════
+// Map of keywords → { section element ID, toast label }
+const NAV_MAP = {
+  'fees saved': { target: 'sec-fees-saved', label: 'Fees Saved — Dual Pricing savings tracker' },
+  'dual pricing': { target: 'sec-fees-saved', label: 'Dual Pricing — Fees Saved card' },
+  'revenue': { target: 'sec-revenue', label: "Today's Revenue" },
+  'today\'s revenue': { target: 'sec-revenue', label: "Today's Revenue stat" },
+  'work orders': { target: 'sec-work-orders', label: 'Active Work Orders' },
+  'active work orders': { target: 'sec-work-orders', label: 'Active Work Orders section' },
+  'ro #1042': { target: 'sec-ro-1042', label: 'RO #1042 — 2019 Honda Civic' },
+  'ro #1043': { target: 'sec-ro-1043', label: 'RO #1043 — 2021 Toyota Camry' },
+  'ro #1044': { target: 'sec-ro-1044', label: 'RO #1044 — 2017 Ford F-150' },
+  'estimates': { target: 'sec-estimates', label: 'Estimates Pending Approval' },
+  'estimate approval': { target: 'sec-estimates', label: 'Estimate Approval section' },
+  'approval rate': { target: 'sec-approval', label: 'Approval Rate stat' },
+  'avg repair order': { target: 'sec-aro', label: 'Average Repair Order stat' },
+  'aro': { target: 'sec-aro', label: 'Average Repair Order stat' },
+  'cars in shop': { target: 'sec-cars', label: 'Cars In Shop stat' },
+  'schedule': { target: 'sec-schedule', label: "Today's Schedule" },
+  'bay schedule': { target: 'sec-bay-schedule', label: 'Bay Utilization schedule' },
+  'reports': { target: 'sec-reports', label: 'Reports section' },
+  'cash vs card': { target: 'sec-report-cash-card', label: 'Cash vs Card Report' },
+  'cash vs. card report': { target: 'sec-report-cash-card', label: 'Cash vs Card Report' },
+  'revenue report': { target: 'sec-report-revenue', label: 'Revenue Report' },
+  'tech productivity': { target: 'sec-report-tech', label: 'Tech Productivity Report' },
+  'customer report': { target: 'sec-report-customers', label: 'Customer Report' },
+  'inspections': { target: 'sec-inspections', label: 'Inspections (DVI) section' },
+  'dvi': { target: 'sec-dvi', label: 'Digital Vehicle Inspections' },
+  'customers': { target: 'sec-customers', label: 'Recent Customers section' },
+};
+
+function makeNavLink(keyword, displayText) {
+  return `<span class="nav-link" onclick="navigateTo('${keyword}')" title="Go to ${keyword}"><span class="link-icon">→</span> ${displayText || keyword}</span>`;
+}
+
+function navigateTo(keyword) {
+  const entry = NAV_MAP[keyword.toLowerCase()];
+  if (!entry) return;
+
+  // Close chat
+  closeChat();
+
+  // Small delay for chat close animation
+  setTimeout(() => {
+    const el = document.getElementById(entry.target);
+    if (!el) return;
+
+    // Scroll to element
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Highlight pulse
+    el.classList.add('highlight');
+    setTimeout(() => el.classList.remove('highlight'), 2200);
+
+    // Show toast
+    showToast('📍 ' + entry.label);
+  }, 350);
+}
+
+function showToast(text) {
+  const toast = document.getElementById('navToast');
+  document.getElementById('toastText').textContent = text;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2800);
+}
+
+// ═══════════════ AI RESPONSES WITH NAV LINKS ═══════════════
+const AI_RESPONSES = {
+  'fees': {
+    text: `<strong>Fees Saved</strong> is the total amount you've kept in your pocket instead of paying to credit card processors.\n\nHere's how it works: When a customer chooses <strong>Card Price</strong> (the higher of the two prices), that extra amount covers the credit card processing fee. Instead of you eating a 3-4% fee on every card transaction, the customer who chooses to pay by card covers it.\n\nSo if you did $10,000 in card sales this month and your dual pricing rate is 3.49%, you saved roughly $349 in fees you would've otherwise paid.\n\nYou can see your running total on the ${makeNavLink('fees saved', 'Fees Saved card')} on your dashboard — money that stayed with you instead of going to Visa/Mastercard.\n\nWant a full breakdown? Check the ${makeNavLink('cash vs card', 'Cash vs. Card Report')} in ${makeNavLink('reports', 'Reports')}.`,
+    suggests: ['Show me reports', 'How is my shop doing today?', 'What is dual pricing?']
+  },
+  'work orders': {
+    text: `Your ${makeNavLink('work orders', 'Active Work Orders')} are in the middle of your dashboard. Right now you have 3 active:\n\n🔧 ${makeNavLink('ro #1042', 'RO #1042')} — 2019 Honda Civic, brake job + alignment with Mike D. (in progress)\n🔧 ${makeNavLink('ro #1043', 'RO #1043')} — 2021 Toyota Camry, oil change + filters with Sarah K. (waiting parts)\n🔧 ${makeNavLink('ro #1044', 'RO #1044')} — 2017 Ford F-150, transmission flush with Mike D. (in progress)\n\nYou can also see ${makeNavLink('cars in shop', 'Cars In Shop')} at the top for a quick count, or check ${makeNavLink('bay schedule', 'Bay Schedule')} to see who's where.\n\nTap any link above to jump right there. ☝️`,
+    suggests: ['How do estimates work?', 'Show me reports', 'How is my shop doing today?']
+  },
+  'estimates': {
+    text: `${makeNavLink('estimates', 'Estimates')} are proposals you send to customers before starting work. PCB Auto lets you build line-item estimates with parts, labor, and descriptions, then send them via text or email.\n\nRight now you have 2 pending:\n📋 EST #2087 — Subaru Outback ($1,240, sent 2 hrs ago)\n📋 EST #2088 — Chevy Malibu ($680, sent 45 min ago)\n\nWhen customers get the link, they can approve or decline individual services right from their phone — no phone call needed. That's what drives your ${makeNavLink('approval rate', 'Approval Rate')} up (78% this month, up from 64%!).\n\nYour ${makeNavLink('avg repair order', 'ARO')} also went up 8% because customers approve more line items when they can see photos and pricing clearly.`,
+    suggests: ['What is fees saved?', 'Where are my work orders?', 'Show me reports']
+  },
+  'reports': {
+    text: `Your ${makeNavLink('reports', 'Reports')} section has everything you need to understand your business:\n\n💳 ${makeNavLink('cash vs card', 'Cash vs. Card')} — See your payment mix and dual pricing savings\n📈 ${makeNavLink('revenue report', 'Revenue')} — Daily, weekly, monthly revenue trends\n🔧 ${makeNavLink('tech productivity', 'Tech Productivity')} — Hours billed, efficiency rate per technician\n👥 ${makeNavLink('customer report', 'Customers')} — Visit frequency, lifetime value, retention\n\nAll reports export to Excel. Tap any of those links to jump straight there.\n\nPro tip: your ${makeNavLink('fees saved', 'Fees Saved')} card at the top of the dashboard is basically a live report — it updates in real time as card transactions come in.`,
+    suggests: ['What is fees saved?', 'How is my shop doing today?', 'Where are my work orders?']
+  },
+  'today': {
+    text: `Here's your shop snapshot for today:\n\n💰 ${makeNavLink("today's revenue", 'Revenue')}: <strong>$4,285</strong> (↑12% vs last Saturday)\n🚗 ${makeNavLink('cars in shop', 'Cars In Shop')}: <strong>7</strong> (3 in progress, 4 waiting)\n📊 ${makeNavLink('avg repair order', 'ARO')}: <strong>$612</strong> (↑8% this week)\n✅ ${makeNavLink('approval rate', 'Approval Rate')}: <strong>78%</strong> (up from 64% last month)\n💰 ${makeNavLink('fees saved', 'Fees Saved')}: <strong>$2,847</strong> this month\n\nYou've got 2 ${makeNavLink('estimates', 'estimates pending')} approval and 3 ${makeNavLink('work orders', 'active work orders')}. ${makeNavLink('inspections', 'DVIs')} are on track — 3 completed today with 14 photos.\n\nSolid Saturday. Your approval rate jump is the big story — that digital approval portal is paying off.`,
+    suggests: ['Show me reports', 'Where are my work orders?', 'What is dual pricing?']
+  },
+  'dual pricing': {
+    text: `<strong>Dual Pricing</strong> (also called Cash Discount) shows customers two prices on every estimate and invoice:\n\n• <strong>Cash Price</strong> — the base price\n• <strong>Card Price</strong> — base price + credit card surcharge (typically 3.49%)\n\nCustomers choose which to pay. If they pay cash or debit, they get the lower price. If they pay credit card, the surcharge covers your processing fees so you net the same either way.\n\nThe result? Check your ${makeNavLink('fees saved', 'Fees Saved')} card — you've saved <strong>$2,847</strong> this month alone. That's money that used to go to Visa and Mastercard.\n\nWant the full picture? The ${makeNavLink('cash vs card', 'Cash vs. Card Report')} shows your payment mix breakdown so you can see exactly how it splits.\n\nThis is built into every estimate and invoice in PCB Auto — it shows both prices automatically.`,
+    suggests: ['What is fees saved?', 'How do estimates work?', 'Show me reports']
+  },
+  'inspections': {
+    text: `${makeNavLink('inspections', 'Digital Vehicle Inspections (DVI)')} let your techs document what they find with photos and notes during every service.\n\nToday's stats: <strong>3 DVIs completed</strong>, 14 photos captured, 2 already sent to customers.\n\nWhen you send DVI results to customers alongside ${makeNavLink('estimates', 'estimates')}, they can see the actual photos of their worn brake pads or dirty filters. That's a big reason your ${makeNavLink('approval rate', 'Approval Rate')} jumped to 78% — seeing is believing.\n\nThe DVI photos also go into the customer's vehicle history, so next visit you (or ${makeNavLink('customers', 'any advisor')}) can reference exactly what was found before.`,
+    suggests: ['How do estimates work?', 'How is my shop doing today?', 'Show me reports']
+  },
+  'default': {
+    text: `Good question! I can help you navigate anywhere in PCB Auto. Here are some things you can ask me:\n\n• "What is Fees Saved?" — I'll explain and link you to the ${makeNavLink('fees saved', 'Fees Saved card')}\n• "Where are my work orders?" — Jump to ${makeNavLink('work orders', 'Active Work Orders')}\n• "Show me reports" — Go to the ${makeNavLink('reports', 'Reports section')}\n• "How am I doing today?" — Full shop snapshot with links\n\nJust ask in plain English — I'll explain the feature AND give you tappable links to go right there. No menu hunting needed. 🎯`,
+    suggests: ['What is fees saved?', 'Where are my work orders?', 'Show me reports', 'How is my shop doing today?']
+  }
+};
+
+function matchResponse(text) {
+  const l = text.toLowerCase();
+  if (/fees saved|fees|fee saved/.test(l)) return AI_RESPONSES['fees'];
+  if (/work order|repair order|ro |active jobs/.test(l)) return AI_RESPONSES['work orders'];
+  if (/estimate|approval|approve|pending/.test(l)) return AI_RESPONSES['estimates'];
+  if (/report|analytics|data|numbers|metrics/.test(l)) return AI_RESPONSES['reports'];
+  if (/today|doing|snapshot|how am i|how.s my|overview|summary/.test(l)) return AI_RESPONSES['today'];
+  if (/dual pric|cash discount|surcharge|card price|cash price/.test(l)) return AI_RESPONSES['dual pricing'];
+  if (/inspect|dvi|photo|digital vehicle/.test(l)) return AI_RESPONSES['inspections'];
+  if (/schedule|bay|calendar|appointment/.test(l)) {
+    return {
+      text: `Your ${makeNavLink('schedule', "Today's Schedule")} shows bay assignments and upcoming appointments.\n\nRight now:\n• Bay 1: Mike D. — ${makeNavLink('ro #1042', 'RO #1042')} (est. done 3:30 PM)\n• Bay 2: Sarah K. — ${makeNavLink('ro #1043', 'RO #1043')} (waiting parts)\n• Bay 3: Open — next appointment at 2:00 PM\n\nTap ${makeNavLink('bay schedule', 'Bay Schedule')} to see the full view.`,
+      suggests: ['Where are my work orders?', 'How is my shop doing today?', 'Show me reports']
+    };
+  }
+  if (/customer|client/.test(l)) {
+    return {
+      text: `Your ${makeNavLink('customers', 'Recent Customers')} section shows everyone who's visited recently. From there you can see vehicle history, past ${makeNavLink('work orders', 'work orders')}, ${makeNavLink('inspections', 'DVI history')}, and contact info.\n\nFor deeper insights, check the ${makeNavLink('customer report', 'Customer Report')} — it shows visit frequency, lifetime value, and retention rates.`,
+      suggests: ['How is my shop doing today?', 'Show me reports', 'Where are my work orders?']
+    };
+  }
+  return AI_RESPONSES['default'];
+}
+
+// ═══════════════ CHAT ENGINE ═══════════════
+function openChat() { document.getElementById('chatOverlay').classList.add('open'); }
+function closeChat() { document.getElementById('chatOverlay').classList.remove('open'); }
+
+function addMessage(role, html) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  // Convert \n to <br> for display
+  const formatted = html.replace(/\n/g, '<br>');
+  div.innerHTML = `<div class="msg-bubble">${formatted}</div>`;
+  const typing = document.getElementById('typingIndicator');
+  typing.parentNode.insertBefore(div, typing);
+  const container = document.getElementById('chatMessages');
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateSuggestions(suggests) {
+  const container = document.getElementById('chatSuggestions');
+  if (!suggests || !suggests.length) { container.innerHTML = ''; return; }
+  container.innerHTML = suggests.map(s =>
+    `<button class="suggest-btn" onclick="askQuestion('${s.replace(/'/g, "\\'")}')">${s}</button>`
+  ).join('');
+}
+
+function askQuestion(text) {
+  document.getElementById('chatInput').value = text;
+  updateSendBtn();
+  sendChat();
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage('user', text);
+  input.value = '';
+  updateSendBtn();
+
+  const typing = document.getElementById('typingIndicator');
+  typing.classList.add('visible');
+  document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+
+  // Hide suggestions while typing
+  document.getElementById('chatSuggestions').innerHTML = '';
+
+  const response = matchResponse(text);
+
+  setTimeout(() => {
+    typing.classList.remove('visible');
+    addMessage('assistant', response.text);
+    updateSuggestions(response.suggests);
+  }, 800 + Math.random() * 700);
+}
+
+function updateSendBtn() {
+  const has = document.getElementById('chatInput').value.trim().length > 0;
+  document.getElementById('btnSend').classList.toggle('active', has);
+}
+</script>
+</body>
+</html>
