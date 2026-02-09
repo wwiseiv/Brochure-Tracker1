@@ -345,7 +345,7 @@ export async function generateROPdf(res: Response, data: PDFData): Promise<void>
       }
     }
 
-    const balanceDue = grandTotal - totalPaid;
+    const balanceDue = grandTotalCard - totalPaid;
     doc.moveTo(totalsX, y).lineTo(PAGE_WIDTH - MARGIN, y).lineWidth(1).strokeColor("#333333").stroke();
     y += 6;
     doc.font("Helvetica-Bold").fontSize(12);

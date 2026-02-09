@@ -1252,9 +1252,10 @@ router.get("/repair-orders/:roId/payments", autoAuth, async (req: Request, res: 
     const totalPaid = completedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
     const totalCash = parseFloat(roData[0].totalCash || "0");
     const totalCard = parseFloat(roData[0].totalCard || "0");
-    const balanceDue = Math.max(0, totalCash - totalPaid);
+    const balanceDueCash = Math.max(0, totalCash - totalPaid);
+    const balanceDueCard = Math.max(0, totalCard - totalPaid);
 
-    res.json({ payments, totalPaid, balanceDue, totalCash, totalCard });
+    res.json({ payments, totalPaid, balanceDue: balanceDueCard, balanceDueCash, balanceDueCard, totalCash: totalCash.toFixed(2), totalCard: totalCard.toFixed(2) });
   } catch (err: any) {
     console.error("List payments error:", err);
     res.status(500).json({ error: "Failed to fetch payments" });
@@ -1300,14 +1301,15 @@ router.post("/repair-orders/:roId/payments", autoAuth, async (req: Request, res:
     if (roData.length) {
       const totalCash = parseFloat(roData[0].totalCash || "0");
       const totalCard = parseFloat(roData[0].totalCard || "0");
-      const balanceDue = Math.max(0, totalCash - totalPaid);
+      const balanceDueCash = Math.max(0, totalCash - totalPaid);
+      const balanceDueCard = Math.max(0, totalCard - totalPaid);
 
       if (totalPaid >= totalCash && totalCash > 0) {
         await db.update(autoRepairOrders).set({ status: "paid", paidAt: new Date() })
           .where(eq(autoRepairOrders.id, roId));
       }
 
-      res.json({ payment, totalPaid, balanceDue, totalCash, totalCard });
+      res.json({ payment, totalPaid, balanceDue: balanceDueCard, balanceDueCash, balanceDueCard, totalCash: totalCash.toFixed(2), totalCard: totalCard.toFixed(2) });
     } else {
       res.json({ payment, totalPaid, balanceDue: 0, totalCash: 0, totalCard: 0 });
     }

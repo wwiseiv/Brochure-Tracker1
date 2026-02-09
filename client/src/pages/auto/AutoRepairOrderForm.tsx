@@ -75,6 +75,8 @@ export default function AutoRepairOrderForm() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [totalPaid, setTotalPaid] = useState(0);
   const [balanceDue, setBalanceDue] = useState(0);
+  const [totalCash, setTotalCash] = useState(0);
+  const [totalCard, setTotalCard] = useState(0);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
@@ -178,6 +180,8 @@ export default function AutoRepairOrderForm() {
       setPayments(data.payments || []);
       setTotalPaid(data.totalPaid || 0);
       setBalanceDue(data.balanceDue || 0);
+      setTotalCash(data.totalCash ? parseFloat(data.totalCash) : 0);
+      setTotalCard(data.totalCard ? parseFloat(data.totalCard) : 0);
     } catch (err) { console.error(err); }
   }, [roId, autoFetch]);
 
@@ -357,7 +361,8 @@ export default function AutoRepairOrderForm() {
   };
 
   const openPaymentDialog = () => {
-    setPaymentForm({ method: "cash", amount: balanceDue > 0 ? balanceDue.toFixed(2) : "", referenceNumber: "", notes: "" });
+    const cashBal = Math.max(0, totalCash - totalPaid);
+    setPaymentForm({ method: "cash", amount: cashBal > 0 ? cashBal.toFixed(2) : "", referenceNumber: "", notes: "" });
     setPaymentDialogOpen(true);
   };
 
@@ -912,9 +917,15 @@ export default function AutoRepairOrderForm() {
                     <span className="font-medium">${totalPaid.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between" data-testid="text-balance-due">
-                    <span className="text-muted-foreground">Balance Due</span>
-                    <span className={`font-bold ${balanceDue > 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
-                      ${balanceDue.toFixed(2)}
+                    <span className="text-muted-foreground">Balance Due (Cash)</span>
+                    <span className={`font-bold ${(totalCash - totalPaid) > 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                      ${Math.max(0, totalCash - totalPaid).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between" data-testid="text-balance-due-card">
+                    <span className="text-muted-foreground">Balance Due (Card)</span>
+                    <span className={`font-bold ${(totalCard - totalPaid) > 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                      ${Math.max(0, totalCard - totalPaid).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -1127,7 +1138,11 @@ export default function AutoRepairOrderForm() {
                 <div className="space-y-4 py-2">
                   <div className="space-y-2">
                     <Label>Payment Method</Label>
-                    <Select value={paymentForm.method} onValueChange={(v) => setPaymentForm({ ...paymentForm, method: v })}>
+                    <Select value={paymentForm.method} onValueChange={(v) => {
+                      const isCard = v === "card";
+                      const methodBalance = Math.max(0, (isCard ? totalCard : totalCash) - totalPaid);
+                      setPaymentForm({ ...paymentForm, method: v, amount: methodBalance > 0 ? methodBalance.toFixed(2) : paymentForm.amount });
+                    }}>
                       <SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
@@ -1150,16 +1165,20 @@ export default function AutoRepairOrderForm() {
                         onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
                         data-testid="input-payment-amount"
                       />
-                      {balanceDue > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPaymentForm({ ...paymentForm, amount: balanceDue.toFixed(2) })}
-                        >
-                          Pay Full Balance
-                        </Button>
-                      )}
+                      {(() => {
+                        const isCard = paymentForm.method === "card";
+                        const methodBalance = Math.max(0, (isCard ? totalCard : totalCash) - totalPaid);
+                        return methodBalance > 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPaymentForm({ ...paymentForm, amount: methodBalance.toFixed(2) })}
+                          >
+                            Pay Full Balance
+                          </Button>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <div className="space-y-2">
