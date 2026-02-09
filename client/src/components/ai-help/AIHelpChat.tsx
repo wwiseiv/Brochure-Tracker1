@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { renderAIMessage } from './AIMessageRenderer';
 import { useAINavigation } from './useAINavigation';
+import { useAutoAuth } from '@/hooks/use-auto-auth';
 
 interface ChatMessage {
   id: string;
@@ -16,14 +17,21 @@ interface Suggestion {
   icon: string;
 }
 
+function getAuthHeaders(token?: string | null): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
 async function sendChatMessage(
   message: string,
   history: ChatMessage[],
+  token?: string | null,
   shopContext?: Record<string, unknown>
 ) {
   const res = await fetch('/api/auto/ai-help/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(token),
     body: JSON.stringify({
       message,
       history: history.slice(-10).map((m) => ({
@@ -37,8 +45,10 @@ async function sendChatMessage(
   return res.json() as Promise<{ response: string }>;
 }
 
-async function fetchSuggestions(page: string) {
-  const res = await fetch(`/api/auto/ai-help/suggestions?page=${encodeURIComponent(page)}`);
+async function fetchSuggestions(page: string, token?: string | null) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`/api/auto/ai-help/suggestions?page=${encodeURIComponent(page)}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch suggestions');
   return res.json() as Promise<{ suggestions: Suggestion[] }>;
 }
@@ -59,16 +69,17 @@ export function AIHelpChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { navigateTo, toast } = useAINavigation();
+  const { token } = useAutoAuth();
 
   const { data: suggestionsData } = useQuery({
     queryKey: ['ai-help-suggestions', location],
-    queryFn: () => fetchSuggestions(location),
+    queryFn: () => fetchSuggestions(location, token),
     staleTime: 60_000,
   });
 
   const chatMutation = useMutation({
     mutationFn: ({ message, history }: { message: string; history: ChatMessage[] }) =>
-      sendChatMessage(message, history),
+      sendChatMessage(message, history, token),
     onSuccess: (data) => {
       setMessages((prev) => [
         ...prev,
@@ -206,11 +217,12 @@ export function AIHelpChat() {
         <div
           data-testid="ai-help-panel"
           className={`
-            bg-white dark:bg-slate-900 rounded-t-[20px] max-h-[82vh] flex flex-col
+            bg-white dark:bg-slate-900 rounded-t-[20px] max-h-[82vh] sm:max-h-[82vh] flex flex-col
             shadow-[0_-10px_40px_rgba(0,0,0,0.15)]
             transition-transform duration-300
             ${isOpen ? 'translate-y-0' : 'translate-y-full'}
           `}
+          style={{ maxHeight: 'min(82vh, 100dvh)' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between gap-1 px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
@@ -243,7 +255,10 @@ export function AIHelpChat() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+          <div
+            className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3"
+            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+          >
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -300,7 +315,10 @@ export function AIHelpChat() {
           )}
 
           {/* Input */}
-          <div className="flex gap-2 px-5 py-3 pb-6 border-t border-slate-200 dark:border-slate-700">
+          <div
+            className="flex gap-2 px-5 py-3 border-t border-slate-200 dark:border-slate-700"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
+          >
             <input
               ref={inputRef}
               value={input}
