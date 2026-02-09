@@ -293,7 +293,7 @@ export default function AutoQuickBooks() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
                 {[
-                  { step: "1", title: "RO Invoiced", desc: "When you invoice a repair order in PCB Auto, an invoice is created in QuickBooks with matching line items (labor, parts, fees)." },
+                  { step: "1", title: "RO Invoiced", desc: "When you invoice a repair order in PCB Auto, an invoice is created in QuickBooks with matching line items (labor, parts, shop supplies)." },
                   { step: "2", title: "Payment Recorded", desc: "When the customer pays (cash or card), the payment is recorded against the QBO invoice. Dual pricing splits automatically." },
                   { step: "3", title: "Accounts Updated", desc: "Revenue goes to your income accounts. Dual pricing amount goes to its own account. Tax to liability. Tips tracked separately." },
                   { step: "4", title: "Set & Forget", desc: "Everything syncs automatically in real time. No CSV exports, no manual entry, no reconciliation headaches." },
@@ -421,7 +421,7 @@ export default function AutoQuickBooks() {
                   { key: "labor", label: "Labor Revenue", desc: "Hourly labor charges on repair orders" },
                   { key: "parts", label: "Parts Revenue", desc: "Parts sold to customers (retail price)" },
                   { key: "dualPricing", label: "Dual Pricing Income", desc: "Card price \u2212 cash price on card transactions" },
-                  { key: "shopSupplies", label: "Shop Supplies", desc: "Shop supply fees charged to customers" },
+                  { key: "shopSupplies", label: "Shop Supplies", desc: "Shop supply charges on repair orders" },
                   { key: "salesTax", label: "Sales Tax Collected", desc: "State and local tax collected" },
                   { key: "tips", label: "Tips Collected", desc: "Customer tips on payments" },
                   { key: "partsCogs", label: "Parts Cost (COGS)", desc: "Wholesale cost of parts sold" },
@@ -844,7 +844,7 @@ export default function AutoQuickBooks() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
                 {[
-                  { title: "Invoices", items: ["Invoice created when RO is invoiced", "Line items: labor, parts, fees", "Customer & vehicle info in memo", "Tax calculated and mapped", "Dual pricing amounts split correctly"], color: "#3b82f6" },
+                  { title: "Invoices", items: ["Invoice created when RO is invoiced", "Line items: labor, parts, shop supplies", "Customer & vehicle info in memo", "Tax calculated and mapped", "Dual pricing amounts split correctly"], color: "#3b82f6" },
                   { title: "Payments", items: ["Payment recorded on invoice", "Cash \u2192 deposit account", "Card \u2192 undeposited funds", "Dual pricing \u2192 separate income account", "Tips tracked in liability account"], color: "#2ca01c" },
                   { title: "Customers", items: ["Auto-created on first RO", "Name, phone, email synced", "Vehicle info in customer notes", "Updates sync both directions", "Service history linked via invoices"], color: "#a855f7" },
                 ].map((section, i) => (

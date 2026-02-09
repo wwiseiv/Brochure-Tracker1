@@ -52,7 +52,7 @@ function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
       title: "Invoice & Payments",
       items: [
         "Open any Repair Order and tap 'Invoice / Pay' to view the dual pricing invoice.",
-        "Choose Cash or Card payment method \u2014 card payments include the dual pricing fee automatically.",
+        "Choose Cash or Card payment method \u2014 card payments use the dual pricing rate automatically.",
         "Add an optional tip before processing the payment.",
         "After payment, print or email the receipt directly to the customer.",
       ],
@@ -63,7 +63,7 @@ function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
       items: [
         "Cash and Card prices are calculated automatically based on your dual pricing rate.",
         "Adjust the dual pricing rate in Invoice Settings (gear icon on the invoice page).",
-        "The dual pricing fee is disclosed on all invoices, receipts, and emails.",
+        "Both Cash Price and Card Price are shown on all invoices, receipts, and emails.",
         "Dual pricing rates are set by the business and typically run between 3 and 4%.",
       ],
     },
@@ -237,10 +237,10 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             {isOwnerOrManager && (
-              <Link href="/auto/integrations">
+              <Link href="/auto/quickbooks">
                 <DropdownMenuItem data-testid="menu-integrations">
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Integrations
+                  QuickBooks
                 </DropdownMenuItem>
               </Link>
             )}
@@ -339,6 +339,20 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
               >
                 <UserPlus className="h-5 w-5" />
                 Staff Management
+              </button>
+            </Link>
+          )}
+          {isOwnerOrManager && (
+            <Link href="/auto/quickbooks">
+              <button
+                className={`flex items-center gap-3 w-full px-3 py-3 rounded-md text-sm ${
+                  location.startsWith("/auto/quickbooks") ? "text-primary bg-primary/10" : "text-foreground"
+                }`}
+                onClick={() => setMoreSheetOpen(false)}
+                data-testid="more-quickbooks"
+              >
+                <Landmark className="h-5 w-5" />
+                QuickBooks
               </button>
             </Link>
           )}
