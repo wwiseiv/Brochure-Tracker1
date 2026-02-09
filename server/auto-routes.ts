@@ -4291,6 +4291,22 @@ export function registerAutoRoutes(app: Express) {
         console.log("[AutoInit] Created demo user owner@demo.com");
       }
 
+      // Ensure demo staff exist (manager + technicians + service advisor)
+      const demoStaff = [
+        { email: "mike@demo.com", firstName: "Mike", lastName: "Thompson", phone: "(317) 555-0901", role: "technician", pin: "1234", payType: "flat_rate", payRate: "30.00" },
+        { email: "sarah@demo.com", firstName: "Sarah", lastName: "Kim", phone: "(317) 555-0902", role: "technician", pin: "5678", payType: "hourly", payRate: "27.00" },
+        { email: "dave@demo.com", firstName: "Dave", lastName: "Rodriguez", phone: "(317) 555-0903", role: "technician", pin: "9012", payType: "hourly", payRate: "25.00" },
+        { email: "jessica@demo.com", firstName: "Jessica", lastName: "Adams", phone: "(317) 555-0904", role: "service_advisor", pin: "3456", payType: "salary", payRate: "52000.00" },
+        { email: "manager@demo.com", firstName: "Rachel", lastName: "Martinez", phone: "(317) 555-0905", role: "manager", pin: "7890", payType: "salary", payRate: "65000.00" },
+      ];
+      for (const s of demoStaff) {
+        const exists = await db.select().from(autoUsers).where(eq(autoUsers.email, s.email)).limit(1);
+        if (!exists.length) {
+          await db.insert(autoUsers).values({ shopId, passwordHash: freshHash, isActive: true, ...s });
+          console.log(`[AutoInit] Created demo staff: ${s.firstName} ${s.lastName} (${s.role})`);
+        }
+      }
+
       // Seed sample data for demo
       await seedDemoData(shopId, ownerId);
     } catch (err) {
