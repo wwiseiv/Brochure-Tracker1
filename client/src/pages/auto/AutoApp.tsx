@@ -24,6 +24,10 @@ import AutoShortApproval from "./AutoShortApproval";
 import AutoBayConfig from "./AutoBayConfig";
 import AutoStaffAvailability from "./AutoStaffAvailability";
 import AutoDashboardVisibility from "./AutoDashboardVisibility";
+import AutoTechPortal from "./AutoTechPortal";
+import AutoReportsV2 from "./AutoReportsV2";
+import AutoCampaignSettings from "./AutoCampaignSettings";
+import AutoLocations from "./AutoLocations";
 import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
 import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
 import { Loader2 } from "lucide-react";
@@ -64,10 +68,14 @@ function AuthenticatedAutoRoutes() {
           <Route path="/auto/repair-orders" component={AutoRepairOrders} />
           <Route path="/auto/inspections" component={AutoInspections} />
           <Route path="/auto/schedule" component={AutoSchedule} />
+          <Route path="/auto/reports-v2" component={AutoReportsV2} />
           <Route path="/auto/reports" component={AutoReports} />
+          <Route path="/auto/tech-portal" component={AutoTechPortal} />
           <Route path="/auto/settings/bays" component={AutoBayConfig} />
           <Route path="/auto/settings/availability" component={AutoStaffAvailability} />
           <Route path="/auto/settings/visibility" component={AutoDashboardVisibility} />
+          <Route path="/auto/settings/campaigns" component={AutoCampaignSettings} />
+          <Route path="/auto/settings/locations" component={AutoLocations} />
           <Route path="/auto/settings" component={AutoSettings} />
           <Route path="/auto/quickbooks" component={AutoQuickBooks} />
           <Route path="/auto/processor" component={AutoPaymentProcessor} />

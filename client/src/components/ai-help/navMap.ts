@@ -236,6 +236,42 @@ export const NAV_MAP: NavTarget[] = [
     keywords: ['dashboard visibility', 'dashboard settings', 'show hide cards', 'card visibility', 'role visibility'],
   },
 
+  // ─── Tech Portal ───
+  {
+    key: 'tech-portal',
+    label: 'Tech Portal',
+    route: '/auto/tech-portal',
+    toast: 'Technician Portal',
+    keywords: ['tech portal', 'technician portal', 'tech dashboard', 'clock in', 'clock out', 'time clock'],
+  },
+
+  // ─── Analytics / Reports V2 ───
+  {
+    key: 'analytics',
+    label: 'Analytics',
+    route: '/auto/reports-v2',
+    toast: 'Advanced Analytics & Reports',
+    keywords: ['analytics', 'reports v2', 'advanced reports', 'advanced analytics', 'detailed reports'],
+  },
+
+  // ─── Locations ───
+  {
+    key: 'settings-locations',
+    label: 'Locations',
+    route: '/auto/settings/locations',
+    toast: 'Shop Locations',
+    keywords: ['locations', 'shop locations', 'branches', 'multi location', 'location settings'],
+  },
+
+  // ─── Campaign Settings ───
+  {
+    key: 'settings-campaigns',
+    label: 'Campaign Settings',
+    route: '/auto/settings/campaigns',
+    toast: 'Campaign Configuration',
+    keywords: ['campaign settings', 'campaigns', 'marketing campaigns', 'campaign config'],
+  },
+
   // ─── New RO ───
   {
     key: 'new-ro',

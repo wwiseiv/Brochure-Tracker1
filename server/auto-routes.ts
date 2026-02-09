@@ -8,8 +8,10 @@ import {
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
   autoCannedServices, autoCannedServiceItems, autoCommunicationLog,
   autoStaffAvailability, autoStaffTimeOff, autoDashboardVisibility,
+  autoLocations, autoRoSequences, autoEstimateSequences, autoTechSessions,
+  autoDeclinedServices, autoCampaignSettings, autoRoCloseSnapshots,
 } from "@shared/schema";
-import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, or, sql, count, sum, gte, lte, between, inArray, isNotNull, ilike, isNull } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
 import crypto from "crypto";
 import { randomUUID } from "crypto";
@@ -559,7 +561,7 @@ router.get("/staff", autoAuth, async (req: Request, res: Response) => {
 router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
-    const { role, isActive, phone, pin, payType, payRate } = req.body;
+    const { role, isActive, phone, pin, payType, payRate, employeeNumber } = req.body;
 
     const user = await db.select().from(autoUsers).where(and(eq(autoUsers.id, userId), eq(autoUsers.shopId, req.autoUser!.shopId))).limit(1);
     if (!user.length) return res.status(404).json({ error: "User not found" });
@@ -580,6 +582,7 @@ router.patch("/staff/:id", autoAuth, autoRequireRole("owner", "manager"), async 
     if (pin !== undefined) updates.pin = pin;
     if (payType !== undefined) updates.payType = payType;
     if (payRate !== undefined) updates.payRate = payRate;
+    if (employeeNumber !== undefined) updates.employeeNumber = employeeNumber;
     updates.updatedAt = new Date();
 
     const [updated] = await db.update(autoUsers).set(updates).where(eq(autoUsers.id, userId)).returning();
@@ -779,10 +782,90 @@ router.get("/vehicles/vin-decode/:vin", autoAuth, async (req: Request, res: Resp
 // REPAIR ORDERS
 // ============================================================================
 
+async function getOrCreateDefaultLocation(shopId: number): Promise<typeof autoLocations.$inferSelect> {
+  const existing = await db.select().from(autoLocations)
+    .where(eq(autoLocations.shopId, shopId))
+    .limit(1);
+
+  if (existing.length > 0) return existing[0];
+
+  const shop = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
+  const [location] = await db.insert(autoLocations).values({
+    shopId,
+    locationNumber: 1,
+    name: shop[0]?.name || "Main Location",
+    isPrimary: true,
+  }).returning();
+
+  await db.insert(autoRoSequences).values({
+    shopId,
+    locationId: location.id,
+    currentNumber: 0,
+  });
+
+  return location;
+}
+
+async function generateRoNumber(shopId: number, locationId?: number): Promise<{ roNumber: string; locationId: number }> {
+  let location;
+  if (locationId) {
+    const loc = await db.select().from(autoLocations)
+      .where(and(eq(autoLocations.id, locationId), eq(autoLocations.shopId, shopId)))
+      .limit(1);
+    if (!loc.length) throw new Error("Location not found");
+    location = loc[0];
+  } else {
+    location = await getOrCreateDefaultLocation(shopId);
+  }
+
+  const [seq] = await db.select().from(autoRoSequences)
+    .where(and(eq(autoRoSequences.shopId, shopId), eq(autoRoSequences.locationId, location.id)))
+    .limit(1);
+
+  let nextNumber: number;
+  if (!seq) {
+    await db.insert(autoRoSequences).values({
+      shopId,
+      locationId: location.id,
+      currentNumber: 1,
+    });
+    nextNumber = 1;
+  } else {
+    nextNumber = seq.currentNumber + 1;
+    await db.update(autoRoSequences)
+      .set({ currentNumber: nextNumber, updatedAt: new Date() })
+      .where(eq(autoRoSequences.id, seq.id));
+  }
+
+  const roNumber = String(location.locationNumber * 10000 + nextNumber);
+  return { roNumber, locationId: location.id };
+}
+
+async function generateEstimateNumber(shopId: number): Promise<string> {
+  const [seq] = await db.select().from(autoEstimateSequences)
+    .where(eq(autoEstimateSequences.shopId, shopId))
+    .limit(1);
+
+  if (!seq) {
+    await db.insert(autoEstimateSequences).values({
+      shopId,
+      currentNumber: 10001,
+      prefix: "EST-",
+    });
+    return "EST-10001";
+  }
+
+  const nextNumber = seq.currentNumber + 1;
+  await db.update(autoEstimateSequences)
+    .set({ currentNumber: nextNumber, updatedAt: new Date() })
+    .where(eq(autoEstimateSequences.id, seq.id));
+
+  return `${seq.prefix || "EST-"}${nextNumber}`;
+}
+
 async function generateRONumber(shopId: number): Promise<string> {
-  const [result] = await db.select({ count: count() }).from(autoRepairOrders).where(eq(autoRepairOrders.shopId, shopId));
-  const num = (result.count || 0) + 1;
-  return `RO-${num.toString().padStart(5, "0")}`;
+  const result = await generateRoNumber(shopId);
+  return result.roNumber;
 }
 
 router.get("/repair-orders", autoAuth, async (req: Request, res: Response) => {
@@ -887,7 +970,8 @@ router.get("/repair-orders", autoAuth, async (req: Request, res: Response) => {
 router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
   try {
     const data = req.body;
-    const roNumber = await generateRONumber(req.autoUser!.shopId);
+    const roResult = await generateRoNumber(req.autoUser!.shopId, data.locationId);
+    const roNumber = roResult.roNumber;
     const approvalToken = crypto.randomBytes(32).toString("hex");
     const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
 
@@ -900,6 +984,9 @@ router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
       promisedDate: data.promisedDate ? new Date(data.promisedDate) : null,
       approvalToken,
       approvalShortCode,
+      isEstimate: false,
+      advisorEmployeeId: req.autoUser!.id,
+      locationId: roResult.locationId,
     }).returning();
 
     await db.insert(autoActivityLog).values({
@@ -1442,6 +1529,389 @@ router.post("/payments/:id/void", autoAuth, async (req: Request, res: Response) 
   } catch (err: any) {
     console.error("Void payment error:", err);
     res.status(500).json({ error: "Failed to void payment" });
+  }
+});
+
+// ============================================================================
+// LOCATIONS
+// ============================================================================
+
+router.get("/locations", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const locations = await db.select().from(autoLocations)
+      .where(eq(autoLocations.shopId, shopId))
+      .orderBy(asc(autoLocations.locationNumber));
+    res.json(locations);
+  } catch (err: any) {
+    console.error("List locations error:", err);
+    res.status(500).json({ error: "Failed to fetch locations" });
+  }
+});
+
+router.post("/locations", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const role = req.autoUser!.role;
+    if (role !== "owner" && role !== "manager") {
+      return res.status(403).json({ error: "Only owners and managers can create locations" });
+    }
+
+    const { name, addressLine1, addressLine2, city, state, zip, phone } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Location name is required" });
+    }
+
+    const existing = await db.select({ locationNumber: autoLocations.locationNumber })
+      .from(autoLocations)
+      .where(eq(autoLocations.shopId, shopId))
+      .orderBy(desc(autoLocations.locationNumber))
+      .limit(1);
+
+    const nextLocationNumber = existing.length > 0 ? existing[0].locationNumber + 1 : 1;
+
+    const [location] = await db.insert(autoLocations).values({
+      shopId,
+      locationNumber: nextLocationNumber,
+      name,
+      addressLine1: addressLine1 || null,
+      addressLine2: addressLine2 || null,
+      city: city || null,
+      state: state || null,
+      zip: zip || null,
+      phone: phone || null,
+      isPrimary: nextLocationNumber === 1,
+    }).returning();
+
+    await db.insert(autoRoSequences).values({
+      shopId,
+      locationId: location.id,
+      currentNumber: 0,
+    });
+
+    res.json(location);
+  } catch (err: any) {
+    console.error("Create location error:", err);
+    res.status(500).json({ error: "Failed to create location" });
+  }
+});
+
+router.patch("/locations/:id", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const role = req.autoUser!.role;
+    if (role !== "owner" && role !== "manager") {
+      return res.status(403).json({ error: "Only owners and managers can update locations" });
+    }
+
+    const locationId = parseInt(req.params.id);
+    const [existing] = await db.select().from(autoLocations)
+      .where(and(eq(autoLocations.id, locationId), eq(autoLocations.shopId, shopId)));
+    if (!existing) {
+      return res.status(404).json({ error: "Location not found" });
+    }
+
+    const { name, addressLine1, addressLine2, city, state, zip, phone, isActive } = req.body;
+    const updates: any = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (addressLine1 !== undefined) updates.addressLine1 = addressLine1;
+    if (addressLine2 !== undefined) updates.addressLine2 = addressLine2;
+    if (city !== undefined) updates.city = city;
+    if (state !== undefined) updates.state = state;
+    if (zip !== undefined) updates.zip = zip;
+    if (phone !== undefined) updates.phone = phone;
+    if (isActive !== undefined) updates.isActive = isActive;
+
+    const [location] = await db.update(autoLocations).set(updates)
+      .where(eq(autoLocations.id, locationId))
+      .returning();
+
+    res.json(location);
+  } catch (err: any) {
+    console.error("Update location error:", err);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
+// ============================================================================
+// ESTIMATES
+// ============================================================================
+
+router.get("/estimates", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const estimates = await db.select({
+      id: autoRepairOrders.id,
+      shopId: autoRepairOrders.shopId,
+      roNumber: autoRepairOrders.roNumber,
+      estimateNumber: autoRepairOrders.estimateNumber,
+      status: autoRepairOrders.status,
+      customerId: autoRepairOrders.customerId,
+      vehicleId: autoRepairOrders.vehicleId,
+      customerConcern: autoRepairOrders.customerConcern,
+      internalNotes: autoRepairOrders.internalNotes,
+      subtotalCash: autoRepairOrders.subtotalCash,
+      subtotalCard: autoRepairOrders.subtotalCard,
+      totalCash: autoRepairOrders.totalCash,
+      totalCard: autoRepairOrders.totalCard,
+      taxAmount: autoRepairOrders.taxAmount,
+      isEstimate: autoRepairOrders.isEstimate,
+      convertedToRoId: autoRepairOrders.convertedToRoId,
+      convertedFromEstimateId: autoRepairOrders.convertedFromEstimateId,
+      serviceAdvisorId: autoRepairOrders.serviceAdvisorId,
+      advisorEmployeeId: autoRepairOrders.advisorEmployeeId,
+      promisedDate: autoRepairOrders.promisedDate,
+      createdAt: autoRepairOrders.createdAt,
+      updatedAt: autoRepairOrders.updatedAt,
+      customerFirstName: autoCustomers.firstName,
+      customerLastName: autoCustomers.lastName,
+      customerPhone: autoCustomers.phone,
+      customerEmail: autoCustomers.email,
+      vehicleYear: autoVehicles.year,
+      vehicleMake: autoVehicles.make,
+      vehicleModel: autoVehicles.model,
+      vehicleLicensePlate: autoVehicles.licensePlate,
+    })
+    .from(autoRepairOrders)
+    .leftJoin(autoCustomers, eq(autoRepairOrders.customerId, autoCustomers.id))
+    .leftJoin(autoVehicles, eq(autoRepairOrders.vehicleId, autoVehicles.id))
+    .where(and(eq(autoRepairOrders.shopId, shopId), eq(autoRepairOrders.isEstimate, true)))
+    .orderBy(desc(autoRepairOrders.createdAt));
+
+    res.json(estimates);
+  } catch (err: any) {
+    console.error("List estimates error:", err);
+    res.status(500).json({ error: "Failed to fetch estimates" });
+  }
+});
+
+router.post("/estimates", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const data = req.body;
+
+    if (!data.customerId || !data.vehicleId) {
+      return res.status(400).json({ error: "customerId and vehicleId are required" });
+    }
+
+    const estimateNumber = await generateEstimateNumber(shopId);
+    const approvalToken = crypto.randomBytes(32).toString("hex");
+    const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const [estimate] = await db.insert(autoRepairOrders).values({
+      shopId,
+      roNumber: estimateNumber,
+      estimateNumber,
+      customerId: data.customerId,
+      vehicleId: data.vehicleId,
+      status: "estimate",
+      isEstimate: true,
+      serviceAdvisorId: data.serviceAdvisorId || req.autoUser!.id,
+      advisorEmployeeId: req.autoUser!.id,
+      bayId: data.bayId || null,
+      customerConcern: data.customerConcern || null,
+      internalNotes: data.internalNotes || null,
+      promisedDate: data.promisedDate ? new Date(data.promisedDate) : null,
+      approvalToken,
+      approvalShortCode,
+    }).returning();
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "estimate",
+      entityId: estimate.id,
+      action: "created",
+      details: { estimateNumber },
+    });
+
+    res.json(estimate);
+  } catch (err: any) {
+    console.error("Create estimate error:", err);
+    res.status(500).json({ error: "Failed to create estimate" });
+  }
+});
+
+router.get("/estimates/:id", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const estimateId = parseInt(req.params.id);
+
+    const [estimate] = await db.select().from(autoRepairOrders)
+      .where(and(
+        eq(autoRepairOrders.id, estimateId),
+        eq(autoRepairOrders.shopId, shopId),
+        eq(autoRepairOrders.isEstimate, true),
+      ));
+    if (!estimate) return res.status(404).json({ error: "Estimate not found" });
+
+    const [customer] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, estimate.customerId));
+    const [vehicle] = await db.select().from(autoVehicles).where(eq(autoVehicles.id, estimate.vehicleId));
+    const lineItems = await db.select().from(autoLineItems)
+      .where(eq(autoLineItems.repairOrderId, estimateId))
+      .orderBy(asc(autoLineItems.sortOrder));
+
+    let serviceAdvisor = null;
+    if (estimate.serviceAdvisorId) {
+      const [sa] = await db.select({ id: autoUsers.id, firstName: autoUsers.firstName, lastName: autoUsers.lastName })
+        .from(autoUsers).where(eq(autoUsers.id, estimate.serviceAdvisorId));
+      serviceAdvisor = sa;
+    }
+
+    res.json({
+      estimate,
+      customer,
+      vehicle,
+      lineItems,
+      serviceAdvisor,
+      convertedToRoId: estimate.convertedToRoId,
+    });
+  } catch (err: any) {
+    console.error("Get estimate error:", err);
+    res.status(500).json({ error: "Failed to fetch estimate" });
+  }
+});
+
+router.patch("/estimates/:id", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const estimateId = parseInt(req.params.id);
+    const data = req.body;
+
+    const updates: any = { updatedAt: new Date() };
+    if (data.customerConcern !== undefined) updates.customerConcern = data.customerConcern;
+    if (data.internalNotes !== undefined) updates.internalNotes = data.internalNotes;
+    if (data.serviceAdvisorId !== undefined) updates.serviceAdvisorId = data.serviceAdvisorId;
+    if (data.promisedDate !== undefined) updates.promisedDate = data.promisedDate ? new Date(data.promisedDate) : null;
+    if (data.bayId !== undefined) updates.bayId = data.bayId;
+    if (data.status !== undefined) updates.status = data.status;
+    if (data.technicianId !== undefined) updates.technicianId = data.technicianId;
+
+    const [estimate] = await db.update(autoRepairOrders).set(updates)
+      .where(and(
+        eq(autoRepairOrders.id, estimateId),
+        eq(autoRepairOrders.shopId, shopId),
+        eq(autoRepairOrders.isEstimate, true),
+      ))
+      .returning();
+
+    if (!estimate) return res.status(404).json({ error: "Estimate not found" });
+
+    res.json(estimate);
+  } catch (err: any) {
+    console.error("Update estimate error:", err);
+    res.status(500).json({ error: "Failed to update estimate" });
+  }
+});
+
+router.post("/estimates/:id/convert", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const estimateId = parseInt(req.params.id);
+
+    const [estimate] = await db.select().from(autoRepairOrders)
+      .where(and(
+        eq(autoRepairOrders.id, estimateId),
+        eq(autoRepairOrders.shopId, shopId),
+        eq(autoRepairOrders.isEstimate, true),
+      ));
+
+    if (!estimate) return res.status(404).json({ error: "Estimate not found" });
+    if (estimate.convertedToRoId) {
+      return res.status(400).json({ error: "Estimate has already been converted to RO", convertedToRoId: estimate.convertedToRoId });
+    }
+
+    const roResult = await generateRoNumber(shopId);
+    const approvalToken = crypto.randomBytes(32).toString("hex");
+    const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const [newRo] = await db.insert(autoRepairOrders).values({
+      shopId,
+      roNumber: roResult.roNumber,
+      customerId: estimate.customerId,
+      vehicleId: estimate.vehicleId,
+      status: "estimate",
+      isEstimate: false,
+      convertedFromEstimateId: estimateId,
+      serviceAdvisorId: estimate.serviceAdvisorId,
+      advisorEmployeeId: req.autoUser!.id,
+      technicianId: estimate.technicianId,
+      bayId: estimate.bayId,
+      customerConcern: estimate.customerConcern,
+      internalNotes: estimate.internalNotes,
+      promisedDate: estimate.promisedDate,
+      locationId: roResult.locationId,
+      approvalToken,
+      approvalShortCode,
+    }).returning();
+
+    const estimateLineItems = await db.select().from(autoLineItems)
+      .where(eq(autoLineItems.repairOrderId, estimateId));
+
+    if (estimateLineItems.length > 0) {
+      for (const item of estimateLineItems) {
+        const { id, repairOrderId, createdAt, updatedAt, ...itemData } = item as any;
+        await db.insert(autoLineItems).values({
+          ...itemData,
+          repairOrderId: newRo.id,
+        });
+      }
+    }
+
+    await db.update(autoRepairOrders).set({
+      convertedToRoId: newRo.id,
+      updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, estimateId));
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "estimate",
+      entityId: estimateId,
+      action: "converted_to_ro",
+      details: { estimateId, newRoId: newRo.id, roNumber: roResult.roNumber },
+    });
+
+    res.json(newRo);
+  } catch (err: any) {
+    console.error("Convert estimate error:", err);
+    res.status(500).json({ error: "Failed to convert estimate to repair order" });
+  }
+});
+
+router.delete("/estimates/:id", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const estimateId = parseInt(req.params.id);
+
+    const [estimate] = await db.select().from(autoRepairOrders)
+      .where(and(
+        eq(autoRepairOrders.id, estimateId),
+        eq(autoRepairOrders.shopId, shopId),
+        eq(autoRepairOrders.isEstimate, true),
+      ));
+
+    if (!estimate) return res.status(404).json({ error: "Estimate not found" });
+    if (estimate.convertedToRoId) {
+      return res.status(400).json({ error: "Cannot delete an estimate that has been converted to an RO" });
+    }
+
+    await db.delete(autoLineItems).where(eq(autoLineItems.repairOrderId, estimateId));
+    await db.delete(autoRepairOrders).where(eq(autoRepairOrders.id, estimateId));
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "estimate",
+      entityId: estimateId,
+      action: "deleted",
+      details: { estimateNumber: estimate.estimateNumber },
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete estimate error:", err);
+    res.status(500).json({ error: "Failed to delete estimate" });
   }
 });
 
@@ -2138,7 +2608,8 @@ router.post("/dvi/inspections/:id/create-ro", autoAuth, async (req: Request, res
       return res.status(400).json({ error: "Inspection must have a customer and vehicle to create an RO" });
     }
 
-    const roNumber = await generateRONumber(shopId);
+    const roResult = await generateRoNumber(shopId);
+    const roNumber = roResult.roNumber;
     const approvalToken = crypto.randomBytes(32).toString("hex");
     const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
 
@@ -2146,6 +2617,9 @@ router.post("/dvi/inspections/:id/create-ro", autoAuth, async (req: Request, res
       shopId, roNumber, customerId: inspection.customerId,
       vehicleId: inspection.vehicleId, status: "estimate",
       serviceAdvisorId: req.autoUser!.id,
+      advisorEmployeeId: req.autoUser!.id,
+      locationId: roResult.locationId,
+      isEstimate: false,
       approvalToken, approvalShortCode,
     }).returning();
 
@@ -5174,6 +5648,1101 @@ router.get("/labor/search", autoAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// TECH SESSION ROUTES
+// ============================================================================
+
+router.post("/tech-sessions/clock-in", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { repairOrderId, serviceLineId, notes } = req.body;
+    const techEmployeeId = req.body.techEmployeeId || req.autoUser!.id;
+
+    if (!repairOrderId || !serviceLineId) {
+      return res.status(400).json({ error: "repairOrderId and serviceLineId are required" });
+    }
+
+    const activeSession = await db.select().from(autoTechSessions)
+      .where(and(
+        eq(autoTechSessions.techEmployeeId, techEmployeeId),
+        eq(autoTechSessions.isActive, true),
+        isNull(autoTechSessions.clockOut)
+      ))
+      .limit(1);
+
+    if (activeSession.length) {
+      return res.status(400).json({ error: "Technician must clock out of current session first" });
+    }
+
+    const ro = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, repairOrderId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+
+    if (!ro.length) {
+      return res.status(404).json({ error: "Repair order not found" });
+    }
+
+    if (ro[0].isEstimate) {
+      return res.status(400).json({ error: "Cannot clock into an estimate" });
+    }
+
+    if (ro[0].status !== "in_progress") {
+      return res.status(400).json({ error: "Repair order must be in_progress to clock in" });
+    }
+
+    const lineItem = await db.select().from(autoLineItems)
+      .where(and(eq(autoLineItems.id, serviceLineId), eq(autoLineItems.repairOrderId, repairOrderId)))
+      .limit(1);
+
+    if (!lineItem.length) {
+      return res.status(404).json({ error: "Line item not found on this repair order" });
+    }
+
+    const [session] = await db.insert(autoTechSessions).values({
+      shopId,
+      repairOrderId,
+      serviceLineId,
+      techEmployeeId,
+      clockIn: new Date(),
+      isActive: true,
+      notes: notes || null,
+    }).returning();
+
+    res.json(session);
+  } catch (err: any) {
+    console.error("Clock-in error:", err);
+    res.status(500).json({ error: "Clock-in failed" });
+  }
+});
+
+router.post("/tech-sessions/clock-out", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { sessionId, techEmployeeId, notes } = req.body;
+
+    let session;
+
+    if (sessionId) {
+      const results = await db.select().from(autoTechSessions)
+        .where(and(
+          eq(autoTechSessions.id, sessionId),
+          eq(autoTechSessions.shopId, shopId),
+          eq(autoTechSessions.isActive, true),
+          isNull(autoTechSessions.clockOut)
+        ))
+        .limit(1);
+      session = results[0];
+    } else {
+      const techId = techEmployeeId || req.autoUser!.id;
+      const results = await db.select().from(autoTechSessions)
+        .where(and(
+          eq(autoTechSessions.techEmployeeId, techId),
+          eq(autoTechSessions.shopId, shopId),
+          eq(autoTechSessions.isActive, true),
+          isNull(autoTechSessions.clockOut)
+        ))
+        .limit(1);
+      session = results[0];
+    }
+
+    if (!session) {
+      return res.status(404).json({ error: "No active session found" });
+    }
+
+    const clockOut = new Date();
+    const durationMinutes = Math.round((clockOut.getTime() - new Date(session.clockIn).getTime()) / 60000);
+
+    const [updated] = await db.update(autoTechSessions).set({
+      clockOut,
+      isActive: false,
+      durationMinutes,
+      notes: notes !== undefined ? notes : session.notes,
+    }).where(eq(autoTechSessions.id, session.id)).returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Clock-out error:", err);
+    res.status(500).json({ error: "Clock-out failed" });
+  }
+});
+
+router.get("/tech-sessions/active", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+
+    const sessions = await db.select({
+      session: autoTechSessions,
+      techFirstName: autoUsers.firstName,
+      techLastName: autoUsers.lastName,
+      roNumber: autoRepairOrders.roNumber,
+      serviceDescription: autoLineItems.description,
+    })
+      .from(autoTechSessions)
+      .innerJoin(autoUsers, eq(autoTechSessions.techEmployeeId, autoUsers.id))
+      .innerJoin(autoRepairOrders, eq(autoTechSessions.repairOrderId, autoRepairOrders.id))
+      .innerJoin(autoLineItems, eq(autoTechSessions.serviceLineId, autoLineItems.id))
+      .where(and(
+        eq(autoTechSessions.shopId, shopId),
+        eq(autoTechSessions.isActive, true),
+        isNull(autoTechSessions.clockOut)
+      ));
+
+    res.json(sessions);
+  } catch (err: any) {
+    console.error("Active sessions error:", err);
+    res.status(500).json({ error: "Failed to fetch active sessions" });
+  }
+});
+
+router.get("/tech-sessions/ro/:roId", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.roId);
+
+    if (isNaN(roId)) return res.status(400).json({ error: "Invalid RO ID" });
+
+    const sessions = await db.select({
+      session: autoTechSessions,
+      techFirstName: autoUsers.firstName,
+      techLastName: autoUsers.lastName,
+      serviceDescription: autoLineItems.description,
+    })
+      .from(autoTechSessions)
+      .innerJoin(autoUsers, eq(autoTechSessions.techEmployeeId, autoUsers.id))
+      .innerJoin(autoLineItems, eq(autoTechSessions.serviceLineId, autoLineItems.id))
+      .where(and(
+        eq(autoTechSessions.repairOrderId, roId),
+        eq(autoTechSessions.shopId, shopId)
+      ))
+      .orderBy(desc(autoTechSessions.clockIn));
+
+    res.json(sessions);
+  } catch (err: any) {
+    console.error("RO sessions error:", err);
+    res.status(500).json({ error: "Failed to fetch RO sessions" });
+  }
+});
+
+router.get("/tech-sessions/tech/:techId", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const techId = parseInt(req.params.techId);
+    const { startDate, endDate } = req.query;
+
+    if (isNaN(techId)) return res.status(400).json({ error: "Invalid tech ID" });
+
+    const conditions = [
+      eq(autoTechSessions.techEmployeeId, techId),
+      eq(autoTechSessions.shopId, shopId),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(autoTechSessions.clockIn, new Date(startDate as string)));
+    }
+    if (endDate) {
+      conditions.push(lte(autoTechSessions.clockIn, new Date(endDate as string)));
+    }
+
+    const sessions = await db.select({
+      session: autoTechSessions,
+      roNumber: autoRepairOrders.roNumber,
+      serviceDescription: autoLineItems.description,
+    })
+      .from(autoTechSessions)
+      .innerJoin(autoRepairOrders, eq(autoTechSessions.repairOrderId, autoRepairOrders.id))
+      .innerJoin(autoLineItems, eq(autoTechSessions.serviceLineId, autoLineItems.id))
+      .where(and(...conditions))
+      .orderBy(desc(autoTechSessions.clockIn))
+      .limit(100);
+
+    res.json(sessions);
+  } catch (err: any) {
+    console.error("Tech sessions error:", err);
+    res.status(500).json({ error: "Failed to fetch tech sessions" });
+  }
+});
+
+// ============================================================================
+// AUTHORIZATION ROUTES
+// ============================================================================
+
+router.post("/repair-orders/:id/authorize-line", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+    const { lineItemId, method, confirmationId } = req.body;
+
+    if (!lineItemId || !method) {
+      return res.status(400).json({ error: "lineItemId and method are required" });
+    }
+
+    const validMethods = ["verbal", "text", "email", "signature", "in_person"];
+    if (!validMethods.includes(method)) {
+      return res.status(400).json({ error: `method must be one of: ${validMethods.join(", ")}` });
+    }
+
+    const ro = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+
+    if (!ro.length) return res.status(404).json({ error: "Repair order not found" });
+
+    const lineItem = await db.select().from(autoLineItems)
+      .where(and(eq(autoLineItems.id, lineItemId), eq(autoLineItems.repairOrderId, roId)))
+      .limit(1);
+
+    if (!lineItem.length) return res.status(404).json({ error: "Line item not found on this repair order" });
+
+    const now = new Date();
+    const [updated] = await db.update(autoLineItems).set({
+      approvalStatus: "approved",
+      approvedAt: now,
+      authorizationMethod: method,
+      authorizationTimestamp: now,
+      authorizationConfirmationId: confirmationId || null,
+    }).where(eq(autoLineItems.id, lineItemId)).returning();
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "repair_order",
+      entityId: roId,
+      action: "line_authorized",
+      details: { lineItemId, description: lineItem[0].description, method },
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Authorize line error:", err);
+    res.status(500).json({ error: "Failed to authorize line item" });
+  }
+});
+
+router.post("/repair-orders/:id/decline-line", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+    const { lineItemId, reason } = req.body;
+
+    if (!lineItemId) {
+      return res.status(400).json({ error: "lineItemId is required" });
+    }
+
+    const ro = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+
+    if (!ro.length) return res.status(404).json({ error: "Repair order not found" });
+
+    const lineItem = await db.select().from(autoLineItems)
+      .where(and(eq(autoLineItems.id, lineItemId), eq(autoLineItems.repairOrderId, roId)))
+      .limit(1);
+
+    if (!lineItem.length) return res.status(404).json({ error: "Line item not found on this repair order" });
+
+    const now = new Date();
+    const [updated] = await db.update(autoLineItems).set({
+      approvalStatus: "declined",
+      declinedAt: now,
+      declinedReason: reason || null,
+      customerRespondedAt: now,
+    }).where(eq(autoLineItems.id, lineItemId)).returning();
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "repair_order",
+      entityId: roId,
+      action: "line_declined",
+      details: { lineItemId, description: lineItem[0].description, reason: reason || null },
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Decline line error:", err);
+    res.status(500).json({ error: "Failed to decline line item" });
+  }
+});
+
+router.post("/repair-orders/:id/present-lines", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+    const { lineItemIds } = req.body;
+
+    if (!lineItemIds || !Array.isArray(lineItemIds) || lineItemIds.length === 0) {
+      return res.status(400).json({ error: "lineItemIds array is required" });
+    }
+
+    const ro = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+
+    if (!ro.length) return res.status(404).json({ error: "Repair order not found" });
+
+    const now = new Date();
+    const updated = await db.update(autoLineItems).set({
+      presentedToCustomer: true,
+      presentedAt: now,
+      presentedByAdvisorId: req.autoUser!.id,
+    }).where(and(
+      inArray(autoLineItems.id, lineItemIds),
+      eq(autoLineItems.repairOrderId, roId)
+    )).returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Present lines error:", err);
+    res.status(500).json({ error: "Failed to present line items" });
+  }
+});
+
+router.post("/repair-orders/:id/signature", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+    const { signatureData, method } = req.body;
+
+    if (!signatureData) {
+      return res.status(400).json({ error: "signatureData is required" });
+    }
+
+    const ro = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+
+    if (!ro.length) return res.status(404).json({ error: "Repair order not found" });
+
+    const now = new Date();
+    const sigMethod = method || "digital";
+
+    await db.update(autoRepairOrders).set({
+      customerSignatureData: signatureData,
+      customerSignatureTimestamp: now,
+      customerSignatureIp: req.ip || null,
+      customerSignatureMethod: sigMethod,
+      updatedAt: now,
+    }).where(eq(autoRepairOrders.id, roId));
+
+    await db.update(autoLineItems).set({
+      approvalStatus: "approved",
+      authorizationMethod: "signature",
+      authorizationTimestamp: now,
+    }).where(and(
+      eq(autoLineItems.repairOrderId, roId),
+      eq(autoLineItems.approvalStatus, "pending"),
+      eq(autoLineItems.presentedToCustomer, true)
+    ));
+
+    await db.insert(autoActivityLog).values({
+      shopId,
+      userId: req.autoUser!.id,
+      entityType: "repair_order",
+      entityId: roId,
+      action: "signature_captured",
+      details: { method: sigMethod },
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Signature error:", err);
+    res.status(500).json({ error: "Failed to save signature" });
+  }
+});
+
+// ============================================================================
+// EMPLOYEE NUMBER SETUP ROUTES
+// ============================================================================
+
+router.patch("/users/:id/employee-number", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const userId = parseInt(req.params.id);
+    const { employeeNumber } = req.body;
+
+    if (!employeeNumber) {
+      return res.status(400).json({ error: "employeeNumber is required" });
+    }
+
+    if (isNaN(userId)) return res.status(400).json({ error: "Invalid user ID" });
+
+    const isSelf = userId === req.autoUser!.id;
+    const isOwnerOrManager = req.autoUser!.role === "owner" || req.autoUser!.role === "manager";
+
+    if (!isSelf && !isOwnerOrManager) {
+      return res.status(403).json({ error: "Only owner/manager can update other users' employee numbers" });
+    }
+
+    const targetUser = await db.select().from(autoUsers)
+      .where(and(eq(autoUsers.id, userId), eq(autoUsers.shopId, shopId)))
+      .limit(1);
+
+    if (!targetUser.length) return res.status(404).json({ error: "User not found" });
+
+    const existing = await db.select().from(autoUsers)
+      .where(and(
+        eq(autoUsers.shopId, shopId),
+        eq(autoUsers.employeeNumber, employeeNumber),
+        sql`${autoUsers.id} != ${userId}`
+      ))
+      .limit(1);
+
+    if (existing.length) {
+      return res.status(400).json({ error: "Employee number already in use within this shop" });
+    }
+
+    const [updated] = await db.update(autoUsers).set({
+      employeeNumber,
+      updatedAt: new Date(),
+    }).where(eq(autoUsers.id, userId)).returning();
+
+    const { passwordHash, resetToken, resetTokenExpiresAt, ...userWithoutSensitive } = updated;
+    res.json(userWithoutSensitive);
+  } catch (err: any) {
+    console.error("Update employee number error:", err);
+    res.status(500).json({ error: "Failed to update employee number" });
+  }
+});
+
+router.post("/users/employee-login", async (req: Request, res: Response) => {
+  try {
+    const { employeeNumber, pin, shopId } = req.body;
+
+    if (!employeeNumber || !pin || !shopId) {
+      return res.status(400).json({ error: "employeeNumber, pin, and shopId are required" });
+    }
+
+    const users = await db.select().from(autoUsers)
+      .where(and(
+        eq(autoUsers.employeeNumber, employeeNumber),
+        eq(autoUsers.shopId, shopId),
+        eq(autoUsers.isActive, true)
+      ))
+      .limit(1);
+
+    if (!users.length) {
+      return res.status(401).json({ error: "Invalid employee number or PIN" });
+    }
+
+    const user = users[0];
+
+    if (!user.pin || user.pin !== pin) {
+      return res.status(401).json({ error: "Invalid employee number or PIN" });
+    }
+
+    await db.update(autoUsers).set({ lastLoginAt: new Date() }).where(eq(autoUsers.id, user.id));
+
+    const authUser: AutoAuthUser = {
+      id: user.id,
+      shopId: user.shopId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    };
+
+    const token = generateToken(authUser);
+    res.json({ token, user: authUser });
+  } catch (err: any) {
+    console.error("Employee login error:", err);
+    res.status(500).json({ error: "Employee login failed" });
+  }
+});
+
+// ============================================================================
+// RO CLOSE SNAPSHOT LOGIC
+// ============================================================================
+
+async function generateCloseSnapshot(shopId: number, roId: number) {
+  const [ro] = await db.select().from(autoRepairOrders)
+    .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)));
+  if (!ro) throw new Error("Repair order not found");
+
+  const lineItems = await db.select().from(autoLineItems)
+    .where(eq(autoLineItems.repairOrderId, roId));
+
+  const techSessions = await db.select({
+    session: autoTechSessions,
+    tech: { firstName: autoUsers.firstName, lastName: autoUsers.lastName },
+  }).from(autoTechSessions)
+    .leftJoin(autoUsers, eq(autoTechSessions.techEmployeeId, autoUsers.id))
+    .where(eq(autoTechSessions.repairOrderId, roId));
+
+  const totalLines = lineItems.length;
+  const originalLines = lineItems.filter(li => li.lineOrigin === "original").length;
+  const addonLines = lineItems.filter(li => li.lineOrigin === "addon" || li.lineOrigin === "inspection_finding").length;
+  const inspectionLines = lineItems.filter(li => li.lineOrigin === "inspection_finding").length;
+
+  const addonItems = lineItems.filter(li => li.lineOrigin === "addon" || li.lineOrigin === "inspection_finding");
+  const approvedAddonLines = addonItems.filter(li => li.approvalStatus === "approved").length;
+  const declinedAddonLines = addonItems.filter(li => li.approvalStatus === "declined").length;
+
+  let totalPartsRevenue = 0, totalLaborRevenue = 0, totalFeesRevenue = 0, totalSubletRevenue = 0;
+  let totalDiscount = 0;
+  let totalCustomerPay = 0, totalInternalCharges = 0, totalWarrantyCharges = 0;
+  let totalBilledHours = 0;
+
+  for (const li of lineItems) {
+    const amount = parseFloat(li.totalCash) || 0;
+    const discountCash = parseFloat(li.discountAmountCash || "0") || 0;
+    totalDiscount += discountCash;
+
+    if (li.type === "labor") {
+      totalLaborRevenue += amount;
+    } else if (li.type === "part" || li.type === "parts") {
+      totalPartsRevenue += amount;
+    } else if (li.type === "fee" || li.type === "fees") {
+      totalFeesRevenue += amount;
+    } else if (li.type === "sublet") {
+      totalSubletRevenue += amount;
+    } else {
+      totalPartsRevenue += amount;
+    }
+
+    const payType = li.partsPayType || li.laborPayType || "customer_pay";
+    if (payType === "customer_pay") {
+      totalCustomerPay += amount;
+    } else if (payType === "internal") {
+      totalInternalCharges += amount;
+    } else if (payType === "warranty") {
+      totalWarrantyCharges += amount;
+    } else {
+      totalCustomerPay += amount;
+    }
+
+    if (li.laborHours) {
+      totalBilledHours += parseFloat(li.laborHours) || 0;
+    }
+  }
+
+  let totalActualMinutes = 0;
+  const techSummary: any[] = [];
+  for (const ts of techSessions) {
+    const mins = ts.session.durationMinutes || 0;
+    totalActualMinutes += mins;
+    techSummary.push({
+      techId: ts.session.techEmployeeId,
+      techName: ts.tech ? `${ts.tech.firstName} ${ts.tech.lastName}` : "Unknown",
+      serviceLineId: ts.session.serviceLineId,
+      billedHours: 0,
+      actualMinutes: mins,
+      clockIn: ts.session.clockIn,
+      clockOut: ts.session.clockOut,
+    });
+  }
+
+  for (const entry of techSummary) {
+    const li = lineItems.find(l => l.id === entry.serviceLineId);
+    if (li && li.laborHours) {
+      entry.billedHours = parseFloat(li.laborHours) || 0;
+    }
+  }
+
+  const totalActualHours = totalActualMinutes / 60;
+
+  const [snapshot] = await db.insert(autoRoCloseSnapshots).values({
+    shopId,
+    repairOrderId: roId,
+    locationId: ro.locationId,
+    advisorEmployeeId: ro.advisorEmployeeId || ro.serviceAdvisorId,
+    roNumber: ro.roNumber,
+    customerId: ro.customerId,
+    vehicleId: ro.vehicleId,
+    totalLines,
+    originalLines,
+    addonLines,
+    inspectionLines,
+    approvedAddonLines,
+    declinedAddonLines,
+    totalPartsRevenue: totalPartsRevenue.toFixed(2),
+    totalLaborRevenue: totalLaborRevenue.toFixed(2),
+    totalFeesRevenue: totalFeesRevenue.toFixed(2),
+    totalSubletRevenue: totalSubletRevenue.toFixed(2),
+    totalDiscount: totalDiscount.toFixed(2),
+    totalCustomerPay: totalCustomerPay.toFixed(2),
+    totalInternalCharges: totalInternalCharges.toFixed(2),
+    totalWarrantyCharges: totalWarrantyCharges.toFixed(2),
+    totalBilledHours: totalBilledHours.toFixed(2),
+    totalActualHours: totalActualHours.toFixed(2),
+    techSummary,
+    closedAt: new Date(),
+  }).returning();
+
+  const declinedItems = lineItems.filter(li => li.approvalStatus === "declined");
+  for (const li of declinedItems) {
+    const existingDeclined = await db.select().from(autoDeclinedServices)
+      .where(and(eq(autoDeclinedServices.serviceLineId, li.id), eq(autoDeclinedServices.shopId, shopId)))
+      .limit(1);
+    if (!existingDeclined.length) {
+      await db.insert(autoDeclinedServices).values({
+        shopId,
+        customerId: ro.customerId,
+        vehicleId: ro.vehicleId,
+        repairOrderId: roId,
+        serviceLineId: li.id,
+        serviceDescription: li.description,
+        estimatedCost: li.totalCash,
+        declinedAt: li.declinedAt || new Date(),
+      });
+    }
+  }
+
+  return snapshot;
+}
+
+router.post("/repair-orders/:id/close", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const roId = parseInt(req.params.id);
+
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    if (ro.isEstimate) {
+      return res.status(400).json({ error: "Cannot close an estimate. Convert to RO first." });
+    }
+
+    if (!["in_progress", "ready_for_pickup"].includes(ro.status)) {
+      return res.status(400).json({ error: `Cannot close RO with status "${ro.status}". Must be in_progress or ready_for_pickup.` });
+    }
+
+    const activeSessions = await db.select().from(autoTechSessions)
+      .where(and(eq(autoTechSessions.repairOrderId, roId), eq(autoTechSessions.isActive, true)));
+    for (const session of activeSessions) {
+      const now = new Date();
+      const durationMinutes = Math.round((now.getTime() - new Date(session.clockIn).getTime()) / 60000);
+      await db.update(autoTechSessions).set({
+        clockOut: now, durationMinutes, isActive: false, autoClockOut: true,
+      }).where(eq(autoTechSessions.id, session.id));
+    }
+
+    const snapshot = await generateCloseSnapshot(shopId, roId);
+
+    await db.update(autoRepairOrders).set({
+      status: "completed", completedAt: new Date(), updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, roId));
+
+    await db.insert(autoActivityLog).values({
+      shopId, userId: req.autoUser!.id,
+      entityType: "repair_order", entityId: roId, action: "ro_closed",
+      details: { roNumber: ro.roNumber, snapshotId: snapshot.id },
+    });
+
+    res.json(snapshot);
+  } catch (err: any) {
+    console.error("RO close error:", err);
+    res.status(500).json({ error: "Failed to close repair order" });
+  }
+});
+
+// ============================================================================
+// DECLINED SERVICES ROUTES
+// ============================================================================
+
+router.get("/declined-services", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { customerId, vehicleId, followUpSent, startDate, endDate } = req.query;
+
+    const conditions: any[] = [eq(autoDeclinedServices.shopId, shopId)];
+    if (customerId) conditions.push(eq(autoDeclinedServices.customerId, parseInt(customerId as string)));
+    if (vehicleId) conditions.push(eq(autoDeclinedServices.vehicleId, parseInt(vehicleId as string)));
+    if (followUpSent === "true") conditions.push(eq(autoDeclinedServices.followUpSent, true));
+    if (followUpSent === "false") conditions.push(eq(autoDeclinedServices.followUpSent, false));
+    if (startDate) conditions.push(gte(autoDeclinedServices.declinedAt, new Date(startDate as string)));
+    if (endDate) conditions.push(lte(autoDeclinedServices.declinedAt, new Date(endDate as string)));
+
+    const results = await db.select({
+      declined: autoDeclinedServices,
+      customerName: sql<string>`${autoCustomers.firstName} || ' ' || ${autoCustomers.lastName}`,
+      vehicleInfo: sql<string>`${autoVehicles.year} || ' ' || ${autoVehicles.make} || ' ' || ${autoVehicles.model}`,
+    }).from(autoDeclinedServices)
+      .leftJoin(autoCustomers, eq(autoDeclinedServices.customerId, autoCustomers.id))
+      .leftJoin(autoVehicles, eq(autoDeclinedServices.vehicleId, autoVehicles.id))
+      .where(and(...conditions))
+      .orderBy(desc(autoDeclinedServices.declinedAt));
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("Declined services list error:", err);
+    res.status(500).json({ error: "Failed to fetch declined services" });
+  }
+});
+
+router.get("/declined-services/customer/:customerId", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const customerId = parseInt(req.params.customerId);
+
+    const results = await db.select({
+      declined: autoDeclinedServices,
+      vehicleInfo: sql<string>`${autoVehicles.year} || ' ' || ${autoVehicles.make} || ' ' || ${autoVehicles.model}`,
+      roNumber: autoRepairOrders.roNumber,
+    }).from(autoDeclinedServices)
+      .leftJoin(autoVehicles, eq(autoDeclinedServices.vehicleId, autoVehicles.id))
+      .leftJoin(autoRepairOrders, eq(autoDeclinedServices.repairOrderId, autoRepairOrders.id))
+      .where(and(eq(autoDeclinedServices.shopId, shopId), eq(autoDeclinedServices.customerId, customerId)))
+      .orderBy(desc(autoDeclinedServices.declinedAt));
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("Customer declined services error:", err);
+    res.status(500).json({ error: "Failed to fetch customer declined services" });
+  }
+});
+
+router.post("/declined-services/:id/mark-followed-up", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const id = parseInt(req.params.id);
+    const { response } = req.body;
+
+    const [updated] = await db.update(autoDeclinedServices).set({
+      followUpSent: true,
+      followUpSentAt: new Date(),
+      followUpResponse: response || null,
+    }).where(and(eq(autoDeclinedServices.id, id), eq(autoDeclinedServices.shopId, shopId)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Declined service not found" });
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Mark followed up error:", err);
+    res.status(500).json({ error: "Failed to mark as followed up" });
+  }
+});
+
+router.post("/declined-services/:id/convert", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const id = parseInt(req.params.id);
+    const { repairOrderId } = req.body;
+
+    if (!repairOrderId) return res.status(400).json({ error: "repairOrderId is required" });
+
+    const [declined] = await db.select().from(autoDeclinedServices)
+      .where(and(eq(autoDeclinedServices.id, id), eq(autoDeclinedServices.shopId, shopId)));
+    if (!declined) return res.status(404).json({ error: "Declined service not found" });
+
+    const [targetRo] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, repairOrderId), eq(autoRepairOrders.shopId, shopId)));
+    if (!targetRo) return res.status(404).json({ error: "Target repair order not found" });
+
+    const [newLineItem] = await db.insert(autoLineItems).values({
+      repairOrderId,
+      type: "labor",
+      description: declined.serviceDescription,
+      unitPriceCash: declined.estimatedCost || "0",
+      unitPriceCard: declined.estimatedCost || "0",
+      totalCash: declined.estimatedCost || "0",
+      totalCard: declined.estimatedCost || "0",
+      lineOrigin: "addon",
+      approvalStatus: "pending",
+      addedAt: new Date(),
+    }).returning();
+
+    await db.update(autoDeclinedServices).set({
+      convertedToRoId: repairOrderId,
+    }).where(eq(autoDeclinedServices.id, id));
+
+    res.json(newLineItem);
+  } catch (err: any) {
+    console.error("Convert declined service error:", err);
+    res.status(500).json({ error: "Failed to convert declined service" });
+  }
+});
+
+// ============================================================================
+// CAMPAIGN SETTINGS ROUTES
+// ============================================================================
+
+router.get("/campaign-settings", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const [settings] = await db.select().from(autoCampaignSettings)
+      .where(eq(autoCampaignSettings.shopId, shopId));
+
+    if (!settings) {
+      return res.json({
+        shopId,
+        declinedFollowupEnabled: true,
+        declinedFollowupDays: "3,7,14",
+        declinedFollowupChannel: "email",
+        declinedFollowupEmailTemplate: null,
+        declinedFollowupSmsTemplate: null,
+      });
+    }
+
+    res.json(settings);
+  } catch (err: any) {
+    console.error("Campaign settings fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch campaign settings" });
+  }
+});
+
+router.put("/campaign-settings", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const role = req.autoUser!.role;
+
+    if (!["owner", "manager"].includes(role)) {
+      return res.status(403).json({ error: "Only owners and managers can update campaign settings" });
+    }
+
+    const { declinedFollowupEnabled, declinedFollowupDays, declinedFollowupChannel,
+            declinedFollowupEmailTemplate, declinedFollowupSmsTemplate } = req.body;
+
+    const [existing] = await db.select().from(autoCampaignSettings)
+      .where(eq(autoCampaignSettings.shopId, shopId));
+
+    let result;
+    if (existing) {
+      [result] = await db.update(autoCampaignSettings).set({
+        declinedFollowupEnabled: declinedFollowupEnabled ?? existing.declinedFollowupEnabled,
+        declinedFollowupDays: declinedFollowupDays ?? existing.declinedFollowupDays,
+        declinedFollowupChannel: declinedFollowupChannel ?? existing.declinedFollowupChannel,
+        declinedFollowupEmailTemplate: declinedFollowupEmailTemplate ?? existing.declinedFollowupEmailTemplate,
+        declinedFollowupSmsTemplate: declinedFollowupSmsTemplate ?? existing.declinedFollowupSmsTemplate,
+        updatedAt: new Date(),
+      }).where(eq(autoCampaignSettings.id, existing.id)).returning();
+    } else {
+      [result] = await db.insert(autoCampaignSettings).values({
+        shopId,
+        declinedFollowupEnabled: declinedFollowupEnabled ?? true,
+        declinedFollowupDays: declinedFollowupDays ?? "3,7,14",
+        declinedFollowupChannel: declinedFollowupChannel ?? "email",
+        declinedFollowupEmailTemplate: declinedFollowupEmailTemplate || null,
+        declinedFollowupSmsTemplate: declinedFollowupSmsTemplate || null,
+      }).returning();
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("Campaign settings update error:", err);
+    res.status(500).json({ error: "Failed to update campaign settings" });
+  }
+});
+
+// ============================================================================
+// REPORTING ENDPOINTS
+// ============================================================================
+
+router.get("/reports/monthly-summary", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { month, locationId } = req.query;
+
+    if (!month || typeof month !== "string" || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: "month query param required in YYYY-MM format" });
+    }
+
+    const monthStart = new Date(`${month}-01T00:00:00.000Z`);
+    const nextMonth = new Date(monthStart);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+
+    const conditions: any[] = [
+      eq(autoRoCloseSnapshots.shopId, shopId),
+      gte(autoRoCloseSnapshots.closedAt, monthStart),
+      lte(autoRoCloseSnapshots.closedAt, nextMonth),
+    ];
+    if (locationId) conditions.push(eq(autoRoCloseSnapshots.locationId, parseInt(locationId as string)));
+
+    const snapshots = await db.select().from(autoRoCloseSnapshots)
+      .where(and(...conditions));
+
+    const totalRosClosed = snapshots.length;
+    let totalPartsRevenue = 0, totalLaborRevenue = 0, totalFeesRevenue = 0, totalSubletRevenue = 0;
+    let totalDiscount = 0;
+    let customerPay = 0, internal = 0, warranty = 0;
+    let totalBilledHours = 0, totalActualHours = 0;
+    let totalAddonLines = 0, totalApprovedAddon = 0, totalDeclinedAddon = 0;
+
+    for (const s of snapshots) {
+      totalPartsRevenue += parseFloat(s.totalPartsRevenue || "0");
+      totalLaborRevenue += parseFloat(s.totalLaborRevenue || "0");
+      totalFeesRevenue += parseFloat(s.totalFeesRevenue || "0");
+      totalSubletRevenue += parseFloat(s.totalSubletRevenue || "0");
+      totalDiscount += parseFloat(s.totalDiscount || "0");
+      customerPay += parseFloat(s.totalCustomerPay || "0");
+      internal += parseFloat(s.totalInternalCharges || "0");
+      warranty += parseFloat(s.totalWarrantyCharges || "0");
+      totalBilledHours += parseFloat(s.totalBilledHours || "0");
+      totalActualHours += parseFloat(s.totalActualHours || "0");
+      totalAddonLines += s.addonLines;
+      totalApprovedAddon += s.approvedAddonLines;
+      totalDeclinedAddon += s.declinedAddonLines;
+    }
+
+    const totalRevenue = customerPay + internal + warranty;
+    const avgRevenuePerRo = totalRosClosed > 0 ? totalRevenue / totalRosClosed : 0;
+    const avgBilledHoursPerRo = totalRosClosed > 0 ? totalBilledHours / totalRosClosed : 0;
+    const efficiency = totalActualHours > 0 ? (totalBilledHours / totalActualHours) * 100 : 0;
+    const addonApprovalRate = (totalApprovedAddon + totalDeclinedAddon) > 0
+      ? (totalApprovedAddon / (totalApprovedAddon + totalDeclinedAddon)) * 100 : 0;
+
+    res.json({
+      month,
+      totalRosClosed,
+      totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+      avgRevenuePerRo: parseFloat(avgRevenuePerRo.toFixed(2)),
+      totalPartsRevenue: parseFloat(totalPartsRevenue.toFixed(2)),
+      totalLaborRevenue: parseFloat(totalLaborRevenue.toFixed(2)),
+      totalFeesRevenue: parseFloat(totalFeesRevenue.toFixed(2)),
+      totalSubletRevenue: parseFloat(totalSubletRevenue.toFixed(2)),
+      totalDiscount: parseFloat(totalDiscount.toFixed(2)),
+      revenueByPayType: {
+        customerPay: parseFloat(customerPay.toFixed(2)),
+        internal: parseFloat(internal.toFixed(2)),
+        warranty: parseFloat(warranty.toFixed(2)),
+      },
+      totalBilledHours: parseFloat(totalBilledHours.toFixed(2)),
+      totalActualHours: parseFloat(totalActualHours.toFixed(2)),
+      avgBilledHoursPerRo: parseFloat(avgBilledHoursPerRo.toFixed(2)),
+      efficiency: parseFloat(efficiency.toFixed(1)),
+      totalAddonLines,
+      addonApprovalRate: parseFloat(addonApprovalRate.toFixed(1)),
+    });
+  } catch (err: any) {
+    console.error("Monthly summary report error:", err);
+    res.status(500).json({ error: "Failed to generate monthly summary report" });
+  }
+});
+
+router.get("/reports/advisor-performance", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate query params required" });
+    }
+
+    const conditions: any[] = [
+      eq(autoRoCloseSnapshots.shopId, shopId),
+      gte(autoRoCloseSnapshots.closedAt, new Date(startDate as string)),
+      lte(autoRoCloseSnapshots.closedAt, new Date(endDate as string)),
+    ];
+
+    const snapshots = await db.select({
+      snapshot: autoRoCloseSnapshots,
+      advisorFirstName: autoUsers.firstName,
+      advisorLastName: autoUsers.lastName,
+    }).from(autoRoCloseSnapshots)
+      .leftJoin(autoUsers, eq(autoRoCloseSnapshots.advisorEmployeeId, autoUsers.id))
+      .where(and(...conditions));
+
+    const advisorMap = new Map<number, {
+      advisorId: number; advisorName: string;
+      rosClosed: number; totalRevenue: number;
+      addonLinesPresented: number; approvedAddon: number; declinedAddon: number;
+    }>();
+
+    for (const row of snapshots) {
+      const advisorId = row.snapshot.advisorEmployeeId || 0;
+      const advisorName = row.advisorFirstName && row.advisorLastName
+        ? `${row.advisorFirstName} ${row.advisorLastName}` : "Unassigned";
+
+      if (!advisorMap.has(advisorId)) {
+        advisorMap.set(advisorId, {
+          advisorId, advisorName,
+          rosClosed: 0, totalRevenue: 0,
+          addonLinesPresented: 0, approvedAddon: 0, declinedAddon: 0,
+        });
+      }
+      const data = advisorMap.get(advisorId)!;
+      data.rosClosed += 1;
+      data.totalRevenue += parseFloat(row.snapshot.totalCustomerPay || "0")
+        + parseFloat(row.snapshot.totalInternalCharges || "0")
+        + parseFloat(row.snapshot.totalWarrantyCharges || "0");
+      data.addonLinesPresented += row.snapshot.approvedAddonLines + row.snapshot.declinedAddonLines;
+      data.approvedAddon += row.snapshot.approvedAddonLines;
+      data.declinedAddon += row.snapshot.declinedAddonLines;
+    }
+
+    const advisors = Array.from(advisorMap.values()).map(a => ({
+      advisorId: a.advisorId,
+      advisorName: a.advisorName,
+      rosClosed: a.rosClosed,
+      totalRevenue: parseFloat(a.totalRevenue.toFixed(2)),
+      avgRevenuePerRo: a.rosClosed > 0 ? parseFloat((a.totalRevenue / a.rosClosed).toFixed(2)) : 0,
+      addonLinesPresented: a.addonLinesPresented,
+      addonApprovalRate: (a.approvedAddon + a.declinedAddon) > 0
+        ? parseFloat(((a.approvedAddon / (a.approvedAddon + a.declinedAddon)) * 100).toFixed(1)) : 0,
+    }));
+
+    res.json({ startDate, endDate, advisors });
+  } catch (err: any) {
+    console.error("Advisor performance report error:", err);
+    res.status(500).json({ error: "Failed to generate advisor performance report" });
+  }
+});
+
+router.get("/reports/tech-efficiency", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate query params required" });
+    }
+
+    const sessions = await db.select({
+      session: autoTechSessions,
+      techFirstName: autoUsers.firstName,
+      techLastName: autoUsers.lastName,
+      billedHours: autoLineItems.laborHours,
+    }).from(autoTechSessions)
+      .leftJoin(autoUsers, eq(autoTechSessions.techEmployeeId, autoUsers.id))
+      .leftJoin(autoLineItems, eq(autoTechSessions.serviceLineId, autoLineItems.id))
+      .where(and(
+        eq(autoTechSessions.shopId, shopId),
+        gte(autoTechSessions.clockIn, new Date(startDate as string)),
+        lte(autoTechSessions.clockIn, new Date(endDate as string)),
+      ));
+
+    const techMap = new Map<number, {
+      techId: number; techName: string;
+      totalSessions: number; totalActualMinutes: number; totalBilledHours: number;
+    }>();
+
+    for (const row of sessions) {
+      const techId = row.session.techEmployeeId;
+      const techName = row.techFirstName && row.techLastName
+        ? `${row.techFirstName} ${row.techLastName}` : "Unknown";
+
+      if (!techMap.has(techId)) {
+        techMap.set(techId, {
+          techId, techName,
+          totalSessions: 0, totalActualMinutes: 0, totalBilledHours: 0,
+        });
+      }
+      const data = techMap.get(techId)!;
+      data.totalSessions += 1;
+      data.totalActualMinutes += row.session.durationMinutes || 0;
+      data.totalBilledHours += parseFloat(row.billedHours || "0");
+    }
+
+    const techs = Array.from(techMap.values()).map(t => {
+      const actualHours = t.totalActualMinutes / 60;
+      return {
+        techId: t.techId,
+        techName: t.techName,
+        totalSessions: t.totalSessions,
+        totalActualMinutes: t.totalActualMinutes,
+        totalBilledHours: parseFloat(t.totalBilledHours.toFixed(2)),
+        avgSessionDuration: t.totalSessions > 0 ? parseFloat((t.totalActualMinutes / t.totalSessions).toFixed(1)) : 0,
+        efficiency: actualHours > 0 ? parseFloat(((t.totalBilledHours / actualHours) * 100).toFixed(1)) : 0,
+      };
+    });
+
+    res.json({ startDate, endDate, techs });
+  } catch (err: any) {
+    console.error("Tech efficiency report error:", err);
+    res.status(500).json({ error: "Failed to generate tech efficiency report" });
+  }
+});
+
 export function registerAutoRoutes(app: Express) {
   app.use("/api/auto", router);
 
@@ -5265,4 +6834,35 @@ export function registerAutoRoutes(app: Express) {
       console.error("[AutoInit] Failed to seed demo data:", err);
     }
   })();
+
+  // Auto clock-out scheduler - runs every 15 minutes
+  setInterval(async () => {
+    try {
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+      const expiredSessions = await db.select().from(autoTechSessions)
+        .where(and(
+          eq(autoTechSessions.isActive, true),
+          lte(autoTechSessions.clockIn, twelveHoursAgo)
+        ));
+      
+      for (const session of expiredSessions) {
+        const clockOut = new Date();
+        const durationMinutes = Math.round((clockOut.getTime() - new Date(session.clockIn).getTime()) / 60000);
+        await db.update(autoTechSessions)
+          .set({
+            clockOut,
+            isActive: false,
+            autoClockOut: true,
+            durationMinutes,
+          })
+          .where(eq(autoTechSessions.id, session.id));
+      }
+      
+      if (expiredSessions.length > 0) {
+        console.log(`Auto clock-out: ${expiredSessions.length} sessions expired`);
+      }
+    } catch (err) {
+      console.error("Auto clock-out error:", err);
+    }
+  }, 15 * 60 * 1000); // Every 15 minutes
 }

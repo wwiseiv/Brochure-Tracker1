@@ -50,6 +50,22 @@ Preferred communication style: Simple, everyday language.
     - **Bay Configuration**: Per-bay sellable hours tracking for shop capacity management (`/auto/settings/bays`). Total sellable hours used in dashboard bay utilization metrics.
     - **Staff Availability & Time Off**: Weekly schedule management per staff member with day-of-week availability toggles and time ranges. Time off request management with approval status (`/auto/settings/availability`). Feeds into dashboard "Staff On Duty" widget.
     - **Dashboard Visibility Settings**: Role-based toggle grid controlling which dashboard cards are visible to each role (owner/manager/advisor/tech). Owner-only configuration (`/auto/settings/visibility`).
+    - **Auto Clock-Out Scheduler**: Automatic clock-out of tech sessions that exceed 12 hours of active time. Runs every 15 minutes, marks expired sessions with autoClockOut flag, calculates final duration. Implemented in `server/auto-routes.ts` registerAutoRoutes function (Feb 9, 2026).
+    - **Repair Orders V2 Overhaul** (Feb 2026):
+        - **Estimates System**: Separate estimates from ROs with dedicated numbering (EST-10001+), dedicated tab view, and one-click convert-to-RO flow preserving all line items.
+        - **Multi-Location Support**: Location CRUD, location-based RO numbering (locationNumber * 10000 + sequence), default location auto-creation. UI at `/auto/settings/locations`.
+        - **Per-Line Pay Types**: Parts and labor pay type classification (customer_pay/internal/warranty) per line item for accurate revenue reporting.
+        - **Line Origin Tracking**: Track whether lines are original, add-on, or inspection_finding for upsell metrics.
+        - **Technician Time Tracking**: Clock-in/out per service line item, one active session per tech enforcement, session history with duration calculations.
+        - **Tech Portal**: Dedicated page at `/auto/tech-portal` for technicians. Shows assigned in-progress ROs, line items, clock-in/out buttons, active timer, and session history. CRITICAL: No pricing information visible.
+        - **Customer Authorization**: Per-line authorization (verbal/text/email/signature/in_person), batch line presentation, RO-level signature capture with IP logging.
+        - **Declined Services & Campaigns**: Automatic recording of declined services on RO close, follow-up campaign settings (email/SMS), declined-to-RO conversion. Settings at `/auto/settings/campaigns`.
+        - **RO Close Snapshots**: Immutable snapshot on RO close capturing all metrics (revenue by type, pay type breakdown, billed vs actual hours, tech summary, add-on approval rates) for reporting.
+        - **Advanced Analytics**: Three-tab reports page at `/auto/reports-v2` with Monthly Summary (KPIs, revenue breakdown, pay type, add-on metrics), Advisor Performance (per-advisor ROs/revenue/approval rates), Tech Efficiency (sessions, hours, efficiency %). CSV export on all tabs.
+        - **Dashboard Active Tech Sessions Widget**: Real-time display of clocked-in technicians with elapsed time.
+        - **Employee Number**: Added to staff management for tech portal identification.
+    - **RO V2 Schema Tables**: autoLocations, autoRoSequences, autoEstimateSequences, autoTechSessions, autoDeclinedServices, autoCampaignSettings, autoRoCloseSnapshots (7 new tables, 37 total auto_ tables).
+    - **RO V2 Key API Routes**: /estimates (CRUD + convert), /locations (CRUD), /tech-sessions (clock-in/out/active/history), /repair-orders/:id/authorize-line, /decline-line, /present-lines, /signature, /close, /declined-services, /campaign-settings, /reports/monthly-summary, /reports/advisor-performance, /reports/tech-efficiency.
 
 ## External Dependencies
 

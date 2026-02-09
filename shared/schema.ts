@@ -3643,6 +3643,7 @@ export const autoUsers = pgTable("auto_users", {
   rollfiLastSyncAt: timestamp("rollfi_last_sync_at"),
   resetToken: text("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
+  employeeNumber: varchar("employee_number", { length: 10 }),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3849,6 +3850,16 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   shopSupplyAmountCard: numeric("shop_supply_amount_card", { precision: 10, scale: 2 }).default("0"),
   discountAmountCash: numeric("discount_amount_cash", { precision: 10, scale: 2 }).default("0"),
   discountAmountCard: numeric("discount_amount_card", { precision: 10, scale: 2 }).default("0"),
+  isEstimate: boolean("is_estimate").default(false),
+  estimateNumber: varchar("estimate_number", { length: 20 }),
+  convertedFromEstimateId: integer("converted_from_estimate_id"),
+  convertedToRoId: integer("converted_to_ro_id"),
+  locationId: integer("location_id"),
+  advisorEmployeeId: integer("advisor_employee_id"),
+  customerSignatureData: text("customer_signature_data"),
+  customerSignatureTimestamp: timestamp("customer_signature_timestamp"),
+  customerSignatureIp: varchar("customer_signature_ip", { length: 45 }),
+  customerSignatureMethod: varchar("customer_signature_method", { length: 20 }).default("digital"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -3930,6 +3941,22 @@ export const autoLineItems = pgTable("auto_line_items", {
   isShopSupply: boolean("is_shop_supply").default(false),
   warrantyMonths: integer("warranty_months"),
   warrantyMiles: integer("warranty_miles"),
+  partsPayType: varchar("parts_pay_type", { length: 20 }).default("customer_pay"),
+  laborPayType: varchar("labor_pay_type", { length: 20 }).default("customer_pay"),
+  retailValueOverride: numeric("retail_value_override", { precision: 10, scale: 2 }),
+  warrantyVendor: varchar("warranty_vendor", { length: 100 }),
+  warrantyClaimNumber: varchar("warranty_claim_number", { length: 100 }),
+  lineOrigin: varchar("line_origin", { length: 20 }).default("original"),
+  addedByUserId: integer("added_by_user_id"),
+  addedAt: timestamp("added_at"),
+  presentedToCustomer: boolean("presented_to_customer").default(false),
+  presentedAt: timestamp("presented_at"),
+  presentedByAdvisorId: integer("presented_by_advisor_id"),
+  customerRespondedAt: timestamp("customer_responded_at"),
+  authorizationMethod: varchar("authorization_method", { length: 20 }),
+  authorizationTimestamp: timestamp("authorization_timestamp"),
+  authorizationConfirmationSent: boolean("authorization_confirmation_sent").default(false),
+  authorizationConfirmationId: varchar("authorization_confirmation_id", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -4775,3 +4802,256 @@ export const insertAutoDashboardVisibilitySchema = createInsertSchema(autoDashbo
 });
 export type InsertAutoDashboardVisibility = z.infer<typeof insertAutoDashboardVisibilitySchema>;
 export type AutoDashboardVisibility = typeof autoDashboardVisibility.$inferSelect;
+
+// 31. Auto Locations
+export const autoLocations = pgTable("auto_locations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  locationNumber: integer("location_number").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  addressLine1: varchar("address_line1", { length: 255 }),
+  addressLine2: varchar("address_line2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  zip: varchar("zip", { length: 10 }),
+  phone: varchar("phone", { length: 20 }),
+  isPrimary: boolean("is_primary").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueShopLocation: unique().on(table.shopId, table.locationNumber),
+}));
+
+export const autoLocationsRelations = relations(autoLocations, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoLocations.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoLocationSchema = createInsertSchema(autoLocations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoLocation = z.infer<typeof insertAutoLocationSchema>;
+export type AutoLocation = typeof autoLocations.$inferSelect;
+
+// 32. Auto RO Sequences
+export const autoRoSequences = pgTable("auto_ro_sequences", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  locationId: integer("location_id").notNull().references(() => autoLocations.id),
+  currentNumber: integer("current_number").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueShopLocation: unique().on(table.shopId, table.locationId),
+}));
+
+export const autoRoSequencesRelations = relations(autoRoSequences, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoRoSequences.shopId],
+    references: [autoShops.id],
+  }),
+  location: one(autoLocations, {
+    fields: [autoRoSequences.locationId],
+    references: [autoLocations.id],
+  }),
+}));
+
+export const insertAutoRoSequenceSchema = createInsertSchema(autoRoSequences).omit({
+  id: true,
+});
+export type InsertAutoRoSequence = z.infer<typeof insertAutoRoSequenceSchema>;
+export type AutoRoSequence = typeof autoRoSequences.$inferSelect;
+
+// 33. Auto Estimate Sequences
+export const autoEstimateSequences = pgTable("auto_estimate_sequences", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  currentNumber: integer("current_number").notNull().default(10000),
+  prefix: varchar("prefix", { length: 10 }).default("EST-"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueShop: unique().on(table.shopId),
+}));
+
+export const autoEstimateSequencesRelations = relations(autoEstimateSequences, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoEstimateSequences.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoEstimateSequenceSchema = createInsertSchema(autoEstimateSequences).omit({
+  id: true,
+});
+export type InsertAutoEstimateSequence = z.infer<typeof insertAutoEstimateSequenceSchema>;
+export type AutoEstimateSequence = typeof autoEstimateSequences.$inferSelect;
+
+// 34. Auto Tech Sessions
+export const autoTechSessions = pgTable("auto_tech_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id),
+  serviceLineId: integer("service_line_id").notNull().references(() => autoLineItems.id),
+  techEmployeeId: integer("tech_employee_id").notNull().references(() => autoUsers.id),
+  clockIn: timestamp("clock_in").notNull().defaultNow(),
+  clockOut: timestamp("clock_out"),
+  durationMinutes: integer("duration_minutes"),
+  isActive: boolean("is_active").default(true),
+  autoClockOut: boolean("auto_clock_out").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoTechSessionsRelations = relations(autoTechSessions, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoTechSessions.shopId],
+    references: [autoShops.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoTechSessions.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+  serviceLine: one(autoLineItems, {
+    fields: [autoTechSessions.serviceLineId],
+    references: [autoLineItems.id],
+  }),
+  techEmployee: one(autoUsers, {
+    fields: [autoTechSessions.techEmployeeId],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoTechSessionSchema = createInsertSchema(autoTechSessions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoTechSession = z.infer<typeof insertAutoTechSessionSchema>;
+export type AutoTechSession = typeof autoTechSessions.$inferSelect;
+
+// 35. Auto Declined Services
+export const autoDeclinedServices = pgTable("auto_declined_services", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  customerId: integer("customer_id").notNull().references(() => autoCustomers.id),
+  vehicleId: integer("vehicle_id").notNull().references(() => autoVehicles.id),
+  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id),
+  serviceLineId: integer("service_line_id").notNull().references(() => autoLineItems.id),
+  serviceDescription: text("service_description").notNull(),
+  estimatedCost: numeric("estimated_cost", { precision: 10, scale: 2 }),
+  declinedAt: timestamp("declined_at").notNull().defaultNow(),
+  followUpSent: boolean("follow_up_sent").default(false),
+  followUpSentAt: timestamp("follow_up_sent_at"),
+  followUpResponse: varchar("follow_up_response", { length: 20 }),
+  followUpCampaignId: integer("follow_up_campaign_id"),
+  convertedToRoId: integer("converted_to_ro_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoDeclinedServicesRelations = relations(autoDeclinedServices, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoDeclinedServices.shopId],
+    references: [autoShops.id],
+  }),
+  customer: one(autoCustomers, {
+    fields: [autoDeclinedServices.customerId],
+    references: [autoCustomers.id],
+  }),
+  vehicle: one(autoVehicles, {
+    fields: [autoDeclinedServices.vehicleId],
+    references: [autoVehicles.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoDeclinedServices.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+  serviceLine: one(autoLineItems, {
+    fields: [autoDeclinedServices.serviceLineId],
+    references: [autoLineItems.id],
+  }),
+}));
+
+export const insertAutoDeclinedServiceSchema = createInsertSchema(autoDeclinedServices).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoDeclinedService = z.infer<typeof insertAutoDeclinedServiceSchema>;
+export type AutoDeclinedService = typeof autoDeclinedServices.$inferSelect;
+
+// 36. Auto Campaign Settings
+export const autoCampaignSettings = pgTable("auto_campaign_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id).unique(),
+  declinedFollowupEnabled: boolean("declined_followup_enabled").default(true),
+  declinedFollowupDays: text("declined_followup_days").default("3,7,14"),
+  declinedFollowupChannel: varchar("declined_followup_channel", { length: 10 }).default("email"),
+  declinedFollowupEmailTemplate: text("declined_followup_email_template"),
+  declinedFollowupSmsTemplate: text("declined_followup_sms_template"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const autoCampaignSettingsRelations = relations(autoCampaignSettings, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoCampaignSettings.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoCampaignSettingsSchema = createInsertSchema(autoCampaignSettings).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoCampaignSettings = z.infer<typeof insertAutoCampaignSettingsSchema>;
+export type AutoCampaignSettings = typeof autoCampaignSettings.$inferSelect;
+
+// 37. Auto RO Close Snapshots
+export const autoRoCloseSnapshots = pgTable("auto_ro_close_snapshots", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id).unique(),
+  locationId: integer("location_id"),
+  advisorEmployeeId: integer("advisor_employee_id"),
+  roNumber: varchar("ro_number", { length: 20 }).notNull(),
+  customerId: integer("customer_id"),
+  vehicleId: integer("vehicle_id"),
+  totalLines: integer("total_lines").notNull().default(0),
+  originalLines: integer("original_lines").notNull().default(0),
+  addonLines: integer("addon_lines").notNull().default(0),
+  inspectionLines: integer("inspection_lines").notNull().default(0),
+  approvedAddonLines: integer("approved_addon_lines").notNull().default(0),
+  declinedAddonLines: integer("declined_addon_lines").notNull().default(0),
+  totalPartsRevenue: numeric("total_parts_revenue", { precision: 10, scale: 2 }).default("0"),
+  totalLaborRevenue: numeric("total_labor_revenue", { precision: 10, scale: 2 }).default("0"),
+  totalFeesRevenue: numeric("total_fees_revenue", { precision: 10, scale: 2 }).default("0"),
+  totalSubletRevenue: numeric("total_sublet_revenue", { precision: 10, scale: 2 }).default("0"),
+  totalDiscount: numeric("total_discount", { precision: 10, scale: 2 }).default("0"),
+  totalCustomerPay: numeric("total_customer_pay", { precision: 10, scale: 2 }).default("0"),
+  totalInternalCharges: numeric("total_internal_charges", { precision: 10, scale: 2 }).default("0"),
+  totalWarrantyCharges: numeric("total_warranty_charges", { precision: 10, scale: 2 }).default("0"),
+  totalBilledHours: numeric("total_billed_hours", { precision: 8, scale: 2 }).default("0"),
+  totalActualHours: numeric("total_actual_hours", { precision: 8, scale: 2 }).default("0"),
+  techSummary: jsonb("tech_summary").default([]),
+  closedAt: timestamp("closed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoRoCloseSnapshotsRelations = relations(autoRoCloseSnapshots, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoRoCloseSnapshots.shopId],
+    references: [autoShops.id],
+  }),
+  repairOrder: one(autoRepairOrders, {
+    fields: [autoRoCloseSnapshots.repairOrderId],
+    references: [autoRepairOrders.id],
+  }),
+}));
+
+export const insertAutoRoCloseSnapshotSchema = createInsertSchema(autoRoCloseSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoRoCloseSnapshot = z.infer<typeof insertAutoRoCloseSnapshotSchema>;
+export type AutoRoCloseSnapshot = typeof autoRoCloseSnapshots.$inferSelect;

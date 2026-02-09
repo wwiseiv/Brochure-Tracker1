@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import {
   FileText, Plus, Loader2, Search, Eye, Pencil, Printer,
-  Wrench, ChevronLeft, ChevronRight, Download,
+  Wrench, ChevronLeft, ChevronRight, Download, ArrowRightLeft, ExternalLink,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -41,6 +41,15 @@ const STATUS_FILTERS = [
   { value: "completed", label: "Completed" },
   { value: "invoiced", label: "Invoiced" },
   { value: "paid", label: "Paid" },
+  { value: "void", label: "Void" },
+];
+
+const ESTIMATE_STATUS_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "estimate", label: "Estimate" },
+  { value: "sent", label: "Sent" },
+  { value: "approved", label: "Approved" },
+  { value: "declined", label: "Declined" },
   { value: "void", label: "Void" },
 ];
 
@@ -94,6 +103,9 @@ interface RepairOrder {
   balanceDue: string | null;
   customer: Customer | null;
   vehicle: Vehicle | null;
+  convertedToRoId?: number | null;
+  estimateNumber?: string | null;
+  isEstimate?: boolean;
 }
 
 interface Stats {
@@ -179,6 +191,7 @@ export default function AutoRepairOrders() {
   const { autoFetch } = useAutoAuth();
   const [, setLocation] = useLocation();
 
+  const [viewTab, setViewTab] = useState<"repair_orders" | "estimates">("repair_orders");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -194,6 +207,7 @@ export default function AutoRepairOrders() {
   const [loading, setLoading] = useState(true);
   const [hasEverLoaded, setHasEverLoaded] = useState(false);
   const [printingId, setPrintingId] = useState<number | null>(null);
+  const [convertingId, setConvertingId] = useState<number | null>(null);
 
   const handlePrintPdf = useCallback(async (roId: number) => {
     setPrintingId(roId);
@@ -215,6 +229,22 @@ export default function AutoRepairOrders() {
       setPrintingId(null);
     }
   }, [autoFetch]);
+
+  const handleConvertToRo = useCallback(async (estimateId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Convert this estimate to a Repair Order?")) return;
+    setConvertingId(estimateId);
+    try {
+      const res = await autoFetch(`/api/auto/estimates/${estimateId}/convert`, { method: "POST" });
+      if (!res.ok) throw new Error("Conversion failed");
+      const data = await res.json();
+      setLocation(`/auto/repair-orders/${data.id}`);
+    } catch (err) {
+      console.error("Convert error:", err);
+    } finally {
+      setConvertingId(null);
+    }
+  }, [autoFetch, setLocation]);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -240,6 +270,8 @@ export default function AutoRepairOrders() {
     return getDateRange(dateRange);
   }, [dateRange, customFrom, customTo]);
 
+  const activeStatusFilters = viewTab === "estimates" ? ESTIMATE_STATUS_FILTERS : STATUS_FILTERS;
+
   const fetchROs = useCallback(async () => {
     setLoading(true);
     try {
@@ -253,24 +285,32 @@ export default function AutoRepairOrders() {
       params.set("page", String(page));
       params.set("limit", String(LIMIT));
 
-      const res = await autoFetch(`/api/auto/repair-orders?${params.toString()}`);
-      const data = await res.json();
-      setRos(data.repairOrders || []);
-      setTotal(data.total ?? 0);
-      setStats({
-        totalRos: data.stats?.totalRos ?? 0,
-        totalBilled: data.stats?.totalBilled ?? 0,
-        totalPaid: data.stats?.totalPaid ?? 0,
-        outstanding: data.stats?.outstanding ?? 0,
-        avgTicket: data.stats?.avgTicket ?? 0,
-      });
+      if (viewTab === "estimates") {
+        const res = await autoFetch(`/api/auto/estimates?${params.toString()}`);
+        const data = await res.json();
+        setRos(data.estimates || []);
+        setTotal(data.total ?? 0);
+        setStats({ totalRos: 0, totalBilled: 0, totalPaid: 0, outstanding: 0, avgTicket: 0 });
+      } else {
+        const res = await autoFetch(`/api/auto/repair-orders?${params.toString()}`);
+        const data = await res.json();
+        setRos(data.repairOrders || []);
+        setTotal(data.total ?? 0);
+        setStats({
+          totalRos: data.stats?.totalRos ?? 0,
+          totalBilled: data.stats?.totalBilled ?? 0,
+          totalPaid: data.stats?.totalPaid ?? 0,
+          outstanding: data.stats?.outstanding ?? 0,
+          avgTicket: data.stats?.avgTicket ?? 0,
+        });
+      }
       setHasEverLoaded(true);
     } catch (err) {
       console.error("Failed to fetch repair orders:", err);
     } finally {
       setLoading(false);
     }
-  }, [autoFetch, search, statusFilter, computedDates, sortOption, page]);
+  }, [autoFetch, search, statusFilter, computedDates, sortOption, page, viewTab]);
 
   useEffect(() => {
     fetchROs();
@@ -294,19 +334,28 @@ export default function AutoRepairOrders() {
   const showingTo = Math.min(page * LIMIT, total);
 
   const exportCsv = () => {
-    const headers = ["RO #", "Date", "Customer Name", "Vehicle", "Status", "Subtotal", "Tax", "Total", "Paid Amount", "Balance Due"];
-    const rows = ros.map((ro) => [
-      ro.roNumber,
-      formatDate(ro.createdAt),
-      ro.customer ? `${ro.customer.firstName} ${ro.customer.lastName}` : "",
-      ro.vehicle ? [ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(" ") : "",
-      ro.status.replace(/_/g, " "),
-      parseFloat(ro.subtotalCash ?? "0").toFixed(2),
-      parseFloat(ro.taxAmount ?? "0").toFixed(2),
-      parseFloat(ro.totalCash ?? "0").toFixed(2),
-      parseFloat(ro.paidAmount ?? "0").toFixed(2),
-      parseFloat(ro.balanceDue ?? "0").toFixed(2),
-    ]);
+    const headers = viewTab === "estimates"
+      ? ["EST #", "Date", "Customer Name", "Vehicle", "Status", "Subtotal", "Tax", "Total"]
+      : ["RO #", "Date", "Customer Name", "Vehicle", "Status", "Subtotal", "Tax", "Total", "Paid Amount", "Balance Due"];
+    const rows = ros.map((ro) => {
+      const base = [
+        ro.roNumber,
+        formatDate(ro.createdAt),
+        ro.customer ? `${ro.customer.firstName} ${ro.customer.lastName}` : "",
+        ro.vehicle ? [ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(" ") : "",
+        ro.status.replace(/_/g, " "),
+        parseFloat(ro.subtotalCash ?? "0").toFixed(2),
+        parseFloat(ro.taxAmount ?? "0").toFixed(2),
+        parseFloat(ro.totalCash ?? "0").toFixed(2),
+      ];
+      if (viewTab !== "estimates") {
+        base.push(
+          parseFloat(ro.paidAmount ?? "0").toFixed(2),
+          parseFloat(ro.balanceDue ?? "0").toFixed(2),
+        );
+      }
+      return base;
+    });
 
     const csvContent = [headers, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -317,7 +366,9 @@ export default function AutoRepairOrders() {
     const link = document.createElement("a");
     const dateStr = new Date().toISOString().split("T")[0];
     link.href = url;
-    link.download = `repair-orders-export-${dateStr}.csv`;
+    link.download = viewTab === "estimates"
+      ? `estimates-export-${dateStr}.csv`
+      : `repair-orders-export-${dateStr}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -326,13 +377,15 @@ export default function AutoRepairOrders() {
     setLocation(`/auto/repair-orders/${id}`);
   };
 
+  const isEstimatesTab = viewTab === "estimates";
+
   return (
     <AutoLayout>
       <div className="p-4 md:p-6 space-y-4 max-w-6xl mx-auto">
         {/* Title + New RO */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-bold flex items-center gap-2" data-testid="text-ros-title">
-            <FileText className="h-5 w-5" /> Repair Orders
+            <FileText className="h-5 w-5" /> {isEstimatesTab ? "Estimates" : "Repair Orders"}
           </h1>
           <div className="flex items-center gap-2">
             <Link href="/auto/repair-orders/new?type=estimate">
@@ -348,11 +401,37 @@ export default function AutoRepairOrders() {
           </div>
         </div>
 
+        {/* Tab Bar */}
+        <div className="flex items-center gap-1 border-b">
+          <button
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              viewTab === "repair_orders"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => { setViewTab("repair_orders"); setPage(1); setStatusFilter("all"); }}
+            data-testid="tab-repair-orders"
+          >
+            Repair Orders
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              viewTab === "estimates"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => { setViewTab("estimates"); setPage(1); setStatusFilter("all"); }}
+            data-testid="tab-estimates"
+          >
+            Estimates
+          </button>
+        </div>
+
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by customer, phone, vehicle, VIN, or RO #..."
+            placeholder={isEstimatesTab ? "Search by customer, phone, vehicle, VIN, or EST #..." : "Search by customer, phone, vehicle, VIN, or RO #..."}
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9"
@@ -362,7 +441,7 @@ export default function AutoRepairOrders() {
 
         {/* Status Filter Pills */}
         <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((sf) => (
+          {activeStatusFilters.map((sf) => (
             <Badge
               key={sf.value}
               variant="outline"
@@ -430,22 +509,24 @@ export default function AutoRepairOrders() {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {[
-            { label: "Total ROs", value: String(stats.totalRos), testId: "stat-total-ros" },
-            { label: "Total Billed", value: formatMoney(parseFloat(String(stats.totalBilled)) || 0), testId: "stat-total-billed" },
-            { label: "Total Paid", value: formatMoney(parseFloat(String(stats.totalPaid)) || 0), testId: "stat-total-paid" },
-            { label: "Outstanding", value: formatMoney(parseFloat(String(stats.outstanding)) || 0), testId: "stat-outstanding" },
-            { label: "Avg Ticket", value: formatMoney(parseFloat(String(stats.avgTicket)) || 0), testId: "stat-avg-ticket" },
-          ].map((stat) => (
-            <Card key={stat.testId} data-testid={stat.testId} className="min-w-0">
-              <CardContent className="p-3 min-w-0">
-                <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
-                <p className="text-base sm:text-lg font-bold truncate">{stat.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {!isEstimatesTab && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {[
+              { label: "Total ROs", value: String(stats.totalRos), testId: "stat-total-ros" },
+              { label: "Total Billed", value: formatMoney(parseFloat(String(stats.totalBilled)) || 0), testId: "stat-total-billed" },
+              { label: "Total Paid", value: formatMoney(parseFloat(String(stats.totalPaid)) || 0), testId: "stat-total-paid" },
+              { label: "Outstanding", value: formatMoney(parseFloat(String(stats.outstanding)) || 0), testId: "stat-outstanding" },
+              { label: "Avg Ticket", value: formatMoney(parseFloat(String(stats.avgTicket)) || 0), testId: "stat-avg-ticket" },
+            ].map((stat) => (
+              <Card key={stat.testId} data-testid={stat.testId} className="min-w-0">
+                <CardContent className="p-3 min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
+                  <p className="text-base sm:text-lg font-bold truncate">{stat.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (
@@ -459,11 +540,13 @@ export default function AutoRepairOrders() {
           <Card>
             <CardContent className="py-16 text-center space-y-3">
               <Wrench className="h-12 w-12 mx-auto text-muted-foreground" />
-              <h2 className="text-lg font-semibold">No Repair Orders Yet</h2>
-              <p className="text-sm text-muted-foreground">Create your first repair order to get started.</p>
-              <Link href="/auto/repair-orders/new">
+              <h2 className="text-lg font-semibold">{isEstimatesTab ? "No Estimates Yet" : "No Repair Orders Yet"}</h2>
+              <p className="text-sm text-muted-foreground">
+                {isEstimatesTab ? "Create your first estimate to get started." : "Create your first repair order to get started."}
+              </p>
+              <Link href={isEstimatesTab ? "/auto/repair-orders/new?type=estimate" : "/auto/repair-orders/new"}>
                 <Button className="gap-2 mt-2" data-testid="button-empty-new-ro">
-                  <Plus className="h-4 w-4" /> New RO
+                  <Plus className="h-4 w-4" /> {isEstimatesTab ? "New Estimate" : "New RO"}
                 </Button>
               </Link>
             </CardContent>
@@ -491,14 +574,14 @@ export default function AutoRepairOrders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[80px]">RO #</TableHead>
+                    <TableHead className="w-[80px]">{isEstimatesTab ? "EST #" : "RO #"}</TableHead>
                     <TableHead className="w-[100px]">Date</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Vehicle</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
                     <TableHead className="text-right w-[100px]">Total</TableHead>
-                    <TableHead className="text-right w-[100px]">Balance</TableHead>
-                    <TableHead className="text-right w-[110px]">Actions</TableHead>
+                    {!isEstimatesTab && <TableHead className="text-right w-[100px]">Balance</TableHead>}
+                    <TableHead className="text-right w-[140px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -536,47 +619,92 @@ export default function AutoRepairOrders() {
                       <TableCell className="text-right font-medium text-sm">
                         {formatMoney(parseFloat(ro.totalCash ?? "0"))}
                       </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {parseFloat(ro.balanceDue ?? "0") > 0 ? (
-                          <span className="text-destructive font-medium">
-                            {formatMoney(parseFloat(ro.balanceDue ?? "0"))}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">$0.00</span>
-                        )}
-                      </TableCell>
+                      {!isEstimatesTab && (
+                        <TableCell className="text-right text-sm">
+                          {parseFloat(ro.balanceDue ?? "0") > 0 ? (
+                            <span className="text-destructive font-medium">
+                              {formatMoney(parseFloat(ro.balanceDue ?? "0"))}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">$0.00</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
-                            data-testid={`button-view-ro-${ro.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {ro.status !== "paid" && ro.status !== "void" && ro.status !== "completed" && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={(e) => { e.stopPropagation(); setLocation(`/auto/repair-orders/${ro.id}`); }}
-                              data-testid={`button-edit-ro-${ro.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                          {isEstimatesTab ? (
+                            <>
+                              {ro.convertedToRoId ? (
+                                <Link
+                                  href={`/auto/repair-orders/${ro.convertedToRoId}`}
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                >
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1"
+                                    data-testid={`button-view-converted-ro-${ro.id}`}
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    View RO
+                                  </Button>
+                                </Link>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1"
+                                  disabled={convertingId === ro.id}
+                                  onClick={(e) => handleConvertToRo(ro.id, e)}
+                                  data-testid={`button-convert-estimate-${ro.id}`}
+                                >
+                                  {convertingId === ro.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRightLeft className="h-3 w-3" />}
+                                  Convert
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
+                                data-testid={`button-view-ro-${ro.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
+                                data-testid={`button-view-ro-${ro.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {ro.status !== "paid" && ro.status !== "void" && ro.status !== "completed" && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); setLocation(`/auto/repair-orders/${ro.id}`); }}
+                                  data-testid={`button-edit-ro-${ro.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={printingId === ro.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrintPdf(ro.id);
+                                }}
+                                data-testid={`button-print-ro-${ro.id}`}
+                              >
+                                {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                              </Button>
+                            </>
                           )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={printingId === ro.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePrintPdf(ro.id);
-                            }}
-                            data-testid={`button-print-ro-${ro.id}`}
-                          >
-                            {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -599,6 +727,11 @@ export default function AutoRepairOrders() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono font-medium text-sm">{ro.roNumber}</span>
                         <StatusBadge status={ro.status} />
+                        {isEstimatesTab && ro.convertedToRoId && (
+                          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Converted
+                          </Badge>
+                        )}
                       </div>
                       <span className="text-sm text-muted-foreground">{formatDate(ro.createdAt)}</span>
                     </div>
@@ -622,43 +755,86 @@ export default function AutoRepairOrders() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="font-medium">{formatMoney(parseFloat(ro.totalCash ?? "0"))}</span>
-                        {parseFloat(ro.balanceDue ?? "0") > 0 && (
+                        {!isEstimatesTab && parseFloat(ro.balanceDue ?? "0") > 0 && (
                           <span className="text-sm text-destructive">
                             Bal: {formatMoney(parseFloat(ro.balanceDue ?? "0"))}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
-                          data-testid={`button-view-ro-mobile-${ro.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {ro.status !== "paid" && ro.status !== "void" && ro.status !== "completed" && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); setLocation(`/auto/repair-orders/${ro.id}`); }}
-                            data-testid={`button-edit-ro-mobile-${ro.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                        {isEstimatesTab ? (
+                          <>
+                            {ro.convertedToRoId ? (
+                              <Link
+                                href={`/auto/repair-orders/${ro.convertedToRoId}`}
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                              >
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1"
+                                  data-testid={`button-view-converted-ro-mobile-${ro.id}`}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View RO
+                                </Button>
+                              </Link>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                disabled={convertingId === ro.id}
+                                onClick={(e) => handleConvertToRo(ro.id, e)}
+                                data-testid={`button-convert-estimate-mobile-${ro.id}`}
+                              >
+                                {convertingId === ro.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRightLeft className="h-3 w-3" />}
+                                Convert
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
+                              data-testid={`button-view-ro-mobile-${ro.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); navigateToRo(ro.id); }}
+                              data-testid={`button-view-ro-mobile-${ro.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {ro.status !== "paid" && ro.status !== "void" && ro.status !== "completed" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); setLocation(`/auto/repair-orders/${ro.id}`); }}
+                                data-testid={`button-edit-ro-mobile-${ro.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              disabled={printingId === ro.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintPdf(ro.id);
+                              }}
+                              data-testid={`button-print-ro-mobile-${ro.id}`}
+                            >
+                              {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                            </Button>
+                          </>
                         )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          disabled={printingId === ro.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrintPdf(ro.id);
-                          }}
-                          data-testid={`button-print-ro-mobile-${ro.id}`}
-                        >
-                          {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                        </Button>
                       </div>
                     </div>
                   </CardContent>

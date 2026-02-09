@@ -10,7 +10,7 @@ import {
   Calendar, Settings, LogOut, Menu, X, Wrench, ChevronDown,
   UserPlus, CreditCard, BarChart3, MoreHorizontal, HelpCircle,
   DollarSign, Printer, Mail, Phone, Shield, Receipt, Landmark,
-  Search, Sparkles,
+  Search, Sparkles, Clock, MapPin, Megaphone, TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -31,6 +31,8 @@ const NAV_ITEMS = [
   { path: "/auto/inspections", label: "Inspections", shortLabel: "Insp", icon: ClipboardCheck },
   { path: "/auto/schedule", label: "Schedule", shortLabel: "Sched", icon: Calendar },
   { path: "/auto/reports", label: "Reports", shortLabel: "Reports", icon: BarChart3 },
+  { path: "/auto/reports-v2", label: "Analytics", shortLabel: "Analytics", icon: TrendingUp },
+  { path: "/auto/tech-portal", label: "Tech Portal", shortLabel: "Tech", icon: Clock },
   { path: "/auto/quickbooks", label: "QuickBooks", shortLabel: "QB", icon: Landmark },
   { path: "/auto/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
@@ -45,6 +47,8 @@ const BOTTOM_TAB_ITEMS = [
 const MORE_SHEET_ITEMS = [
   { path: "/auto/inspections", label: "Inspections", icon: ClipboardCheck },
   { path: "/auto/reports", label: "Reports", icon: BarChart3 },
+  { path: "/auto/reports-v2", label: "Analytics", icon: TrendingUp },
+  { path: "/auto/tech-portal", label: "Tech Portal", icon: Clock },
   { path: "/auto/settings", label: "Settings", icon: Settings },
 ];
 

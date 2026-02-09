@@ -9,7 +9,7 @@ import {
   DollarSign, TrendingUp, CheckCircle, ShieldCheck,
   FileText, Users, Calendar, Plus, ClipboardCheck,
   Phone, MessageSquare, Clock, Loader2, ArrowRight,
-  Wrench, UserCheck, AlertCircle
+  Wrench, UserCheck, AlertCircle, Timer
 } from "lucide-react";
 import { AutoLayout } from "./AutoLayout";
 import { handleCall, handleSms, SMS_TEMPLATES } from "@/lib/auto-communication";
@@ -53,6 +53,29 @@ interface EnhancedDashboardData {
   visibility: Record<string, boolean>;
 }
 
+interface ActiveTechSession {
+  session: {
+    id: number;
+    clockIn: string;
+    clockOut: string | null;
+    isActive: boolean;
+  };
+  techFirstName: string;
+  techLastName: string;
+  roNumber: string;
+  serviceDescription: string;
+}
+
+function formatElapsedTime(clockIn: string): string {
+  const start = new Date(clockIn).getTime();
+  const now = Date.now();
+  const diffMs = now - start;
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
@@ -94,6 +117,17 @@ export default function AutoDashboard() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
+  const [techSessions, setTechSessions] = useState<ActiveTechSession[]>([]);
+  const [techSessionsLoading, setTechSessionsLoading] = useState(true);
+
+  const fetchTechSessions = useCallback(() => {
+    setTechSessionsLoading(true);
+    autoFetch("/api/auto/tech-sessions/active")
+      .then((res) => res.json())
+      .then((d) => setTechSessions(Array.isArray(d) ? d : []))
+      .catch(console.error)
+      .finally(() => setTechSessionsLoading(false));
+  }, [autoFetch]);
 
   const fetchDashboard = useCallback(() => {
     setLoading(true);
@@ -112,7 +146,8 @@ export default function AutoDashboard() {
 
   useEffect(() => {
     fetchDashboard();
-  }, [fetchDashboard]);
+    fetchTechSessions();
+  }, [fetchDashboard, fetchTechSessions]);
 
   const visibility = data?.visibility ?? {};
 
@@ -538,6 +573,54 @@ export default function AutoDashboard() {
             )}
           </div>
         </div>
+
+        <Card data-testid="card-active-tech-sessions">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="h-4 w-4" />
+              Active Tech Sessions
+            </CardTitle>
+            <Badge variant="secondary" data-testid="badge-active-sessions-count">
+              {techSessions.length}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {techSessionsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : techSessions.length > 0 ? (
+              <div className="space-y-2">
+                {techSessions.map((ts) => (
+                  <div
+                    key={ts.session.id}
+                    className="flex items-center justify-between gap-2 rounded-md border p-3"
+                    data-testid={`tech-session-${ts.session.id}`}
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="text-sm font-medium truncate" data-testid={`text-tech-name-${ts.session.id}`}>
+                        {ts.techFirstName} {ts.techLastName}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                        <span data-testid={`text-tech-ro-${ts.session.id}`}>RO #{ts.roNumber}</span>
+                        <span className="truncate" data-testid={`text-tech-service-${ts.session.id}`}>{ts.serviceDescription}</span>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-xs" data-testid={`badge-elapsed-${ts.session.id}`}>
+                      <Clock className="h-3 w-3 mr-1" />
+                      {formatElapsedTime(ts.session.clockIn)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <Wrench className="h-8 w-8 mb-2" />
+                <p className="text-sm" data-testid="text-no-active-sessions">No active sessions</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       <CopyMessageModal
         open={!!smsModal}

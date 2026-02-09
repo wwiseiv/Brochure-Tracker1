@@ -17,6 +17,7 @@ interface StaffUser {
   email: string; role: string; isActive: boolean;
   phone: string | null; payType: string | null;
   payRate: string | null; pin: string | null;
+  employeeNumber: string | null;
 }
 
 interface Invitation {
@@ -50,7 +51,7 @@ export default function AutoStaff() {
   const [copied, setCopied] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editMember, setEditMember] = useState<StaffUser | null>(null);
-  const [editForm, setEditForm] = useState({ phone: "", role: "", payType: "", payRate: "", pin: "", isActive: true });
+  const [editForm, setEditForm] = useState({ phone: "", role: "", payType: "", payRate: "", pin: "", employeeNumber: "", isActive: true });
   const [saving, setSaving] = useState(false);
   const [resetPasswordMode, setResetPasswordMode] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -134,6 +135,7 @@ export default function AutoStaff() {
       payType: member.payType || "",
       payRate: member.payRate || "",
       pin: member.pin || "",
+      employeeNumber: member.employeeNumber || "",
       isActive: member.isActive,
     });
     setResetPasswordMode(false);
@@ -153,6 +155,7 @@ export default function AutoStaff() {
           payType: editForm.payType || null,
           payRate: editForm.payRate || null,
           pin: editForm.pin || null,
+          employeeNumber: editForm.employeeNumber || null,
           isActive: editForm.isActive,
         }),
       });
@@ -286,6 +289,9 @@ export default function AutoStaff() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">{member.firstName} {member.lastName}</p>
                     <p className="text-xs text-muted-foreground">{member.email}</p>
+                    {member.employeeNumber && (
+                      <p className="text-xs text-muted-foreground" data-testid={`text-staff-employee-number-${member.id}`}>Emp# {member.employeeNumber}</p>
+                    )}
                     {member.phone && (
                       <p className="text-xs text-muted-foreground" data-testid={`text-staff-phone-${member.id}`}>{member.phone}</p>
                     )}
@@ -347,6 +353,17 @@ export default function AutoStaff() {
                   <Label className="text-xs text-muted-foreground">Last Name</Label>
                   <p className="text-sm font-medium" data-testid="text-edit-last-name">{editMember.lastName}</p>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Employee #</Label>
+                <Input
+                  type="text"
+                  value={editForm.employeeNumber}
+                  onChange={(e) => setEditForm({ ...editForm, employeeNumber: e.target.value })}
+                  placeholder="e.g. EMP001"
+                  data-testid="input-staff-employee-number"
+                />
               </div>
 
               <div className="space-y-2">
