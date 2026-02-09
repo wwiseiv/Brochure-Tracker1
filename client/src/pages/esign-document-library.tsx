@@ -656,7 +656,7 @@ export default function ESignDocumentLibrary() {
       </div>
 
       <Dialog open={showNewRequestDialog} onOpenChange={setShowNewRequestDialog}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] mx-4 flex flex-col overflow-hidden">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[80dvh] mx-4 flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>New E-Signature Request</DialogTitle>
             <DialogDescription>
@@ -724,9 +724,9 @@ export default function ESignDocumentLibrary() {
               </Select>
             </div>
 
-            <div className="space-y-2 flex-1 flex flex-col min-h-0">
+            <div className="space-y-2">
               <Label>Documents to Include</Label>
-              <div className="border rounded-md divide-y flex-1 overflow-y-auto min-h-[120px]">
+              <div className="border rounded-md divide-y overflow-y-auto max-h-[200px]">
                 {templates.map(template => (
                   <label
                     key={template.id}
@@ -755,7 +755,7 @@ export default function ESignDocumentLibrary() {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4 flex-shrink-0 border-t mt-4">
+          <div className="flex gap-2 pt-4 pb-2 flex-shrink-0 border-t mt-4">
             <Button
               variant="outline"
               onClick={() => {
