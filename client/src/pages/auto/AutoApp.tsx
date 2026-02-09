@@ -1,5 +1,5 @@
 import { Switch, Route, Redirect } from "wouter";
-import { useAutoAuth } from "@/hooks/use-auto-auth";
+import { useAutoAuth, AutoAuthProvider } from "@/hooks/use-auto-auth";
 import AutoLogin from "./AutoLogin";
 import AutoRegister from "./AutoRegister";
 import AutoDashboard from "./AutoDashboard";
@@ -68,15 +68,17 @@ function AuthenticatedAutoRoutes() {
 
 export default function AutoApp() {
   return (
-    <Switch>
-      <Route path="/auto/login" component={AutoLogin} />
-      <Route path="/auto/register" component={AutoRegister} />
-      <Route path="/auto/approve/:token" component={AutoPublicApproval} />
-      <Route path="/auto/inspect/:token" component={AutoPublicInspection} />
-      <Route path="/auto/public/*">
-        {() => <div className="p-6 text-center">Public page - Coming soon</div>}
-      </Route>
-      <Route component={AuthenticatedAutoRoutes} />
-    </Switch>
+    <AutoAuthProvider>
+      <Switch>
+        <Route path="/auto/login" component={AutoLogin} />
+        <Route path="/auto/register" component={AutoRegister} />
+        <Route path="/auto/approve/:token" component={AutoPublicApproval} />
+        <Route path="/auto/inspect/:token" component={AutoPublicInspection} />
+        <Route path="/auto/public/*">
+          {() => <div className="p-6 text-center">Public page - Coming soon</div>}
+        </Route>
+        <Route component={AuthenticatedAutoRoutes} />
+      </Switch>
+    </AutoAuthProvider>
   );
 }

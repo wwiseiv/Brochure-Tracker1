@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
 
 interface AutoUser {
   id: number;
@@ -32,6 +32,13 @@ interface AutoAuthState {
   isLoading: boolean;
 }
 
+interface AutoAuthContextValue extends AutoAuthState {
+  login: (email: string, password: string) => Promise<any>;
+  register: (token: string, firstName: string, lastName: string, password: string, phone?: string) => Promise<any>;
+  logout: () => void;
+  autoFetch: (url: string, options?: RequestInit & { rawBody?: boolean }) => Promise<Response>;
+}
+
 const TOKEN_KEY = "pcb_auto_token";
 
 function getStoredToken(): string | null {
@@ -42,7 +49,9 @@ function getStoredToken(): string | null {
   }
 }
 
-export function useAutoAuth() {
+const AutoAuthContext = createContext<AutoAuthContextValue | null>(null);
+
+export function AutoAuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AutoAuthState>({
     user: null,
     shop: null,
@@ -91,7 +100,7 @@ export function useAutoAuth() {
       });
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const res = await fetch("/api/auto/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -103,9 +112,9 @@ export function useAutoAuth() {
     localStorage.setItem(TOKEN_KEY, data.token);
     setState({ user: data.user, shop: data.shop, token: data.token, isLoading: false });
     return data;
-  };
+  }, []);
 
-  const register = async (token: string, firstName: string, lastName: string, password: string, phone?: string) => {
+  const register = useCallback(async (token: string, firstName: string, lastName: string, password: string, phone?: string) => {
     const res = await fetch("/api/auto/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,14 +126,34 @@ export function useAutoAuth() {
     localStorage.setItem(TOKEN_KEY, data.token);
     setState({ user: data.user, shop: data.shop, token: data.token, isLoading: false });
     return data;
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setState({ user: null, shop: null, token: null, isLoading: false });
+  }, []);
+
+  const value: AutoAuthContextValue = {
+    ...state,
+    login,
+    register,
+    logout,
+    autoFetch,
   };
 
-  return { ...state, login, register, logout, autoFetch };
+  return (
+    <AutoAuthContext.Provider value={value}>
+      {children}
+    </AutoAuthContext.Provider>
+  );
+}
+
+export function useAutoAuth(): AutoAuthContextValue {
+  const context = useContext(AutoAuthContext);
+  if (!context) {
+    throw new Error("useAutoAuth must be used within an AutoAuthProvider");
+  }
+  return context;
 }
 
 export type { AutoUser, AutoShop };
