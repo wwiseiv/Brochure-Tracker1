@@ -191,6 +191,31 @@ export default function LandingPage() {
           </a>
         </section>
 
+        <section className="mb-12 pt-4" data-testid="section-video-tour">
+          <h2 className="text-xl md:text-2xl font-bold text-center mb-2">
+            See It in <span className="text-primary">Action</span>
+          </h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            A 4-minute walkthrough of every tool in your sales toolkit.
+          </p>
+
+          <div className="mx-auto w-[95%] md:w-[88%] lg:w-[min(900px,70%)]">
+            <div
+              className="relative overflow-hidden rounded-md md:rounded-xl shadow-lg bg-black"
+              style={{ aspectRatio: "16/9" }}
+            >
+              <iframe
+                src="https://player.vimeo.com/video/1163436271?badge=0&autopause=0&player_id=0&app_id=58479"
+                className="absolute inset-0 w-full h-full border-0"
+                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"
+                title="PCBancard Field Sales Intelligence Suite Overview"
+                loading="lazy"
+                data-testid="iframe-platform-tour"
+              />
+            </div>
+          </div>
+        </section>
+
         <section className="mb-12">
           <h2 className="text-lg font-semibold text-center mb-2">Core Field Operations</h2>
           <p className="text-sm text-muted-foreground text-center mb-6">Track deployments, manage merchants, and build your territory</p>
