@@ -239,8 +239,16 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             {isOwnerOrManager && (
               <Link href="/auto/quickbooks">
                 <DropdownMenuItem data-testid="menu-integrations">
-                  <CreditCard className="h-4 w-4 mr-2" />
+                  <Landmark className="h-4 w-4 mr-2" />
                   QuickBooks
+                </DropdownMenuItem>
+              </Link>
+            )}
+            {isOwnerOrManager && (
+              <Link href="/auto/processor">
+                <DropdownMenuItem data-testid="menu-processor">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Payment Processor
                 </DropdownMenuItem>
               </Link>
             )}
@@ -353,6 +361,20 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
               >
                 <Landmark className="h-5 w-5" />
                 QuickBooks
+              </button>
+            </Link>
+          )}
+          {isOwnerOrManager && (
+            <Link href="/auto/processor">
+              <button
+                className={`flex items-center gap-3 w-full px-3 py-3 rounded-md text-sm ${
+                  location.startsWith("/auto/processor") ? "text-primary bg-primary/10" : "text-foreground"
+                }`}
+                onClick={() => setMoreSheetOpen(false)}
+                data-testid="more-processor"
+              >
+                <CreditCard className="h-5 w-5" />
+                Payment Processor
               </button>
             </Link>
           )}
