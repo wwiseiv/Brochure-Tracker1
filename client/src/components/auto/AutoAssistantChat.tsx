@@ -251,68 +251,104 @@ function FloatingButton() {
   );
 }
 
-function AssistantNavLink({ navKey, onNavigate }: { navKey: string; onNavigate: (route: string) => void }) {
-  const target = NAV_TARGETS[navKey];
-  if (!target) return <span className="text-muted-foreground">[{navKey}]</span>;
-
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onNavigate(target.route);
-      }}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 text-blue-600 dark:text-blue-400 font-semibold text-xs leading-tight bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded transition-all duration-150 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/40 whitespace-nowrap"
-      title={`Go to ${target.label}`}
-      data-testid={`navlink-${navKey}`}
-    >
-      <ArrowRight className="h-3 w-3 shrink-0" />
-      {target.label}
-    </button>
-  );
-}
-
-function renderAssistantContent(content: string, onNavigate: (route: string) => void): ReactNode[] {
-  const navPattern = /\[\[nav:([a-z0-9-]+)\]\]/g;
+function renderAssistantContent(content: string, onNavigate: (route: string) => void): ReactNode {
+  const navPattern = /\*{0,2}\[\[nav:([a-z0-9-]+)\]\]\*{0,2}/g;
   if (!navPattern.test(content)) {
-    return [
-      <div key="md" className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
-        <ReactMarkdown>{content}</ReactMarkdown>
-      </div>
-    ];
+    return <ReactMarkdown>{content}</ReactMarkdown>;
   }
 
   navPattern.lastIndex = 0;
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  let cleaned = content;
+  const navKeys: { placeholder: string; key: string }[] = [];
   let idx = 0;
 
-  while ((match = navPattern.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const textBefore = content.slice(lastIndex, match.index);
-      parts.push(
-        <span key={`md-${idx}`} className="prose prose-sm dark:prose-invert max-w-none inline [&_p]:inline [&_p]:m-0">
-          <ReactMarkdown>{textBefore}</ReactMarkdown>
-        </span>
-      );
-    }
-    parts.push(
-      <AssistantNavLink key={`nav-${idx}`} navKey={match[1]} onNavigate={onNavigate} />
-    );
-    lastIndex = match.index + match[0].length;
+  cleaned = content.replace(navPattern, (_full, key: string) => {
+    const placeholder = `NAVPLACEHOLDER_${idx}_${key}`;
+    navKeys.push({ placeholder, key });
     idx++;
-  }
+    return placeholder;
+  });
 
-  if (lastIndex < content.length) {
-    const textAfter = content.slice(lastIndex);
-    parts.push(
-      <span key={`md-end`} className="prose prose-sm dark:prose-invert max-w-none inline [&_p]:inline [&_p]:m-0">
-        <ReactMarkdown>{textAfter}</ReactMarkdown>
-      </span>
-    );
-  }
+  const paragraphs = cleaned.split(/\n\n+/);
+  const result: ReactNode[] = [];
 
-  return parts;
+  paragraphs.forEach((para, pIdx) => {
+    const hasNav = navKeys.some(n => para.includes(n.placeholder));
+    if (!hasNav) {
+      result.push(
+        <div key={`p-${pIdx}`}>
+          <ReactMarkdown>{para}</ReactMarkdown>
+        </div>
+      );
+      return;
+    }
+
+    const lines = para.split(/\n/);
+    lines.forEach((line, lIdx) => {
+      const lineNavs = navKeys.filter(n => line.includes(n.placeholder));
+      if (lineNavs.length === 0) {
+        result.push(
+          <div key={`p-${pIdx}-l-${lIdx}`}>
+            <ReactMarkdown>{line}</ReactMarkdown>
+          </div>
+        );
+        return;
+      }
+
+      const segments: ReactNode[] = [];
+      let remaining = line;
+      let sIdx = 0;
+
+      for (const nav of lineNavs) {
+        const pos = remaining.indexOf(nav.placeholder);
+        if (pos > 0) {
+          let textBefore = remaining.slice(0, pos).replace(/\*{2,}/g, '').trim();
+          if (textBefore) {
+            segments.push(<span key={`s-${pIdx}-${lIdx}-${sIdx}`}>{textBefore} </span>);
+            sIdx++;
+          }
+        }
+
+        const target = NAV_TARGETS[nav.key];
+        if (target) {
+          segments.push(
+            <button
+              key={`n-${pIdx}-${lIdx}-${sIdx}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate(target.route);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 my-0.5 text-blue-600 dark:text-blue-400 font-semibold text-xs bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/40 whitespace-nowrap align-middle"
+              title={`Go to ${target.label}`}
+              data-testid={`navlink-${nav.key}`}
+            >
+              <ArrowRight className="h-3 w-3 shrink-0" />
+              {target.label}
+            </button>
+          );
+        } else {
+          segments.push(<span key={`u-${pIdx}-${lIdx}-${sIdx}`} className="text-muted-foreground">[{nav.key}]</span>);
+        }
+        sIdx++;
+        remaining = remaining.slice(pos + nav.placeholder.length);
+      }
+
+      if (remaining.trim()) {
+        let textAfter = remaining.replace(/\*{2,}/g, '').trim();
+        if (textAfter) {
+          segments.push(<span key={`e-${pIdx}-${lIdx}-${sIdx}`}> {textAfter}</span>);
+        }
+      }
+
+      result.push(
+        <div key={`line-${pIdx}-${lIdx}`} className="flex flex-wrap items-center gap-0.5 my-1">
+          {segments}
+        </div>
+      );
+    });
+  });
+
+  return <div>{result}</div>;
 }
 
 function ChatPanel() {

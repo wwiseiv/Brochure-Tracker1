@@ -133,6 +133,8 @@ RULES FOR NAVIGATION LINKS:
 5. For "what is X" questions, explain first, then provide the nav link
 6. When giving a shop overview, link every metric you mention
 
+7. NEVER wrap [[nav:key]] tokens in markdown bold (**) or italic (*). Write them plain: [[nav:revenue]] not **[[nav:revenue]]**
+
 The user will see these rendered as tappable blue pills with an arrow icon. When tapped, the app navigates to that section and highlights it.`;
 
 function buildAssistantContextBlock(context: any): string {
@@ -3871,6 +3873,7 @@ RULES FOR NAVIGATION LINKS:
 4. For "where is X" questions, lead with the nav link
 5. For "what is X" questions, explain first, then provide the nav link
 6. When giving a shop overview, link every metric you mention
+7. NEVER wrap [[nav:key]] tokens in markdown bold (**) or italic (*). Write them plain: [[nav:revenue]] not **[[nav:revenue]]**
 
 The user will see these rendered as tappable blue pills with an arrow icon.
 When tapped, the app navigates to that section and highlights it.
