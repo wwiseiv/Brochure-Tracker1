@@ -1106,7 +1106,8 @@ export default function DealPipelinePage() {
                   onClick={() => {
                     const stageColumn = document.querySelector(`[data-testid="stage-column-${stage}"]`);
                     if (stageColumn) {
-                      stageColumn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                      const isDesktop = window.innerWidth >= 1024;
+                      stageColumn.scrollIntoView({ behavior: 'smooth', block: isDesktop ? 'start' : 'nearest', inline: isDesktop ? 'nearest' : 'center' });
                     }
                   }}
                   className={`flex flex-col items-center px-2 py-1 rounded cursor-pointer hover-elevate active-elevate-2 transition-all ${count > 0 ? config.color : 'bg-muted/30 text-muted-foreground'}`}
@@ -1121,22 +1122,16 @@ export default function DealPipelinePage() {
           </div>
         </div>
 
-        {/* Kanban Board - Full width with horizontal scroll */}
+        {/* Kanban Board - Horizontal scroll on mobile/tablet, stacked grid on desktop */}
         <div
           ref={kanbanDrag.ref}
-          className="overflow-x-auto overflow-y-hidden pb-4 -mx-4 px-4"
+          className="lg:overflow-visible overflow-x-auto overflow-y-hidden pb-4 -mx-4 px-4 lg:mx-0 lg:px-0"
           style={{ WebkitOverflowScrolling: 'touch' }}
           data-testid="kanban-board"
         >
-          <div className="flex gap-3 flex-nowrap w-max">
+          <div className="flex gap-3 flex-nowrap w-max lg:w-full lg:flex-wrap lg:grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
-              <div key={phaseName} className="flex gap-2">
-                {/* Phase Divider Label - shown between groups */}
-                {phaseIdx > 0 && (
-                  <div className="flex items-center">
-                    <div className="w-px h-full bg-border mx-1" />
-                  </div>
-                )}
+              <div key={phaseName} className="contents">
                 
                 {stages.map((stage) => {
                   const stageDeals = kanbanFilteredDeals.filter(d => d.currentStage === stage);
@@ -1147,7 +1142,7 @@ export default function DealPipelinePage() {
                   return (
                     <div
                       key={stage}
-                      className={`flex-none w-[220px] md:w-[240px] lg:w-[260px] rounded-lg ${isTerminal ? 'bg-muted/30' : 'bg-muted/50'}`}
+                      className={`flex-none w-[220px] md:w-[240px] lg:w-full rounded-lg ${isTerminal ? 'bg-muted/30' : 'bg-muted/50'}`}
                       data-testid={`stage-column-${stage}`}
                     >
                       {/* Stage Header */}
@@ -1165,7 +1160,7 @@ export default function DealPipelinePage() {
                       </div>
                       
                       {/* Deal Cards */}
-                      <div className="p-2 space-y-2 max-h-[50vh] md:max-h-[60vh] overflow-y-auto">
+                      <div className="p-2 space-y-2 max-h-[50vh] md:max-h-[60vh] lg:max-h-none overflow-y-auto lg:overflow-y-visible">
                         {stageDeals.map((deal) => (
                           <Card
                             key={deal.id}
