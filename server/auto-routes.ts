@@ -2960,7 +2960,7 @@ router.post("/reports/export", autoAuth, async (req: Request, res: Response) => 
 
       if (prompt) {
         const response = await anthropicClient.messages.create({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-5-20250929",
           max_tokens: 500,
           messages: [{ role: "user", content: prompt }],
         });
@@ -3239,7 +3239,7 @@ IMPORTANT COMPLIANCE RULES - You MUST follow these:
 - The difference between cash price and card price is called "Dual Pricing" — never call it a fee or surcharge.`;
 
       const response = await anthropicClient.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       });
@@ -3253,7 +3253,7 @@ IMPORTANT COMPLIANCE RULES - You MUST follow these:
     }
 
     const ExcelJS = await import("exceljs");
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new (ExcelJS.default?.Workbook ?? ExcelJS.Workbook)();
     workbook.creator = "PCB Auto";
     workbook.created = new Date();
 
