@@ -247,7 +247,7 @@ export default function AutoInspections() {
 
   const downloadPdf = () => {
     if (!activeInspection) return;
-    const token = localStorage.getItem("auto_token");
+    const token = localStorage.getItem("pcb_auto_token");
     const url = `/api/auto/dvi/inspections/${activeInspection.id}/pdf`;
     window.open(url + `?token=${encodeURIComponent(token || "")}`, "_blank");
   };

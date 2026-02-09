@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { AutoLayout } from "./AutoLayout";
@@ -104,6 +104,28 @@ export default function AutoRepairOrderForm() {
     customerId: "", vehicleId: "", technicianId: "",
     customerConcern: "", internalNotes: "", promisedDate: "",
   });
+
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerSearchRef = useRef<HTMLDivElement>(null);
+
+  const filteredCustomers = customerSearch.trim()
+    ? customers.filter(c => `${c.firstName} ${c.lastName}`.toLowerCase().includes(customerSearch.toLowerCase())
+        || (c.phone && c.phone.includes(customerSearch))
+        || (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase())))
+    : customers;
+
+  const selectedCustomer = form.customerId ? customers.find(c => c.id.toString() === form.customerId) : null;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(e.target as Node)) {
+        setCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const [newItem, setNewItem] = useState({
     type: "labor", description: "", partNumber: "", quantity: "1",
@@ -581,14 +603,81 @@ export default function AutoRepairOrderForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Customer *</Label>
-                  <Select value={form.customerId} onValueChange={onCustomerChange} disabled={!isNew}>
-                    <SelectTrigger data-testid="select-customer"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                    <SelectContent>
-                      {customers.map(c => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.firstName} {c.lastName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {!isNew ? (
+                    <div className="flex items-center h-9 px-3 rounded-md border bg-muted text-sm" data-testid="text-selected-customer">
+                      {selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "No customer"}
+                    </div>
+                  ) : selectedCustomer ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center flex-1 h-9 px-3 rounded-md border bg-muted text-sm" data-testid="text-selected-customer">
+                        {selectedCustomer.firstName} {selectedCustomer.lastName}
+                        {selectedCustomer.phone && <span className="text-muted-foreground ml-2 text-xs">{selectedCustomer.phone}</span>}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setForm({ ...form, customerId: "", vehicleId: "" });
+                          setVehicles([]);
+                          setCustomerSearch("");
+                        }}
+                        data-testid="button-clear-customer"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="relative" ref={customerSearchRef}>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          placeholder="Search by name, phone, or email..."
+                          value={customerSearch}
+                          onChange={(e) => {
+                            setCustomerSearch(e.target.value);
+                            setCustomerDropdownOpen(true);
+                          }}
+                          onFocus={() => setCustomerDropdownOpen(true)}
+                          className="pl-8"
+                          autoComplete="off"
+                          role="combobox"
+                          aria-expanded={customerDropdownOpen}
+                          aria-haspopup="listbox"
+                          data-testid="input-customer-search"
+                        />
+                      </div>
+                      {customerDropdownOpen && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-auto rounded-md border bg-popover shadow-md" role="listbox">
+                          {filteredCustomers.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">No customers found</div>
+                          ) : (
+                            filteredCustomers.slice(0, 50).map(c => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                role="option"
+                                className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer flex items-center justify-between"
+                                onClick={() => {
+                                  onCustomerChange(c.id.toString());
+                                  setCustomerSearch("");
+                                  setCustomerDropdownOpen(false);
+                                }}
+                                data-testid={`option-customer-${c.id}`}
+                              >
+                                <span className="font-medium">{c.firstName} {c.lastName}</span>
+                                {(c.phone || c.email) && (
+                                  <span className="text-xs text-muted-foreground ml-2 truncate">
+                                    {c.phone || c.email}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Vehicle *</Label>
