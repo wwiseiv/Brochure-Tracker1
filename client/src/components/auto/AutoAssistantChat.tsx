@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAutoAssistant } from "./AutoAssistantProvider";
 import { useLocation } from "wouter";
-import ReactMarkdown from "react-markdown";
 import { Sparkles, X, Send, Mic, MicOff, Volume2, VolumeX, Square, Trash2, ArrowRight } from "lucide-react";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 
@@ -33,31 +32,31 @@ const PAGE_LABELS: Record<string, string> = {
   "unknown": "PCB Auto",
 };
 
-const NAV_TARGETS: Record<string, { label: string; route: string }> = {
-  "revenue": { label: "Revenue", route: "/auto/dashboard" },
-  "open-ros": { label: "Open ROs", route: "/auto/dashboard" },
-  "total-customers": { label: "Total Customers", route: "/auto/dashboard" },
-  "appointments": { label: "Today's Appointments", route: "/auto/dashboard" },
-  "fees-saved": { label: "Fees Saved", route: "/auto/dashboard" },
-  "work-orders": { label: "Work Orders", route: "/auto/repair-orders" },
-  "estimates": { label: "Estimates", route: "/auto/repair-orders" },
-  "customers": { label: "Customers", route: "/auto/customers" },
-  "vehicles": { label: "Vehicles", route: "/auto/customers" },
-  "schedule": { label: "Schedule", route: "/auto/schedule" },
-  "inspections": { label: "Inspections (DVI)", route: "/auto/inspections" },
-  "invoices": { label: "Invoices", route: "/auto/repair-orders" },
-  "parts": { label: "Parts", route: "/auto/repair-orders" },
-  "reports": { label: "Reports", route: "/auto/reports" },
-  "report-cash-card": { label: "Cash vs Card Report", route: "/auto/reports" },
-  "report-revenue": { label: "Revenue Report", route: "/auto/reports" },
-  "report-tech": { label: "Tech Productivity", route: "/auto/reports" },
-  "report-customers": { label: "Customer Report", route: "/auto/reports" },
-  "settings": { label: "Settings", route: "/auto/settings" },
-  "settings-dual-pricing": { label: "Dual Pricing Settings", route: "/auto/settings" },
-  "settings-staff": { label: "Staff Management", route: "/auto/staff" },
-  "settings-quickbooks": { label: "QuickBooks", route: "/auto/quickbooks" },
-  "new-ro": { label: "New Work Order", route: "/auto/repair-orders/new" },
-  "payment-processor": { label: "Payment Processor", route: "/auto/processor" },
+const NAV_TARGETS: Record<string, { label: string; route: string; highlightId?: string; toast?: string }> = {
+  "revenue": { label: "Revenue", route: "/auto/dashboard", highlightId: "stat-revenue", toast: "Revenue (Month)" },
+  "open-ros": { label: "Open ROs", route: "/auto/dashboard", highlightId: "stat-open-ros", toast: "Open Repair Orders" },
+  "total-customers": { label: "Total Customers", route: "/auto/dashboard", highlightId: "stat-total-customers", toast: "Total Customers" },
+  "appointments": { label: "Today's Appointments", route: "/auto/dashboard", highlightId: "stat-appointments", toast: "Today's Appointments" },
+  "fees-saved": { label: "Fees Saved", route: "/auto/dashboard", highlightId: "card-dual-pricing-widget", toast: "Dual Pricing Savings" },
+  "work-orders": { label: "Work Orders", route: "/auto/repair-orders", toast: "Work Orders" },
+  "estimates": { label: "Estimates", route: "/auto/repair-orders", toast: "Estimates" },
+  "customers": { label: "Customers", route: "/auto/customers", toast: "Customer Management" },
+  "vehicles": { label: "Vehicles", route: "/auto/customers", toast: "Vehicle Records" },
+  "schedule": { label: "Schedule", route: "/auto/schedule", toast: "Today's Schedule" },
+  "inspections": { label: "Inspections (DVI)", route: "/auto/inspections", toast: "Digital Vehicle Inspections" },
+  "invoices": { label: "Invoices", route: "/auto/repair-orders", toast: "Invoices" },
+  "parts": { label: "Parts", route: "/auto/repair-orders", toast: "Parts Ordering" },
+  "reports": { label: "Reports", route: "/auto/reports", toast: "Reports & Analytics" },
+  "report-cash-card": { label: "Cash vs Card Report", route: "/auto/reports", toast: "Cash vs Card Report" },
+  "report-revenue": { label: "Revenue Report", route: "/auto/reports", toast: "Revenue Report" },
+  "report-tech": { label: "Tech Productivity", route: "/auto/reports", toast: "Tech Productivity" },
+  "report-customers": { label: "Customer Report", route: "/auto/reports", toast: "Customer Report" },
+  "settings": { label: "Settings", route: "/auto/settings", toast: "Shop Settings" },
+  "settings-dual-pricing": { label: "Dual Pricing Settings", route: "/auto/settings", toast: "Dual Pricing Configuration" },
+  "settings-staff": { label: "Staff Management", route: "/auto/staff", toast: "Staff & Roles" },
+  "settings-quickbooks": { label: "QuickBooks", route: "/auto/quickbooks", toast: "QuickBooks Integration" },
+  "new-ro": { label: "New Work Order", route: "/auto/repair-orders/new", toast: "Create New Work Order" },
+  "payment-processor": { label: "Payment Processor", route: "/auto/processor", toast: "Payment Processor Setup" },
 };
 
 function getPageKey(): string {
@@ -251,104 +250,73 @@ function FloatingButton() {
   );
 }
 
-function renderAssistantContent(content: string, onNavigate: (route: string) => void): ReactNode {
-  const navPattern = /\*{0,2}\[\[nav:([a-z0-9-]+)\]\]\*{0,2}/g;
-  if (!navPattern.test(content)) {
-    return <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"><ReactMarkdown>{content}</ReactMarkdown></div>;
-  }
+function renderAssistantContent(content: string, onNavigate: (key: string) => void): ReactNode {
+  const nodes: ReactNode[] = [];
+  const lines = content.split('\n');
 
-  navPattern.lastIndex = 0;
-  let cleaned = content;
-  const navKeys: { placeholder: string; key: string }[] = [];
-  let idx = 0;
-
-  cleaned = content.replace(navPattern, (_full, key: string) => {
-    const placeholder = `NAVPLACEHOLDER_${idx}_${key}`;
-    navKeys.push({ placeholder, key });
-    idx++;
-    return placeholder;
-  });
-
-  const paragraphs = cleaned.split(/\n\n+/);
-  const result: ReactNode[] = [];
-
-  paragraphs.forEach((para, pIdx) => {
-    const hasNav = navKeys.some(n => para.includes(n.placeholder));
-    if (!hasNav) {
-      result.push(
-        <div key={`p-${pIdx}`} className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
-          <ReactMarkdown>{para}</ReactMarkdown>
-        </div>
-      );
-      return;
+  lines.forEach((line, lineIdx) => {
+    if (lineIdx > 0) {
+      nodes.push(<br key={`br-${lineIdx}`} />);
     }
 
-    const lines = para.split(/\n/);
-    lines.forEach((line, lIdx) => {
-      const lineNavs = navKeys.filter(n => line.includes(n.placeholder));
-      if (lineNavs.length === 0) {
-        result.push(
-          <div key={`p-${pIdx}-l-${lIdx}`} className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
-            <ReactMarkdown>{line}</ReactMarkdown>
-          </div>
+    const tokenPattern = /(\*{0,2}\[\[nav:([a-z0-9-]+)\]\]\*{0,2}|\*\*(.+?)\*\*)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = tokenPattern.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        nodes.push(
+          <span key={`t-${lineIdx}-${lastIndex}`}>
+            {line.slice(lastIndex, match.index)}
+          </span>
         );
-        return;
       }
 
-      const segments: ReactNode[] = [];
-      let remaining = line;
-      let sIdx = 0;
-
-      for (const nav of lineNavs) {
-        const pos = remaining.indexOf(nav.placeholder);
-        if (pos > 0) {
-          let textBefore = remaining.slice(0, pos).replace(/\*{2,}/g, '').trim();
-          if (textBefore) {
-            segments.push(<span key={`s-${pIdx}-${lIdx}-${sIdx}`}>{textBefore} </span>);
-            sIdx++;
-          }
-        }
-
-        const target = NAV_TARGETS[nav.key];
+      if (match[2]) {
+        const navKey = match[2];
+        const target = NAV_TARGETS[navKey];
         if (target) {
-          segments.push(
+          nodes.push(
             <button
-              key={`n-${pIdx}-${lIdx}-${sIdx}`}
+              key={`nav-${lineIdx}-${match.index}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onNavigate(target.route);
+                onNavigate(navKey);
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 my-0.5 text-blue-600 dark:text-blue-400 font-semibold text-xs bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/40 whitespace-nowrap align-middle"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 text-blue-600 dark:text-blue-400 font-semibold text-[13px] leading-tight bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-800/40 active:bg-blue-200 dark:active:bg-blue-700/50 border-b-[1.5px] border-blue-300 dark:border-blue-600 hover:border-blue-500 rounded transition-all duration-150 cursor-pointer whitespace-nowrap"
               title={`Go to ${target.label}`}
-              data-testid={`navlink-${nav.key}`}
+              data-testid={`navlink-${navKey}`}
             >
-              <ArrowRight className="h-3 w-3 shrink-0" />
+              <ArrowRight className="h-3 w-3 shrink-0 opacity-70" />
               {target.label}
             </button>
           );
         } else {
-          segments.push(<span key={`u-${pIdx}-${lIdx}-${sIdx}`} className="text-muted-foreground">[{nav.key}]</span>);
+          nodes.push(
+            <span key={`u-${lineIdx}-${match.index}`} className="text-muted-foreground">[{navKey}]</span>
+          );
         }
-        sIdx++;
-        remaining = remaining.slice(pos + nav.placeholder.length);
+      } else if (match[3]) {
+        nodes.push(
+          <strong key={`b-${lineIdx}-${match.index}`} className="font-semibold">
+            {match[3]}
+          </strong>
+        );
       }
 
-      if (remaining.trim()) {
-        let textAfter = remaining.replace(/\*{2,}/g, '').trim();
-        if (textAfter) {
-          segments.push(<span key={`e-${pIdx}-${lIdx}-${sIdx}`}> {textAfter}</span>);
-        }
-      }
+      lastIndex = match.index + match[0].length;
+    }
 
-      result.push(
-        <div key={`line-${pIdx}-${lIdx}`} className="flex flex-wrap items-center gap-0.5 my-1">
-          {segments}
-        </div>
+    if (lastIndex < line.length) {
+      nodes.push(
+        <span key={`t-${lineIdx}-end`}>
+          {line.slice(lastIndex)}
+        </span>
       );
-    });
+    }
   });
 
-  return <div>{result}</div>;
+  return <>{nodes}</>;
 }
 
 function ChatPanel() {
@@ -363,9 +331,23 @@ function ChatPanel() {
 
   const { playingId, play } = useReadAloud();
 
-  const handleNavigation = useCallback((route: string) => {
+  const handleNavigation = useCallback((navKey: string) => {
+    const target = NAV_TARGETS[navKey];
+    if (!target) return;
     close();
-    setTimeout(() => setLocation(route), 300);
+    setTimeout(() => {
+      setLocation(target.route);
+      if (target.highlightId) {
+        setTimeout(() => {
+          const el = document.getElementById(target.highlightId!);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ai-nav-highlight');
+            setTimeout(() => el.classList.remove('ai-nav-highlight'), 2500);
+          }
+        }, 400);
+      }
+    }, 300);
   }, [close, setLocation]);
 
   const handleDictationResult = useCallback((text: string) => {
@@ -522,7 +504,7 @@ function ChatPanel() {
                   data-testid={`message-${msg.role}-${msg.id}`}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="max-w-none">
+                    <div className="text-sm leading-relaxed">
                       {renderAssistantContent(msg.content, handleNavigation)}
                     </div>
                   ) : (
