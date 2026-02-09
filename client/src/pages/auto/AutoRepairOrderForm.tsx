@@ -568,7 +568,7 @@ export default function AutoRepairOrderForm() {
                       <DropdownMenuSeparator />
                       {selectedCustomer?.phone && ro.approvalToken && (
                         <DropdownMenuItem onClick={() => {
-                          const total = `$${parseFloat(ro.grandTotalCash || "0").toFixed(2)}`;
+                          const total = `$${parseFloat(ro.totalCash || "0").toFixed(2)}`;
                           const msg = SMS_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, ro.roNumber, total, approvalUrl);
                           const result = handleSms(selectedCustomer.phone!, msg, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
                           if (!result.isMobile) setSmsModal({ phone: result.phone, message: result.body });
@@ -578,7 +578,7 @@ export default function AutoRepairOrderForm() {
                       )}
                       {selectedCustomer?.email && ro.approvalToken && (
                         <DropdownMenuItem onClick={() => {
-                          const total = `$${parseFloat(ro.grandTotalCash || "0").toFixed(2)}`;
+                          const total = `$${parseFloat(ro.totalCash || "0").toFixed(2)}`;
                           const tmpl = EMAIL_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, vehicleStr, ro.roNumber, total, approvalUrl, "(888) 537-7332");
                           handleEmail(selectedCustomer.email!, tmpl.subject, tmpl.body, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
                         }} data-testid="menu-email-estimate">
