@@ -40,11 +40,16 @@ const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
 }
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const d = new Date(dateStr);
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hour12}:${m.toString().padStart(2, "0")} ${ampm}`;
 }
 
 function getDuration(start: string, end: string) {
@@ -66,12 +71,16 @@ function statusBadge(status: string) {
 }
 
 function getCalendarDays(year: number, month: number) {
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
+  const first = new Date(Date.UTC(year, month, 1));
+  const last = new Date(Date.UTC(year, month + 1, 0));
   const days: (Date | null)[] = [];
-  for (let i = 0; i < first.getDay(); i++) days.push(null);
-  for (let d = 1; d <= last.getDate(); d++) days.push(new Date(year, month, d));
+  for (let i = 0; i < first.getUTCDay(); i++) days.push(null);
+  for (let d = 1; d <= last.getUTCDate(); d++) days.push(new Date(Date.UTC(year, month, d)));
   return days;
+}
+
+function toDateStr(d: Date) {
+  return `${d.getUTCFullYear()}-${(d.getUTCMonth() + 1).toString().padStart(2, "0")}-${d.getUTCDate().toString().padStart(2, "0")}`;
 }
 
 export default function AutoSchedule() {
@@ -93,17 +102,17 @@ export default function AutoSchedule() {
   });
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
-  const dateStr = selectedDate.toISOString().split("T")[0];
-  const dayLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const dateStr = `${selectedDate.getUTCFullYear()}-${(selectedDate.getUTCMonth() + 1).toString().padStart(2, "0")}-${selectedDate.getUTCDate().toString().padStart(2, "0")}`;
+  const dayLabel = new Date(dateStr + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
   const today = useMemo(() => new Date(), []);
 
   const fetchDayData = useCallback(async () => {
     setLoading(true);
     try {
-      const dayStart = new Date(dateStr + "T00:00:00");
-      const dayEnd = new Date(dateStr + "T23:59:59");
+      const dayStart = dateStr + "T00:00:00.000Z";
+      const dayEnd = dateStr + "T23:59:59.999Z";
       const [aptsRes, baysRes, staffRes] = await Promise.all([
-        autoFetch(`/api/auto/appointments?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`),
+        autoFetch(`/api/auto/appointments?start=${dayStart}&end=${dayEnd}`),
         autoFetch("/api/auto/bays"),
         autoFetch("/api/auto/staff"),
       ]);
@@ -117,11 +126,12 @@ export default function AutoSchedule() {
 
   const fetchMonthData = useCallback(async () => {
     try {
-      const y = calendarMonth.getFullYear();
-      const m = calendarMonth.getMonth();
-      const monthStart = new Date(y, m, 1);
-      const monthEnd = new Date(y, m + 1, 0, 23, 59, 59);
-      const res = await autoFetch(`/api/auto/appointments?start=${monthStart.toISOString()}&end=${monthEnd.toISOString()}`);
+      const y = calendarMonth.getUTCFullYear();
+      const m = calendarMonth.getUTCMonth();
+      const monthStart = `${y}-${(m + 1).toString().padStart(2, "0")}-01T00:00:00.000Z`;
+      const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const monthEnd = `${y}-${(m + 1).toString().padStart(2, "0")}-${lastDay}T23:59:59.999Z`;
+      const res = await autoFetch(`/api/auto/appointments?start=${monthStart}&end=${monthEnd}`);
       setMonthAppointments(await res.json());
     } catch (err) { console.error(err); }
   }, [autoFetch, calendarMonth]);
@@ -132,7 +142,8 @@ export default function AutoSchedule() {
   const daysWithAppointments = useMemo(() => {
     const set = new Set<string>();
     monthAppointments.forEach(a => {
-      const d = new Date(a.startTime).toISOString().split("T")[0];
+      const dt = new Date(a.startTime);
+      const d = `${dt.getUTCFullYear()}-${(dt.getUTCMonth() + 1).toString().padStart(2, "0")}-${dt.getUTCDate().toString().padStart(2, "0")}`;
       set.add(d);
     });
     return set;
@@ -156,14 +167,14 @@ export default function AutoSchedule() {
     [...appointments].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
   [appointments]);
 
-  const prevDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d); };
-  const nextDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d); };
+  const prevDay = () => { const d = new Date(selectedDate); d.setUTCDate(d.getUTCDate() - 1); setSelectedDate(d); };
+  const nextDay = () => { const d = new Date(selectedDate); d.setUTCDate(d.getUTCDate() + 1); setSelectedDate(d); };
 
   const handleCreate = async () => {
     if (!form.title) return;
     try {
-      const startTime = new Date(`${form.date || dateStr}T${form.startTime}:00`);
-      const endTime = new Date(`${form.date || dateStr}T${form.endTime}:00`);
+      const startTime = new Date(`${form.date || dateStr}T${form.startTime}:00.000Z`);
+      const endTime = new Date(`${form.date || dateStr}T${form.endTime}:00.000Z`);
       const res = await autoFetch("/api/auto/appointments", {
         method: "POST",
         body: JSON.stringify({
@@ -199,8 +210,10 @@ export default function AutoSchedule() {
   const getAppointmentPosition = (apt: Appointment) => {
     const start = new Date(apt.startTime);
     const end = new Date(apt.endTime);
-    const top = ((start.getHours() * 60 + start.getMinutes()) - START_HOUR * 60) / 60 * HOUR_HEIGHT;
-    const height = Math.max(((end.getHours() * 60 + end.getMinutes()) - (start.getHours() * 60 + start.getMinutes())) / 60 * HOUR_HEIGHT, 30);
+    const startMinutes = start.getUTCHours() * 60 + start.getUTCMinutes();
+    const endMinutes = end.getUTCHours() * 60 + end.getUTCMinutes();
+    const top = (startMinutes - START_HOUR * 60) / 60 * HOUR_HEIGHT;
+    const height = Math.max((endMinutes - startMinutes) / 60 * HOUR_HEIGHT, 30);
     return { top, height };
   };
 
@@ -221,14 +234,14 @@ export default function AutoSchedule() {
     return bays.find(b => b.id === bayId)?.name || null;
   };
 
-  const calDays = useMemo(() => getCalendarDays(calendarMonth.getFullYear(), calendarMonth.getMonth()), [calendarMonth]);
-  const monthLabel = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const calDays = useMemo(() => getCalendarDays(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth()), [calendarMonth]);
+  const monthLabel = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   const mobileWeekDays = useMemo(() => {
     const days: Date[] = [];
     for (let i = -3; i <= 3; i++) {
       const d = new Date(today);
-      d.setDate(d.getDate() + i);
+      d.setUTCDate(d.getUTCDate() + i);
       days.push(d);
     }
     return days;
@@ -296,7 +309,7 @@ export default function AutoSchedule() {
         {/* Mobile date picker bar */}
         <div className="lg:hidden flex items-center gap-1 overflow-x-auto pb-2">
           {mobileWeekDays.map((d) => {
-            const ds = d.toISOString().split("T")[0];
+            const ds = toDateStr(d);
             const isSelected = isSameDay(d, selectedDate);
             const hasDot = daysWithAppointments.has(ds);
             return (
@@ -305,8 +318,8 @@ export default function AutoSchedule() {
                 onClick={() => setSelectedDate(new Date(d))}
                 className={`flex flex-col items-center px-3 py-2 rounded-md min-w-[48px] ${isSelected ? "bg-primary text-primary-foreground" : ""}`}
               >
-                <span className="text-[10px] uppercase">{WEEKDAYS[d.getDay()]}</span>
-                <span className="text-sm font-medium">{d.getDate()}</span>
+                <span className="text-[10px] uppercase">{WEEKDAYS[d.getUTCDay()]}</span>
+                <span className="text-sm font-medium">{d.getUTCDate()}</span>
                 {hasDot && <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-primary-foreground" : "bg-primary"}`} />}
               </button>
             );
@@ -320,11 +333,11 @@ export default function AutoSchedule() {
             <Card data-testid="mini-calendar">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} data-testid="button-prev-month">
+                  <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(new Date(Date.UTC(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth() - 1, 1)))} data-testid="button-prev-month">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-xs font-medium" data-testid="text-current-month">{monthLabel}</span>
-                  <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} data-testid="button-next-month">
+                  <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(new Date(Date.UTC(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth() + 1, 1)))} data-testid="button-next-month">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -332,7 +345,7 @@ export default function AutoSchedule() {
                   {WEEKDAYS.map(d => <div key={d} className="text-[10px] text-muted-foreground py-1">{d}</div>)}
                   {calDays.map((day, i) => {
                     if (!day) return <div key={`e-${i}`} />;
-                    const ds = day.toISOString().split("T")[0];
+                    const ds = toDateStr(day);
                     const isToday = isSameDay(day, today);
                     const isSelected = isSameDay(day, selectedDate);
                     const hasDot = daysWithAppointments.has(ds);
@@ -346,7 +359,7 @@ export default function AutoSchedule() {
                           ${isToday ? "bg-primary text-primary-foreground" : ""}
                           ${isSelected && !isToday ? "ring-2 ring-primary" : ""}
                         `}>
-                          {day.getDate()}
+                          {day.getUTCDate()}
                         </span>
                         <span className={`w-1 h-1 rounded-full ${hasDot ? "bg-primary" : "bg-transparent"}`} />
                       </button>
