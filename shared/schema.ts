@@ -4188,10 +4188,12 @@ export type AutoDviTemplate = typeof autoDviTemplates.$inferSelect;
 // 10. Auto DVI Inspections
 export const autoDviInspections = pgTable("auto_dvi_inspections", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  repairOrderId: integer("repair_order_id").notNull().references(() => autoRepairOrders.id),
+  repairOrderId: integer("repair_order_id").references(() => autoRepairOrders.id),
   shopId: integer("shop_id").notNull().references(() => autoShops.id),
   templateId: integer("template_id").references(() => autoDviTemplates.id),
   technicianId: integer("technician_id").notNull().references(() => autoUsers.id),
+  customerId: integer("customer_id").references(() => autoCustomers.id),
+  vehicleId: integer("vehicle_id").references(() => autoVehicles.id),
   vehicleMileage: integer("vehicle_mileage"),
   overallCondition: varchar("overall_condition", { length: 20 }),
   publicToken: varchar("public_token", { length: 100 }).unique(),
@@ -4220,6 +4222,14 @@ export const autoDviInspectionsRelations = relations(autoDviInspections, ({ one,
   technician: one(autoUsers, {
     fields: [autoDviInspections.technicianId],
     references: [autoUsers.id],
+  }),
+  customer: one(autoCustomers, {
+    fields: [autoDviInspections.customerId],
+    references: [autoCustomers.id],
+  }),
+  vehicle: one(autoVehicles, {
+    fields: [autoDviInspections.vehicleId],
+    references: [autoVehicles.id],
   }),
   items: many(autoDviItems),
 }));
