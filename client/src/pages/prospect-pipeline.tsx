@@ -1028,7 +1028,7 @@ export default function DealPipelinePage() {
     return (
       <div className="space-y-4">
         {/* Stage Progress Summary Bar - Clickable shortcuts */}
-        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto touch-pan-x scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex gap-1" style={{ width: 'max-content' }}>
             {STAGE_ORDER.map((stage, idx) => {
               const count = kanbanFilteredDeals.filter(d => d.currentStage === stage).length;
@@ -1056,7 +1056,7 @@ export default function DealPipelinePage() {
         </div>
 
         {/* Kanban Board - Full width with horizontal scroll */}
-        <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', maxWidth: 'calc(100% + 2rem)' }}>
+        <div className="overflow-x-auto pb-4 scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex gap-3" style={{ width: 'max-content' }}>
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
               <div key={phaseName} className="flex gap-2">
@@ -1190,7 +1190,7 @@ export default function DealPipelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 safe-area-bottom" data-testid="pipeline-page">
+    <div className="min-h-screen bg-background pb-24 safe-area-bottom overflow-x-hidden" data-testid="pipeline-page">
       <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1296,7 +1296,7 @@ export default function DealPipelinePage() {
         </div>
       )}
 
-      <main className={`${viewMode === 'kanban' ? 'w-full px-4' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
+      <main className={`${viewMode === 'kanban' ? 'w-full max-w-full px-4 overflow-hidden' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -1321,7 +1321,7 @@ export default function DealPipelinePage() {
 
             {/* Phase Filters - Only show in List view */}
             {viewMode === 'list' && (
-              <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', maxWidth: 'calc(100% + 2rem)' }}>
+              <div className="overflow-x-auto pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="flex gap-2" style={{ width: 'max-content' }}>
                   {PHASES.map((phase) => (
                     <Button
