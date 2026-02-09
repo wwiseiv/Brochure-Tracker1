@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { AutoLayout } from "./AutoLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,7 @@ interface Appointment {
   customer?: { firstName: string; lastName: string; phone?: string | null; id?: number } | null;
   vehicle?: { year: number | null; make: string | null; model: string | null } | null;
   color: string | null;
+  repairOrderId: number | null;
 }
 
 interface Bay { id: number; name: string; }
@@ -75,6 +77,7 @@ function getCalendarDays(year: number, month: number) {
 export default function AutoSchedule() {
   const { autoFetch } = useAutoAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -424,12 +427,23 @@ export default function AutoSchedule() {
                 ) : (
                   <div className="space-y-2">
                     {sortedAppointments.map(apt => (
-                      <Card key={apt.id} className="hover-elevate overflow-visible" data-testid={`card-appointment-${apt.id}`}>
+                      <Card
+                        key={apt.id}
+                        className={`hover-elevate overflow-visible ${apt.repairOrderId ? "cursor-pointer" : ""}`}
+                        data-testid={`card-appointment-${apt.id}`}
+                        onClick={() => {
+                          if (apt.repairOrderId) {
+                            navigate(`/auto/repair-orders/${apt.repairOrderId}`);
+                          } else {
+                            toast({ title: "No repair order linked", description: "This appointment is not linked to a repair order." });
+                          }
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-start justify-between gap-2 group">
                             <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">{apt.title}</span>
+                                <span className={`text-sm font-medium ${apt.repairOrderId ? "group-hover:underline" : ""}`}>{apt.title}</span>
                                 {statusBadge(apt.status)}
                               </div>
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -491,7 +505,7 @@ export default function AutoSchedule() {
                                 variant="ghost"
                                 size="icon"
                                 className="invisible group-hover:visible"
-                                onClick={() => deleteAppointment(apt.id)}
+                                onClick={(e) => { e.stopPropagation(); deleteAppointment(apt.id); }}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -556,10 +570,17 @@ export default function AutoSchedule() {
                                       className={`absolute left-1 right-1 rounded-md p-1 text-xs overflow-hidden cursor-pointer group ${getAppointmentColor(apt)}`}
                                       style={{ top, height, minHeight: 30 }}
                                       data-testid={`apt-${apt.id}`}
+                                      onClick={() => {
+                                        if (apt.repairOrderId) {
+                                          navigate(`/auto/repair-orders/${apt.repairOrderId}`);
+                                        } else {
+                                          toast({ title: "No repair order linked", description: "This appointment is not linked to a repair order." });
+                                        }
+                                      }}
                                     >
                                       <div className="flex items-start justify-between gap-1">
                                         <div className="min-w-0">
-                                          <p className="font-medium truncate">{apt.title}</p>
+                                          <p className={`font-medium truncate ${apt.repairOrderId ? "group-hover:underline" : ""}`}>{apt.title}</p>
                                           {apt.customer && <p className="truncate text-[10px] opacity-80">{apt.customer.firstName} {apt.customer.lastName}</p>}
                                           <p className="text-[10px] opacity-70 flex items-center gap-1">
                                             <Clock className="h-2.5 w-2.5" />
