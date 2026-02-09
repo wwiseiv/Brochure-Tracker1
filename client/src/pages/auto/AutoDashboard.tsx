@@ -76,7 +76,7 @@ export default function AutoDashboard() {
     { label: "Open ROs", value: stats?.openRepairOrders ?? 0, icon: FileText, color: "text-blue-500", href: "/auto/repair-orders" },
     { label: "Total Customers", value: stats?.totalCustomers ?? 0, icon: Users, color: "text-green-500", href: "/auto/customers" },
     { label: "Today's Appointments", value: stats?.todayAppointments ?? 0, icon: Calendar, color: "text-purple-500", href: "/auto/schedule" },
-    { label: "Revenue (Month)", value: `$${(stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-500", href: "#" },
+    { label: "Revenue (Month)", value: `$${(stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-500", href: "/auto/reports?tab=revenue" },
   ];
 
   return (

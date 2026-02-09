@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearch } from "wouter";
 import { AutoLayout } from "./AutoLayout";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,12 +109,22 @@ interface DualPricingData {
   }>;
 }
 
+const TAB_MAP: Record<string, string> = {
+  revenue: "job-pl",
+  tax: "sales-tax",
+  technician: "tech-productivity",
+  customer: "approvals",
+  "dual-pricing": "dual-pricing",
+};
+
 export default function AutoReports() {
   const { autoFetch } = useAutoAuth();
+  const searchString = useSearch();
+  const urlTab = new URLSearchParams(searchString).get("tab");
   const defaults = getQuickDates("thisMonth");
   const [startDate, setStartDate] = useState(defaults.start);
   const [endDate, setEndDate] = useState(defaults.end);
-  const [activeTab, setActiveTab] = useState("job-pl");
+  const [activeTab, setActiveTab] = useState(urlTab && TAB_MAP[urlTab] ? TAB_MAP[urlTab] : "job-pl");
 
   const [jobPL, setJobPL] = useState<JobPLData | null>(null);
   const [salesTax, setSalesTax] = useState<SalesTaxData | null>(null);
