@@ -162,43 +162,60 @@ function useDragScroll() {
   const ref = useRef<HTMLDivElement>(null);
   const state = useRef({ isDown: false, startX: 0, scrollLeft: 0, moved: false });
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
+  useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return;
-    state.current = { isDown: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
-    el.style.cursor = 'grabbing';
-    el.style.userSelect = 'none';
-  }, []);
 
-  const onMouseLeave = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    state.current.isDown = false;
+    let isDown = false;
+    let startX = 0;
+    let scrollLeftStart = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return;
+      isDown = true;
+      startX = e.clientX;
+      scrollLeftStart = el.scrollLeft;
+      el.style.cursor = 'grabbing';
+      el.style.userSelect = 'none';
+      e.preventDefault();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const dx = e.clientX - startX;
+      el.scrollLeft = scrollLeftStart - dx;
+    };
+
+    const handleMouseUp = () => {
+      if (!isDown) return;
+      isDown = false;
+      el.style.cursor = 'grab';
+      el.style.removeProperty('user-select');
+    };
+
+    const handleMouseLeave = () => {
+      if (!isDown) return;
+      isDown = false;
+      el.style.cursor = 'grab';
+      el.style.removeProperty('user-select');
+    };
+
     el.style.cursor = 'grab';
-    el.style.removeProperty('user-select');
+    el.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    el.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      el.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      el.removeEventListener('mouseleave', handleMouseLeave);
+    };
   }, []);
 
-  const onMouseUp = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    state.current.isDown = false;
-    el.style.cursor = 'grab';
-    el.style.removeProperty('user-select');
-  }, []);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!state.current.isDown) return;
-    e.preventDefault();
-    const el = ref.current;
-    if (!el) return;
-    const x = e.pageX - el.offsetLeft;
-    const walk = (x - state.current.startX) * 1.5;
-    el.scrollLeft = state.current.scrollLeft - walk;
-    state.current.moved = true;
-  }, []);
-
-  return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove, style: { cursor: 'grab' } as React.CSSProperties };
+  return { ref };
 }
 
 export default function DealPipelinePage() {
@@ -1077,12 +1094,8 @@ export default function DealPipelinePage() {
         {/* Stage Progress Summary Bar - Clickable shortcuts */}
         <div
           ref={stageDrag.ref}
-          onMouseDown={stageDrag.onMouseDown}
-          onMouseLeave={stageDrag.onMouseLeave}
-          onMouseUp={stageDrag.onMouseUp}
-          onMouseMove={stageDrag.onMouseMove}
           className="bg-card border border-border rounded-lg p-3 overflow-x-auto scrollbar-hide"
-          style={{ ...stageDrag.style, WebkitOverflowScrolling: 'touch' }}
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex gap-1" style={{ width: 'max-content' }}>
             {STAGE_ORDER.map((stage, idx) => {
@@ -1113,12 +1126,8 @@ export default function DealPipelinePage() {
         {/* Kanban Board - Full width with horizontal scroll */}
         <div
           ref={kanbanDrag.ref}
-          onMouseDown={kanbanDrag.onMouseDown}
-          onMouseLeave={kanbanDrag.onMouseLeave}
-          onMouseUp={kanbanDrag.onMouseUp}
-          onMouseMove={kanbanDrag.onMouseMove}
           className="overflow-x-auto pb-4 scrollbar-thin"
-          style={{ ...kanbanDrag.style, WebkitOverflowScrolling: 'touch' }}
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex gap-3" style={{ width: 'max-content' }}>
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
@@ -1386,12 +1395,8 @@ export default function DealPipelinePage() {
             {viewMode === 'list' && (
               <div
                 ref={listPhasesDrag.ref}
-                onMouseDown={listPhasesDrag.onMouseDown}
-                onMouseLeave={listPhasesDrag.onMouseLeave}
-                onMouseUp={listPhasesDrag.onMouseUp}
-                onMouseMove={listPhasesDrag.onMouseMove}
                 className="overflow-x-auto pb-2 scrollbar-hide"
-                style={{ ...listPhasesDrag.style, WebkitOverflowScrolling: 'touch' }}
+                style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 <div className="flex gap-2" style={{ width: 'max-content' }}>
                   {PHASES.map((phase) => (
