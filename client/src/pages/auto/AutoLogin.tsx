@@ -342,7 +342,7 @@ export default function AutoLogin() {
           <img
             src={pcbAutoLogo}
             alt="PCB Auto"
-            className="mx-auto h-32 object-contain mb-8"
+            className="mx-auto h-48 sm:h-56 md:h-64 lg:h-72 object-contain mb-8"
             data-testid="hero-logo"
           />
           <h1
