@@ -46,8 +46,74 @@ import featureAiAssistant from "@/assets/images/feature-ai-assistant.png";
 import deepDualPricing from "@/assets/images/deep-dual-pricing.png";
 import deepDvi from "@/assets/images/deep-dvi.png";
 import deepPartstech from "@/assets/images/deep-partstech.png";
-import deepQuickbooks from "@/assets/images/deep-quickbooks.png";
 import deepAiAssistant from "@/assets/images/deep-ai-assistant.png";
+import { Check } from "lucide-react";
+
+function QBSyncMockup() {
+  return (
+    <div className="rounded-xl shadow-2xl overflow-hidden bg-[#0f172a] text-white border border-white/10">
+      <div className="flex items-start">
+        <div className="w-1.5 bg-emerald-500 self-stretch flex-shrink-0" />
+        <div className="flex-1 p-5 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center text-sm font-extrabold text-white flex-shrink-0">
+              QB
+            </div>
+            <span className="font-bold text-emerald-400 text-lg">QuickBooks</span>
+            <Badge variant="secondary" className="ml-auto bg-emerald-500/15 text-emerald-400 text-[10px] no-default-hover-elevate no-default-active-elevate">
+              Connected
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "847", label: "Total Synced" },
+              { value: "22", label: "This Week" },
+              { value: "$38,420", label: "Revenue" },
+            ].map((s) => (
+              <div key={s.label} className="bg-white/5 rounded-lg p-3 text-center">
+                <div className="text-xl font-bold tabular-nums">{s.value}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sync Log</div>
+            <div className="bg-white/5 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 px-3 py-1.5 text-[10px] text-slate-500 font-semibold uppercase tracking-wider border-b border-white/5">
+                <span>Status</span>
+                <span>RO Number</span>
+                <span>Customer</span>
+                <span className="text-right">Amount</span>
+              </div>
+              {[
+                { ro: "RO-1041", customer: "Acme Corp", amount: "$120.00", ok: true },
+                { ro: "RO-1040", customer: "Doe Inc.", amount: "$5,400.00", ok: true },
+                { ro: "RO-1039", customer: "Doe Inc.", amount: "$5,400.00", ok: false },
+              ].map((row, i) => (
+                <div key={i} className={`grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 items-center px-3 py-2 text-xs ${i < 2 ? "border-b border-white/5" : ""}`}>
+                  <span>
+                    {row.ok ? (
+                      <div className="w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <Check className="w-2 h-2 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-3 h-3 rounded-full bg-amber-500" />
+                    )}
+                  </span>
+                  <span className="text-slate-400">{row.ro}</span>
+                  <span className="text-slate-300">{row.customer}</span>
+                  <span className="text-right tabular-nums text-slate-300">{row.amount}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const features = [
   {
@@ -136,7 +202,16 @@ const features = [
   },
 ];
 
-const deepDives = [
+interface DeepDive {
+  headline: string;
+  body: string;
+  badges: string[];
+  reversed: boolean;
+  image?: string;
+  customVisual?: boolean;
+}
+
+const deepDives: DeepDive[] = [
   {
     image: deepDualPricing,
     headline: "Dual Pricing That Keeps You Compliant and Profitable",
@@ -175,7 +250,7 @@ const deepDives = [
     reversed: false,
   },
   {
-    image: deepQuickbooks,
+    customVisual: true,
     headline: "Your Books Stay Current \u2014 Automatically",
     body: "Connect QuickBooks in 30 seconds. From that point on, every invoice and every payment syncs automatically. Labor goes to your labor income account. Parts to parts revenue. Dual pricing to its own trackable income account. Tax to your liability account. No more end-of-month data entry. No CSV imports. Your accountant will thank you.",
     badges: [
@@ -406,14 +481,18 @@ export default function AutoLogin() {
               } items-center`}
             >
               <div className="md:w-1/2 w-full">
-                <div className="rounded-md overflow-hidden shadow-lg">
-                  <img
-                    src={dive.image}
-                    alt={dive.headline}
-                    className="w-full h-full object-cover"
-                    data-testid={`img-deep-dive-${index}`}
-                  />
-                </div>
+                {dive.customVisual ? (
+                  <QBSyncMockup />
+                ) : dive.image ? (
+                  <div className="rounded-md overflow-hidden shadow-lg">
+                    <img
+                      src={dive.image}
+                      alt={dive.headline}
+                      className="w-full h-full object-cover"
+                      data-testid={`img-deep-dive-${index}`}
+                    />
+                  </div>
+                ) : null}
               </div>
               <div className="md:w-1/2 w-full space-y-5">
                 <h3
