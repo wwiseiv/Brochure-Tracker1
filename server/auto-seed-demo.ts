@@ -58,7 +58,12 @@ export async function seedDemoData(shopId: number, ownerId: number): Promise<voi
       phone: "(317) 555-0904", role: "service_advisor", pin: "3456", payType: "salary", payRate: "52000.00",
     }).returning();
 
-    console.log("[AutoInit] Created 4 staff members");
+    await db.insert(autoUsers).values({
+      shopId, email: "manager@demo.com", passwordHash, firstName: "Rachel", lastName: "Martinez",
+      phone: "(317) 555-0905", role: "manager", pin: "7890", payType: "salary", payRate: "65000.00",
+    }).returning();
+
+    console.log("[AutoInit] Created 5 staff members");
 
     // ── Customers ──
     const [robertSmith] = await db.insert(autoCustomers).values({
