@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAutoAssistant } from "./AutoAssistantProvider";
+import { useLocation } from "wouter";
 import ReactMarkdown from "react-markdown";
-import { Sparkles, X, Send, Mic, MicOff, Volume2, VolumeX, Square, Trash2 } from "lucide-react";
+import { Sparkles, X, Send, Mic, MicOff, Volume2, VolumeX, Square, Trash2, ArrowRight } from "lucide-react";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 
 const QUICK_ACTIONS: Record<string, string[]> = {
@@ -30,6 +31,33 @@ const PAGE_LABELS: Record<string, string> = {
   "invoice": "Invoice",
   "staff": "Staff",
   "unknown": "PCB Auto",
+};
+
+const NAV_TARGETS: Record<string, { label: string; route: string }> = {
+  "revenue": { label: "Revenue", route: "/auto/dashboard" },
+  "open-ros": { label: "Open ROs", route: "/auto/dashboard" },
+  "total-customers": { label: "Total Customers", route: "/auto/dashboard" },
+  "appointments": { label: "Today's Appointments", route: "/auto/dashboard" },
+  "fees-saved": { label: "Fees Saved", route: "/auto/dashboard" },
+  "work-orders": { label: "Work Orders", route: "/auto/repair-orders" },
+  "estimates": { label: "Estimates", route: "/auto/repair-orders" },
+  "customers": { label: "Customers", route: "/auto/customers" },
+  "vehicles": { label: "Vehicles", route: "/auto/customers" },
+  "schedule": { label: "Schedule", route: "/auto/schedule" },
+  "inspections": { label: "Inspections (DVI)", route: "/auto/inspections" },
+  "invoices": { label: "Invoices", route: "/auto/repair-orders" },
+  "parts": { label: "Parts", route: "/auto/repair-orders" },
+  "reports": { label: "Reports", route: "/auto/reports" },
+  "report-cash-card": { label: "Cash vs Card Report", route: "/auto/reports" },
+  "report-revenue": { label: "Revenue Report", route: "/auto/reports" },
+  "report-tech": { label: "Tech Productivity", route: "/auto/reports" },
+  "report-customers": { label: "Customer Report", route: "/auto/reports" },
+  "settings": { label: "Settings", route: "/auto/settings" },
+  "settings-dual-pricing": { label: "Dual Pricing Settings", route: "/auto/settings" },
+  "settings-staff": { label: "Staff Management", route: "/auto/staff" },
+  "settings-quickbooks": { label: "QuickBooks", route: "/auto/quickbooks" },
+  "new-ro": { label: "New Work Order", route: "/auto/repair-orders/new" },
+  "payment-processor": { label: "Payment Processor", route: "/auto/processor" },
 };
 
 function getPageKey(): string {
@@ -223,9 +251,74 @@ function FloatingButton() {
   );
 }
 
+function AssistantNavLink({ navKey, onNavigate }: { navKey: string; onNavigate: (route: string) => void }) {
+  const target = NAV_TARGETS[navKey];
+  if (!target) return <span className="text-muted-foreground">[{navKey}]</span>;
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onNavigate(target.route);
+      }}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 text-blue-600 dark:text-blue-400 font-semibold text-xs leading-tight bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded transition-all duration-150 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/40 whitespace-nowrap"
+      title={`Go to ${target.label}`}
+      data-testid={`navlink-${navKey}`}
+    >
+      <ArrowRight className="h-3 w-3 shrink-0" />
+      {target.label}
+    </button>
+  );
+}
+
+function renderAssistantContent(content: string, onNavigate: (route: string) => void): ReactNode[] {
+  const navPattern = /\[\[nav:([a-z0-9-]+)\]\]/g;
+  if (!navPattern.test(content)) {
+    return [
+      <div key="md" className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
+    ];
+  }
+
+  navPattern.lastIndex = 0;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let idx = 0;
+
+  while ((match = navPattern.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const textBefore = content.slice(lastIndex, match.index);
+      parts.push(
+        <span key={`md-${idx}`} className="prose prose-sm dark:prose-invert max-w-none inline [&_p]:inline [&_p]:m-0">
+          <ReactMarkdown>{textBefore}</ReactMarkdown>
+        </span>
+      );
+    }
+    parts.push(
+      <AssistantNavLink key={`nav-${idx}`} navKey={match[1]} onNavigate={onNavigate} />
+    );
+    lastIndex = match.index + match[0].length;
+    idx++;
+  }
+
+  if (lastIndex < content.length) {
+    const textAfter = content.slice(lastIndex);
+    parts.push(
+      <span key={`md-end`} className="prose prose-sm dark:prose-invert max-w-none inline [&_p]:inline [&_p]:m-0">
+        <ReactMarkdown>{textAfter}</ReactMarkdown>
+      </span>
+    );
+  }
+
+  return parts;
+}
+
 function ChatPanel() {
   const { isOpen, close, messages, sendMessage, isLoading, clearMessages } = useAutoAssistant();
   const [input, setInput] = useState("");
+  const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pageKey = getPageKey();
@@ -233,6 +326,11 @@ function ChatPanel() {
   const pageLabel = PAGE_LABELS[pageKey] || "PCB Auto";
 
   const { playingId, play } = useReadAloud();
+
+  const handleNavigation = useCallback((route: string) => {
+    close();
+    setTimeout(() => setLocation(route), 300);
+  }, [close, setLocation]);
 
   const handleDictationResult = useCallback((text: string) => {
     setInput(prev => prev + (prev ? " " : "") + text);
@@ -389,7 +487,7 @@ function ChatPanel() {
                 >
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      {renderAssistantContent(msg.content, handleNavigation)}
                     </div>
                   ) : (
                     msg.content
