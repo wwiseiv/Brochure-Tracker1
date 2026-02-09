@@ -658,16 +658,89 @@ async function generateRONumber(shopId: number): Promise<string> {
 
 router.get("/repair-orders", autoAuth, async (req: Request, res: Response) => {
   try {
-    const { status, page = "1", limit = "50" } = req.query;
-    const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { status, search, from, to, sort = "date", order = "desc", page = "1", limit = "25" } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
 
-    let conditions = [eq(autoRepairOrders.shopId, req.autoUser!.shopId)];
+    let conditions: any[] = [eq(autoRepairOrders.shopId, req.autoUser!.shopId)];
     if (status) conditions.push(eq(autoRepairOrders.status, status as string));
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+
+      const matchingCustomers = await db.select({ id: autoCustomers.id })
+        .from(autoCustomers)
+        .where(and(
+          eq(autoCustomers.shopId, req.autoUser!.shopId),
+          or(
+            sql`${autoCustomers.firstName} ILIKE ${searchTerm}`,
+            sql`${autoCustomers.lastName} ILIKE ${searchTerm}`,
+            sql`${autoCustomers.phone} ILIKE ${searchTerm}`,
+            sql`${autoCustomers.email} ILIKE ${searchTerm}`,
+            sql`CONCAT(${autoCustomers.firstName}, ' ', ${autoCustomers.lastName}) ILIKE ${searchTerm}`,
+          )
+        ));
+
+      const matchingVehicles = await db.select({ id: autoVehicles.id })
+        .from(autoVehicles)
+        .where(and(
+          eq(autoVehicles.shopId, req.autoUser!.shopId),
+          or(
+            sql`${autoVehicles.vin} ILIKE ${searchTerm}`,
+            sql`CONCAT(${autoVehicles.year}::text, ' ', ${autoVehicles.make}, ' ', ${autoVehicles.model}) ILIKE ${searchTerm}`,
+            sql`${autoVehicles.make} ILIKE ${searchTerm}`,
+            sql`${autoVehicles.model} ILIKE ${searchTerm}`,
+          )
+        ));
+
+      const customerIds = matchingCustomers.map(c => c.id);
+      const vehicleIds = matchingVehicles.map(v => v.id);
+
+      const searchConditions: any[] = [];
+      searchConditions.push(sql`${autoRepairOrders.roNumber} ILIKE ${searchTerm}`);
+      if (customerIds.length > 0) searchConditions.push(inArray(autoRepairOrders.customerId, customerIds));
+      if (vehicleIds.length > 0) searchConditions.push(inArray(autoRepairOrders.vehicleId, vehicleIds));
+
+      conditions.push(or(...searchConditions)!);
+    }
+
+    if (from) conditions.push(gte(autoRepairOrders.createdAt, new Date(from as string)));
+    if (to) {
+      const toDate = new Date(to as string);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(autoRepairOrders.createdAt, toDate));
+    }
+
+    let orderClause;
+    const isAsc = order === "asc";
+    switch(sort) {
+      case "customer":
+      case "ro_number": orderClause = isAsc ? asc(autoRepairOrders.roNumber) : desc(autoRepairOrders.roNumber); break;
+      case "total": orderClause = isAsc ? asc(autoRepairOrders.totalCash) : desc(autoRepairOrders.totalCash); break;
+      case "status": orderClause = isAsc ? asc(autoRepairOrders.status) : desc(autoRepairOrders.status); break;
+      default: orderClause = isAsc ? asc(autoRepairOrders.createdAt) : desc(autoRepairOrders.createdAt);
+    }
+
+    const statsResult = await db.select({
+      totalRos: count(),
+      totalBilled: sql<string>`COALESCE(SUM(CAST(${autoRepairOrders.totalCash} AS numeric)), 0)`,
+      totalPaid: sql<string>`COALESCE(SUM(CAST(${autoRepairOrders.paidAmount} AS numeric)), 0)`,
+      outstanding: sql<string>`COALESCE(SUM(CAST(${autoRepairOrders.balanceDue} AS numeric)), 0)`,
+    }).from(autoRepairOrders).where(and(...conditions));
+
+    const stats = {
+      totalRos: statsResult[0]?.totalRos || 0,
+      totalBilled: parseFloat(statsResult[0]?.totalBilled || "0"),
+      totalPaid: parseFloat(statsResult[0]?.totalPaid || "0"),
+      outstanding: parseFloat(statsResult[0]?.outstanding || "0"),
+      avgTicket: statsResult[0]?.totalRos > 0 ? parseFloat(statsResult[0]?.totalBilled || "0") / statsResult[0].totalRos : 0,
+    };
 
     const ros = await db.select().from(autoRepairOrders)
       .where(and(...conditions))
-      .orderBy(desc(autoRepairOrders.createdAt))
-      .limit(parseInt(limit as string)).offset(offset);
+      .orderBy(orderClause)
+      .limit(limitNum).offset(offset);
 
     const enriched = await Promise.all(ros.map(async (ro) => {
       const [customer] = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId)).limit(1);
@@ -676,7 +749,7 @@ router.get("/repair-orders", autoAuth, async (req: Request, res: Response) => {
     }));
 
     const [totalResult] = await db.select({ count: count() }).from(autoRepairOrders).where(and(...conditions));
-    res.json({ repairOrders: enriched, total: totalResult.count, page: parseInt(page as string) });
+    res.json({ repairOrders: enriched, total: totalResult.count, page: pageNum, limit: limitNum, stats });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch repair orders" });
   }
