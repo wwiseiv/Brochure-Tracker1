@@ -74,9 +74,10 @@ Preferred communication style: Simple, everyday language.
 - Uppy
 
 ### PCB Auto Integrations
+- Dough Gateway (payment processing - sandbox integration with tokenizer, dual pricing, vault, webhooks). Service files in `server/services/dough-gateway/`. Requires DOUGH_SANDBOX_API_KEY, DOUGH_SANDBOX_PUBLIC_KEY, DOUGH_SANDBOX_PROCESSOR_ID env vars.
 - Rollfi (embedded payroll)
 - PartsTech (parts lookup)
-- FluidPay (payment processing)
+- FluidPay (payment processing - legacy)
 - QuickBooks (accounting sync)
 - Twilio (SMS notifications)
 - MOTOR (labor guide)

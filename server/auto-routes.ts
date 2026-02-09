@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import express, { Router, Request, Response } from "express";
 import type { Express } from "express";
 import { db } from "./db";
 import { 
@@ -1442,6 +1442,222 @@ router.post("/payments/:id/void", autoAuth, async (req: Request, res: Response) 
   } catch (err: any) {
     console.error("Void payment error:", err);
     res.status(500).json({ error: "Failed to void payment" });
+  }
+});
+
+// ============================================================================
+// DOUGH GATEWAY PAYMENT PROCESSING
+// ============================================================================
+
+router.post("/dough/process-payment", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured. Set DOUGH_SANDBOX_API_KEY." });
+    }
+    const { repairOrderId, token } = req.body;
+    if (!repairOrderId || !token) {
+      return res.status(400).json({ error: "repairOrderId and token are required" });
+    }
+    const shopId = req.autoUser!.shopId;
+    const roData = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, repairOrderId), eq(autoRepairOrders.shopId, shopId)))
+      .limit(1);
+    if (!roData.length) return res.status(404).json({ error: "Repair order not found" });
+    const ro = roData[0];
+    const customer = await db.select().from(autoCustomers).where(eq(autoCustomers.id, ro.customerId)).limit(1);
+    const totalCard = parseFloat(ro.totalCard || ro.total || "0");
+    const totalCents = Math.round(totalCard * 100);
+    const repairOrder = {
+      repairOrderId: ro.id,
+      customerName: customer.length ? `${customer[0].firstName} ${customer[0].lastName}` : "Customer",
+      subtotal: Math.round(parseFloat(ro.subtotal || "0") * 100),
+      tax: Math.round(parseFloat(ro.taxAmount || "0") * 100),
+      total: totalCents,
+      paymentType: "card_price" as const,
+      lineItems: [],
+    };
+    const payments = new PCBAutoPaymentService(config);
+    const result = await payments.processTokenPayment(repairOrder, token);
+    if (result.success) {
+      const amountStr = totalCard.toFixed(2);
+      await db.insert(autoPayments).values({
+        repairOrderId: ro.id, shopId,
+        amount: amountStr, method: "card",
+        status: "completed", transactionId: result.transactionId || null,
+        paymentToken: token, notes: `Dough Gateway: ${result.receiptData?.authCode || ""}`,
+        processedAt: new Date(),
+      });
+      await db.insert(autoActivityLog).values({
+        shopId, userId: req.autoUser!.id,
+        entityType: "payment", entityId: ro.id, action: "dough_payment_processed",
+        details: { amount: amountStr, transactionId: result.transactionId, last4: result.receiptData?.last4 },
+      });
+      res.json({ success: true, receipt: result.receiptData });
+    } else {
+      res.status(400).json({ success: false, error: result.errorMessage });
+    }
+  } catch (err: any) {
+    console.error("Dough payment error:", err);
+    res.status(500).json({ error: "Payment processing failed" });
+  }
+});
+
+router.post("/dough/calculate-dual-pricing", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const { subtotalCents } = req.body;
+    if (!subtotalCents || typeof subtotalCents !== "number") {
+      return res.status(400).json({ error: "subtotalCents is required" });
+    }
+    const pricing = await payments.calculateDualPricing(subtotalCents);
+    res.json(pricing);
+  } catch (err: any) {
+    console.error("Dual pricing calc error:", err);
+    res.status(500).json({ error: "Failed to calculate pricing" });
+  }
+});
+
+router.post("/dough/void", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const userRole = req.autoUser!.role;
+    if (userRole !== "owner" && userRole !== "manager") {
+      return res.status(403).json({ error: "Only owners and managers can void payments" });
+    }
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const { transactionId } = req.body;
+    if (!transactionId) return res.status(400).json({ error: "transactionId is required" });
+    const result = await payments.voidPayment(transactionId);
+    res.json(result);
+  } catch (err: any) {
+    console.error("Dough void error:", err);
+    res.status(500).json({ error: "Failed to void payment" });
+  }
+});
+
+router.post("/dough/refund", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const userRole = req.autoUser!.role;
+    if (userRole !== "owner" && userRole !== "manager") {
+      return res.status(403).json({ error: "Only owners and managers can issue refunds" });
+    }
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const { transactionId, amount } = req.body;
+    if (!transactionId) return res.status(400).json({ error: "transactionId is required" });
+    const result = await payments.refundPayment(transactionId, amount);
+    res.json(result);
+  } catch (err: any) {
+    console.error("Dough refund error:", err);
+    res.status(500).json({ error: "Failed to process refund" });
+  }
+});
+
+router.post("/dough/vault/create", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const { customerName, email, token } = req.body;
+    if (!customerName || !token) return res.status(400).json({ error: "customerName and token required" });
+    const result = await payments.createCustomerVault(customerName, email || "", token);
+    res.json(result);
+  } catch (err: any) {
+    console.error("Vault create error:", err);
+    res.status(500).json({ error: "Failed to create customer vault" });
+  }
+});
+
+router.post("/dough/vault/charge", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const { repairOrder, customerId } = req.body;
+    if (!repairOrder || !customerId) return res.status(400).json({ error: "repairOrder and customerId required" });
+    const result = await payments.chargeVaultCustomer(repairOrder, customerId);
+    if (result.success) {
+      res.json({ success: true, receipt: result.receiptData });
+    } else {
+      res.status(400).json({ success: false, error: result.errorMessage });
+    }
+  } catch (err: any) {
+    console.error("Vault charge error:", err);
+    res.status(500).json({ error: "Failed to charge stored card" });
+  }
+});
+
+router.get("/dough/transaction/:id", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const { PCBAutoPaymentService, getDoughConfig } = await import("./services/dough-gateway");
+    const config = getDoughConfig();
+    if (!config.apiKey) {
+      return res.status(503).json({ error: "Payment gateway not configured" });
+    }
+    const payments = new PCBAutoPaymentService(config);
+    const transaction = await payments.getTransactionDetails(req.params.id);
+    res.json(transaction);
+  } catch (err: any) {
+    console.error("Get transaction error:", err);
+    res.status(500).json({ error: "Failed to get transaction" });
+  }
+});
+
+router.get("/dough/config", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const publicKey = process.env.DOUGH_SANDBOX_PUBLIC_KEY || "";
+    const gatewayUrl = process.env.NODE_ENV === "production"
+      ? "https://app.doughgateway.com"
+      : "https://sandbox.doughgateway.com";
+    const isConfigured = !!(process.env.DOUGH_SANDBOX_API_KEY);
+    res.json({ publicKey, gatewayUrl, isConfigured });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to get config" });
+  }
+});
+
+// Dough Gateway webhook (no auth - external, uses raw body for HMAC verification)
+router.post("/dough/webhook", express.raw({ type: "application/json" }), async (req: Request, res: Response) => {
+  try {
+    const webhookSecret = process.env.DOUGH_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      return res.status(503).json({ error: "Webhook not configured" });
+    }
+    const { createWebhookHandler } = await import("./services/dough-gateway");
+    const handler = createWebhookHandler({
+      clientSecret: webhookSecret,
+      onTransactionSettled: async (event) => {
+        console.log(`[Dough Webhook] Transaction settled: ${event.id}`);
+      },
+      onSettlementBatch: async (event) => {
+        console.log(`[Dough Webhook] Settlement batch received: ${event.id}`);
+      },
+    });
+    handler(req, res, () => {});
+  } catch (err: any) {
+    console.error("Webhook error:", err);
+    res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 
