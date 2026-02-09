@@ -160,7 +160,6 @@ interface PipelineCounts {
 
 function useDragScroll() {
   const ref = useRef<HTMLDivElement>(null);
-  const state = useRef({ isDown: false, startX: 0, scrollLeft: 0, moved: false });
 
   useEffect(() => {
     const el = ref.current;
@@ -169,34 +168,32 @@ function useDragScroll() {
     let isDown = false;
     let startX = 0;
     let scrollLeftStart = 0;
+    let hasMoved = false;
 
     const handleMouseDown = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return;
+      if ((e.target as HTMLElement).closest('button, a, input, [role="button"], .deal-card')) return;
       isDown = true;
+      hasMoved = false;
       startX = e.clientX;
       scrollLeftStart = el.scrollLeft;
       el.style.cursor = 'grabbing';
       el.style.userSelect = 'none';
-      e.preventDefault();
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDown) return;
-      e.preventDefault();
       const dx = e.clientX - startX;
-      el.scrollLeft = scrollLeftStart - dx;
+      if (Math.abs(dx) > 3) hasMoved = true;
+      if (hasMoved) {
+        e.preventDefault();
+        el.scrollLeft = scrollLeftStart - dx;
+      }
     };
 
     const handleMouseUp = () => {
       if (!isDown) return;
       isDown = false;
-      el.style.cursor = 'grab';
-      el.style.removeProperty('user-select');
-    };
-
-    const handleMouseLeave = () => {
-      if (!isDown) return;
-      isDown = false;
+      hasMoved = false;
       el.style.cursor = 'grab';
       el.style.removeProperty('user-select');
     };
@@ -205,13 +202,13 @@ function useDragScroll() {
     el.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-    el.addEventListener('mouseleave', handleMouseLeave);
+    el.addEventListener('mouseleave', handleMouseUp);
 
     return () => {
       el.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      el.removeEventListener('mouseleave', handleMouseLeave);
+      el.removeEventListener('mouseleave', handleMouseUp);
     };
   }, []);
 
@@ -1096,8 +1093,9 @@ export default function DealPipelinePage() {
           ref={stageDrag.ref}
           className="bg-card border border-border rounded-lg p-3 overflow-x-auto scrollbar-hide"
           style={{ WebkitOverflowScrolling: 'touch' }}
+          data-testid="stage-tabs-bar"
         >
-          <div className="flex gap-1" style={{ width: 'max-content' }}>
+          <div className="flex gap-1 flex-nowrap w-max">
             {STAGE_ORDER.map((stage, idx) => {
               const count = kanbanFilteredDeals.filter(d => d.currentStage === stage).length;
               const config = DEAL_STAGE_CONFIG[stage];
@@ -1126,10 +1124,11 @@ export default function DealPipelinePage() {
         {/* Kanban Board - Full width with horizontal scroll */}
         <div
           ref={kanbanDrag.ref}
-          className="overflow-x-auto pb-4 scrollbar-thin"
+          className="overflow-x-auto overflow-y-hidden pb-4 -mx-4 px-4"
           style={{ WebkitOverflowScrolling: 'touch' }}
+          data-testid="kanban-board"
         >
-          <div className="flex gap-3" style={{ width: 'max-content' }}>
+          <div className="flex gap-3 flex-nowrap w-max">
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
               <div key={phaseName} className="flex gap-2">
                 {/* Phase Divider Label - shown between groups */}
@@ -1148,7 +1147,7 @@ export default function DealPipelinePage() {
                   return (
                     <div
                       key={stage}
-                      className={`flex-shrink-0 w-[180px] md:w-[200px] lg:w-[220px] rounded-lg ${isTerminal ? 'bg-muted/30' : 'bg-muted/50'}`}
+                      className={`flex-none w-[220px] md:w-[240px] lg:w-[260px] rounded-lg ${isTerminal ? 'bg-muted/30' : 'bg-muted/50'}`}
                       data-testid={`stage-column-${stage}`}
                     >
                       {/* Stage Header */}
@@ -1262,7 +1261,7 @@ export default function DealPipelinePage() {
   };
 
   return (
-    <div className={`min-h-screen bg-background pb-24 safe-area-bottom ${viewMode !== 'kanban' ? 'overflow-x-hidden' : ''}`} data-testid="pipeline-page">
+    <div className={`min-h-screen bg-background pb-24 safe-area-bottom ${viewMode !== 'kanban' ? 'overflow-x-hidden' : 'overflow-x-hidden'}`} data-testid="pipeline-page">
       <header className="sticky top-0 z-40 bg-card border-b border-border safe-area-top">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1368,7 +1367,7 @@ export default function DealPipelinePage() {
         </div>
       )}
 
-      <main className={`${viewMode === 'kanban' ? 'w-full max-w-full px-4' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
+      <main className={`${viewMode === 'kanban' ? 'w-full max-w-full px-4 overflow-x-hidden' : 'container max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto px-4'} py-4 md:py-6 space-y-4`}>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
