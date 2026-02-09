@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { AutoLayout } from "./AutoLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   BarChart3, Link2, ClipboardList, Settings, FileText, CreditCard,
   CheckCircle2, Wrench, Cog, DollarSign, Droplets, Landmark,
@@ -170,257 +177,191 @@ export default function AutoQuickBooks() {
 
   const stepIcons = [FileText, CreditCard, BarChart3, CheckCircle2];
 
+  const filteredLog = MOCK_SYNC_LOG.filter(s => filterStatus === "all" || s.status === filterStatus);
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0f1117",
-      fontFamily: "'DM Sans', 'SF Pro Display', system-ui, sans-serif",
-      color: "#e5e7eb",
-    }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <AutoLayout>
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-green-500 flex items-center justify-center text-xl font-extrabold text-white shadow-md">
+              QB
+            </div>
+            <div>
+              <h1 className="text-xl font-bold" data-testid="text-qb-title">
+                QuickBooks Integration
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                PCB Auto → QuickBooks Online · Automatic Sync
+              </p>
+            </div>
+          </div>
 
-      <div style={{
-        background: "linear-gradient(135deg, #111827 0%, #1a1f2e 100%)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        padding: "20px 32px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 16,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: "linear-gradient(135deg, #2ca01c 0%, #0aab4b 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 800, color: "white",
-            boxShadow: "0 4px 14px rgba(44,160,28,0.3)",
-          }}>QB</div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "white", letterSpacing: "-0.3px" }} data-testid="text-qb-title">
-              QuickBooks Integration
-            </div>
-            <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
-              PCB Auto → QuickBooks Online · Automatic Sync
-            </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {connected && (
+              <Button
+                variant="outline"
+                onClick={handleSync}
+                disabled={syncing}
+                data-testid="button-sync-now"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            )}
+            <Badge
+              variant={connected ? "default" : "destructive"}
+              className={connected ? "bg-green-500/10 text-green-500 no-default-hover-elevate no-default-active-elevate" : "no-default-hover-elevate no-default-active-elevate"}
+              data-testid="status-connection"
+            >
+              <span className={`w-2 h-2 rounded-full mr-2 ${connected ? "bg-green-500" : "bg-destructive"}`} />
+              {connected ? "CONNECTED" : "DISCONNECTED"}
+            </Badge>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {connected && (
-            <button onClick={handleSync} disabled={syncing} data-testid="button-sync-now" style={{
-              padding: "10px 20px", borderRadius: 10,
-              background: syncing ? "#374151" : "rgba(255,255,255,0.08)",
-              color: syncing ? "#9ca3af" : "white",
-              border: "1px solid rgba(255,255,255,0.1)",
-              fontSize: 13, fontWeight: 600, cursor: syncing ? "default" : "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-              transition: "all 0.15s ease",
-            }}>
-              <RefreshCw size={14} style={{ animation: syncing ? "spin 1s linear infinite" : "none" }} />
-              {syncing ? "Syncing..." : "Sync Now"}
-            </button>
-          )}
-          <div style={{
-            padding: "8px 16px", borderRadius: 20,
-            background: connected ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
-            color: connected ? "#4ade80" : "#f87171",
-            fontSize: 12, fontWeight: 700, letterSpacing: "0.5px",
-            display: "flex", alignItems: "center", gap: 6,
-          }} data-testid="status-connection">
-            <span style={{
-              width: 7, height: 7, borderRadius: "50%",
-              background: connected ? "#22c55e" : "#ef4444",
-              boxShadow: connected ? "0 0 8px rgba(34,197,94,0.5)" : "none",
-            }} />
-            {connected ? "CONNECTED" : "DISCONNECTED"}
-          </div>
-        </div>
-      </div>
+        <Tabs value={tab} onValueChange={v => setTab(v as TabId)} className="space-y-4">
+          <TabsList className="flex flex-wrap">
+            {tabs.map(t => (
+              <TabsTrigger key={t.id} value={t.id} data-testid={`tab-${t.id}`}>
+                <t.icon className="h-4 w-4 mr-2" />
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-      <div style={{
-        display: "flex", gap: 2, padding: "0 32px",
-        background: "rgba(255,255,255,0.02)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        overflowX: "auto",
-      }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} style={{
-            padding: "14px 20px", fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-            color: tab === t.id ? "white" : "#6b7280",
-            background: "none", border: "none", cursor: "pointer",
-            borderBottom: tab === t.id ? "2px solid #2ca01c" : "2px solid transparent",
-            display: "flex", alignItems: "center", gap: 8,
-            transition: "all 0.15s ease", whiteSpace: "nowrap",
-          }}>
-            <t.icon size={15} /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ padding: "28px 32px", maxWidth: 1200, margin: "0 auto" }}>
-
-        {tab === "dashboard" && (
-          <div>
-            <div style={{
-              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 16, marginBottom: 28,
-            }}>
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
-                { label: "Total Synced", value: MOCK_SUMMARY.totalSynced.toLocaleString(), sub: "all time", color: "#2ca01c" },
-                { label: "This Week", value: MOCK_SUMMARY.thisWeek, sub: "transactions", color: "#3b82f6" },
-                { label: "Revenue Synced", value: fmt(MOCK_SUMMARY.totalRevenue), sub: "this month", color: "#a855f7" },
-                { label: "Dual Pricing Tracked", value: fmt(MOCK_SUMMARY.totalDP), sub: "this month", color: "#f59e0b" },
-                { label: "Pending Invoices", value: MOCK_SUMMARY.pendingInvoices, sub: "awaiting payment", color: "#6366f1" },
-                { label: "Errors", value: MOCK_SUMMARY.errors, sub: "need attention", color: MOCK_SUMMARY.errors > 0 ? "#ef4444" : "#22c55e" },
+                { label: "Total Synced", value: MOCK_SUMMARY.totalSynced.toLocaleString(), sub: "all time", colorClass: "text-green-500" },
+                { label: "This Week", value: MOCK_SUMMARY.thisWeek, sub: "transactions", colorClass: "text-blue-500" },
+                { label: "Revenue Synced", value: fmt(MOCK_SUMMARY.totalRevenue), sub: "this month", colorClass: "text-purple-500" },
+                { label: "Dual Pricing Tracked", value: fmt(MOCK_SUMMARY.totalDP), sub: "this month", colorClass: "text-amber-500" },
+                { label: "Pending Invoices", value: MOCK_SUMMARY.pendingInvoices, sub: "awaiting payment", colorClass: "text-indigo-500" },
+                { label: "Errors", value: MOCK_SUMMARY.errors, sub: "need attention", colorClass: MOCK_SUMMARY.errors > 0 ? "text-red-500" : "text-green-500" },
               ].map((s, i) => (
-                <div key={i} style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 14, padding: "20px 22px",
-                }} data-testid={`stat-${s.label.toLowerCase().replace(/\s/g, "-")}`}>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.label}</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: "#4b5563", marginTop: 4 }}>{s.sub}</div>
-                </div>
+                <Card key={i} data-testid={`stat-${s.label.toLowerCase().replace(/\s/g, "-")}`}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{s.label}</div>
+                    <div className={`text-2xl font-extrabold tabular-nums mt-1 ${s.colorClass}`}>{s.value}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{s.sub}</div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
 
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28, marginBottom: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 20 }}>
-                How PCB Auto → QuickBooks Sync Works
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
-                {[
-                  { step: "1", title: "RO Invoiced", desc: "When you invoice a repair order in PCB Auto, an invoice is created in QuickBooks with matching line items (labor, parts, shop supplies)." },
-                  { step: "2", title: "Payment Recorded", desc: "When the customer pays (cash or card), the payment is recorded against the QBO invoice. Dual pricing splits automatically." },
-                  { step: "3", title: "Accounts Updated", desc: "Revenue goes to your income accounts. Dual pricing amount goes to its own account. Tax to liability. Tips tracked separately." },
-                  { step: "4", title: "Set & Forget", desc: "Everything syncs automatically in real time. No CSV exports, no manual entry, no reconciliation headaches." },
-                ].map((s, i) => {
-                  const StepIcon = stepIcons[i];
-                  return (
-                    <div key={i} style={{ display: "flex", gap: 14 }}>
-                      <div style={{
-                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                        background: "rgba(44,160,28,0.12)", color: "#4ade80",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 20,
-                      }}><StepIcon size={20} /></div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>
-                          <span style={{ color: "#2ca01c", marginRight: 6 }}>Step {s.step}</span>{s.title}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">How PCB Auto → QuickBooks Sync Works</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {[
+                    { step: "1", title: "RO Invoiced", desc: "When you invoice a repair order in PCB Auto, an invoice is created in QuickBooks with matching line items (labor, parts, shop supplies)." },
+                    { step: "2", title: "Payment Recorded", desc: "When the customer pays (cash or card), the payment is recorded against the QBO invoice. Dual pricing splits automatically." },
+                    { step: "3", title: "Accounts Updated", desc: "Revenue goes to your income accounts. Dual pricing amount goes to its own account. Tax to liability. Tips tracked separately." },
+                    { step: "4", title: "Set & Forget", desc: "Everything syncs automatically in real time. No CSV exports, no manual entry, no reconciliation headaches." },
+                  ].map((s, i) => {
+                    const StepIcon = stepIcons[i];
+                    return (
+                      <div key={i} className="flex gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center flex-shrink-0">
+                          <StepIcon className="h-5 w-5" />
                         </div>
-                        <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5, marginTop: 4 }}>{s.desc}</div>
+                        <div>
+                          <div className="text-sm font-bold">
+                            <span className="text-green-500 mr-1.5">Step {s.step}</span>{s.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-relaxed mt-1">{s.desc}</div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 6 }}>
-                Sample QBO Journal Entry \u2014 Card Payment
-              </div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>
-                RO #1001 · Robert Smith · 2019 Ford F-150 XLT · Paid by Card
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                      {["Account", "Debit", "Credit", "Memo"].map(h => (
-                        <th key={h} style={{
-                          padding: "10px 14px", textAlign: h === "Debit" || h === "Credit" ? "right" : "left",
-                          color: "#9ca3af", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.5px",
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { account: "Undeposited Funds", debit: 568.82, credit: null, memo: "Card payment \u2014 Visa \u00b7\u00b7\u00b7\u00b74821" },
-                      { account: "Service Revenue \u2014 Labor", debit: null, credit: 187.50, memo: "2.0 hrs labor @ $125/hr (brakes, belt)" },
-                      { account: "Service Revenue \u2014 Parts", debit: null, credit: 232.48, memo: "Bosch pads, ACDelco rotors, Gates belt, Fram filter" },
-                      { account: "Shop Supply Revenue", debit: null, credit: 26.96, memo: "Shop supplies" },
-                      { account: "Dual Pricing Income", debit: null, credit: 19.18, memo: "Card price \u2212 cash price (3.49%)" },
-                      { account: "Parts COGS", debit: 154.49, credit: null, memo: "Wholesale parts cost" },
-                      { account: "Inventory / AP", debit: null, credit: 154.49, memo: "Parts cost offset" },
-                      { account: "Sales Tax Payable", debit: null, credit: 35.96, memo: "IN state + Hamilton County (7%)" },
-                      { account: "Accounts Receivable", debit: null, credit: 66.74, memo: "Clear AR for RO #1001" },
-                    ].map((row, i) => (
-                      <tr key={i} style={{
-                        borderBottom: "1px solid rgba(255,255,255,0.04)",
-                        background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
-                      }}>
-                        <td style={{ padding: "10px 14px", fontWeight: 600, color: "#e5e7eb" }}>{row.account}</td>
-                        <td style={{
-                          padding: "10px 14px", textAlign: "right",
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                          color: row.debit ? "#4ade80" : "transparent",
-                        }}>{row.debit ? fmt(row.debit) : "\u2014"}</td>
-                        <td style={{
-                          padding: "10px 14px", textAlign: "right",
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                          color: row.credit ? "#60a5fa" : "transparent",
-                        }}>{row.credit ? fmt(row.credit) : "\u2014"}</td>
-                        <td style={{ padding: "10px 14px", fontSize: 12, color: "#6b7280" }}>{row.memo}</td>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Sample QBO Journal Entry — Card Payment</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  RO #1001 · Robert Smith · 2019 Ford F-150 XLT · Paid by Card
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        {["Account", "Debit", "Credit", "Memo"].map(h => (
+                          <th key={h} className={`px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground ${h === "Debit" || h === "Credit" ? "text-right" : "text-left"}`}>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                    <tr style={{ borderTop: "2px solid rgba(255,255,255,0.1)" }}>
-                      <td style={{ padding: "12px 14px", fontWeight: 800, color: "white" }}>TOTALS</td>
-                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "#4ade80" }}>{fmt(723.31)}</td>
-                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>{fmt(723.31)}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 12, color: "#4ade80", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                        <Check size={14} /> Balanced
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div style={{
-                marginTop: 16, padding: "12px 16px", borderRadius: 10,
-                background: "rgba(44,160,28,0.08)", border: "1px solid rgba(44,160,28,0.15)",
-                fontSize: 12, color: "#6b7280", lineHeight: 1.6,
-              }}>
-                <span style={{ color: "#4ade80", fontWeight: 700 }}>Key:</span> The <strong style={{ color: "#f59e0b" }}>Dual Pricing Income</strong> line ({fmt(19.18)}) is the difference between the card price and cash price. This goes to its own income account so the shop owner can see exactly how much the dual pricing program earns — separate from service revenue. The customer never sees this breakdown.
-              </div>
-            </div>
-          </div>
-        )}
+                    </thead>
+                    <tbody>
+                      {[
+                        { account: "Undeposited Funds", debit: 568.82, credit: null, memo: "Card payment — Visa ··4821" },
+                        { account: "Service Revenue — Labor", debit: null, credit: 187.50, memo: "2.0 hrs labor @ $125/hr (brakes, belt)" },
+                        { account: "Service Revenue — Parts", debit: null, credit: 232.48, memo: "Bosch pads, ACDelco rotors, Gates belt, Fram filter" },
+                        { account: "Shop Supply Revenue", debit: null, credit: 26.96, memo: "Shop supplies" },
+                        { account: "Dual Pricing Income", debit: null, credit: 19.18, memo: "Card price − cash price (3.49%)" },
+                        { account: "Parts COGS", debit: 154.49, credit: null, memo: "Wholesale parts cost" },
+                        { account: "Inventory / AP", debit: null, credit: 154.49, memo: "Parts cost offset" },
+                        { account: "Sales Tax Payable", debit: null, credit: 35.96, memo: "IN state + Hamilton County (7%)" },
+                        { account: "Accounts Receivable", debit: null, credit: 66.74, memo: "Clear AR for RO #1001" },
+                      ].map((row, i) => (
+                        <tr key={i} className={`border-b border-border/50 ${i % 2 !== 0 ? "bg-muted/30" : ""}`}>
+                          <td className="px-3 py-2.5 font-semibold">{row.account}</td>
+                          <td className={`px-3 py-2.5 text-right tabular-nums text-xs ${row.debit ? "text-green-500" : "text-transparent"}`}>
+                            {row.debit ? fmt(row.debit) : "—"}
+                          </td>
+                          <td className={`px-3 py-2.5 text-right tabular-nums text-xs ${row.credit ? "text-blue-500" : "text-transparent"}`}>
+                            {row.credit ? fmt(row.credit) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{row.memo}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t-2">
+                        <td className="px-3 py-3 font-extrabold">TOTALS</td>
+                        <td className="px-3 py-3 text-right tabular-nums font-bold text-green-500">{fmt(723.31)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums font-bold text-blue-500">{fmt(723.31)}</td>
+                        <td className="px-3 py-3 text-xs font-semibold text-green-500 flex items-center gap-1">
+                          <Check className="h-3.5 w-3.5" /> Balanced
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-        {tab === "mapping" && (
-          <div>
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 4 }}>
-                Chart of Accounts Mapping
-              </div>
-              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 24 }}>
-                Map PCB Auto transaction types to your QuickBooks accounts. These determine where revenue, costs, and liabilities land in your books.
-              </div>
+                <div className="mt-4 p-3 rounded-md bg-green-500/5 border border-green-500/15 text-xs text-muted-foreground leading-relaxed">
+                  <span className="text-green-500 font-bold">Key:</span> The <strong className="text-amber-500">Dual Pricing Income</strong> line ({fmt(19.18)}) is the difference between the card price and cash price. This goes to its own income account so the shop owner can see exactly how much the dual pricing program earns — separate from service revenue. The customer never sees this breakdown.
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              <div style={{ display: "grid", gap: 2 }}>
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 40px 1fr 1fr",
-                  padding: "10px 16px", alignItems: "center",
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>PCB Auto Category</div>
+          <TabsContent value="mapping" className="space-y-5">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Chart of Accounts Mapping</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Map PCB Auto transaction types to your QuickBooks accounts. These determine where revenue, costs, and liabilities land in your books.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="hidden md:grid grid-cols-[1fr_40px_1fr_auto] gap-2 px-3 py-2 items-center">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">PCB Auto Category</div>
                   <div />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>QuickBooks Account</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Account Type</div>
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">QuickBooks Account</div>
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Account Type</div>
                 </div>
 
                 {[
                   { key: "labor", label: "Labor Revenue", desc: "Hourly labor charges on repair orders" },
                   { key: "parts", label: "Parts Revenue", desc: "Parts sold to customers (retail price)" },
-                  { key: "dualPricing", label: "Dual Pricing Income", desc: "Card price \u2212 cash price on card transactions" },
+                  { key: "dualPricing", label: "Dual Pricing Income", desc: "Card price − cash price on card transactions" },
                   { key: "shopSupplies", label: "Shop Supplies", desc: "Shop supply charges on repair orders" },
                   { key: "salesTax", label: "Sales Tax Collected", desc: "State and local tax collected" },
                   { key: "tips", label: "Tips Collected", desc: "Customer tips on payments" },
@@ -432,461 +373,339 @@ export default function AutoQuickBooks() {
                   const selectedAccount = MOCK_ACCOUNTS.find(a => a.id === mappings[item.key]);
                   const MappingIcon = mappingIcons[item.key] || FileText;
                   return (
-                    <div key={item.key} style={{
-                      display: "grid", gridTemplateColumns: "1fr 40px 1fr 1fr",
-                      padding: "14px 16px", alignItems: "center",
-                      background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent",
-                      borderRadius: 8, gap: 8,
-                    }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <MappingIcon size={16} style={{ color: "#9ca3af" }} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{item.label}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{item.desc}</div>
-                          </div>
+                    <div key={item.key} className={`grid grid-cols-1 md:grid-cols-[1fr_40px_1fr_auto] gap-2 md:gap-3 px-3 py-3 items-center rounded-md ${i % 2 === 0 ? "bg-muted/30" : ""}`}>
+                      <div className="flex items-center gap-3">
+                        <MappingIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div>
+                          <div className="text-sm font-semibold">{item.label}</div>
+                          <div className="text-xs text-muted-foreground">{item.desc}</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "center", color: "#4b5563", fontSize: 18 }}>\u2192</div>
+                      <div className="hidden md:flex justify-center text-muted-foreground">→</div>
                       <div>
-                        <select
+                        <Select
                           value={mappings[item.key]}
-                          onChange={e => setMappings(m => ({ ...m, [item.key]: e.target.value }))}
-                          data-testid={`select-mapping-${item.key}`}
-                          style={{
-                            width: "100%", padding: "10px 12px", borderRadius: 8,
-                            background: "#1a1f2e", color: "white", border: "1px solid rgba(255,255,255,0.1)",
-                            fontSize: 13, fontWeight: 500, cursor: "pointer",
-                            appearance: "auto",
-                          }}
+                          onValueChange={val => setMappings(m => ({ ...m, [item.key]: val }))}
                         >
-                          {MOCK_ACCOUNTS.map(a => (
-                            <option key={a.id} value={a.id}>{a.number} \u2014 {a.name}</option>
-                          ))}
-                        </select>
+                          <SelectTrigger data-testid={`select-mapping-${item.key}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MOCK_ACCOUNTS.map(a => (
+                              <SelectItem key={a.id} value={a.id}>{a.number} — {a.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <div style={{
-                        padding: "6px 12px", borderRadius: 6,
-                        background: selectedAccount?.type === "Income" ? "rgba(34,197,94,0.1)" :
-                          selectedAccount?.type === "Bank" ? "rgba(59,130,246,0.1)" :
-                          selectedAccount?.type === "Cost of Goods Sold" ? "rgba(239,68,68,0.1)" :
-                          "rgba(255,255,255,0.05)",
-                        color: selectedAccount?.type === "Income" ? "#4ade80" :
-                          selectedAccount?.type === "Bank" ? "#60a5fa" :
-                          selectedAccount?.type === "Cost of Goods Sold" ? "#f87171" :
-                          "#9ca3af",
-                        fontSize: 12, fontWeight: 600, display: "inline-block",
-                      }}>
-                        {selectedAccount?.type}
+                      <div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs no-default-hover-elevate no-default-active-elevate ${
+                            selectedAccount?.type === "Income" ? "border-green-500/30 text-green-500 bg-green-500/10" :
+                            selectedAccount?.type === "Bank" ? "border-blue-500/30 text-blue-500 bg-blue-500/10" :
+                            selectedAccount?.type === "Cost of Goods Sold" ? "border-red-500/30 text-red-500 bg-red-500/10" :
+                            ""
+                          }`}
+                        >
+                          {selectedAccount?.type}
+                        </Badge>
                       </div>
                     </div>
                   );
                 })}
-              </div>
 
-              <div style={{
-                marginTop: 24, display: "flex", gap: 12, justifyContent: "flex-end",
-              }}>
-                <button data-testid="button-reset-mapping" style={{
-                  padding: "10px 20px", borderRadius: 10,
-                  background: "rgba(255,255,255,0.06)", color: "#9ca3af",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
-                }}>Reset to Defaults</button>
-                <button data-testid="button-save-mapping" style={{
-                  padding: "10px 24px", borderRadius: 10,
-                  background: "linear-gradient(135deg, #2ca01c 0%, #0aab4b 100%)",
-                  color: "white", border: "none",
-                  fontSize: 13, fontWeight: 700, cursor: "pointer",
-                  boxShadow: "0 4px 14px rgba(44,160,28,0.3)",
-                }}>Save Mapping</button>
-              </div>
-            </div>
+                <div className="flex gap-3 justify-end pt-4">
+                  <Button variant="outline" data-testid="button-reset-mapping">
+                    Reset to Defaults
+                  </Button>
+                  <Button className="bg-green-600 text-white" data-testid="button-save-mapping">
+                    Save Mapping
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div style={{
-              background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)",
-              borderRadius: 14, padding: 24, marginTop: 20,
-            }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-                <DollarSign size={16} /> How Dual Pricing Maps to QuickBooks
-              </div>
-              <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.7 }}>
-                When a customer pays by <strong style={{ color: "white" }}>card</strong>, the total is higher than the cash price. The difference goes to <strong style={{ color: "#f59e0b" }}>Dual Pricing Income</strong> — a separate income account so you can track exactly how much your dual pricing program earns, separate from service revenue.
-                <br /><br />
-                When a customer pays by <strong style={{ color: "white" }}>cash</strong>, there is no dual pricing amount — the full payment goes to your revenue accounts.
-                <br /><br />
-                <strong style={{ color: "white" }}>Example (Card Payment on $549.64 RO):</strong><br />
-                Service Revenue receives $446.94 (labor + parts + supplies)<br />
-                Sales Tax Payable receives $35.96<br />
-                Dual Pricing Income receives $19.18 (card price \u2212 cash price)<br />
-                Undeposited Funds is debited $568.82 (total card charge)<br />
-                Everything balances. Your accountant will love this.
-              </div>
-            </div>
-          </div>
-        )}
+            <Card className="border-amber-500/20">
+              <CardContent className="pt-5 pb-5">
+                <div className="flex items-center gap-2 mb-2 text-amber-500 font-bold text-sm">
+                  <DollarSign className="h-4 w-4" /> How Dual Pricing Maps to QuickBooks
+                </div>
+                <div className="text-sm text-muted-foreground leading-relaxed space-y-3">
+                  <p>
+                    When a customer pays by <strong className="text-foreground">card</strong>, the total is higher than the cash price. The difference goes to <strong className="text-amber-500">Dual Pricing Income</strong> — a separate income account so you can track exactly how much your dual pricing program earns, separate from service revenue.
+                  </p>
+                  <p>
+                    When a customer pays by <strong className="text-foreground">cash</strong>, there is no dual pricing amount — the full payment goes to your revenue accounts.
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Example (Card Payment on $549.64 RO):</strong><br />
+                    Service Revenue receives $446.94 (labor + parts + supplies)<br />
+                    Sales Tax Payable receives $35.96<br />
+                    Dual Pricing Income receives $19.18 (card price − cash price)<br />
+                    Undeposited Funds is debited $568.82 (total card charge)<br />
+                    Everything balances. Your accountant will love this.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {tab === "log" && (
-          <div>
-            <div style={{
-              display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center",
-            }}>
-              <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600, marginRight: 8 }}>Filter:</div>
+          <TabsContent value="log" className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground font-semibold mr-2">Filter:</span>
               {[
-                { id: "all", label: "All" },
+                { id: "all", label: "All", icon: undefined },
                 { id: "synced", label: "Synced", icon: Check },
                 { id: "pending_payment", label: "Pending", icon: Clock },
                 { id: "error", label: "Errors", icon: AlertTriangle },
               ].map(f => (
-                <button key={f.id} onClick={() => setFilterStatus(f.id)} data-testid={`filter-${f.id}`} style={{
-                  padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: filterStatus === f.id ? "rgba(44,160,28,0.15)" : "rgba(255,255,255,0.04)",
-                  color: filterStatus === f.id ? "#4ade80" : "#6b7280",
-                  border: filterStatus === f.id ? "1px solid rgba(44,160,28,0.3)" : "1px solid rgba(255,255,255,0.06)",
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 4,
-                }}>
-                  {f.icon && <f.icon size={12} />}
+                <Button
+                  key={f.id}
+                  variant={filterStatus === f.id ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterStatus(f.id)}
+                  data-testid={`filter-${f.id}`}
+                  className={filterStatus === f.id ? "bg-green-600 text-white" : ""}
+                >
+                  {f.icon && <f.icon className="h-3 w-3 mr-1" />}
                   {f.label}
-                </button>
+                </Button>
               ))}
 
-              <div style={{ flex: 1 }} />
+              <div className="flex-1" />
 
-              <button data-testid="button-export-excel" style={{
-                padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                background: "rgba(255,255,255,0.06)", color: "#9ca3af",
-                border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 6,
-              }}>
-                <Download size={13} /> Export to Excel
-              </button>
+              <Button variant="outline" size="sm" data-testid="button-export-excel">
+                <Download className="h-3.5 w-3.5 mr-1.5" /> Export to Excel
+              </Button>
             </div>
 
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, overflow: "hidden",
-            }}>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 900 }}>
-                  <thead>
-                    <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                      {["Status", "Date", "RO #", "Customer", "Vehicle", "Method", "Amount", "Dual Pricing", "QBO Invoice", "QBO Payment"].map(h => (
-                        <th key={h} style={{
-                          padding: "12px 14px", textAlign: h === "Amount" || h === "Dual Pricing" ? "right" : "left",
-                          color: "#6b7280", fontWeight: 600, fontSize: 11,
-                          textTransform: "uppercase", letterSpacing: "0.5px",
-                          borderBottom: "1px solid rgba(255,255,255,0.06)",
-                          whiteSpace: "nowrap",
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOCK_SYNC_LOG
-                      .filter(s => filterStatus === "all" || s.status === filterStatus)
-                      .map((s, i) => (
-                      <tr key={s.id} style={{
-                        borderBottom: "1px solid rgba(255,255,255,0.04)",
-                        background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
-                        cursor: "pointer",
-                        transition: "background 0.1s",
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)")}
-                      onClick={() => setShowJournal(showJournal === s.id ? null : s.id)}
-                      data-testid={`row-sync-${s.id}`}
-                      >
-                        <td style={{ padding: "12px 14px" }}>
-                          <span style={{
-                            padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                            background: s.status === "synced" ? "rgba(34,197,94,0.12)" :
-                              s.status === "pending_payment" ? "rgba(245,158,11,0.12)" :
-                              "rgba(239,68,68,0.12)",
-                            color: s.status === "synced" ? "#4ade80" :
-                              s.status === "pending_payment" ? "#fbbf24" : "#f87171",
-                            display: "inline-flex", alignItems: "center", gap: 4,
-                          }}>
-                            {s.status === "synced" ? <><Check size={10} /> Synced</> : s.status === "pending_payment" ? <><Clock size={10} /> Pending</> : <><AlertTriangle size={10} /> Error</>}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 14px", whiteSpace: "nowrap", color: "#9ca3af" }}>
-                          {fmtDate(s.syncedAt)}<br />
-                          <span style={{ fontSize: 11, color: "#4b5563" }}>{fmtTime(s.syncedAt)}</span>
-                        </td>
-                        <td style={{ padding: "12px 14px", fontWeight: 700, color: "white", fontFamily: "'JetBrains Mono', monospace" }}>
-                          #{s.roNumber}
-                        </td>
-                        <td style={{ padding: "12px 14px", fontWeight: 600, color: "#e5e7eb" }}>{s.customer}</td>
-                        <td style={{ padding: "12px 14px", color: "#6b7280", fontSize: 12 }}>{s.vehicle}</td>
-                        <td style={{ padding: "12px 14px" }}>
-                          {s.method && (
-                            <span style={{
-                              padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                              background: s.method === "card" ? "rgba(59,130,246,0.12)" : "rgba(34,197,94,0.12)",
-                              color: s.method === "card" ? "#60a5fa" : "#4ade80",
-                              display: "inline-flex", alignItems: "center", gap: 4,
-                            }}>
-                              {s.method === "card" ? <><CreditCard size={10} /> Card</> : <><Banknote size={10} /> Cash</>}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{
-                          padding: "12px 14px", textAlign: "right",
-                          fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "white",
-                        }}>{fmt(s.amount)}</td>
-                        <td style={{
-                          padding: "12px 14px", textAlign: "right",
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                          color: s.dpAmount > 0 ? "#fbbf24" : "#374151",
-                        }}>{s.dpAmount > 0 ? fmt(s.dpAmount) : "\u2014"}</td>
-                        <td style={{
-                          padding: "12px 14px",
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#2ca01c",
-                        }}>{s.qboInvoice}</td>
-                        <td style={{
-                          padding: "12px 14px",
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                          color: s.qboPayment ? "#2ca01c" : "#4b5563",
-                        }}>{s.qboPayment || "\u2014"}</td>
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[900px]">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        {["Status", "Date", "RO #", "Customer", "Vehicle", "Method", "Amount", "Dual Pricing", "QBO Invoice", "QBO Payment"].map(h => (
+                          <th key={h} className={`px-3 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b whitespace-nowrap ${h === "Amount" || h === "Dual Pricing" ? "text-right" : "text-left"}`}>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLog.map((s, i) => (
+                        <tr
+                          key={s.id}
+                          className={`border-b border-border/50 cursor-pointer hover-elevate ${i % 2 !== 0 ? "bg-muted/20" : ""}`}
+                          onClick={() => setShowJournal(showJournal === s.id ? null : s.id)}
+                          data-testid={`row-sync-${s.id}`}
+                        >
+                          <td className="px-3 py-3">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs no-default-hover-elevate no-default-active-elevate ${
+                                s.status === "synced" ? "border-green-500/30 text-green-500 bg-green-500/10" :
+                                s.status === "pending_payment" ? "border-amber-500/30 text-amber-500 bg-amber-500/10" :
+                                "border-red-500/30 text-red-500 bg-red-500/10"
+                              }`}
+                            >
+                              {s.status === "synced" ? <><Check className="h-3 w-3 mr-1" /> Synced</> :
+                               s.status === "pending_payment" ? <><Clock className="h-3 w-3 mr-1" /> Pending</> :
+                               <><AlertTriangle className="h-3 w-3 mr-1" /> Error</>}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {fmtDate(s.syncedAt)}<br />
+                            <span className="text-xs text-muted-foreground/60">{fmtTime(s.syncedAt)}</span>
+                          </td>
+                          <td className="px-3 py-3 font-bold tabular-nums">
+                            #{s.roNumber}
+                          </td>
+                          <td className="px-3 py-3 font-semibold">{s.customer}</td>
+                          <td className="px-3 py-3 text-muted-foreground text-xs">{s.vehicle}</td>
+                          <td className="px-3 py-3">
+                            {s.method && (
+                              <Badge
+                                variant="outline"
+                                className={`text-xs no-default-hover-elevate no-default-active-elevate ${
+                                  s.method === "card" ? "border-blue-500/30 text-blue-500 bg-blue-500/10" : "border-green-500/30 text-green-500 bg-green-500/10"
+                                }`}
+                              >
+                                {s.method === "card" ? <><CreditCard className="h-3 w-3 mr-1" /> Card</> : <><Banknote className="h-3 w-3 mr-1" /> Cash</>}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums font-semibold">{fmt(s.amount)}</td>
+                          <td className={`px-3 py-3 text-right tabular-nums text-xs ${s.dpAmount > 0 ? "text-amber-500" : "text-muted-foreground/30"}`}>
+                            {s.dpAmount > 0 ? fmt(s.dpAmount) : "—"}
+                          </td>
+                          <td className="px-3 py-3 tabular-nums text-xs text-green-500">{s.qboInvoice}</td>
+                          <td className={`px-3 py-3 tabular-nums text-xs ${s.qboPayment ? "text-green-500" : "text-muted-foreground/30"}`}>
+                            {s.qboPayment || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filterStatus === "error" && MOCK_SYNC_LOG.filter(s => s.status === "error").length > 0 && (
+                  <div className="px-5 py-4 bg-red-500/5 border-t border-red-500/15">
+                    {MOCK_SYNC_LOG.filter(s => s.status === "error").map(s => (
+                      <div key={s.id} className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                          <span className="text-red-500 font-semibold text-sm">RO #{s.roNumber}:</span>
+                          <span className="text-muted-foreground text-sm ml-2">{s.error}</span>
+                        </div>
+                        <Button variant="destructive" size="sm" data-testid={`button-retry-${s.id}`}>
+                          Retry Sync
+                        </Button>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {filterStatus === "error" && MOCK_SYNC_LOG.filter(s => s.status === "error").length > 0 && (
-                <div style={{
-                  padding: "16px 20px", background: "rgba(239,68,68,0.06)",
-                  borderTop: "1px solid rgba(239,68,68,0.15)",
-                }}>
-                  {MOCK_SYNC_LOG.filter(s => s.status === "error").map(s => (
-                    <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <span style={{ color: "#f87171", fontWeight: 600, fontSize: 13 }}>RO #{s.roNumber}:</span>
-                        <span style={{ color: "#9ca3af", fontSize: 13, marginLeft: 8 }}>{s.error}</span>
-                      </div>
-                      <button data-testid={`button-retry-${s.id}`} style={{
-                        padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                        background: "rgba(239,68,68,0.15)", color: "#f87171",
-                        border: "1px solid rgba(239,68,68,0.3)", cursor: "pointer",
-                      }}>Retry Sync</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              display: "flex", gap: 20, marginTop: 16, justifyContent: "center", flexWrap: "wrap",
-            }}>
-              <div style={{ fontSize: 12, color: "#4b5563" }}>
-                Showing {MOCK_SYNC_LOG.filter(s => filterStatus === "all" || s.status === filterStatus).length} of {MOCK_SYNC_LOG.length} transactions
-              </div>
-              <div style={{ fontSize: 12, color: "#4b5563" }}>
-                Last synced: {fmtDate(MOCK_SUMMARY.lastSync)} at {fmtTime(MOCK_SUMMARY.lastSync)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "settings" && (
-          <div style={{ display: "grid", gap: 20 }}>
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 20 }}>
-                QuickBooks Online Connection
-              </div>
-
-              {connected ? (
-                <div>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 16, padding: 20,
-                    background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)",
-                    borderRadius: 12, marginBottom: 20,
-                  }}>
-                    <div style={{
-                      width: 52, height: 52, borderRadius: 14,
-                      background: "linear-gradient(135deg, #2ca01c 0%, #0aab4b 100%)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 24, fontWeight: 800, color: "white",
-                    }}>QB</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "white" }}>Demo Auto Repair</div>
-                      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>QuickBooks Online Plus · Company ID: 4620816365272840</div>
-                      <div style={{ fontSize: 12, color: "#4ade80", marginTop: 4, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                        <Check size={12} /> Connected since Jan 15, 2026
-                      </div>
-                    </div>
-                    <button onClick={handleDisconnect} data-testid="button-disconnect" style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                      background: "rgba(239,68,68,0.1)", color: "#f87171",
-                      border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer",
-                    }}>Disconnect</button>
                   </div>
+                )}
+              </CardContent>
+            </Card>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Token Status</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#4ade80", marginTop: 4 }}>Valid</div>
-                      <div style={{ fontSize: 11, color: "#4b5563", marginTop: 2 }}>Expires: Mar 15, 2026 · Auto-refreshes</div>
+            <div className="flex gap-5 justify-center flex-wrap text-xs text-muted-foreground">
+              <span>Showing {filteredLog.length} of {MOCK_SYNC_LOG.length} transactions</span>
+              <span>Last synced: {fmtDate(MOCK_SUMMARY.lastSync)} at {fmtTime(MOCK_SUMMARY.lastSync)}</span>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-5">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">QuickBooks Online Connection</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {connected ? (
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-green-500/5 border border-green-500/15 flex-wrap">
+                      <div className="w-13 h-13 rounded-xl bg-green-500 flex items-center justify-center text-2xl font-extrabold text-white">
+                        QB
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold">Demo Auto Repair</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">QuickBooks Online Plus · Company ID: 4620816365272840</div>
+                        <div className="text-xs text-green-500 mt-1 font-semibold flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Connected since Jan 15, 2026
+                        </div>
+                      </div>
+                      <Button variant="destructive" size="sm" onClick={handleDisconnect} data-testid="button-disconnect">
+                        Disconnect
+                      </Button>
                     </div>
-                    <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>API Calls Today</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "white", marginTop: 4 }}>47 / 500</div>
-                      <div style={{ fontSize: 11, color: "#4b5563", marginTop: 2 }}>Intuit rate limit: 500/min</div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Card>
+                        <CardContent className="pt-3 pb-3">
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">Token Status</div>
+                          <div className="text-sm font-bold text-green-500 mt-1">Valid</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">Expires: Mar 15, 2026 · Auto-refreshes</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-3 pb-3">
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">API Calls Today</div>
+                          <div className="text-sm font-bold mt-1">47 / 500</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">Intuit rate limit: 500/min</div>
+                        </CardContent>
+                      </Card>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{
-                    padding: 28, textAlign: "center",
-                    background: "rgba(255,255,255,0.02)", borderRadius: 12,
-                    border: "1px dashed rgba(255,255,255,0.1)",
-                  }}>
-                    <div style={{
-                      width: 72, height: 72, borderRadius: 20, margin: "0 auto 16px",
-                      background: "rgba(44,160,28,0.1)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 32, fontWeight: 800, color: "#2ca01c",
-                    }}>QB</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 8 }}>
-                      Connect QuickBooks Online
+                ) : (
+                  <div className="py-8 text-center rounded-xl border border-dashed">
+                    <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-3xl font-extrabold text-green-500 mx-auto mb-4">
+                      QB
                     </div>
-                    <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 400, margin: "0 auto 24px", lineHeight: 1.6 }}>
+                    <div className="text-base font-bold mb-2">Connect QuickBooks Online</div>
+                    <div className="text-sm text-muted-foreground max-w-sm mx-auto mb-6 leading-relaxed">
                       Link your QuickBooks account to automatically sync invoices, payments, and dual pricing data. Takes 30 seconds.
                     </div>
-                    <button onClick={handleConnect} disabled={connecting} data-testid="button-connect-qb" style={{
-                      padding: "14px 32px", borderRadius: 12,
-                      background: connecting
-                        ? "rgba(44,160,28,0.3)"
-                        : "linear-gradient(135deg, #2ca01c 0%, #0aab4b 100%)",
-                      color: "white", border: "none",
-                      fontSize: 15, fontWeight: 700, cursor: connecting ? "default" : "pointer",
-                      boxShadow: connecting ? "none" : "0 4px 20px rgba(44,160,28,0.4)",
-                      display: "inline-flex", alignItems: "center", gap: 10,
-                      transition: "all 0.2s ease",
-                    }}>
+                    <Button
+                      className="bg-green-600 text-white"
+                      onClick={handleConnect}
+                      disabled={connecting}
+                      data-testid="button-connect-qb"
+                    >
                       {connecting ? (
                         <>
-                          <RefreshCw size={16} style={{ animation: "spin 1s linear infinite" }} />
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                           Connecting to QuickBooks...
                         </>
                       ) : (
                         <>
-                          <ExternalLink size={18} />
+                          <ExternalLink className="h-4 w-4 mr-2" />
                           Connect to QuickBooks
                         </>
                       )}
-                    </button>
+                    </Button>
                     {connecting && (
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 12 }}>
+                      <div className="text-xs text-muted-foreground mt-3">
                         Redirecting to Intuit for authorization...
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
 
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 20 }}>
-                Sync Settings
-              </div>
-
-              <div style={{ display: "grid", gap: 16 }}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Sync Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 {[
                   { id: "autoSync", label: "Automatic Sync", desc: "Sync transactions to QuickBooks in real time as payments are processed", value: autoSync, setter: setAutoSync },
                   { id: "syncInvoices", label: "Sync Invoices", desc: "Create QBO invoices when repair orders are invoiced in PCB Auto", value: syncInvoices, setter: setSyncInvoices },
                   { id: "syncPayments", label: "Sync Payments", desc: "Record payments in QBO when customers pay (cash or card)", value: syncPayments, setter: setSyncPayments },
                   { id: "syncCustomers", label: "Sync Customers", desc: "Create and update customer records in QBO from PCB Auto", value: syncCustomers, setter: setSyncCustomers },
                 ].map(setting => (
-                  <div key={setting.id} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "14px 18px", background: "rgba(255,255,255,0.02)",
-                    borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)",
-                  }}>
+                  <div key={setting.id} className="flex items-center justify-between gap-4 p-4 rounded-md bg-muted/30 border">
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "white" }}>{setting.label}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{setting.desc}</div>
+                      <div className="text-sm font-semibold">{setting.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{setting.desc}</div>
                     </div>
-                    <button onClick={() => setting.setter(!setting.value)} data-testid={`toggle-${setting.id}`} style={{
-                      width: 52, height: 28, borderRadius: 14, border: "none",
-                      background: setting.value ? "#2ca01c" : "#374151",
-                      position: "relative", cursor: "pointer",
-                      transition: "background 0.2s ease",
-                    }}>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: "50%",
-                        background: "white", position: "absolute", top: 3,
-                        left: setting.value ? 27 : 3,
-                        transition: "left 0.2s ease",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-                      }} />
-                    </button>
+                    <Switch
+                      checked={setting.value}
+                      onCheckedChange={() => setting.setter(!setting.value)}
+                      data-testid={`toggle-${setting.id}`}
+                    />
                   </div>
                 ))}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div style={{
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 14, padding: 28,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 20 }}>
-                What Syncs to QuickBooks
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-                {[
-                  { title: "Invoices", items: ["Invoice created when RO is invoiced", "Line items: labor, parts, shop supplies", "Customer & vehicle info in memo", "Tax calculated and mapped", "Dual pricing amounts split correctly"], color: "#3b82f6" },
-                  { title: "Payments", items: ["Payment recorded on invoice", "Cash \u2192 deposit account", "Card \u2192 undeposited funds", "Dual pricing \u2192 separate income account", "Tips tracked in liability account"], color: "#2ca01c" },
-                  { title: "Customers", items: ["Auto-created on first RO", "Name, phone, email synced", "Vehicle info in customer notes", "Updates sync both directions", "Service history linked via invoices"], color: "#a855f7" },
-                ].map((section, i) => (
-                  <div key={i} style={{
-                    padding: 20, borderRadius: 12,
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                  }}>
-                    <div style={{
-                      fontSize: 14, fontWeight: 700,
-                      color: section.color, marginBottom: 12,
-                    }}>
-                      {section.title}
-                    </div>
-                    {section.items.map((item, j) => (
-                      <div key={j} style={{
-                        fontSize: 12, color: "#9ca3af", padding: "5px 0",
-                        display: "flex", gap: 8, alignItems: "flex-start",
-                      }}>
-                        <Check size={12} style={{ color: section.color, flexShrink: 0, marginTop: 2 }} />
-                        {item}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">What Syncs to QuickBooks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { title: "Invoices", items: ["Invoice created when RO is invoiced", "Line items: labor, parts, shop supplies", "Customer & vehicle info in memo", "Tax calculated and mapped", "Dual pricing amounts split correctly"], colorClass: "text-blue-500" },
+                    { title: "Payments", items: ["Payment recorded on invoice", "Cash → deposit account", "Card → undeposited funds", "Dual pricing → separate income account", "Tips tracked in liability account"], colorClass: "text-green-500" },
+                    { title: "Customers", items: ["Auto-created on first RO", "Name, phone, email synced", "Vehicle info in customer notes", "Updates sync both directions", "Service history linked via invoices"], colorClass: "text-purple-500" },
+                  ].map((section, i) => (
+                    <div key={i} className="p-4 rounded-md bg-muted/30 border">
+                      <div className={`text-sm font-bold mb-3 ${section.colorClass}`}>
+                        {section.title}
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+                      {section.items.map((item, j) => (
+                        <div key={j} className="text-xs text-muted-foreground py-1 flex gap-2 items-start">
+                          <Check className={`h-3 w-3 flex-shrink-0 mt-0.5 ${section.colorClass}`} />
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        * { box-sizing: border-box; margin: 0; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-        select option { background: #1a1f2e; color: white; }
-      `}</style>
-    </div>
+    </AutoLayout>
   );
 }
