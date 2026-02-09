@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { AutoLayout } from "./AutoLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ClipboardCheck, Plus, Loader2, ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, XCircle, Circle, Car, User, Wrench, Send, Calendar, FileText, Copy, ExternalLink } from "lucide-react";
+import { ClipboardCheck, Plus, Loader2, ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, XCircle, Circle, Car, User, Wrench, Send, Calendar, FileText, Copy, ExternalLink, Link2, Zap, Search, ArrowLeft, ChevronRight, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface DviTemplate {
@@ -22,6 +23,8 @@ interface DviTemplate {
 interface Inspection {
   id: number;
   repairOrderId: number;
+  customerId?: number | null;
+  vehicleId?: number | null;
   status: string;
   overallCondition: string | null;
   notes: string | null;
@@ -118,6 +121,7 @@ function getCustomerName(customer: Inspection["customer"]): string {
 export default function AutoInspections() {
   const { autoFetch } = useAutoAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
@@ -125,7 +129,48 @@ export default function AutoInspections() {
   const [items, setItems] = useState<InspectionItem[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [roNumber, setRoNumber] = useState("");
+  const [modalStep, setModalStep] = useState<"choose" | "search-ro" | "search-customer" | "new-customer">("choose");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [customerResults, setCustomerResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newYear, setNewYear] = useState("");
+  const [newMake, setNewMake] = useState("");
+  const [newModel, setNewModel] = useState("");
+
+  const resetModal = useCallback(() => {
+    setModalStep("choose");
+    setSearchQuery("");
+    setSearchResults([]);
+    setCustomerResults([]);
+    setSearchLoading(false);
+    setCreating(false);
+    setNewFirstName("");
+    setNewLastName("");
+    setNewPhone("");
+    setNewYear("");
+    setNewMake("");
+    setNewModel("");
+  }, []);
+
+  useEffect(() => {
+    if (!dialogOpen) resetModal();
+  }, [dialogOpen, resetModal]);
+
+  const buildDefaultItems = useCallback(() => {
+    const items: { category: string; itemName: string; sortOrder: number }[] = [];
+    let sortOrder = 0;
+    Object.entries(DEFAULT_CATEGORIES).forEach(([cat, catItems]) => {
+      catItems.forEach((item) => {
+        items.push({ category: cat, itemName: item, sortOrder: sortOrder++ });
+      });
+    });
+    return items;
+  }, []);
 
   const fetchInspections = useCallback(async () => {
     try {
@@ -138,35 +183,126 @@ export default function AutoInspections() {
 
   useEffect(() => { fetchInspections(); }, [fetchInspections]);
 
-  const createInspection = async () => {
-    if (!roNumber) return;
+  const searchROs = useCallback(async (query: string) => {
+    setSearchLoading(true);
     try {
-      const rosRes = await autoFetch(`/api/auto/repair-orders?status=all`);
-      const rosData = await rosRes.json();
-      const ro = (rosData.repairOrders || []).find((r: any) => r.roNumber === roNumber);
-      if (!ro) { toast({ title: "Error", description: "RO not found", variant: "destructive" }); return; }
+      const url = query ? `/api/auto/dvi/search?q=${encodeURIComponent(query)}` : `/api/auto/dvi/search`;
+      const res = await autoFetch(url);
+      const data = await res.json();
+      setSearchResults(data || []);
+    } catch (err) { console.error(err); }
+    finally { setSearchLoading(false); }
+  }, [autoFetch]);
 
-      const items: { category: string; itemName: string; sortOrder: number }[] = [];
-      let sortOrder = 0;
-      Object.entries(DEFAULT_CATEGORIES).forEach(([cat, catItems]) => {
-        catItems.forEach((item) => {
-          items.push({ category: cat, itemName: item, sortOrder: sortOrder++ });
-        });
-      });
+  const searchCustomers = useCallback(async (query: string) => {
+    setSearchLoading(true);
+    try {
+      const url = query ? `/api/auto/dvi/search-customers?q=${encodeURIComponent(query)}` : `/api/auto/dvi/search-customers`;
+      const res = await autoFetch(url);
+      const data = await res.json();
+      setCustomerResults(data || []);
+    } catch (err) { console.error(err); }
+    finally { setSearchLoading(false); }
+  }, [autoFetch]);
 
+  useEffect(() => {
+    if (modalStep !== "search-ro") return;
+    if (searchQuery.length === 0) { searchROs(""); return; }
+    if (searchQuery.length < 2) return;
+    const timer = setTimeout(() => searchROs(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, modalStep, searchROs]);
+
+  useEffect(() => {
+    if (modalStep !== "search-customer") return;
+    if (searchQuery.length === 0) { searchCustomers(""); return; }
+    if (searchQuery.length < 2) return;
+    const timer = setTimeout(() => searchCustomers(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, modalStep, searchCustomers]);
+
+  const createInspectionFromRO = async (roId: number) => {
+    setCreating(true);
+    try {
+      const defaultItems = buildDefaultItems();
       const res = await autoFetch("/api/auto/dvi/inspections", {
         method: "POST",
-        body: JSON.stringify({ repairOrderId: ro.id, items }),
+        body: JSON.stringify({ repairOrderId: roId, items: defaultItems }),
       });
-      if (!res.ok) throw new Error("Failed to create");
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed"); }
       const inspection = await res.json();
       setDialogOpen(false);
-      setRoNumber("");
+      resetModal();
       toast({ title: "Inspection Created" });
       openInspection(inspection.id);
+      fetchInspections();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setCreating(false); }
+  };
+
+  const createStandaloneInspection = async (customerId: number, vehicleId: number) => {
+    setCreating(true);
+    try {
+      const defaultItems = buildDefaultItems();
+      const res = await autoFetch("/api/auto/dvi/inspections", {
+        method: "POST",
+        body: JSON.stringify({ customerId, vehicleId, items: defaultItems }),
+      });
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed"); }
+      const inspection = await res.json();
+      setDialogOpen(false);
+      resetModal();
+      toast({ title: "Inspection Created" });
+      openInspection(inspection.id);
+      fetchInspections();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setCreating(false); }
+  };
+
+  const createNewCustomerAndInspection = async () => {
+    if (!newFirstName || !newLastName || !newYear || !newMake || !newModel) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+      return;
     }
+    setCreating(true);
+    try {
+      const custRes = await autoFetch("/api/auto/customers", {
+        method: "POST",
+        body: JSON.stringify({ firstName: newFirstName, lastName: newLastName, phone: newPhone }),
+      });
+      if (!custRes.ok) throw new Error("Failed to create customer");
+      const customer = await custRes.json();
+
+      const vehRes = await autoFetch("/api/auto/vehicles", {
+        method: "POST",
+        body: JSON.stringify({ customerId: customer.id, year: parseInt(newYear), make: newMake, model: newModel }),
+      });
+      if (!vehRes.ok) throw new Error("Failed to create vehicle");
+      const vehicle = await vehRes.json();
+
+      await createStandaloneInspection(customer.id, vehicle.id);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setCreating(false);
+    }
+  };
+
+  const createROFromInspection = async () => {
+    if (!activeInspection) return;
+    setCreating(true);
+    try {
+      const res = await autoFetch(`/api/auto/dvi/inspections/${activeInspection.id}/create-ro`, {
+        method: "POST",
+      });
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed to create RO"); }
+      const data = await res.json();
+      toast({ title: "Repair Order Created", description: `RO ${data.roNumber || ""} created from inspection` });
+      setLocation(`/auto/repair-orders/${data.id}`);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setCreating(false); }
   };
 
   const openInspection = async (id: number) => {
@@ -310,6 +446,18 @@ export default function AutoInspections() {
             </div>
           </div>
 
+          {!activeInspection.repairOrderId && (
+            <Button
+              onClick={createROFromInspection}
+              disabled={creating}
+              className="w-full gap-2"
+              data-testid="button-create-ro-from-inspection"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+              Create RO from Inspection
+            </Button>
+          )}
+
           {(customerName || technicianName || activeInspection.vehicleMileage) && (
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               {customerName && (
@@ -409,20 +557,264 @@ export default function AutoInspections() {
                 <Plus className="h-4 w-4" /> New Inspection
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Start New Inspection</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>RO Number</Label>
-                  <Input
-                    value={roNumber}
-                    onChange={(e) => setRoNumber(e.target.value)}
-                    placeholder="e.g. RO-001"
-                    data-testid="input-ro-number"
-                  />
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {modalStep === "choose" && "Start New Inspection"}
+                  {modalStep === "search-ro" && "Link to Existing RO"}
+                  {modalStep === "search-customer" && "Quick Inspection"}
+                  {modalStep === "new-customer" && "New Customer & Vehicle"}
+                </DialogTitle>
+              </DialogHeader>
+
+              {creating && (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Creating inspection...</p>
                 </div>
-                <Button className="w-full" onClick={createInspection} data-testid="button-start-inspection">Start Inspection</Button>
-              </div>
+              )}
+
+              {!creating && modalStep === "choose" && (
+                <div className="space-y-3">
+                  <Card
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => { setModalStep("search-ro"); setSearchQuery(""); }}
+                    data-testid="card-link-existing-ro"
+                  >
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="flex items-center justify-center h-10 w-10 rounded-md bg-muted shrink-0">
+                        <Link2 className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm">Link to Existing RO</p>
+                        <p className="text-xs text-muted-foreground">Search by customer name, vehicle, or RO number</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </CardContent>
+                  </Card>
+                  <Card
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => { setModalStep("search-customer"); setSearchQuery(""); }}
+                    data-testid="card-quick-inspection"
+                  >
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="flex items-center justify-center h-10 w-10 rounded-md bg-muted shrink-0">
+                        <Zap className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm">Quick Inspection</p>
+                        <p className="text-xs text-muted-foreground">Start without an RO — inspect now, create RO later</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {!creating && modalStep === "search-ro" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => { setModalStep("choose"); setSearchQuery(""); setSearchResults([]); }} data-testid="button-back-choose-ro">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search customer, vehicle, or RO number..."
+                        className="pl-9"
+                        autoFocus
+                        data-testid="input-search-ro"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto space-y-2">
+                    {searchLoading && (
+                      <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    )}
+                    {!searchLoading && searchResults.length === 0 && (
+                      <div className="text-center py-6 space-y-2">
+                        <p className="text-sm text-muted-foreground">No matching ROs found</p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => { setModalStep("search-customer"); setSearchQuery(""); }}
+                          data-testid="link-quick-inspection-fallback"
+                        >
+                          Start a Quick Inspection instead
+                        </Button>
+                      </div>
+                    )}
+                    {!searchLoading && searchResults.map((ro: any) => {
+                      const isClosed = ["completed", "invoiced", "void"].includes(ro.status);
+                      return (
+                        <Card
+                          key={ro.id}
+                          className={`${isClosed ? "opacity-50" : "hover-elevate cursor-pointer"}`}
+                          onClick={() => { if (!isClosed) createInspectionFromRO(ro.id); }}
+                          data-testid={`card-ro-result-${ro.id}`}
+                        >
+                          <CardContent className="p-3 space-y-1">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{ro.customerName || "Unknown Customer"}</p>
+                                <p className="text-xs text-muted-foreground">{ro.roNumber}</p>
+                              </div>
+                              <Badge variant={isClosed ? "secondary" : "outline"} className="capitalize shrink-0" data-testid={`badge-ro-status-${ro.id}`}>
+                                {isClosed ? "Closed" : ro.status}
+                              </Badge>
+                            </div>
+                            {(ro.vehicleInfo || ro.year) && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Car className="h-3 w-3 shrink-0" />
+                                <span className="truncate">
+                                  {ro.vehicleInfo || `${ro.year || ""} ${ro.make || ""} ${ro.model || ""}`.trim()}
+                                  {ro.color ? ` · ${ro.color}` : ""}
+                                  {ro.mileage ? ` · ${Number(ro.mileage).toLocaleString()} mi` : ""}
+                                </span>
+                              </p>
+                            )}
+                            {ro.hasDvi && (
+                              <p className="text-xs flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                                <AlertTriangle className="h-3 w-3 shrink-0" /> Has existing inspection
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!creating && modalStep === "search-customer" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => { setModalStep("choose"); setSearchQuery(""); setCustomerResults([]); }} data-testid="button-back-choose-customer">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search customer or vehicle..."
+                        className="pl-9"
+                        autoFocus
+                        data-testid="input-search-customer"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto space-y-2">
+                    {searchLoading && (
+                      <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    )}
+                    {!searchLoading && customerResults.length === 0 && (
+                      <div className="text-center py-6">
+                        <p className="text-sm text-muted-foreground mb-2">No customers found</p>
+                      </div>
+                    )}
+                    {!searchLoading && customerResults.map((cust: any) => (
+                      <Card key={cust.id} data-testid={`card-customer-result-${cust.id}`}>
+                        <CardContent className="p-3 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-medium">{cust.firstName} {cust.lastName}</span>
+                            {cust.phone && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Phone className="h-3 w-3" /> {cust.phone}
+                              </span>
+                            )}
+                          </div>
+                          {cust.vehicles && cust.vehicles.length > 0 && (
+                            <div className="space-y-1 pl-6">
+                              {cust.vehicles.map((v: any) => (
+                                <div
+                                  key={v.id}
+                                  className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+                                  onClick={() => createStandaloneInspection(cust.id, v.id)}
+                                  data-testid={`vehicle-select-${v.id}`}
+                                >
+                                  <span className="text-sm flex items-center gap-1.5">
+                                    <Car className="h-3.5 w-3.5 text-muted-foreground" />
+                                    {v.year} {v.make} {v.model}
+                                  </span>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(!cust.vehicles || cust.vehicles.length === 0) && (
+                            <p className="text-xs text-muted-foreground pl-6">No vehicles on file</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => setModalStep("new-customer")}
+                    data-testid="button-new-customer"
+                  >
+                    <Plus className="h-4 w-4" /> New Customer
+                  </Button>
+                </div>
+              )}
+
+              {!creating && modalStep === "new-customer" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => setModalStep("search-customer")} data-testid="button-back-search-customer">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">Back to search</span>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Customer Info</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">First Name</Label>
+                        <Input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} placeholder="First name" data-testid="input-new-first-name" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Last Name</Label>
+                        <Input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} placeholder="Last name" data-testid="input-new-last-name" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Phone</Label>
+                      <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="(555) 555-1234" data-testid="input-new-phone" />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Vehicle Info</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Year</Label>
+                        <Input value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="2024" data-testid="input-new-year" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Make</Label>
+                        <Input value={newMake} onChange={(e) => setNewMake(e.target.value)} placeholder="Toyota" data-testid="input-new-make" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Model</Label>
+                        <Input value={newModel} onChange={(e) => setNewModel(e.target.value)} placeholder="Camry" data-testid="input-new-model" />
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={createNewCustomerAndInspection}
+                    disabled={!newFirstName || !newLastName || !newYear || !newMake || !newModel}
+                    data-testid="button-create-customer-inspection"
+                  >
+                    Create & Start Inspection
+                  </Button>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>

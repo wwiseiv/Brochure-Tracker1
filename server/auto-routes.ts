@@ -8,7 +8,7 @@ import {
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
   autoCannedServices, autoCannedServiceItems, autoCommunicationLog,
 } from "@shared/schema";
-import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull, ilike } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
 import crypto from "crypto";
 import { randomUUID } from "crypto";
@@ -907,6 +907,40 @@ router.post("/repair-orders", autoAuth, async (req: Request, res: Response) => {
       details: { roNumber },
     });
 
+    try {
+      const publicToken = crypto.randomBytes(32).toString("hex");
+      const shopId = req.autoUser!.shopId;
+      const defaultTemplates = await db.select().from(autoDviTemplates)
+        .where(and(eq(autoDviTemplates.shopId, shopId), eq(autoDviTemplates.isDefault, true)))
+        .limit(1);
+
+      const [inspection] = await db.insert(autoDviInspections).values({
+        repairOrderId: ro.id, shopId,
+        templateId: defaultTemplates.length ? defaultTemplates[0].id : null,
+        technicianId: req.autoUser!.id,
+        customerId: data.customerId, vehicleId: data.vehicleId,
+        publicToken,
+      }).returning();
+
+      if (defaultTemplates.length && defaultTemplates[0].categories) {
+        const categories = typeof defaultTemplates[0].categories === "string"
+          ? JSON.parse(defaultTemplates[0].categories as string)
+          : defaultTemplates[0].categories;
+        for (const cat of categories as any[]) {
+          for (const item of cat.items || []) {
+            await db.insert(autoDviItems).values({
+              inspectionId: inspection.id, categoryName: cat.name,
+              itemName: item.name, condition: "not_inspected", sortOrder: item.sortOrder || 0,
+            });
+          }
+        }
+      } else {
+        await createDviItemsFromDefaults(inspection.id);
+      }
+    } catch (dviErr: any) {
+      console.error("Auto-create DVI inspection error (non-blocking):", dviErr);
+    }
+
     res.json(ro);
   } catch (err: any) {
     console.error("Create RO error:", err);
@@ -1414,11 +1448,225 @@ router.post("/payments/:id/void", autoAuth, async (req: Request, res: Response) 
 // DVI
 // ============================================================================
 
+const DEFAULT_DVI_CATEGORIES: Record<string, string[]> = {
+  "Under Hood": ["Air Filter", "Battery", "Belts", "Coolant Level", "Coolant Hoses", "Power Steering Fluid", "Brake Fluid", "Transmission Fluid", "Engine Oil Level", "Wiper Fluid", "Wiper Blades"],
+  "Under Vehicle": ["CV Boots/Axles", "Exhaust System", "Fuel Lines", "Oil Leaks", "Suspension Components", "Shocks/Struts", "Steering Components", "Differential Fluid", "Transfer Case Fluid", "Frame/Underbody"],
+  "Brakes": ["Front Brake Pads", "Rear Brake Pads", "Front Rotors", "Rear Rotors", "Brake Lines", "Parking Brake", "Brake Calipers"],
+  "Tires & Wheels": ["LF Tire Tread", "RF Tire Tread", "LR Tire Tread", "RR Tire Tread", "Tire Pressure", "Wheel Condition", "Spare Tire", "Alignment"],
+  "Interior": ["Horn", "Interior Lights", "Dash Lights/Warning", "Seat Belts", "A/C System", "Heater", "Cabin Air Filter", "Power Windows", "Power Locks", "Mirrors"],
+  "Exterior": ["Headlights", "Tail Lights", "Turn Signals", "Brake Lights", "Windshield", "Body Condition", "Paint Condition", "Door Handles", "Weatherstripping", "Wipers"],
+  "Fluids & Filters": ["Engine Oil Condition", "Transmission Fluid Condition", "Coolant Condition", "Power Steering Fluid Condition", "Brake Fluid Condition", "Oil Filter", "Fuel Filter"],
+};
+
+async function createDviItemsFromDefaults(inspectionId: number) {
+  let sortOrder = 0;
+  for (const [categoryName, items] of Object.entries(DEFAULT_DVI_CATEGORIES)) {
+    for (const itemName of items) {
+      await db.insert(autoDviItems).values({
+        inspectionId, categoryName, itemName, condition: "not_inspected", sortOrder: sortOrder++,
+      });
+    }
+  }
+}
+
+router.get("/dvi/search", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || "").trim();
+    const shopId = req.autoUser!.shopId;
+    const excludedStatuses = ["completed", "invoiced", "void"];
+
+    let conditions: any[] = [
+      eq(autoRepairOrders.shopId, shopId),
+    ];
+
+    let limitNum = 5;
+
+    if (q && q.length >= 2) {
+      limitNum = 10;
+      const searchPattern = `%${q}%`;
+      conditions.push(
+        or(
+          ilike(autoCustomers.firstName, searchPattern),
+          ilike(autoCustomers.lastName, searchPattern),
+          ilike(autoVehicles.make, searchPattern),
+          ilike(autoVehicles.model, searchPattern),
+          sql`CAST(${autoVehicles.year} AS TEXT) ILIKE ${searchPattern}`,
+          ilike(autoRepairOrders.roNumber, searchPattern),
+        )!
+      );
+    } else {
+      conditions.push(
+        sql`${autoRepairOrders.status} NOT IN ('completed', 'invoiced', 'void', 'paid')`
+      );
+    }
+
+    const rows = await db.select({
+      id: autoRepairOrders.id,
+      roNumber: autoRepairOrders.roNumber,
+      status: autoRepairOrders.status,
+      customerId: autoRepairOrders.customerId,
+      vehicleId: autoRepairOrders.vehicleId,
+      customerFirstName: autoCustomers.firstName,
+      customerLastName: autoCustomers.lastName,
+      vehicleYear: autoVehicles.year,
+      vehicleMake: autoVehicles.make,
+      vehicleModel: autoVehicles.model,
+      vehicleColor: autoVehicles.color,
+      vehicleMileage: autoVehicles.mileage,
+    }).from(autoRepairOrders)
+      .leftJoin(autoCustomers, eq(autoRepairOrders.customerId, autoCustomers.id))
+      .leftJoin(autoVehicles, eq(autoRepairOrders.vehicleId, autoVehicles.id))
+      .where(and(...conditions))
+      .orderBy(desc(autoRepairOrders.createdAt))
+      .limit(limitNum);
+
+    const results = [];
+    for (const row of rows) {
+      const existingDvi = await db.select({ id: autoDviInspections.id }).from(autoDviInspections)
+        .where(eq(autoDviInspections.repairOrderId, row.id)).limit(1);
+      results.push({
+        id: row.id,
+        roNumber: row.roNumber,
+        status: row.status,
+        customerId: row.customerId,
+        vehicleId: row.vehicleId,
+        customerName: [row.customerFirstName, row.customerLastName].filter(Boolean).join(" "),
+        vehicleInfo: [row.vehicleYear, row.vehicleMake, row.vehicleModel].filter(Boolean).join(" "),
+        vehicleColor: row.vehicleColor,
+        vehicleMileage: row.vehicleMileage,
+        hasDvi: existingDvi.length > 0,
+      });
+    }
+
+    res.json(results);
+  } catch (err: any) {
+    console.error("DVI search error:", err);
+    res.status(500).json({ error: "Failed to search repair orders" });
+  }
+});
+
+router.get("/dvi/search-customers", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || "").trim();
+    const shopId = req.autoUser!.shopId;
+
+    let customerConditions: any[] = [eq(autoCustomers.shopId, shopId)];
+    let limitNum = 5;
+
+    if (q && q.length >= 2) {
+      limitNum = 10;
+      const searchPattern = `%${q}%`;
+      customerConditions.push(
+        or(
+          ilike(autoCustomers.firstName, searchPattern),
+          ilike(autoCustomers.lastName, searchPattern),
+        )!
+      );
+    }
+
+    const customers = await db.select({
+      id: autoCustomers.id,
+      firstName: autoCustomers.firstName,
+      lastName: autoCustomers.lastName,
+      phone: autoCustomers.phone,
+    }).from(autoCustomers)
+      .where(and(...customerConditions))
+      .orderBy(desc(autoCustomers.createdAt))
+      .limit(limitNum);
+
+    const results = [];
+    for (const cust of customers) {
+      const vehicles = await db.select({
+        id: autoVehicles.id,
+        year: autoVehicles.year,
+        make: autoVehicles.make,
+        model: autoVehicles.model,
+        color: autoVehicles.color,
+        vin: autoVehicles.vin,
+        mileage: autoVehicles.mileage,
+      }).from(autoVehicles)
+        .where(and(eq(autoVehicles.customerId, cust.id), eq(autoVehicles.shopId, shopId)));
+
+      if (q && q.length >= 2) {
+        const searchPattern = `%${q}%`;
+        const vehicleMatches = await db.select({
+          id: autoVehicles.id,
+          year: autoVehicles.year,
+          make: autoVehicles.make,
+          model: autoVehicles.model,
+          color: autoVehicles.color,
+          vin: autoVehicles.vin,
+          mileage: autoVehicles.mileage,
+        }).from(autoVehicles)
+          .where(and(
+            eq(autoVehicles.shopId, shopId),
+            or(
+              ilike(autoVehicles.make, searchPattern),
+              ilike(autoVehicles.model, searchPattern),
+              sql`CAST(${autoVehicles.year} AS TEXT) ILIKE ${searchPattern}`,
+            )
+          ))
+          .limit(limitNum);
+
+        const existingIds = new Set(vehicles.map(v => v.id));
+        for (const vm of vehicleMatches) {
+          if (!existingIds.has(vm.id)) {
+            const [owner] = await db.select({
+              id: autoCustomers.id,
+              firstName: autoCustomers.firstName,
+              lastName: autoCustomers.lastName,
+              phone: autoCustomers.phone,
+            }).from(autoCustomers)
+              .innerJoin(autoVehicles, eq(autoVehicles.customerId, autoCustomers.id))
+              .where(and(eq(autoVehicles.id, vm.id), eq(autoCustomers.shopId, shopId)));
+
+            if (owner && !results.find(r => r.customerId === owner.id)) {
+              const ownerVehicles = await db.select({
+                id: autoVehicles.id,
+                year: autoVehicles.year,
+                make: autoVehicles.make,
+                model: autoVehicles.model,
+                color: autoVehicles.color,
+                vin: autoVehicles.vin,
+                mileage: autoVehicles.mileage,
+              }).from(autoVehicles)
+                .where(and(eq(autoVehicles.customerId, owner.id), eq(autoVehicles.shopId, shopId)));
+
+              results.push({
+                customerId: owner.id,
+                customerName: [owner.firstName, owner.lastName].filter(Boolean).join(" "),
+                customerPhone: owner.phone,
+                vehicles: ownerVehicles,
+              });
+            }
+          }
+        }
+      }
+
+      if (!results.find(r => r.customerId === cust.id)) {
+        results.push({
+          customerId: cust.id,
+          customerName: [cust.firstName, cust.lastName].filter(Boolean).join(" "),
+          customerPhone: cust.phone,
+          vehicles,
+        });
+      }
+    }
+
+    res.json(results.slice(0, 10));
+  } catch (err: any) {
+    console.error("DVI customer search error:", err);
+    res.status(500).json({ error: "Failed to search customers" });
+  }
+});
+
 router.get("/dvi/inspections", autoAuth, async (req: Request, res: Response) => {
   try {
     const inspections = await db.select({
       id: autoDviInspections.id,
       repairOrderId: autoDviInspections.repairOrderId,
+      customerId: autoDviInspections.customerId,
+      vehicleId: autoDviInspections.vehicleId,
       status: autoDviInspections.status,
       overallCondition: autoDviInspections.overallCondition,
       notes: autoDviInspections.notes,
@@ -1428,18 +1676,27 @@ router.get("/dvi/inspections", autoAuth, async (req: Request, res: Response) => 
       sentToCustomerAt: autoDviInspections.sentToCustomerAt,
       createdAt: autoDviInspections.createdAt,
     }).from(autoDviInspections)
-      .innerJoin(autoRepairOrders, eq(autoDviInspections.repairOrderId, autoRepairOrders.id))
-      .where(eq(autoRepairOrders.shopId, req.autoUser!.shopId))
+      .where(eq(autoDviInspections.shopId, req.autoUser!.shopId))
       .orderBy(desc(autoDviInspections.createdAt));
 
     const result = [];
     for (const insp of inspections) {
-      const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.id, insp.repairOrderId)).limit(1);
-      let customer = null, vehicle = null, technician = null;
-      if (ro) {
-        const [c] = await db.select({ id: autoCustomers.id, firstName: autoCustomers.firstName, lastName: autoCustomers.lastName, phone: autoCustomers.phone }).from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+      let ro = null, customer = null, vehicle = null, technician = null;
+
+      if (insp.repairOrderId) {
+        const [roRow] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.id, insp.repairOrderId)).limit(1);
+        ro = roRow || null;
+      }
+
+      const custId = ro ? ro.customerId : insp.customerId;
+      const vehId = ro ? ro.vehicleId : insp.vehicleId;
+
+      if (custId) {
+        const [c] = await db.select({ id: autoCustomers.id, firstName: autoCustomers.firstName, lastName: autoCustomers.lastName, phone: autoCustomers.phone }).from(autoCustomers).where(eq(autoCustomers.id, custId));
         customer = c || null;
-        const [v] = await db.select({ id: autoVehicles.id, year: autoVehicles.year, make: autoVehicles.make, model: autoVehicles.model, licensePlate: autoVehicles.licensePlate }).from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+      }
+      if (vehId) {
+        const [v] = await db.select({ id: autoVehicles.id, year: autoVehicles.year, make: autoVehicles.make, model: autoVehicles.model, licensePlate: autoVehicles.licensePlate }).from(autoVehicles).where(eq(autoVehicles.id, vehId));
         vehicle = v || null;
       }
       if (insp.technicianId) {
@@ -1476,14 +1733,34 @@ router.get("/dvi/templates", autoAuth, async (req: Request, res: Response) => {
 router.post("/dvi/inspections", autoAuth, async (req: Request, res: Response) => {
   try {
     const data = req.body;
+
+    if (!data.repairOrderId && (!data.customerId || !data.vehicleId)) {
+      return res.status(400).json({ error: "Either a repair order or both customer and vehicle are required" });
+    }
+
     const publicToken = crypto.randomBytes(32).toString("hex");
 
+    let customerId = data.customerId || null;
+    let vehicleId = data.vehicleId || null;
+
+    if (data.repairOrderId) {
+      const [ro] = await db.select().from(autoRepairOrders)
+        .where(and(eq(autoRepairOrders.id, data.repairOrderId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
+      if (ro) {
+        customerId = customerId || ro.customerId;
+        vehicleId = vehicleId || ro.vehicleId;
+      }
+    }
+
     const [inspection] = await db.insert(autoDviInspections).values({
-      repairOrderId: data.repairOrderId, shopId: req.autoUser!.shopId,
+      repairOrderId: data.repairOrderId || null, shopId: req.autoUser!.shopId,
       templateId: data.templateId || null, technicianId: req.autoUser!.id,
+      customerId, vehicleId,
       vehicleMileage: data.vehicleMileage || null, publicToken,
       notes: data.notes || null,
     }).returning();
+
+    let itemsCreated = false;
 
     if (data.templateId) {
       const [template] = await db.select().from(autoDviTemplates).where(eq(autoDviTemplates.id, data.templateId));
@@ -1493,11 +1770,30 @@ router.post("/dvi/inspections", autoAuth, async (req: Request, res: Response) =>
           for (const item of cat.items || []) {
             await db.insert(autoDviItems).values({
               inspectionId: inspection.id, categoryName: cat.name,
-              itemName: item.name, condition: "good", sortOrder: item.sortOrder || 0,
+              itemName: item.name, condition: "not_inspected", sortOrder: item.sortOrder || 0,
             });
           }
         }
+        itemsCreated = true;
       }
+    }
+
+    if (!itemsCreated && data.items && Array.isArray(data.items)) {
+      let sortOrder = 0;
+      for (const item of data.items) {
+        await db.insert(autoDviItems).values({
+          inspectionId: inspection.id,
+          categoryName: item.categoryName || item.category || "General",
+          itemName: item.itemName || item.name,
+          condition: item.condition || "not_inspected",
+          sortOrder: item.sortOrder ?? sortOrder++,
+        });
+      }
+      itemsCreated = true;
+    }
+
+    if (!itemsCreated) {
+      await createDviItemsFromDefaults(inspection.id);
     }
 
     res.json(inspection);
@@ -1609,6 +1905,47 @@ router.post("/dvi/inspections/:id/send", autoAuth, async (req: Request, res: Res
   } catch (err: any) {
     console.error("Send DVI error:", err);
     res.status(500).json({ error: "Failed to send inspection" });
+  }
+});
+
+router.post("/dvi/inspections/:id/create-ro", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const inspectionId = parseInt(req.params.id);
+    const shopId = req.autoUser!.shopId;
+
+    const [inspection] = await db.select().from(autoDviInspections)
+      .where(and(eq(autoDviInspections.id, inspectionId), eq(autoDviInspections.shopId, shopId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+    if (inspection.repairOrderId) return res.status(400).json({ error: "Inspection already has a repair order" });
+    if (!inspection.customerId || !inspection.vehicleId) {
+      return res.status(400).json({ error: "Inspection must have a customer and vehicle to create an RO" });
+    }
+
+    const roNumber = await generateRONumber(shopId);
+    const approvalToken = crypto.randomBytes(32).toString("hex");
+    const approvalShortCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const [ro] = await db.insert(autoRepairOrders).values({
+      shopId, roNumber, customerId: inspection.customerId,
+      vehicleId: inspection.vehicleId, status: "estimate",
+      serviceAdvisorId: req.autoUser!.id,
+      approvalToken, approvalShortCode,
+    }).returning();
+
+    await db.update(autoDviInspections)
+      .set({ repairOrderId: ro.id, updatedAt: new Date() })
+      .where(eq(autoDviInspections.id, inspectionId));
+
+    await db.insert(autoActivityLog).values({
+      shopId, userId: req.autoUser!.id,
+      entityType: "repair_order", entityId: ro.id, action: "created",
+      details: { roNumber, source: "dvi_inspection", inspectionId },
+    });
+
+    res.json(ro);
+  } catch (err: any) {
+    console.error("Create RO from inspection error:", err);
+    res.status(500).json({ error: "Failed to create repair order from inspection" });
   }
 });
 
