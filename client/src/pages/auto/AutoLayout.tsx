@@ -27,8 +27,8 @@ import { AIHelpChat } from "@/components/ai-help";
 
 const NAV_ITEMS = [
   { path: "/auto/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
-  { path: "/auto/customers", label: "Customers", shortLabel: "Cust", icon: Users },
   { path: "/auto/repair-orders", label: "Repair Orders", shortLabel: "ROs", icon: FileText },
+  { path: "/auto/customers", label: "Customers", shortLabel: "Cust", icon: Users },
   { path: "/auto/inspections", label: "Inspections", shortLabel: "Insp", icon: ClipboardCheck },
   { path: "/auto/schedule", label: "Schedule", shortLabel: "Sched", icon: Calendar },
   { path: "/auto/reports", label: "Reports", shortLabel: "Reports", icon: BarChart3 },
@@ -39,8 +39,8 @@ const NAV_ITEMS = [
 const BOTTOM_TAB_ITEMS = [
   { path: "/auto/dashboard", label: "Home", icon: LayoutDashboard, testId: "bottomnav-home" },
   { path: "/auto/repair-orders", label: "ROs", icon: FileText, testId: "bottomnav-ros" },
-  { path: "/auto/schedule", label: "Schedule", icon: Calendar, testId: "bottomnav-schedule" },
   { path: "/auto/customers", label: "Cust", icon: Users, testId: "bottomnav-cust" },
+  { path: "/auto/schedule", label: "Schedule", icon: Calendar, testId: "bottomnav-schedule" },
 ];
 
 const MORE_SHEET_ITEMS = [
