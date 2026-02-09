@@ -663,24 +663,48 @@ export default function AutoRepairOrderForm() {
                         <DropdownMenuItem onSelect={(e) => {
                           e.preventDefault();
                           const url = approvalUrl;
-                          const ta = document.createElement("textarea");
-                          ta.value = url;
-                          ta.style.position = "fixed";
-                          ta.style.left = "-9999px";
-                          ta.style.top = "-9999px";
-                          ta.style.opacity = "0";
-                          document.body.appendChild(ta);
-                          ta.focus();
-                          ta.select();
-                          try {
-                            document.execCommand("copy");
-                            toast({ title: "Link Copied", description: "Approval link copied to clipboard" });
-                            logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: url }, token);
-                          } catch {
-                            toast({ title: "Copy Failed", description: url, variant: "destructive" });
-                          } finally {
-                            document.body.removeChild(ta);
-                          }
+                          const copyToClipboard = async () => {
+                            if (navigator.clipboard && window.isSecureContext) {
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                toast({ title: "Link Copied", description: "Approval link copied to clipboard" });
+                                logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: url }, token);
+                                return;
+                              } catch {}
+                            }
+                            const ta = document.createElement("textarea");
+                            ta.value = url;
+                            ta.setAttribute("readonly", "");
+                            ta.style.position = "fixed";
+                            ta.style.left = "0";
+                            ta.style.top = "0";
+                            ta.style.width = "1px";
+                            ta.style.height = "1px";
+                            ta.style.padding = "0";
+                            ta.style.border = "none";
+                            ta.style.outline = "none";
+                            ta.style.boxShadow = "none";
+                            ta.style.background = "transparent";
+                            ta.style.opacity = "0.01";
+                            ta.style.fontSize = "16px";
+                            document.body.appendChild(ta);
+                            ta.focus();
+                            ta.setSelectionRange(0, url.length);
+                            try {
+                              const ok = document.execCommand("copy");
+                              if (ok) {
+                                toast({ title: "Link Copied", description: "Approval link copied to clipboard" });
+                                logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: url }, token);
+                              } else {
+                                toast({ title: "Copy Failed", description: url, variant: "destructive" });
+                              }
+                            } catch {
+                              toast({ title: "Copy Failed", description: url, variant: "destructive" });
+                            } finally {
+                              document.body.removeChild(ta);
+                            }
+                          };
+                          copyToClipboard();
                         }} data-testid="menu-copy-approval-link">
                           <Link2 className="h-4 w-4 mr-2" /> Copy Approval Link
                         </DropdownMenuItem>

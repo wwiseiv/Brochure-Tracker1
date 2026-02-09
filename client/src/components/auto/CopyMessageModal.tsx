@@ -26,32 +26,41 @@ export default function CopyMessageModal({
 }: CopyMessageModalProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
+    const onSuccess = () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(message);
+        onSuccess();
+        return;
+      } catch {}
+    }
     try {
       const ta = document.createElement("textarea");
       ta.value = message;
+      ta.setAttribute("readonly", "");
       ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      ta.style.top = "-9999px";
-      ta.style.opacity = "0";
+      ta.style.left = "0";
+      ta.style.top = "0";
+      ta.style.width = "1px";
+      ta.style.height = "1px";
+      ta.style.padding = "0";
+      ta.style.border = "none";
+      ta.style.outline = "none";
+      ta.style.boxShadow = "none";
+      ta.style.background = "transparent";
+      ta.style.opacity = "0.01";
+      ta.style.fontSize = "16px";
       document.body.appendChild(ta);
       ta.focus();
-      ta.select();
       ta.setSelectionRange(0, message.length);
-      document.execCommand("copy");
+      const ok = document.execCommand("copy");
       document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      try {
-        navigator.clipboard.writeText(message).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        });
-      } catch {
-        setCopied(false);
-      }
-    }
+      if (ok) onSuccess();
+    } catch {}
   };
 
   return (
