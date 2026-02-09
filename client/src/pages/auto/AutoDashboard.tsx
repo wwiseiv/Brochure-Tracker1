@@ -1,83 +1,191 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Users, Calendar, DollarSign, Plus, ClipboardCheck, Phone, MessageSquare, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  DollarSign, TrendingUp, CheckCircle, ShieldCheck,
+  FileText, Users, Calendar, Plus, ClipboardCheck,
+  Phone, MessageSquare, Clock, Loader2, ArrowRight,
+  Wrench, UserCheck, AlertCircle
+} from "lucide-react";
 import { AutoLayout } from "./AutoLayout";
 import { handleCall, handleSms, SMS_TEMPLATES } from "@/lib/auto-communication";
 import CopyMessageModal from "@/components/auto/CopyMessageModal";
 
-interface DualPricingStats {
-  totalCollected: number;
-  cashTotal: number;
-  cardTotal: number;
-  cashCount: number;
-  cardCount: number;
-  dpEarned: number;
-  totalPayments: number;
-}
-
-interface DashboardStats {
-  totalRepairOrders: number;
-  openRepairOrders: number;
-  totalCustomers: number;
-  todayAppointments: number;
+interface EnhancedDashboardData {
+  todayRevenue: number;
   monthRevenue: number;
-}
-
-interface DashboardAppointment {
-  id: number;
-  title: string;
-  description: string | null;
-  status: string;
-  startTime: string;
-  endTime: string;
-  customer?: { id?: number; firstName: string; lastName: string; phone?: string | null } | null;
-  vehicle?: { year: number | null; make: string | null; model: string | null } | null;
+  carsInShop: number;
+  aro: number;
+  approvalRate: number;
+  feesSaved: number;
+  openROs: Array<{
+    id: number;
+    roNumber: string;
+    status: string;
+    totalCash: string;
+    totalCard: string;
+    createdAt: string;
+    customer: { firstName: string; lastName: string } | null;
+    vehicle: { year: number | null; make: string | null; model: string | null } | null;
+  }>;
+  bayCapacity: {
+    totalBays: number;
+    totalSellableHours: number;
+    bookedHours: number;
+    availableHours: number;
+  };
+  appointments: Array<{
+    id: number;
+    title: string;
+    description: string | null;
+    status: string;
+    startTime: string;
+    endTime: string;
+    customer?: { id?: number; firstName: string; lastName: string; phone?: string | null } | null;
+    vehicle?: { year: number | null; make: string | null; model: string | null } | null;
+  }>;
+  staffOnDuty: Array<{ id: number; firstName: string; lastName: string; role: string }>;
+  totalCustomers: number;
+  visibility: Record<string, boolean>;
 }
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function formatCurrency(value: number): string {
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "estimate":
+      return "secondary";
+    case "approved":
+      return "default";
+    case "in_progress":
+      return "outline";
+    default:
+      return "secondary";
+  }
+}
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case "estimate":
+      return "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30";
+    case "approved":
+      return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30";
+    case "in_progress":
+      return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30";
+    default:
+      return "";
+  }
+}
+
 export default function AutoDashboard() {
   const { autoFetch, user } = useAutoAuth();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [data, setData] = useState<EnhancedDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [todayApts, setTodayApts] = useState<DashboardAppointment[]>([]);
-  const [dpStats, setDpStats] = useState<DualPricingStats | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [smsModal, setSmsModal] = useState<{ phone: string; message: string } | null>(null);
 
-  useEffect(() => {
-    autoFetch("/api/auto/dashboard/stats")
+  const fetchDashboard = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    const qs = params.toString();
+    const url = `/api/auto/dashboard/enhanced${qs ? `?${qs}` : ""}`;
+
+    autoFetch(url)
       .then((res) => res.json())
-      .then(setStats)
+      .then((d) => setData(d))
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, [autoFetch, startDate, endDate]);
 
-    autoFetch("/api/auto/dashboard/dual-pricing")
-      .then((res) => res.json())
-      .then(setDpStats)
-      .catch(console.error);
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-    const today = new Date();
-    const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-    autoFetch(`/api/auto/appointments?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`)
-      .then((res) => res.json())
-      .then((apts: DashboardAppointment[]) => {
-        setTodayApts(apts.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()));
-      })
-      .catch(console.error);
-  }, [autoFetch]);
+  const visibility = data?.visibility ?? {};
 
   const statCards = [
-    { label: "Open ROs", id: "stat-open-ros", value: stats?.openRepairOrders ?? 0, icon: FileText, color: "text-blue-500", href: "/auto/repair-orders" },
-    { label: "Total Customers", id: "stat-total-customers", value: stats?.totalCustomers ?? 0, icon: Users, color: "text-green-500", href: "/auto/customers" },
-    { label: "Today's Appointments", id: "stat-appointments", value: stats?.todayAppointments ?? 0, icon: Calendar, color: "text-purple-500", href: "/auto/schedule" },
-    { label: "Revenue (Month)", id: "stat-revenue", value: `$${(stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, icon: DollarSign, color: "text-emerald-500", href: "/auto/reports?tab=revenue" },
+    {
+      key: "revenue",
+      id: "stat-revenue",
+      label: "Revenue",
+      subtitle: "Today",
+      value: data ? formatCurrency(data.todayRevenue) : "...",
+      icon: DollarSign,
+      color: "text-emerald-500",
+      href: "/auto/reports?tab=revenue",
+    },
+    {
+      key: "carsInShop",
+      id: "stat-cars-in-shop",
+      label: "Cars In Shop",
+      subtitle: `${data?.bayCapacity?.availableHours ?? 0}h available`,
+      value: data?.carsInShop ?? 0,
+      icon: Wrench,
+      color: "text-blue-500",
+      href: "/auto/repair-orders",
+    },
+    {
+      key: "aro",
+      id: "stat-aro",
+      label: "ARO",
+      subtitle: "This month avg",
+      value: data ? formatCurrency(data.aro) : "...",
+      icon: TrendingUp,
+      color: "text-purple-500",
+      href: "/auto/reports",
+    },
+    {
+      key: "approvalRate",
+      id: "stat-approval-rate",
+      label: "Approval Rate",
+      subtitle: "Items approved",
+      value: data ? `${data.approvalRate}%` : "...",
+      icon: CheckCircle,
+      color: "text-green-500",
+      href: "/auto/reports",
+    },
+    {
+      key: "feesSaved",
+      id: "stat-fees-saved",
+      label: "Fees Saved",
+      subtitle: "Dual pricing earned",
+      value: data ? formatCurrency(data.feesSaved) : "...",
+      icon: ShieldCheck,
+      color: "text-amber-500",
+      href: "/auto/reports?tab=revenue",
+    },
   ];
+
+  const visibleStatCards = statCards.filter((c) => visibility[c.key] !== false);
+
+  const bayUtilization = data?.bayCapacity
+    ? data.bayCapacity.totalSellableHours > 0
+      ? Math.round((data.bayCapacity.bookedHours / data.bayCapacity.totalSellableHours) * 100)
+      : 0
+    : 0;
+
+  if (loading && !data) {
+    return (
+      <AutoLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AutoLayout>
+    );
+  }
 
   return (
     <AutoLayout>
@@ -105,205 +213,331 @@ export default function AutoDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {statCards.map((stat) => (
-            <Link key={stat.label} href={stat.href} className="min-w-0">
-              <Card className="hover-elevate cursor-pointer" id={stat.id} data-testid={stat.id}>
-                <CardContent className="p-4 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <stat.icon className={`h-5 w-5 ${stat.color} shrink-0`} />
-                  </div>
-                  <p className="text-xl sm:text-2xl font-bold truncate">{loading ? "..." : stat.value}</p>
-                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-
-        {dpStats && dpStats.totalPayments > 0 && (
-          <Card id="card-dual-pricing-widget" data-testid="card-dual-pricing-widget">
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-base font-semibold">Today's Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-2xl sm:text-3xl font-bold" data-testid="text-total-collected">
-                ${dpStats.totalCollected.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Cash Payments</p>
-                  <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                    ${dpStats.cashTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{dpStats.cashCount} transactions</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Card Payments</p>
-                  <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                    ${dpStats.cardTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{dpStats.cardCount} transactions</p>
-                </div>
-              </div>
-              {dpStats.dpEarned > 0 && (
-                <div className="border rounded-md p-3 text-center">
-                  <p className="text-sm text-muted-foreground">Dual Pricing Earned</p>
-                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-dp-earned">
-                    ${dpStats.dpEarned.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">from {dpStats.cardCount} card transactions</p>
-                </div>
-              )}
-              {dpStats.totalPayments > 0 && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-green-600 dark:text-green-400">Cash {Math.round((dpStats.cashCount / dpStats.totalPayments) * 100)}%</span>
-                  <div className="flex-1 bg-muted rounded-md h-2.5 overflow-hidden flex">
-                    <div className="bg-green-500 h-full" style={{ width: `${(dpStats.cashCount / dpStats.totalPayments) * 100}%` }} />
-                    <div className="bg-blue-500 h-full" style={{ width: `${(dpStats.cardCount / dpStats.totalPayments) * 100}%` }} />
-                  </div>
-                  <span className="text-blue-600 dark:text-blue-400">Card {Math.round((dpStats.cardCount / dpStats.totalPayments) * 100)}%</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {visibleStatCards.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {visibleStatCards.map((stat) => (
+              <Link key={stat.key} href={stat.href} className="min-w-0">
+                <Card className="hover-elevate cursor-pointer" id={stat.id} data-testid={stat.id}>
+                  <CardContent className="p-4 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <stat.icon className={`h-5 w-5 ${stat.color} shrink-0`} />
+                    </div>
+                    <p className="text-xl sm:text-2xl font-bold truncate">
+                      {loading ? "..." : stat.value}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{stat.subtitle}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         )}
 
         <div className="grid md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link href="/auto/repair-orders/new">
-                <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-new-ro">
-                  <FileText className="h-4 w-4" />
-                  Create New Estimate
-                </Button>
-              </Link>
-              <Link href="/auto/customers/new">
-                <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-new-customer">
-                  <Users className="h-4 w-4" />
-                  Add New Customer
-                </Button>
-              </Link>
-              <Link href="/auto/schedule">
-                <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-schedule">
-                  <Calendar className="h-4 w-4" />
-                  View Schedule
-                </Button>
-              </Link>
-              <Link href="/auto/inspections">
-                <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-dvi">
-                  <ClipboardCheck className="h-4 w-4" />
-                  Start Inspection
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base">Shop Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Repair Orders</span>
-                <span className="font-medium" data-testid="text-total-ros">{loading ? "..." : stats?.totalRepairOrders ?? 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Open Orders</span>
-                <span className="font-medium">{loading ? "..." : stats?.openRepairOrders ?? 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Monthly Revenue</span>
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  ${loading ? "..." : (stats?.monthRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {todayApts.length > 0 && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base">Today's Appointments</CardTitle>
-              <Link href="/auto/schedule">
-                <Button variant="ghost" size="sm" data-testid="button-view-all-apts">View All</Button>
-              </Link>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {todayApts.map((apt) => (
-                <div
-                  key={apt.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3 group"
-                  data-testid={`dashboard-apt-${apt.id}`}
-                >
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="text-sm font-medium truncate">{apt.title}</p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(apt.startTime)} - {formatTime(apt.endTime)}
-                      </span>
-                      {apt.customer && (
-                        <span>{apt.customer.firstName} {apt.customer.lastName}</span>
-                      )}
-                      {apt.vehicle && (apt.vehicle.year || apt.vehicle.make || apt.vehicle.model) && (
-                        <span>{[apt.vehicle.year, apt.vehicle.make, apt.vehicle.model].filter(Boolean).join(" ")}</span>
-                      )}
-                    </div>
+          <div className="space-y-4">
+            {visibility.openRos !== false && (
+              <Card data-testid="card-open-ros">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-base">Open Repair Orders</CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-[140px]"
+                      data-testid="input-start-date"
+                    />
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-[140px]"
+                      data-testid="input-end-date"
+                    />
+                    {(startDate || endDate) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setStartDate("");
+                          setEndDate("");
+                        }}
+                        data-testid="button-clear-dates"
+                      >
+                        Clear
+                      </Button>
+                    )}
                   </div>
-                  {apt.customer?.phone && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="sm:invisible sm:group-hover:visible"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const token = localStorage.getItem("pcb_auto_token") || "";
-                          handleCall(apt.customer!.phone!, apt.customer!.id || 0, token);
-                        }}
-                        data-testid={`button-call-dashboard-apt-${apt.id}`}
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="sm:invisible sm:group-hover:visible"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const token = localStorage.getItem("pcb_auto_token") || "";
-                          const customerName = `${apt.customer!.firstName} ${apt.customer!.lastName}`;
-                          const msg = apt.description
-                            ? SMS_TEMPLATES.appointmentReminder(
-                                "Demo Auto Shop",
-                                customerName,
-                                new Date(apt.startTime).toLocaleDateString(),
-                                formatTime(apt.startTime),
-                                apt.description
-                              )
-                            : SMS_TEMPLATES.general("Demo Auto Shop", customerName);
-                          const result = handleSms(apt.customer!.phone!, msg, apt.customer!.id || 0, token);
-                          if (!result.isMobile) {
-                            setSmsModal({ phone: result.phone, message: result.body });
-                          }
-                        }}
-                        data-testid={`button-text-dashboard-apt-${apt.id}`}
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : data?.openROs && data.openROs.length > 0 ? (
+                    data.openROs.map((ro) => (
+                      <Link key={ro.id} href={`/auto/repair-orders/${ro.id}`}>
+                        <div
+                          className="flex items-center justify-between gap-2 rounded-md border p-3 hover-elevate cursor-pointer"
+                          data-testid={`ro-row-${ro.id}`}
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium truncate">
+                                RO #{ro.roNumber}
+                              </p>
+                              <Badge
+                                className={`text-xs no-default-hover-elevate no-default-active-elevate ${getStatusColor(ro.status)}`}
+                                variant="secondary"
+                              >
+                                {ro.status.replace(/_/g, " ")}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                              {ro.customer && (
+                                <span className="truncate">
+                                  {ro.customer.firstName} {ro.customer.lastName}
+                                </span>
+                              )}
+                              {ro.vehicle && (ro.vehicle.year || ro.vehicle.make || ro.vehicle.model) && (
+                                <span className="truncate">
+                                  {[ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(" ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold">
+                              {formatCurrency(parseFloat(ro.totalCash) || 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <FileText className="h-8 w-8 mb-2" />
+                      <p className="text-sm">No open repair orders</p>
                     </div>
                   )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )}
+
+            {visibility.quickActions !== false && (
+              <Card data-testid="card-quick-actions">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-base">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Link href="/auto/repair-orders/new">
+                    <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-new-ro">
+                      <FileText className="h-4 w-4" />
+                      Create New Estimate
+                    </Button>
+                  </Link>
+                  <Link href="/auto/customers/new">
+                    <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-new-customer">
+                      <Users className="h-4 w-4" />
+                      Add New Customer
+                    </Button>
+                  </Link>
+                  <Link href="/auto/customers">
+                    <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-edit-customer">
+                      <UserCheck className="h-4 w-4" />
+                      Edit Customer
+                    </Button>
+                  </Link>
+                  <Link href="/auto/schedule">
+                    <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-schedule">
+                      <Calendar className="h-4 w-4" />
+                      View Schedule
+                    </Button>
+                  </Link>
+                  <Link href="/auto/inspections">
+                    <Button variant="outline" className="w-full justify-start gap-3" data-testid="quick-dvi">
+                      <ClipboardCheck className="h-4 w-4" />
+                      Start Inspection
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {visibility.appointmentsAvailability !== false && (
+              <Card data-testid="card-appointments-availability">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-base">Today's Schedule</CardTitle>
+                  <Link href="/auto/schedule">
+                    <Button variant="ghost" size="sm" data-testid="button-view-all-schedule">
+                      View All
+                      <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </Link>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {data?.bayCapacity && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Bay Capacity</span>
+                        <span className="font-medium">
+                          {data.bayCapacity.availableHours}h of {data.bayCapacity.totalSellableHours}h available
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-md h-2.5 overflow-hidden">
+                        <div
+                          className="bg-blue-500 h-full rounded-md transition-all"
+                          style={{
+                            width: `${data.bayCapacity.totalSellableHours > 0
+                              ? Math.min((data.bayCapacity.bookedHours / data.bayCapacity.totalSellableHours) * 100, 100)
+                              : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {data?.staffOnDuty && data.staffOnDuty.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Staff On Duty</p>
+                      <div className="flex flex-wrap gap-2">
+                        {data.staffOnDuty.map((staff) => (
+                          <div
+                            key={staff.id}
+                            className="flex items-center gap-1.5 text-sm"
+                            data-testid={`staff-${staff.id}`}
+                          >
+                            <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate">{staff.firstName} {staff.lastName}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {staff.role}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {data?.appointments && data.appointments.length > 0 ? (
+                      data.appointments.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className="flex items-center justify-between gap-2 rounded-md border p-3 group"
+                          data-testid={`dashboard-apt-${apt.id}`}
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <p className="text-sm font-medium truncate">{apt.title}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatTime(apt.startTime)} - {formatTime(apt.endTime)}
+                              </span>
+                              {apt.customer && (
+                                <span className="truncate">
+                                  {apt.customer.firstName} {apt.customer.lastName}
+                                </span>
+                              )}
+                              {apt.vehicle && (apt.vehicle.year || apt.vehicle.make || apt.vehicle.model) && (
+                                <span className="truncate">
+                                  {[apt.vehicle.year, apt.vehicle.make, apt.vehicle.model].filter(Boolean).join(" ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {apt.customer?.phone && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="sm:invisible sm:group-hover:visible"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const token = localStorage.getItem("pcb_auto_token") || "";
+                                  handleCall(apt.customer!.phone!, apt.customer!.id || 0, token);
+                                }}
+                                data-testid={`button-call-apt-${apt.id}`}
+                              >
+                                <Phone className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="sm:invisible sm:group-hover:visible"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const token = localStorage.getItem("pcb_auto_token") || "";
+                                  const customerName = `${apt.customer!.firstName} ${apt.customer!.lastName}`;
+                                  const msg = apt.description
+                                    ? SMS_TEMPLATES.appointmentReminder(
+                                        "Demo Auto Shop",
+                                        customerName,
+                                        new Date(apt.startTime).toLocaleDateString(),
+                                        formatTime(apt.startTime),
+                                        apt.description
+                                      )
+                                    : SMS_TEMPLATES.general("Demo Auto Shop", customerName);
+                                  const result = handleSms(apt.customer!.phone!, msg, apt.customer!.id || 0, token);
+                                  if (!result.isMobile) {
+                                    setSmsModal({ phone: result.phone, message: result.body });
+                                  }
+                                }}
+                                data-testid={`button-text-apt-${apt.id}`}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Calendar className="h-8 w-8 mb-2" />
+                        <p className="text-sm">No appointments today</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {visibility.shopStats !== false && (
+              <Card data-testid="card-shop-stats">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-base">Shop Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total Customers</span>
+                    <span className="font-medium" data-testid="text-total-customers">
+                      {data?.totalCustomers ?? 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Monthly Revenue</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400" data-testid="text-monthly-revenue">
+                      {data ? formatCurrency(data.monthRevenue) : "..."}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">ARO</span>
+                    <span className="font-medium" data-testid="text-aro">
+                      {data ? formatCurrency(data.aro) : "..."}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Bay Utilization</span>
+                    <span className="font-medium" data-testid="text-bay-utilization">
+                      {bayUtilization}%
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
       <CopyMessageModal
         open={!!smsModal}

@@ -7,6 +7,7 @@ import {
   autoDviInspections, autoDviItems, autoBays, autoAppointments,
   autoIntegrationConfigs, autoSmsLog, autoActivityLog,
   autoCannedServices, autoCannedServiceItems, autoCommunicationLog,
+  autoStaffAvailability, autoStaffTimeOff, autoDashboardVisibility,
 } from "@shared/schema";
 import { eq, and, desc, asc, or, sql, count, gte, lte, inArray, isNotNull, ilike } from "drizzle-orm";
 import { autoAuth, autoRequireRole, hashPassword, comparePasswords, generateToken, type AutoAuthUser } from "./auto-auth";
@@ -2525,6 +2526,356 @@ router.get("/dashboard/dual-pricing", autoAuth, async (req: Request, res: Respon
   } catch (err) {
     console.error("Dashboard dual pricing error:", err);
     res.json({ totalCollected: 0, cashTotal: 0, cardTotal: 0, cashCount: 0, cardCount: 0, dpEarned: 0, totalPayments: 0 });
+  }
+});
+
+// ============================================================================
+// ENHANCED DASHBOARD (authenticated)
+// ============================================================================
+
+router.get("/dashboard/enhanced", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const userRole = req.autoUser!.role;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
+
+    const todayPayments = await db.select({ amount: autoPayments.amount, tipAmount: autoPayments.tipAmount })
+      .from(autoPayments)
+      .where(and(eq(autoPayments.shopId, shopId), eq(autoPayments.status, "completed"),
+        gte(autoPayments.processedAt, today), lte(autoPayments.processedAt, tomorrow)));
+    const todayRevenue = todayPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0") + parseFloat(p.tipAmount || "0"), 0);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthPayments = await db.select({ amount: autoPayments.amount, tipAmount: autoPayments.tipAmount })
+      .from(autoPayments)
+      .where(and(eq(autoPayments.shopId, shopId), eq(autoPayments.status, "completed"), gte(autoPayments.processedAt, monthStart)));
+    const monthRevenue = monthPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0") + parseFloat(p.tipAmount || "0"), 0);
+
+    const openStatuses = ["estimate", "approved", "in_progress"];
+    let openROsQuery = and(eq(autoRepairOrders.shopId, shopId), or(...openStatuses.map(s => eq(autoRepairOrders.status, s))));
+    
+    const [carsInShop] = await db.select({ count: count() }).from(autoRepairOrders).where(openROsQuery);
+
+    const completedROs = await db.select({ totalCash: autoRepairOrders.totalCash })
+      .from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.shopId, shopId), eq(autoRepairOrders.status, "completed"), gte(autoRepairOrders.updatedAt, monthStart)));
+    const aro = completedROs.length > 0 
+      ? completedROs.reduce((sum, ro) => sum + parseFloat(ro.totalCash || "0"), 0) / completedROs.length 
+      : 0;
+
+    const monthLineItems = await db.select({ approvalStatus: autoLineItems.approvalStatus })
+      .from(autoLineItems)
+      .innerJoin(autoRepairOrders, eq(autoLineItems.repairOrderId, autoRepairOrders.id))
+      .where(and(eq(autoRepairOrders.shopId, shopId), gte(autoLineItems.createdAt, monthStart)));
+    const approvedCount = monthLineItems.filter(li => li.approvalStatus === "approved").length;
+    const approvalRate = monthLineItems.length > 0 ? Math.round((approvedCount / monthLineItems.length) * 100) : 0;
+
+    const dpPayments = await db.select({ method: autoPayments.method, totalCash: autoRepairOrders.totalCash, totalCard: autoRepairOrders.totalCard })
+      .from(autoPayments)
+      .innerJoin(autoRepairOrders, eq(autoPayments.repairOrderId, autoRepairOrders.id))
+      .where(and(eq(autoPayments.shopId, shopId), gte(autoPayments.processedAt, monthStart)));
+    const feesSaved = dpPayments.filter(p => p.method !== 'cash')
+      .reduce((sum, p) => sum + (parseFloat(p.totalCard || "0") - parseFloat(p.totalCash || "0")), 0);
+
+    let openROConditions: any[] = [eq(autoRepairOrders.shopId, shopId), or(...openStatuses.map(s => eq(autoRepairOrders.status, s)))];
+    if (startDate) openROConditions.push(gte(autoRepairOrders.createdAt, startDate));
+    if (endDate) openROConditions.push(lte(autoRepairOrders.createdAt, endDate));
+    
+    const openROs = await db.select({
+      id: autoRepairOrders.id,
+      roNumber: autoRepairOrders.roNumber,
+      status: autoRepairOrders.status,
+      totalCash: autoRepairOrders.totalCash,
+      totalCard: autoRepairOrders.totalCard,
+      createdAt: autoRepairOrders.createdAt,
+      customerId: autoRepairOrders.customerId,
+      vehicleId: autoRepairOrders.vehicleId,
+    }).from(autoRepairOrders).where(and(...openROConditions)).orderBy(desc(autoRepairOrders.createdAt)).limit(20);
+
+    const enrichedROs = [];
+    for (const ro of openROs) {
+      let customer = null, vehicle = null;
+      if (ro.customerId) {
+        const [c] = await db.select({ firstName: autoCustomers.firstName, lastName: autoCustomers.lastName }).from(autoCustomers).where(eq(autoCustomers.id, ro.customerId));
+        customer = c || null;
+      }
+      if (ro.vehicleId) {
+        const [v] = await db.select({ year: autoVehicles.year, make: autoVehicles.make, model: autoVehicles.model }).from(autoVehicles).where(eq(autoVehicles.id, ro.vehicleId));
+        vehicle = v || null;
+      }
+      enrichedROs.push({ ...ro, customer, vehicle });
+    }
+
+    const bays = await db.select().from(autoBays).where(and(eq(autoBays.shopId, shopId), eq(autoBays.isActive, true)));
+    const totalSellableHours = bays.reduce((sum, b) => sum + parseFloat((b as any).sellableHoursPerDay || "8"), 0);
+    
+    const todayApts = await db.select({ estimatedDuration: autoAppointments.estimatedDuration })
+      .from(autoAppointments)
+      .where(and(eq(autoAppointments.shopId, shopId), gte(autoAppointments.startTime, today), lte(autoAppointments.startTime, tomorrow)));
+    const bookedHours = todayApts.reduce((sum, a) => sum + (a.estimatedDuration || 60) / 60, 0);
+    const availableHours = Math.max(0, totalSellableHours - bookedHours);
+
+    const appointments = await db.select()
+      .from(autoAppointments)
+      .where(and(eq(autoAppointments.shopId, shopId), gte(autoAppointments.startTime, today), lte(autoAppointments.startTime, tomorrow)))
+      .orderBy(asc(autoAppointments.startTime));
+    
+    const enrichedApts = [];
+    for (const apt of appointments) {
+      let customer = null, vehicle = null;
+      if (apt.customerId) {
+        const [c] = await db.select({ id: autoCustomers.id, firstName: autoCustomers.firstName, lastName: autoCustomers.lastName, phone: autoCustomers.phone }).from(autoCustomers).where(eq(autoCustomers.id, apt.customerId));
+        customer = c || null;
+      }
+      if (apt.vehicleId) {
+        const [v] = await db.select({ year: autoVehicles.year, make: autoVehicles.make, model: autoVehicles.model }).from(autoVehicles).where(eq(autoVehicles.id, apt.vehicleId));
+        vehicle = v || null;
+      }
+      enrichedApts.push({ ...apt, customer, vehicle });
+    }
+
+    const dayOfWeek = today.getDay();
+    const staffAvail = await db.select({
+      userId: autoStaffAvailability.userId,
+      startTime: autoStaffAvailability.startTime,
+      endTime: autoStaffAvailability.endTime,
+      isAvailable: autoStaffAvailability.isAvailable,
+    }).from(autoStaffAvailability)
+      .where(and(eq(autoStaffAvailability.shopId, shopId), eq(autoStaffAvailability.dayOfWeek, dayOfWeek), eq(autoStaffAvailability.isAvailable, true)));
+
+    const timeOff = await db.select({ userId: autoStaffTimeOff.userId })
+      .from(autoStaffTimeOff)
+      .where(and(eq(autoStaffTimeOff.shopId, shopId), lte(autoStaffTimeOff.startDate, tomorrow), gte(autoStaffTimeOff.endDate, today), eq(autoStaffTimeOff.status, "approved")));
+    const timeOffUserIds = new Set(timeOff.map(t => t.userId));
+
+    const availableStaffIds = staffAvail.filter(s => !timeOffUserIds.has(s.userId)).map(s => s.userId);
+    let staffOnDuty: { id: number; firstName: string; lastName: string; role: string }[] = [];
+    if (availableStaffIds.length > 0) {
+      staffOnDuty = await db.select({ id: autoUsers.id, firstName: autoUsers.firstName, lastName: autoUsers.lastName, role: autoUsers.role })
+        .from(autoUsers)
+        .where(and(eq(autoUsers.shopId, shopId), eq(autoUsers.isActive, true), inArray(autoUsers.id, availableStaffIds)));
+    }
+
+    if (staffAvail.length === 0) {
+      staffOnDuty = await db.select({ id: autoUsers.id, firstName: autoUsers.firstName, lastName: autoUsers.lastName, role: autoUsers.role })
+        .from(autoUsers)
+        .where(and(eq(autoUsers.shopId, shopId), eq(autoUsers.isActive, true), or(
+          eq(autoUsers.role, "technician"), eq(autoUsers.role, "service_advisor"), eq(autoUsers.role, "manager")
+        )));
+    }
+
+    const [totalCustomersResult] = await db.select({ count: count() }).from(autoCustomers).where(eq(autoCustomers.shopId, shopId));
+
+    const visibility = await db.select().from(autoDashboardVisibility).where(eq(autoDashboardVisibility.shopId, shopId));
+
+    const visibilityMap: Record<string, boolean> = {};
+    const defaultCards = ["revenue", "carsInShop", "aro", "approvalRate", "feesSaved", "openRos", "quickActions", "appointmentsAvailability", "shopStats"];
+    for (const cardKey of defaultCards) {
+      const setting = visibility.find(v => v.cardKey === cardKey);
+      if (setting) {
+        if (userRole === "owner") visibilityMap[cardKey] = setting.visibleToOwner ?? true;
+        else if (userRole === "manager") visibilityMap[cardKey] = setting.visibleToManager ?? true;
+        else if (userRole === "service_advisor") visibilityMap[cardKey] = setting.visibleToAdvisor ?? true;
+        else if (userRole === "technician") visibilityMap[cardKey] = setting.visibleToTech ?? false;
+        else visibilityMap[cardKey] = true;
+      } else {
+        visibilityMap[cardKey] = userRole !== "technician" || ["carsInShop", "quickActions", "appointmentsAvailability"].includes(cardKey);
+      }
+    }
+
+    res.json({
+      todayRevenue,
+      monthRevenue,
+      carsInShop: carsInShop.count,
+      aro: Math.round(aro * 100) / 100,
+      approvalRate,
+      feesSaved: Math.round(feesSaved * 100) / 100,
+      openROs: enrichedROs,
+      bayCapacity: { totalBays: bays.length, totalSellableHours, bookedHours: Math.round(bookedHours * 10) / 10, availableHours: Math.round(availableHours * 10) / 10 },
+      appointments: enrichedApts,
+      staffOnDuty,
+      totalCustomers: totalCustomersResult.count,
+      visibility: visibilityMap,
+    });
+  } catch (err: any) {
+    console.error("Enhanced dashboard error:", err);
+    res.status(500).json({ error: "Failed to fetch enhanced dashboard" });
+  }
+});
+
+// ============================================================================
+// DASHBOARD VISIBILITY SETTINGS (authenticated)
+// ============================================================================
+
+router.get("/dashboard/visibility", autoAuth, autoRequireRole("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const settings = await db.select().from(autoDashboardVisibility).where(eq(autoDashboardVisibility.shopId, shopId));
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch visibility settings" });
+  }
+});
+
+router.put("/dashboard/visibility", autoAuth, autoRequireRole("owner"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { settings } = req.body;
+    if (!Array.isArray(settings)) return res.status(400).json({ error: "settings must be an array" });
+
+    const results = [];
+    for (const s of settings) {
+      const existing = await db.select().from(autoDashboardVisibility)
+        .where(and(eq(autoDashboardVisibility.shopId, shopId), eq(autoDashboardVisibility.cardKey, s.cardKey)));
+      
+      if (existing.length > 0) {
+        const [updated] = await db.update(autoDashboardVisibility)
+          .set({ visibleToOwner: s.visibleToOwner, visibleToManager: s.visibleToManager, visibleToAdvisor: s.visibleToAdvisor, visibleToTech: s.visibleToTech })
+          .where(and(eq(autoDashboardVisibility.shopId, shopId), eq(autoDashboardVisibility.cardKey, s.cardKey)))
+          .returning();
+        results.push(updated);
+      } else {
+        const [created] = await db.insert(autoDashboardVisibility)
+          .values({ shopId, cardKey: s.cardKey, visibleToOwner: s.visibleToOwner, visibleToManager: s.visibleToManager, visibleToAdvisor: s.visibleToAdvisor, visibleToTech: s.visibleToTech })
+          .returning();
+        results.push(created);
+      }
+    }
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update visibility settings" });
+  }
+});
+
+// ============================================================================
+// STAFF AVAILABILITY CRUD (authenticated)
+// ============================================================================
+
+router.get("/staff/availability/:userId", autoAuth, async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const userId = parseInt(req.params.userId);
+    const availability = await db.select().from(autoStaffAvailability)
+      .where(and(eq(autoStaffAvailability.shopId, shopId), eq(autoStaffAvailability.userId, userId)))
+      .orderBy(asc(autoStaffAvailability.dayOfWeek));
+    res.json(availability);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch availability" });
+  }
+});
+
+router.put("/staff/availability/:userId", autoAuth, autoRequireRole("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const userId = parseInt(req.params.userId);
+    const { schedule } = req.body;
+    if (!Array.isArray(schedule)) return res.status(400).json({ error: "schedule must be an array" });
+
+    await db.delete(autoStaffAvailability).where(and(eq(autoStaffAvailability.shopId, shopId), eq(autoStaffAvailability.userId, userId)));
+    
+    const results = [];
+    for (const day of schedule) {
+      const [created] = await db.insert(autoStaffAvailability)
+        .values({ shopId, userId, dayOfWeek: day.dayOfWeek, startTime: day.startTime, endTime: day.endTime, isAvailable: day.isAvailable ?? true })
+        .returning();
+      results.push(created);
+    }
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update availability" });
+  }
+});
+
+// ============================================================================
+// STAFF TIME OFF CRUD (authenticated)
+// ============================================================================
+
+router.get("/staff/time-off", autoAuth, async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const userId = req.query.userId ? parseInt(req.query.userId as string) : null;
+    
+    let conditions: any[] = [eq(autoStaffTimeOff.shopId, shopId)];
+    if (userId) conditions.push(eq(autoStaffTimeOff.userId, userId));
+    
+    const timeOff = await db.select().from(autoStaffTimeOff).where(and(...conditions)).orderBy(desc(autoStaffTimeOff.startDate));
+    
+    const enriched = [];
+    for (const t of timeOff) {
+      const [user] = await db.select({ firstName: autoUsers.firstName, lastName: autoUsers.lastName })
+        .from(autoUsers).where(eq(autoUsers.id, t.userId));
+      enriched.push({ ...t, user: user || null });
+    }
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch time off" });
+  }
+});
+
+router.post("/staff/time-off", autoAuth, autoRequireRole("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const { userId, startDate, endDate, reason, status } = req.body;
+    if (!userId || !startDate || !endDate) return res.status(400).json({ error: "userId, startDate, and endDate are required" });
+    
+    const [created] = await db.insert(autoStaffTimeOff)
+      .values({ shopId, userId, startDate: new Date(startDate), endDate: new Date(endDate), reason: reason || null, status: status || "approved" })
+      .returning();
+    res.json(created);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create time off" });
+  }
+});
+
+router.delete("/staff/time-off/:id", autoAuth, autoRequireRole("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const id = parseInt(req.params.id);
+    const [deleted] = await db.delete(autoStaffTimeOff)
+      .where(and(eq(autoStaffTimeOff.id, id), eq(autoStaffTimeOff.shopId, shopId)))
+      .returning();
+    if (!deleted) return res.status(404).json({ error: "Time off not found" });
+    res.json(deleted);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete time off" });
+  }
+});
+
+// ============================================================================
+// BAY CONFIGURATION (authenticated)
+// ============================================================================
+
+router.get("/bays/config", autoAuth, async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const bays = await db.select().from(autoBays).where(eq(autoBays.shopId, shopId)).orderBy(asc(autoBays.sortOrder));
+    res.json(bays);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch bay config" });
+  }
+});
+
+router.patch("/bays/:id/config", autoAuth, autoRequireRole("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.autoUser!.shopId;
+    const bayId = parseInt(req.params.id);
+    const { sellableHoursPerDay } = req.body;
+    if (sellableHoursPerDay === undefined) return res.status(400).json({ error: "sellableHoursPerDay is required" });
+    
+    const [updated] = await db.update(autoBays)
+      .set({ sellableHoursPerDay: sellableHoursPerDay.toString() })
+      .where(and(eq(autoBays.id, bayId), eq(autoBays.shopId, shopId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "Bay not found" });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update bay config" });
   }
 });
 

@@ -21,6 +21,9 @@ import AutoPaymentProcessor from "./AutoPaymentProcessor";
 import AutoForgotPassword from "./AutoForgotPassword";
 import AutoResetPassword from "./AutoResetPassword";
 import AutoShortApproval from "./AutoShortApproval";
+import AutoBayConfig from "./AutoBayConfig";
+import AutoStaffAvailability from "./AutoStaffAvailability";
+import AutoDashboardVisibility from "./AutoDashboardVisibility";
 import { AutoAssistantProvider } from "@/components/auto/AutoAssistantProvider";
 import { AutoAssistantChat } from "@/components/auto/AutoAssistantChat";
 import { Loader2 } from "lucide-react";
@@ -62,6 +65,9 @@ function AuthenticatedAutoRoutes() {
           <Route path="/auto/inspections" component={AutoInspections} />
           <Route path="/auto/schedule" component={AutoSchedule} />
           <Route path="/auto/reports" component={AutoReports} />
+          <Route path="/auto/settings/bays" component={AutoBayConfig} />
+          <Route path="/auto/settings/availability" component={AutoStaffAvailability} />
+          <Route path="/auto/settings/visibility" component={AutoDashboardVisibility} />
           <Route path="/auto/settings" component={AutoSettings} />
           <Route path="/auto/quickbooks" component={AutoQuickBooks} />
           <Route path="/auto/processor" component={AutoPaymentProcessor} />

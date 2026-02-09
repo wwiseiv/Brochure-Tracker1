@@ -42,10 +42,14 @@ Preferred communication style: Simple, everyday language.
     - **Invoice & Payment System**: Dual pricing payment flow with professional invoice view, tip selection, and printable receipt.
     - **Email Integration**: Backend email service (Resend) for invoices/receipts with PDF attachments.
     - **Help Menu**: In-app help sections.
-    - **AI Assistant**: Floating, context-aware chat assistant (Anthropic Claude, ElevenLabs TTS) with voice dictation. Provider lives at AuthenticatedAutoRoutes level in AutoApp.tsx (not in AutoLayout) so chat state persists across page navigations. Messages backed by localStorage.
+    - **AI Assistant**: Floating, context-aware chat assistant (Anthropic Claude, ElevenLabs TTS) with voice dictation. Provider lives at AuthenticatedAutoRoutes level in AutoApp.tsx (not in AutoLayout) so chat state persists across page navigations. Messages backed by localStorage. Navigation keywords in navMap.ts support dashboard cards, settings pages, and all core sections.
     - **Parts Lookup & Labor Guide**: Simulated integrations (PartsTech, MOTOR) for adding line items.
     - **QuickBooks Integration**: Simulated integration page for investor demo.
     - **Dual Pricing Compliance**: Full compliance across all customer-facing screens, avoiding "surcharge" terminology.
+    - **Enhanced Dashboard**: Role-based visibility controls with 5 KPI stat cards (Revenue, Cars In Shop, ARO, Approval Rate, Fees Saved), Appointments & Availability widget with bay capacity tracking and staff on duty, Open ROs card with date range filtering, Quick Actions, and Shop Overview. Dashboard card visibility configurable per role (owner/manager/advisor/tech) via `/auto/settings/visibility`.
+    - **Bay Configuration**: Per-bay sellable hours tracking for shop capacity management (`/auto/settings/bays`). Total sellable hours used in dashboard bay utilization metrics.
+    - **Staff Availability & Time Off**: Weekly schedule management per staff member with day-of-week availability toggles and time ranges. Time off request management with approval status (`/auto/settings/availability`). Feeds into dashboard "Staff On Duty" widget.
+    - **Dashboard Visibility Settings**: Role-based toggle grid controlling which dashboard cards are visible to each role (owner/manager/advisor/tech). Owner-only configuration (`/auto/settings/visibility`).
 
 ## External Dependencies
 

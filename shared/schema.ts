@@ -3783,6 +3783,7 @@ export const autoBays = pgTable("auto_bays", {
   description: text("description"),
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
+  sellableHoursPerDay: numeric("sellable_hours_per_day", { precision: 4, scale: 1 }).default("8"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -3910,6 +3911,7 @@ export const autoLineItems = pgTable("auto_line_items", {
   totalCard: numeric("total_card", { precision: 10, scale: 2 }).notNull(),
   laborHours: numeric("labor_hours", { precision: 6, scale: 2 }),
   laborRate: numeric("labor_rate", { precision: 8, scale: 2 }),
+  estimatedHours: numeric("estimated_hours", { precision: 6, scale: 2 }),
   vendorId: varchar("vendor_id", { length: 100 }),
   isTaxable: boolean("is_taxable").default(true),
   isAdjustable: boolean("is_adjustable").default(true),
@@ -4284,6 +4286,7 @@ export const autoAppointments = pgTable("auto_appointments", {
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   estimatedDuration: integer("estimated_duration"),
+  estimatedLaborHours: numeric("estimated_labor_hours", { precision: 6, scale: 2 }),
   color: varchar("color", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -4686,3 +4689,89 @@ export const insertAutoCommunicationLogSchema = createInsertSchema(autoCommunica
 });
 export type InsertAutoCommunicationLog = z.infer<typeof insertAutoCommunicationLogSchema>;
 export type AutoCommunicationLog = typeof autoCommunicationLog.$inferSelect;
+
+// 28. Auto Staff Availability
+export const autoStaffAvailability = pgTable("auto_staff_availability", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  userId: integer("user_id").notNull().references(() => autoUsers.id),
+  dayOfWeek: integer("day_of_week").notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  isAvailable: boolean("is_available").default(true),
+}, (table) => ({
+  uniqueUserDay: unique().on(table.userId, table.dayOfWeek),
+}));
+
+export const autoStaffAvailabilityRelations = relations(autoStaffAvailability, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoStaffAvailability.shopId],
+    references: [autoShops.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoStaffAvailability.userId],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoStaffAvailabilitySchema = createInsertSchema(autoStaffAvailability).omit({
+  id: true,
+});
+export type InsertAutoStaffAvailability = z.infer<typeof insertAutoStaffAvailabilitySchema>;
+export type AutoStaffAvailability = typeof autoStaffAvailability.$inferSelect;
+
+// 29. Auto Staff Time Off
+export const autoStaffTimeOff = pgTable("auto_staff_time_off", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  userId: integer("user_id").notNull().references(() => autoUsers.id),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  reason: text("reason"),
+  status: varchar("status", { length: 20 }).default("approved"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const autoStaffTimeOffRelations = relations(autoStaffTimeOff, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoStaffTimeOff.shopId],
+    references: [autoShops.id],
+  }),
+  user: one(autoUsers, {
+    fields: [autoStaffTimeOff.userId],
+    references: [autoUsers.id],
+  }),
+}));
+
+export const insertAutoStaffTimeOffSchema = createInsertSchema(autoStaffTimeOff).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAutoStaffTimeOff = z.infer<typeof insertAutoStaffTimeOffSchema>;
+export type AutoStaffTimeOff = typeof autoStaffTimeOff.$inferSelect;
+
+// 30. Auto Dashboard Visibility
+export const autoDashboardVisibility = pgTable("auto_dashboard_visibility", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  shopId: integer("shop_id").notNull().references(() => autoShops.id),
+  cardKey: varchar("card_key", { length: 50 }).notNull(),
+  visibleToOwner: boolean("visible_to_owner").default(true),
+  visibleToManager: boolean("visible_to_manager").default(true),
+  visibleToAdvisor: boolean("visible_to_advisor").default(true),
+  visibleToTech: boolean("visible_to_tech").default(false),
+}, (table) => ({
+  uniqueShopCard: unique().on(table.shopId, table.cardKey),
+}));
+
+export const autoDashboardVisibilityRelations = relations(autoDashboardVisibility, ({ one }) => ({
+  shop: one(autoShops, {
+    fields: [autoDashboardVisibility.shopId],
+    references: [autoShops.id],
+  }),
+}));
+
+export const insertAutoDashboardVisibilitySchema = createInsertSchema(autoDashboardVisibility).omit({
+  id: true,
+});
+export type InsertAutoDashboardVisibility = z.infer<typeof insertAutoDashboardVisibilitySchema>;
+export type AutoDashboardVisibility = typeof autoDashboardVisibility.$inferSelect;
