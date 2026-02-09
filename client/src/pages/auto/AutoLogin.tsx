@@ -400,12 +400,16 @@ export default function AutoLogin() {
           </p>
           <div className="max-w-[960px] mx-auto rounded-md overflow-hidden shadow-lg">
             <iframe
-              src="https://player.vimeo.com/video/1163099932?h=37a0e865bc&title=0&byline=0&portrait=0&autoplay=0"
+              src="https://player.vimeo.com/video/1163335594?title=0&byline=0&portrait=0"
+              width="100%"
+              height="100%"
               className="w-full aspect-video"
+              frameBorder="0"
               allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
               loading="lazy"
               title="PCB Auto Demo"
+              style={{ borderRadius: '12px' }}
               data-testid="iframe-demo-video"
             />
           </div>
