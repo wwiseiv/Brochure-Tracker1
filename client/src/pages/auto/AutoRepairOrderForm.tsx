@@ -660,25 +660,26 @@ export default function AutoRepairOrderForm() {
                         </DropdownMenuItem>
                       )}
                       {ro.approvalToken && (
-                        <DropdownMenuItem onClick={async () => {
+                        <DropdownMenuItem onSelect={(e) => {
+                          e.preventDefault();
+                          const url = approvalUrl;
+                          const ta = document.createElement("textarea");
+                          ta.value = url;
+                          ta.style.position = "fixed";
+                          ta.style.left = "-9999px";
+                          ta.style.top = "-9999px";
+                          ta.style.opacity = "0";
+                          document.body.appendChild(ta);
+                          ta.focus();
+                          ta.select();
                           try {
-                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                              await navigator.clipboard.writeText(approvalUrl);
-                            } else {
-                              const ta = document.createElement("textarea");
-                              ta.value = approvalUrl;
-                              ta.style.position = "fixed";
-                              ta.style.left = "-9999px";
-                              document.body.appendChild(ta);
-                              ta.focus();
-                              ta.select();
-                              document.execCommand("copy");
-                              document.body.removeChild(ta);
-                            }
+                            document.execCommand("copy");
                             toast({ title: "Link Copied", description: "Approval link copied to clipboard" });
-                            logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: approvalUrl }, token);
+                            logCommunication({ customerId: parseInt(form.customerId), repairOrderId: ro.id, channel: "link_copy", templateUsed: "approval_link", invoiceUrl: url }, token);
                           } catch {
-                            toast({ title: "Copy Failed", description: approvalUrl, variant: "destructive" });
+                            toast({ title: "Copy Failed", description: url, variant: "destructive" });
+                          } finally {
+                            document.body.removeChild(ta);
                           }
                         }} data-testid="menu-copy-approval-link">
                           <Link2 className="h-4 w-4 mr-2" /> Copy Approval Link

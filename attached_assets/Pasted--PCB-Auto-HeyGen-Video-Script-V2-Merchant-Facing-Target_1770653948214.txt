@@ -1,0 +1,80 @@
+# PCB Auto — HeyGen Video Script V2 (Merchant-Facing)
+# Target: Auto Repair Shop Owners
+# Estimated Runtime: ~2:25
+# Tone: Confident, specific, show-don't-tell
+
+---
+
+## AUDIO SCRIPT — Copy/paste this block directly into HeyGen
+
+Let me ask you something. How much did you pay Visa and Mastercard last month? Not your software. Not your parts. Just the privilege of accepting a credit card. Two thousand? Three thousand? Now multiply that by twelve. That is your money walking out the door every single month. And your shop management software? It doesn't even mention it.
+
+We built PCB Auto to fix that.
+
+This is your dashboard. Open ROs, customer count, today's appointments, monthly revenue — everything at a glance. But look at this number right here. Dual Pricing Earned. That is money you used to hand to the bank that is now staying in your account. Every single transaction, tracked in real time.
+
+Here is how it works. Look at this invoice. See the bottom? Cash Price, one eighty. Card Price, one eighty-seven twenty. Every estimate, every invoice, automatically. Fully compliant. No surcharge language. Your customer chooses how to pay. You keep the difference either way.
+
+Now let me walk you through a job. A car comes in. Your tech runs a digital inspection — green, yellow, red — just like a stoplight. Red means it needs attention now. Yellow means keep an eye on it. They add notes, add photos, and save.
+
+Need to know the labor time? You are not guessing. Pull up the MOTOR Labor Guide right inside the ticket. Search the operation, see the hours, see the estimated cost, and add it to the repair order in one click.
+
+Need parts? Search PartsTech without leaving the screen. You see cost, list price, and which vendor has it in stock — AutoZone, NAPA, O'Reilly — with delivery times. Pick the one you want and add it to the RO.
+
+Now here is where it gets interesting. Instead of calling your customer and playing phone tag for two days, PCB Auto texts them a link. They open it on their phone and see every service, the price, and an Approve or Decline button for each line item. They see the cash savings right at the top. They sign with their finger and submit. Done. No voicemail. No callback. Just an approved job sitting in your queue.
+
+But here is the part that no one else has. See that chat icon in the corner? That is an AI Service Advisor, built right into the customer's approval page. Your customer can ask it anything. "What's urgent?" "Can this wait a month?" "Why does this cost so much?" And it answers instantly, based on the actual services on their estimate. Your service advisors stop repeating the same brake speech fifteen times a day.
+
+And your team? Managed. Every technician, service advisor, and manager — their role, their pay rate, their contact info — all in one place. Hourly, salary, flat rate — it handles all of it. Add a new hire in thirty seconds. No spreadsheets. No paperwork. Just invite them and they are in.
+
+When the job is done, the invoice syncs straight to QuickBooks. Labor goes to labor income. Parts go to parts revenue. Dual pricing goes to its own trackable account. Tax goes to liability. Eight hundred forty-seven transactions synced automatically. No CSV exports. No end-of-month scramble. Your accountant stops calling you.
+
+Look — there are two hundred thousand independent shops in this country, and eighty-five percent of them are still on paper or software from the nineties. The ones who move first win. PCB Auto was built by someone with twenty-seven years in the payments industry who got tired of watching shops bleed money to processors and waste time on systems that don't talk to each other.
+
+Go to PCBAuto.com. Fifteen minutes. That is all we need to show you what your shop looks like when the software actually works for you.
+
+---
+
+## VISUAL CHEAT SHEET — Which image to show during each section
+
+| Timing | Script Section | Asset | Direction |
+|--------|---------------|-------|-----------|
+| 0:00 | "Let me ask you something..." | **Avatar on camera** | Direct eye contact, conversational open |
+| 0:15 | "We built PCB Auto to fix that." | **Avatar on camera** | Confident pause before transition |
+| 0:18 | "This is your dashboard..." | **Dashboard.png** | Slow zoom into the stat cards (Open ROs, Revenue), then pan down to "Dual Pricing Earned: $121.60" |
+| 0:30 | "Here is how it works. Look at this invoice..." | **Invoice.png** | Zoom into Cash Price: $180.00 / Card Price: $187.20 at the bottom |
+| 0:45 | "Now let me walk you through a job..." | **Inspection_.png** | Start at top (Vehicle info), pan down through the green/yellow/red dots. Pause on the red Air Filter item |
+| 0:58 | "Need to know the labor time?" | **MOTO_Labor_Guide.png** | Show the search results — Front Brake Pads 1.2 hrs / $144, the "+ Add to RO" buttons |
+| 1:08 | "Need parts?" | **Parts_Lookup.png** | Show PartsTech results — cost/list prices, vendor availability (AutoZone In Stock, NAPA In Stock) |
+| 1:18 | "Instead of calling your customer..." | **Public-facing_approval_page.png** | Full page view — show the dark header with vehicle info, scroll to Approve/Decline buttons, pause on "Cash Price Savings $7.20" badge, end on "Sign to authorize" |
+| 1:35 | "See that chat icon in the corner?" | **AI_Service_Advisor.png** | Zoom into the chat — show "What's urgent?" question and the AI's detailed response about safety items vs. maintenance items |
+| 1:48 | "And your team? Managed." | **Staff_Management.png** | Show the full staff list — roles (technician, service advisor, owner, manager), pay rates ($25/hr, $52K/yr, Flat Rate $30/hr), "Invite Staff" button |
+| 1:58 | "the invoice syncs straight to QuickBooks..." | **Quickbooks.png** | Show the sync dashboard — 847 Total Synced, $38,420 Revenue Synced, the 4-step "How Sync Works" section |
+| 2:10 | "Look — there are two hundred thousand..." | **Avatar on camera** | Back to direct eye contact for the credibility close |
+| 2:22 | "Go to PCBAuto.com..." | **PCB_Auto_Logo.png** | Transition from avatar to full-screen PCB Auto logo on black background. Add text overlay: "PCBAuto.com" and "Book a Demo" below the logo. Hold for 3-4 seconds. |
+
+---
+
+## KEY IMPROVEMENTS OVER V1
+
+1. **Uses ALL 11 assets** — Dashboard, Invoice, Inspection, MOTOR Labor Guide, Parts Lookup, Public-facing Approval Page, AI Service Advisor, Staff Management, QuickBooks, PCB Auto Logo, plus avatar on camera
+2. **Walks through a complete job** — inspection → labor guide → parts → estimate → approval → invoice → QuickBooks (logical workflow, not jumping around)
+3. **Moved the "27 years" credential to the close** — earns more weight after they've seen the product, not before
+4. **Pulled real numbers from the screenshots** — $121.60 dual pricing earned, 847 synced, $38,420 revenue, $180/$187.20 invoice — makes it feel real, not hypothetical
+5. **Removed the $30-40K/year claim** — too aggressive without shop context, replaced with visible proof on the dashboard
+6. **Tighter transitions** — each visual leads naturally into the next
+7. **AI section is the climax, not a sidenote** — positioned right after the approval page so the viewer sees where it lives and what it does in context
+8. **Shorter sentences throughout** — better for TTS pacing in HeyGen, fewer run-on phrases that sound robotic when read aloud
+
+---
+
+## HEYGEN PRODUCTION NOTES
+
+- **Avatar:** Professional, approachable — polo or button-down, not a suit
+- **Background for avatar scenes:** Solid dark charcoal or subtle gradient — clean, not distracting
+- **Pacing:** Slightly slower than normal speech — HeyGen TTS tends to rush. Add 0.5s pauses between major sections
+- **Transitions between assets:** Simple crossfade or slide, nothing flashy
+- **Text overlays (optional but recommended):**
+  - "Cash Price: $180 / Card Price: $187.20" when the invoice is shown
+  - "847 transactions synced automatically" when QuickBooks is shown
+  - "PCBAuto.com — Book a Demo" on the final CTA screen
