@@ -3176,6 +3176,381 @@ router.post("/reports/export", autoAuth, async (req: Request, res: Response) => 
 });
 
 // ============================================================================
+// REVENUE EXPORT (AI-POWERED)
+// ============================================================================
+
+router.post("/reports/revenue/export", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.autoUser!;
+    const { startDate, endDate, jobPL, dualPricing } = req.body;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+
+    const shop = await db.select().from(autoShops).where(eq(autoShops.id, user.shopId)).limit(1);
+    if (!shop.length) return res.status(404).json({ error: "Shop not found" });
+    const shopName = shop[0].name;
+
+    const totalRevenue = jobPL?.summary?.totalRevenue ?? 0;
+    const totalCost = jobPL?.summary?.totalCost ?? 0;
+    const totalProfit = jobPL?.summary?.totalProfit ?? 0;
+    const avgMargin = jobPL?.summary?.avgMargin ?? 0;
+    const jobCount = jobPL?.details?.length ?? 0;
+    const cashTxCount = dualPricing?.summary?.cashTransactions ?? 0;
+    const cardTxCount = dualPricing?.summary?.cardTransactions ?? 0;
+    const totalTx = dualPricing?.summary?.totalTransactions ?? 0;
+    const cashPct = dualPricing?.summary?.cashPercent ?? 0;
+    const cardPct = dualPricing?.summary?.cardPercent ?? 0;
+    const dpEarned = dualPricing?.summary?.totalDualPricingCollected ?? 0;
+    const totalCollected = dualPricing?.summary?.totalCollected ?? 0;
+    const avgCash = dualPricing?.summary?.avgTransactionCash ?? 0;
+    const avgCard = dualPricing?.summary?.avgTransactionCard ?? 0;
+
+    let aiAnalysis = "";
+    try {
+      const prompt = `You are a financial analyst for "${shopName}", an auto repair shop. Write a professional financial analysis report for ${startDate} to ${endDate}.
+
+DATA:
+- Total Revenue: $${totalRevenue.toFixed(2)} from ${jobCount} completed jobs
+- Total Cost: $${totalCost.toFixed(2)}
+- Net Profit: $${totalProfit.toFixed(2)}
+- Average Margin: ${avgMargin.toFixed(1)}%
+- Average Job Value: $${jobCount > 0 ? (totalRevenue / jobCount).toFixed(2) : "0"}
+- Total Transactions: ${totalTx} (${cashTxCount} cash / ${cardTxCount} card)
+- Cash: ${cashPct}%, Avg cash transaction: $${avgCash.toFixed(2)}
+- Card: ${cardPct}%, Avg card transaction: $${avgCard.toFixed(2)}
+- Dual Pricing Earned: $${dpEarned.toFixed(2)}
+- Total Collected (including DP): $${totalCollected.toFixed(2)}
+
+Write these sections (use ### headings, keep each section 2-4 sentences):
+### Executive Summary
+### Revenue Performance
+### Profitability Analysis
+### Payment Mix Analysis
+### Dual Pricing Impact
+### Recommendations
+
+Use the actual numbers. Be specific, professional, and actionable. Keep it concise.
+
+IMPORTANT COMPLIANCE RULES - You MUST follow these:
+- NEVER use the words "fee", "surcharge", "processing fee", or "card fee" anywhere in your analysis.
+- Always refer to dual pricing using ONLY these terms: "Cash Price", "Card Price", "Dual Pricing", or "Dual Pricing Earned".
+- The difference between cash price and card price is called "Dual Pricing" — never call it a fee or surcharge.`;
+
+      const response = await anthropicClient.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const block = response.content[0];
+      if (block.type === "text") {
+        aiAnalysis = block.text;
+      }
+    } catch (aiErr) {
+      console.error("AI revenue analysis failed (continuing without):", aiErr);
+      aiAnalysis = "AI analysis unavailable for this export.";
+    }
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "PCB Auto";
+    workbook.created = new Date();
+
+    const brandColor = "FF6C3AE0";
+    const darkHeader = "FF111827";
+    const greenAccent = "FF16A34A";
+    const lightBg = "FFF9FAFB";
+    const whiteBg = "FFFFFFFF";
+
+    // ─── Sheet 1: Financial Summary ───
+    const summarySheet = workbook.addWorksheet("Financial Summary");
+    summarySheet.columns = [
+      { header: "", key: "col1", width: 32 },
+      { header: "", key: "col2", width: 22 },
+      { header: "", key: "col3", width: 22 },
+      { header: "", key: "col4", width: 22 },
+    ];
+
+    const titleRow = summarySheet.addRow(["Revenue Report — " + shopName]);
+    titleRow.font = { bold: true, size: 16, color: { argb: brandColor } };
+    titleRow.height = 30;
+    summarySheet.mergeCells("A1:D1");
+
+    const subtitleRow = summarySheet.addRow([`Period: ${startDate} to ${endDate}  |  Generated: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`]);
+    subtitleRow.font = { size: 10, color: { argb: "FF6B7280" } };
+    summarySheet.mergeCells("A2:D2");
+
+    summarySheet.addRow([]);
+
+    const kpiHeader = summarySheet.addRow(["KEY FINANCIAL METRICS", "", "", ""]);
+    kpiHeader.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+    kpiHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+    kpiHeader.height = 26;
+    summarySheet.mergeCells(`A${kpiHeader.number}:D${kpiHeader.number}`);
+
+    const kpiRows = [
+      ["Total Revenue", `$${totalRevenue.toFixed(2)}`, "Net Profit", `$${totalProfit.toFixed(2)}`],
+      ["Total Cost", `$${totalCost.toFixed(2)}`, "Profit Margin", `${avgMargin.toFixed(1)}%`],
+      ["Completed Jobs", `${jobCount}`, "Avg Job Value", `$${jobCount > 0 ? (totalRevenue / jobCount).toFixed(2) : "0.00"}`],
+      ["Total Transactions", `${totalTx}`, "Total Collected", `$${totalCollected.toFixed(2)}`],
+      ["Dual Pricing Earned", `$${dpEarned.toFixed(2)}`, "Total Earnings", `$${(totalProfit + dpEarned).toFixed(2)}`],
+    ];
+
+    kpiRows.forEach((rowData, i) => {
+      const r = summarySheet.addRow(rowData);
+      r.getCell(1).font = { bold: true, color: { argb: "FF374151" } };
+      r.getCell(2).font = { bold: true, size: 12, color: { argb: "FF111827" } };
+      r.getCell(2).alignment = { horizontal: "right" };
+      r.getCell(3).font = { bold: true, color: { argb: "FF374151" } };
+      r.getCell(4).font = { bold: true, size: 12, color: { argb: "FF111827" } };
+      r.getCell(4).alignment = { horizontal: "right" };
+      r.height = 24;
+      if (i % 2 === 0) {
+        r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightBg } };
+      }
+    });
+
+    summarySheet.addRow([]);
+
+    const payHeader = summarySheet.addRow(["PAYMENT BREAKDOWN", "", "", ""]);
+    payHeader.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+    payHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+    payHeader.height = 26;
+    summarySheet.mergeCells(`A${payHeader.number}:D${payHeader.number}`);
+
+    const payRows = [
+      ["Cash Transactions", `${cashTxCount}`, "Cash %", `${cashPct}%`],
+      ["Card Transactions", `${cardTxCount}`, "Card %", `${cardPct}%`],
+      ["Avg Cash Transaction", `$${avgCash.toFixed(2)}`, "Avg Card Transaction", `$${avgCard.toFixed(2)}`],
+    ];
+
+    payRows.forEach((rowData, i) => {
+      const r = summarySheet.addRow(rowData);
+      r.getCell(1).font = { bold: true, color: { argb: "FF374151" } };
+      r.getCell(2).font = { bold: true, color: { argb: "FF111827" } };
+      r.getCell(2).alignment = { horizontal: "right" };
+      r.getCell(3).font = { bold: true, color: { argb: "FF374151" } };
+      r.getCell(4).font = { bold: true, color: { argb: "FF111827" } };
+      r.getCell(4).alignment = { horizontal: "right" };
+      r.height = 24;
+      if (i % 2 === 0) {
+        r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightBg } };
+      }
+    });
+
+    // ─── Sheet 2: AI Analysis ───
+    const aiSheet = workbook.addWorksheet("AI Financial Analysis");
+    aiSheet.columns = [{ header: "", key: "content", width: 90 }];
+
+    const aiTitle = aiSheet.addRow(["Financial Analysis — " + shopName]);
+    aiTitle.font = { bold: true, size: 16, color: { argb: brandColor } };
+    aiTitle.height = 30;
+
+    const aiSubtitle = aiSheet.addRow([`AI-Generated Analysis for ${startDate} to ${endDate}`]);
+    aiSubtitle.font = { size: 10, color: { argb: "FF6B7280" } };
+
+    aiSheet.addRow([]);
+
+    const sections = aiAnalysis.split(/###\s*/g).filter(Boolean);
+    for (const section of sections) {
+      const lines = section.trim().split("\n");
+      const heading = lines[0]?.trim();
+      const body = lines.slice(1).join("\n").trim();
+
+      if (heading) {
+        const hRow = aiSheet.addRow([heading]);
+        hRow.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
+        hRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: brandColor } };
+        hRow.height = 28;
+      }
+
+      if (body) {
+        const bRow = aiSheet.addRow([body]);
+        bRow.getCell(1).alignment = { wrapText: true, vertical: "top" };
+        bRow.height = Math.max(40, Math.ceil(body.length / 80) * 18);
+      }
+      aiSheet.addRow([]);
+    }
+
+    // ─── Sheet 3: Job Details ───
+    if (jobPL?.details?.length) {
+      const jobSheet = workbook.addWorksheet("Job Revenue Details");
+      jobSheet.columns = [
+        { header: "RO #", key: "roNumber", width: 14 },
+        { header: "Customer", key: "customerName", width: 26 },
+        { header: "Vehicle", key: "vehicleInfo", width: 28 },
+        { header: "Date", key: "date", width: 14 },
+        { header: "Revenue", key: "revenue", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Cost", key: "cost", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Profit", key: "profit", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Margin", key: "margin", width: 12, style: { numFmt: "0.0%" } },
+      ];
+
+      const jHeader = jobSheet.getRow(1);
+      jHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      jHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+      jHeader.alignment = { vertical: "middle", horizontal: "center" };
+      jHeader.height = 28;
+
+      (jobPL.details as any[]).forEach((row: any, i: number) => {
+        const r = jobSheet.addRow({
+          roNumber: row.roNumber,
+          customerName: row.customerName,
+          vehicleInfo: row.vehicleInfo,
+          date: row.date ? new Date(row.date).toLocaleDateString("en-US") : "",
+          revenue: row.revenue ?? 0,
+          cost: row.cost ?? 0,
+          profit: row.profit ?? 0,
+          margin: (row.margin ?? 0) / 100,
+        });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightBg } };
+        }
+      });
+
+      const totRow = jobSheet.addRow({
+        roNumber: "",
+        customerName: "TOTALS",
+        vehicleInfo: "",
+        date: "",
+        revenue: totalRevenue,
+        cost: totalCost,
+        profit: totalProfit,
+        margin: totalRevenue > 0 ? totalProfit / totalRevenue : 0,
+      });
+      totRow.font = { bold: true };
+      totRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+      totRow.height = 26;
+
+      jobSheet.views = [{ state: "frozen", ySplit: 1 }];
+      jobSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: jobSheet.rowCount, column: jobSheet.columns.length },
+      };
+    }
+
+    // ─── Sheet 4: Transaction Details ───
+    if (dualPricing?.transactions?.length) {
+      const txSheet = workbook.addWorksheet("Transaction Details");
+      txSheet.columns = [
+        { header: "Date", key: "date", width: 14 },
+        { header: "RO #", key: "roNumber", width: 14 },
+        { header: "Customer", key: "customerName", width: 26 },
+        { header: "Vehicle", key: "vehicle", width: 28 },
+        { header: "Method", key: "method", width: 10 },
+        { header: "Cash Price", key: "cashPrice", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Card Price", key: "cardPrice", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Amount Paid", key: "amountPaid", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Tip", key: "tip", width: 12, style: { numFmt: "$#,##0.00" } },
+        { header: "Total Collected", key: "totalCollected", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "DP Earned", key: "dpAmount", width: 14, style: { numFmt: "$#,##0.00" } },
+      ];
+
+      const txHeader = txSheet.getRow(1);
+      txHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      txHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+      txHeader.alignment = { vertical: "middle", horizontal: "center" };
+      txHeader.height = 28;
+
+      (dualPricing.transactions as any[]).forEach((tx: any, i: number) => {
+        const r = txSheet.addRow({
+          date: tx.date ? new Date(tx.date).toLocaleDateString("en-US") : "",
+          roNumber: tx.roNumber,
+          customerName: tx.customerName,
+          vehicle: tx.vehicle,
+          method: tx.method === "cash" ? "Cash" : "Card",
+          cashPrice: tx.cashPrice ?? 0,
+          cardPrice: tx.cardPrice ?? 0,
+          amountPaid: tx.amountPaid ?? 0,
+          tip: tx.tip ?? 0,
+          totalCollected: tx.totalCollected ?? 0,
+          dpAmount: tx.dpAmount ?? 0,
+        });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightBg } };
+        }
+      });
+
+      txSheet.views = [{ state: "frozen", ySplit: 1 }];
+      txSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: txSheet.rowCount, column: txSheet.columns.length },
+      };
+    }
+
+    // ─── Sheet 5: Daily Summary ───
+    const dailyMap: Record<string, { revenue: number; count: number; cash: number; card: number; tips: number; dpEarned: number }> = {};
+    if (dualPricing?.transactions) {
+      for (const tx of dualPricing.transactions as any[]) {
+        const day = tx.date ? new Date(tx.date).toLocaleDateString("en-US") : "Unknown";
+        if (!dailyMap[day]) dailyMap[day] = { revenue: 0, count: 0, cash: 0, card: 0, tips: 0, dpEarned: 0 };
+        dailyMap[day].revenue += tx.totalCollected ?? 0;
+        dailyMap[day].count += 1;
+        if (tx.method === "cash") dailyMap[day].cash += tx.amountPaid ?? 0;
+        else dailyMap[day].card += tx.amountPaid ?? 0;
+        dailyMap[day].tips += tx.tip ?? 0;
+        dailyMap[day].dpEarned += tx.dpAmount ?? 0;
+      }
+    }
+
+    const dailyEntries = Object.entries(dailyMap);
+    if (dailyEntries.length > 0) {
+      const dailySheet = workbook.addWorksheet("Daily Breakdown");
+      dailySheet.columns = [
+        { header: "Date", key: "date", width: 16 },
+        { header: "Transactions", key: "count", width: 14 },
+        { header: "Cash Revenue", key: "cash", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Card Revenue", key: "card", width: 16, style: { numFmt: "$#,##0.00" } },
+        { header: "Tips", key: "tips", width: 12, style: { numFmt: "$#,##0.00" } },
+        { header: "DP Earned", key: "dpEarned", width: 14, style: { numFmt: "$#,##0.00" } },
+        { header: "Total Revenue", key: "revenue", width: 18, style: { numFmt: "$#,##0.00" } },
+      ];
+
+      const dHeader = dailySheet.getRow(1);
+      dHeader.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      dHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+      dHeader.alignment = { vertical: "middle", horizontal: "center" };
+      dHeader.height = 28;
+
+      dailyEntries.forEach(([date, data], i) => {
+        const r = dailySheet.addRow({ date, ...data });
+        if (i % 2 === 1) {
+          r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightBg } };
+        }
+      });
+
+      const dtotRow = dailySheet.addRow({
+        date: "TOTALS",
+        count: dailyEntries.reduce((s, [, d]) => s + d.count, 0),
+        cash: dailyEntries.reduce((s, [, d]) => s + d.cash, 0),
+        card: dailyEntries.reduce((s, [, d]) => s + d.card, 0),
+        tips: dailyEntries.reduce((s, [, d]) => s + d.tips, 0),
+        dpEarned: dailyEntries.reduce((s, [, d]) => s + d.dpEarned, 0),
+        revenue: dailyEntries.reduce((s, [, d]) => s + d.revenue, 0),
+      });
+      dtotRow.font = { bold: true };
+      dtotRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+      dtotRow.height = 26;
+
+      dailySheet.views = [{ state: "frozen", ySplit: 1 }];
+    }
+
+    const filename = `PCB_Auto_Revenue_Report_${startDate}_to_${endDate}.xlsx`;
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error("Revenue export error:", err);
+    res.status(500).json({ error: "Failed to generate revenue export" });
+  }
+});
+
+// ============================================================================
 // MOUNT
 // ============================================================================
 

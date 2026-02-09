@@ -128,6 +128,7 @@ export default function AutoReports() {
   const [endDate, setEndDate] = useState(defaults.end);
   const [activeTab, setActiveTab] = useState(urlTab && TAB_MAP[urlTab] ? TAB_MAP[urlTab] : "job-pl");
   const [exporting, setExporting] = useState(false);
+  const [revenueExporting, setRevenueExporting] = useState(false);
 
   const [jobPL, setJobPL] = useState<JobPLData | null>(null);
   const [salesTax, setSalesTax] = useState<SalesTaxData | null>(null);
@@ -191,6 +192,28 @@ export default function AutoReports() {
     setStartDate(dates.start);
     setEndDate(dates.end);
   }
+
+  const exportRevenueReport = async () => {
+    setRevenueExporting(true);
+    try {
+      const res = await autoFetch("/api/auto/reports/revenue/export", {
+        method: "POST",
+        body: JSON.stringify({ startDate, endDate, jobPL, dualPricing }),
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `PCB_Auto_Revenue_Report_${startDate}_to_${endDate}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast({ title: "Revenue Report Downloaded", description: "AI-powered financial analysis included" });
+    } catch (err: any) {
+      toast({ title: "Export Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRevenueExporting(false);
+    }
+  };
 
   const maxRevenue = techProd?.technicians?.length
     ? Math.max(...techProd.technicians.map((t) => t.totalRevenue ?? 0), 1)
@@ -283,6 +306,12 @@ export default function AutoReports() {
 
               return (
                 <>
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={exportRevenueReport} disabled={revenueExporting || (!jobPL && !dualPricing)} data-testid="button-export-revenue">
+                      {revenueExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                      {revenueExporting ? "Generating AI Report..." : "Export to Excel"}
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                     <Card className="min-w-0">
                       <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
