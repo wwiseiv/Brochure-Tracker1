@@ -320,7 +320,7 @@ export default function AutoLogin() {
           <img
             src={pcbAutoLogo}
             alt="PCB Auto"
-            className="h-10 object-contain"
+            className="h-14 sm:h-16 object-contain"
             data-testid="nav-logo"
           />
           <Button
@@ -342,7 +342,7 @@ export default function AutoLogin() {
           <img
             src={pcbAutoLogo}
             alt="PCB Auto"
-            className="mx-auto h-48 sm:h-56 md:h-64 lg:h-72 object-contain mb-8"
+            className="mx-auto h-56 sm:h-64 md:h-80 lg:h-96 object-contain mb-8"
             data-testid="hero-logo"
           />
           <h1
@@ -627,7 +627,7 @@ export default function AutoLogin() {
                 <img
                   src={pcbAutoLogo}
                   alt="PCB Auto"
-                  className="mx-auto h-24 object-contain mb-3"
+                  className="mx-auto h-32 object-contain mb-3"
                 />
                 <CardDescription>Sign in to your shop account</CardDescription>
               </CardHeader>
@@ -698,7 +698,7 @@ export default function AutoLogin() {
             <img
               src={pcbAutoLogo}
               alt="PCB Auto"
-              className="h-12 object-contain mb-4"
+              className="h-16 object-contain mb-4"
               data-testid="footer-logo"
             />
             <p className="text-slate-400 text-sm leading-relaxed">
