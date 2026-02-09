@@ -17,10 +17,13 @@ import {
 
 const STATUS_COLORS: Record<string, string> = {
   quote: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-  estimate: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  approved: "bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100",
-  in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  estimate: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
+  sent: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  partially_approved: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  declined: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  in_progress: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200",
+  completed: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
   invoiced: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
   void: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
@@ -30,7 +33,10 @@ const STATUS_FILTERS = [
   { value: "all", label: "All" },
   { value: "quote", label: "Quote" },
   { value: "estimate", label: "Estimate" },
+  { value: "sent", label: "Sent" },
   { value: "approved", label: "Approved" },
+  { value: "partially_approved", label: "Partial" },
+  { value: "declined", label: "Declined" },
   { value: "in_progress", label: "In Progress" },
   { value: "completed", label: "Completed" },
   { value: "invoiced", label: "Invoiced" },
@@ -148,13 +154,21 @@ function getDateRange(preset: string): { from: string; to: string } | null {
   }
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  quote: "Quote", estimate: "Estimate", sent: "Sent",
+  approved: "Approved", partially_approved: "Partial",
+  declined: "Declined", in_progress: "In Progress",
+  completed: "Completed", invoiced: "Invoiced",
+  paid: "Paid", void: "Void",
+};
+
 function StatusBadge({ status }: { status: string }) {
   return (
     <Badge
       variant="outline"
       className={`${STATUS_COLORS[status] || ""} no-default-hover-elevate no-default-active-elevate`}
     >
-      {status.replace(/_/g, " ").toUpperCase()}
+      {(STATUS_LABELS[status] || status.replace(/_/g, " ")).toUpperCase()}
     </Badge>
   );
 }
@@ -320,11 +334,18 @@ export default function AutoRepairOrders() {
           <h1 className="text-xl font-bold flex items-center gap-2" data-testid="text-ros-title">
             <FileText className="h-5 w-5" /> Repair Orders
           </h1>
-          <Link href="/auto/repair-orders/new">
-            <Button className="gap-2" data-testid="button-new-ro">
-              <Plus className="h-4 w-4" /> New RO
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/auto/repair-orders/new?type=estimate">
+              <Button variant="outline" className="gap-2" data-testid="button-new-estimate">
+                <Plus className="h-4 w-4" /> New Estimate
+              </Button>
+            </Link>
+            <Link href="/auto/repair-orders/new">
+              <Button className="gap-2" data-testid="button-new-ro">
+                <Plus className="h-4 w-4" /> New RO
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Search Bar */}

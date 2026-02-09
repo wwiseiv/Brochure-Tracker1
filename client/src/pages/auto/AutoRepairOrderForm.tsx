@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown, Search, Clock } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Trash2, FileText, Download, DollarSign, CreditCard, Banknote, X, Phone, MessageSquare, Mail, Link2, ChevronDown, Search, Clock, Wrench, Send } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { handleCall, handleSms, handleEmail, SMS_TEMPLATES, EMAIL_TEMPLATES, logCommunication } from "@/lib/auto-communication";
 import CopyMessageModal from "@/components/auto/CopyMessageModal";
@@ -39,8 +39,10 @@ interface Payment {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  estimate: "Estimate", approved: "Approved", in_progress: "In Progress",
-  completed: "Completed", invoiced: "Invoiced", paid: "Paid", void: "Void",
+  estimate: "Estimate", sent: "Sent", approved: "Approved",
+  partially_approved: "Partially Approved", declined: "Declined",
+  in_progress: "In Progress", completed: "Completed",
+  invoiced: "Invoiced", paid: "Paid", void: "Void",
 };
 
 const METHOD_LABELS: Record<string, string> = {
@@ -61,6 +63,7 @@ export default function AutoRepairOrderForm() {
   const [, params] = useRoute("/auto/repair-orders/:id");
   const { toast } = useToast();
   const isNew = params?.id === "new";
+  const isEstimateMode = isNew && new URLSearchParams(window.location.search).get("type") === "estimate";
   const roId = isNew ? null : params?.id;
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -101,6 +104,11 @@ export default function AutoRepairOrderForm() {
   const [laborLoading, setLaborLoading] = useState(false);
   const [laborRate, setLaborRate] = useState("120");
   const [addingLaborId, setAddingLaborId] = useState<string | null>(null);
+
+  const [sendEstimateOpen, setSendEstimateOpen] = useState(false);
+  const [sendMethod, setSendMethod] = useState<"sms" | "email" | "both">("both");
+  const [sendingEstimate, setSendingEstimate] = useState(false);
+  const [convertingToWO, setConvertingToWO] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "", vehicleId: "", technicianId: "",
@@ -240,6 +248,59 @@ export default function AutoRepairOrderForm() {
       toast({ title: "Updated" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSendEstimate = async () => {
+    if (!roId || !ro) return;
+    setSendingEstimate(true);
+    try {
+      const token = localStorage.getItem("pcb_auto_token") || "";
+      const selectedCustomer = customers.find(c => c.id.toString() === form.customerId);
+      const selectedVehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
+      const customerName = selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "";
+      const vehicleStr = selectedVehicle ? [selectedVehicle.year, selectedVehicle.make, selectedVehicle.model].filter(Boolean).join(" ") : "";
+      const total = `$${parseFloat(ro.totalCash || "0").toFixed(2)}`;
+      const approvalUrl = `${window.location.origin}/auto/approve/${ro.approvalToken || ""}`;
+
+      if ((sendMethod === "sms" || sendMethod === "both") && selectedCustomer?.phone) {
+        const msg = SMS_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, ro.roNumber, total, approvalUrl);
+        const result = handleSms(selectedCustomer.phone, msg, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
+        if (!result.isMobile) setSmsModal({ phone: result.phone, message: result.body });
+      }
+
+      if ((sendMethod === "email" || sendMethod === "both") && selectedCustomer?.email) {
+        const tmpl = EMAIL_TEMPLATES.estimateApproval("Demo Auto Shop", customerName, vehicleStr, ro.roNumber, total, approvalUrl, "(888) 537-7332");
+        handleEmail(selectedCustomer.email, tmpl.subject, tmpl.body, parseInt(form.customerId), token, { repairOrderId: ro.id, templateUsed: "estimate_approval", invoiceUrl: approvalUrl });
+      }
+
+      const res = await autoFetch(`/api/auto/repair-orders/${roId}/send-estimate`, {
+        method: "POST", body: JSON.stringify({ method: sendMethod }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRo(data);
+        toast({ title: "Estimate Sent", description: `Sent via ${sendMethod === "both" ? "SMS & Email" : sendMethod.toUpperCase()}` });
+      }
+
+      setSendEstimateOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to send estimate", variant: "destructive" });
+    } finally {
+      setSendingEstimate(false);
+    }
+  };
+
+  const handleConvertToWorkOrder = async () => {
+    if (!roId) return;
+    setConvertingToWO(true);
+    try {
+      await handleUpdateRO({ status: "in_progress" });
+      toast({ title: "Converted", description: "Estimate converted to work order" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setConvertingToWO(false);
     }
   };
 
@@ -490,7 +551,7 @@ export default function AutoRepairOrderForm() {
             <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <h1 className="text-xl font-bold">
-            {isNew ? "New Repair Order" : `${ro?.roNumber || ""}`}
+            {isNew ? (isEstimateMode ? "New Estimate" : "New Repair Order") : `${ro?.roNumber || ""}`}
           </h1>
           {ro && (
             <Badge variant="outline" className="ml-2">
@@ -504,6 +565,19 @@ export default function AutoRepairOrderForm() {
         <div className="flex items-center gap-3">
           {ro && (
             <div className="ml-auto flex items-center gap-2 flex-wrap">
+              {ro && (ro.status === "estimate" || ro.status === "sent") && lineItems.length > 0 && (
+                <Button size="sm" onClick={() => setSendEstimateOpen(true)} data-testid="button-send-estimate"
+                  className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Mail className="h-4 w-4 mr-1" /> Send Estimate
+                </Button>
+              )}
+              {ro && (ro.status === "approved" || ro.status === "partially_approved") && (
+                <Button size="sm" onClick={handleConvertToWorkOrder} disabled={convertingToWO} data-testid="button-convert-wo"
+                  className="bg-green-600 hover:bg-green-700 text-white">
+                  {convertingToWO ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Wrench className="h-4 w-4 mr-1" />}
+                  Start Work Order
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => downloadPdf("estimate")} disabled={downloadingPdf !== null} data-testid="button-download-estimate-pdf">
                 {downloadingPdf === "estimate" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
                 Estimate PDF
@@ -1282,6 +1356,63 @@ export default function AutoRepairOrderForm() {
         phone={smsModal?.phone || ""}
         message={smsModal?.message || ""}
       />
+      <Dialog open={sendEstimateOpen} onOpenChange={setSendEstimateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Estimate for Approval</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Send {ro?.roNumber} to {selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "the customer"} for review and approval.
+            </div>
+            <div className="space-y-2">
+              <Label>Send via</Label>
+              <div className="flex gap-2">
+                <Button variant={sendMethod === "sms" ? "default" : "outline"} size="sm"
+                  onClick={() => setSendMethod("sms")} disabled={!selectedCustomer?.phone}
+                  data-testid="button-send-sms">
+                  <MessageSquare className="h-4 w-4 mr-1" /> SMS
+                </Button>
+                <Button variant={sendMethod === "email" ? "default" : "outline"} size="sm"
+                  onClick={() => setSendMethod("email")} disabled={!selectedCustomer?.email}
+                  data-testid="button-send-email">
+                  <Mail className="h-4 w-4 mr-1" /> Email
+                </Button>
+                <Button variant={sendMethod === "both" ? "default" : "outline"} size="sm"
+                  onClick={() => setSendMethod("both")}
+                  disabled={!selectedCustomer?.phone || !selectedCustomer?.email}
+                  data-testid="button-send-both">
+                  Both
+                </Button>
+              </div>
+            </div>
+            {selectedCustomer?.phone && (sendMethod === "sms" || sendMethod === "both") && (
+              <div className="text-xs text-muted-foreground">
+                SMS to: {selectedCustomer.phone}
+              </div>
+            )}
+            {selectedCustomer?.email && (sendMethod === "email" || sendMethod === "both") && (
+              <div className="text-xs text-muted-foreground">
+                Email to: {selectedCustomer.email}
+              </div>
+            )}
+            <div className="rounded-md border p-3 text-sm bg-muted/50">
+              <div className="font-medium mb-1">Estimate Summary</div>
+              <div>Total: ${parseFloat(ro?.totalCash || "0").toFixed(2)}</div>
+              <div>{lineItems.length} line item{lineItems.length !== 1 ? "s" : ""}</div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendEstimateOpen(false)} data-testid="button-cancel-send">
+              Cancel
+            </Button>
+            <Button onClick={handleSendEstimate} disabled={sendingEstimate} data-testid="button-confirm-send">
+              {sendingEstimate ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+              Send Estimate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AutoLayout>
   );
 }

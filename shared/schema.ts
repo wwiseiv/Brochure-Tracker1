@@ -3823,6 +3823,7 @@ export const autoRepairOrders = pgTable("auto_repair_orders", {
   approvalToken: varchar("approval_token", { length: 100 }).unique(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by", { length: 100 }),
+  estimateSentAt: timestamp("estimate_sent_at"),
   hideCashDiscount: boolean("hide_cash_discount").default(false),
   taxPartsAmount: numeric("tax_parts_amount", { precision: 10, scale: 2 }).default("0"),
   taxLaborAmount: numeric("tax_labor_amount", { precision: 10, scale: 2 }).default("0"),

@@ -483,8 +483,8 @@ export default function AutoPublicApproval() {
   }
 
   const { repairOrder: ro, customer, vehicle, shop, lineItems } = data;
-  const isReadOnly = ["approved", "completed", "invoiced", "in-progress"].includes(ro.status) || !!ro.approvedAt;
-  const isActionable = ro.status === "estimate" || ro.status === "declined";
+  const isReadOnly = ["approved", "partially_approved", "completed", "invoiced", "in_progress", "in-progress"].includes(ro.status) || !!ro.approvedAt;
+  const isActionable = ro.status === "estimate" || ro.status === "sent" || ro.status === "declined";
 
   if (submitted) {
     const approvedCount = approvedDecisions.length;

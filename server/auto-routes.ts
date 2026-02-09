@@ -967,6 +967,36 @@ router.patch("/repair-orders/:id", autoAuth, async (req: Request, res: Response)
   }
 });
 
+router.post("/repair-orders/:id/send-estimate", autoAuth, async (req: Request, res: Response) => {
+  try {
+    const roId = parseInt(req.params.id);
+    const [ro] = await db.select().from(autoRepairOrders)
+      .where(and(eq(autoRepairOrders.id, roId), eq(autoRepairOrders.shopId, req.autoUser!.shopId)));
+    if (!ro) return res.status(404).json({ error: "Repair order not found" });
+
+    if (ro.status !== "estimate" && ro.status !== "sent") {
+      return res.status(400).json({ error: "Only estimates can be sent for approval" });
+    }
+
+    const [updated] = await db.update(autoRepairOrders).set({
+      status: "sent",
+      estimateSentAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(autoRepairOrders.id, roId)).returning();
+
+    await db.insert(autoActivityLog).values({
+      shopId: req.autoUser!.shopId, userId: req.autoUser!.id,
+      entityType: "repair_order", entityId: ro.id, action: "estimate_sent",
+      details: { roNumber: ro.roNumber, method: req.body.method || "manual" },
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Send estimate error:", err);
+    res.status(500).json({ error: "Failed to send estimate" });
+  }
+});
+
 async function recalculateROTotals(roId: number, shopId: number) {
   const [shop] = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
   if (!shop) throw new Error("Shop not found");
@@ -2243,7 +2273,7 @@ router.post("/public/estimate/:token/approve", async (req: Request, res: Respons
     const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
     if (!ro) return res.status(404).json({ error: "Estimate not found" });
 
-    if (ro.status !== "estimate" && ro.status !== "declined") {
+    if (ro.status !== "estimate" && ro.status !== "sent" && ro.status !== "declined") {
       return res.status(400).json({ error: "This estimate has already been approved" });
     }
 
@@ -2270,7 +2300,7 @@ router.post("/public/estimate/:token/decline", async (req: Request, res: Respons
     const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
     if (!ro) return res.status(404).json({ error: "Estimate not found" });
 
-    if (ro.status !== "estimate") {
+    if (ro.status !== "estimate" && ro.status !== "sent") {
       return res.status(400).json({ error: "This estimate cannot be declined in its current state" });
     }
 
@@ -2382,7 +2412,7 @@ router.post("/public/estimate/:token/line-approval", async (req: Request, res: R
     const [ro] = await db.select().from(autoRepairOrders).where(eq(autoRepairOrders.approvalToken, req.params.token));
     if (!ro) return res.status(404).json({ error: "Estimate not found" });
 
-    if (ro.status !== "estimate" && ro.status !== "declined") {
+    if (ro.status !== "estimate" && ro.status !== "sent" && ro.status !== "declined") {
       return res.status(400).json({ error: "This estimate cannot be modified in its current state" });
     }
 
@@ -2425,7 +2455,7 @@ router.post("/public/estimate/:token/line-approval", async (req: Request, res: R
     if (hasApproved && !hasDeclined) {
       newStatus = "approved";
     } else if (hasApproved && hasDeclined) {
-      newStatus = "approved";
+      newStatus = "partially_approved";
     } else if (!hasApproved && hasDeclined) {
       newStatus = "declined";
     }
