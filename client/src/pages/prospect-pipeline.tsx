@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSwipeable } from "react-swipeable";
@@ -158,6 +158,49 @@ interface PipelineCounts {
   [stage: string]: number;
 }
 
+function useDragScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const state = useRef({ isDown: false, startX: 0, scrollLeft: 0, moved: false });
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return;
+    state.current = { isDown: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+    el.style.cursor = 'grabbing';
+    el.style.userSelect = 'none';
+  }, []);
+
+  const onMouseLeave = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    state.current.isDown = false;
+    el.style.cursor = 'grab';
+    el.style.removeProperty('user-select');
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    state.current.isDown = false;
+    el.style.cursor = 'grab';
+    el.style.removeProperty('user-select');
+  }, []);
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!state.current.isDown) return;
+    e.preventDefault();
+    const el = ref.current;
+    if (!el) return;
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - state.current.startX) * 1.5;
+    el.scrollLeft = state.current.scrollLeft - walk;
+    state.current.moved = true;
+  }, []);
+
+  return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove, style: { cursor: 'grab' } as React.CSSProperties };
+}
+
 export default function DealPipelinePage() {
   const [, navigate] = useLocation();
   const [phaseFilter, setPhaseFilter] = useState<string>("All");
@@ -188,6 +231,10 @@ export default function DealPipelinePage() {
 
   const [showCreateDealSheet, setShowCreateDealSheet] = useState(false);
   
+  const stageDrag = useDragScroll();
+  const kanbanDrag = useDragScroll();
+  const listPhasesDrag = useDragScroll();
+
   // AI Summary and Lead Score state
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const [isScoreOpen, setIsScoreOpen] = useState(true);
@@ -1028,7 +1075,15 @@ export default function DealPipelinePage() {
     return (
       <div className="space-y-4">
         {/* Stage Progress Summary Bar - Clickable shortcuts */}
-        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div
+          ref={stageDrag.ref}
+          onMouseDown={stageDrag.onMouseDown}
+          onMouseLeave={stageDrag.onMouseLeave}
+          onMouseUp={stageDrag.onMouseUp}
+          onMouseMove={stageDrag.onMouseMove}
+          className="bg-card border border-border rounded-lg p-3 overflow-x-auto scrollbar-hide"
+          style={{ ...stageDrag.style, WebkitOverflowScrolling: 'touch' }}
+        >
           <div className="flex gap-1" style={{ width: 'max-content' }}>
             {STAGE_ORDER.map((stage, idx) => {
               const count = kanbanFilteredDeals.filter(d => d.currentStage === stage).length;
@@ -1056,7 +1111,15 @@ export default function DealPipelinePage() {
         </div>
 
         {/* Kanban Board - Full width with horizontal scroll */}
-        <div className="overflow-x-auto pb-4 scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div
+          ref={kanbanDrag.ref}
+          onMouseDown={kanbanDrag.onMouseDown}
+          onMouseLeave={kanbanDrag.onMouseLeave}
+          onMouseUp={kanbanDrag.onMouseUp}
+          onMouseMove={kanbanDrag.onMouseMove}
+          className="overflow-x-auto pb-4 scrollbar-thin"
+          style={{ ...kanbanDrag.style, WebkitOverflowScrolling: 'touch' }}
+        >
           <div className="flex gap-3" style={{ width: 'max-content' }}>
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
               <div key={phaseName} className="flex gap-2">
@@ -1321,7 +1384,15 @@ export default function DealPipelinePage() {
 
             {/* Phase Filters - Only show in List view */}
             {viewMode === 'list' && (
-              <div className="overflow-x-auto pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div
+                ref={listPhasesDrag.ref}
+                onMouseDown={listPhasesDrag.onMouseDown}
+                onMouseLeave={listPhasesDrag.onMouseLeave}
+                onMouseUp={listPhasesDrag.onMouseUp}
+                onMouseMove={listPhasesDrag.onMouseMove}
+                className="overflow-x-auto pb-2 scrollbar-hide"
+                style={{ ...listPhasesDrag.style, WebkitOverflowScrolling: 'touch' }}
+              >
                 <div className="flex gap-2" style={{ width: 'max-content' }}>
                   {PHASES.map((phase) => (
                     <Button
