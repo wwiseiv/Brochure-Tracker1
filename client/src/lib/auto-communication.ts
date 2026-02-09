@@ -15,11 +15,9 @@ export function buildEmailLink(
   body: string,
   cc?: string
 ): string {
-  const params = new URLSearchParams();
-  params.set("subject", subject);
-  params.set("body", body);
-  if (cc) params.set("cc", cc);
-  return `mailto:${to}?${params.toString()}`;
+  let link = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  if (cc) link += `&cc=${encodeURIComponent(cc)}`;
+  return link;
 }
 
 export function formatPhone(phone: string): string {
