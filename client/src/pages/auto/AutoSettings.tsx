@@ -50,9 +50,9 @@ export default function AutoSettings() {
         state: s.state || "", zip: s.zip || "", phone: s.phone || "",
         email: s.email || "", timezone: s.timezone || "America/New_York",
         laborRate: s.laborRate || "0",
-        cardFeePercent: s.cardFeePercent || "3.5",
-        partsTaxRate: s.partsTaxRate || "0",
-        laborTaxRate: s.laborTaxRate || "0",
+        cardFeePercent: parseFloat((parseFloat(s.cardFeePercent || "0") * 100).toFixed(4)).toString(),
+        partsTaxRate: parseFloat((parseFloat(s.partsTaxRate || "0") * 100).toFixed(4)).toString(),
+        laborTaxRate: parseFloat((parseFloat(s.laborTaxRate || "0") * 100).toFixed(4)).toString(),
         laborTaxable: s.laborTaxable !== false,
         defaultPartsMarkupPct: s.defaultPartsMarkupPct || "0",
         shopSupplyMethod: s.shopSupplyMethod || "none",
@@ -66,7 +66,13 @@ export default function AutoSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await autoFetch("/api/auto/shop/settings", { method: "PATCH", body: JSON.stringify(form) });
+      const payload = {
+        ...form,
+        cardFeePercent: (parseFloat(form.cardFeePercent || "0") / 100).toString(),
+        partsTaxRate: (parseFloat(form.partsTaxRate || "0") / 100).toString(),
+        laborTaxRate: (parseFloat(form.laborTaxRate || "0") / 100).toString(),
+      };
+      const res = await autoFetch("/api/auto/shop/settings", { method: "PATCH", body: JSON.stringify(payload) });
       if (!res.ok) throw new Error("Failed to save");
       toast({ title: "Settings Saved" });
     } catch (err: any) {
