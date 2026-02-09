@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAutoAuth } from "@/hooks/use-auto-auth";
 
@@ -6,7 +6,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  timestamp: Date;
+  timestamp: string;
 }
 
 interface AssistantContextType {
@@ -18,6 +18,35 @@ interface AssistantContextType {
   sendMessage: (text: string) => Promise<void>;
   isLoading: boolean;
   clearMessages: () => void;
+}
+
+const STORAGE_KEY = "pcb_auto_assistant_messages";
+const SESSION_KEY = "pcb_auto_assistant_session";
+
+function loadMessages(): Message[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return [];
+}
+
+function saveMessages(msgs: Message[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
+  } catch {}
+}
+
+function loadSessionId(): string {
+  try {
+    const existing = localStorage.getItem(SESSION_KEY);
+    if (existing) return existing;
+  } catch {}
+  const newId = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  try { localStorage.setItem(SESSION_KEY, newId); } catch {}
+  return newId;
 }
 
 const AssistantCtx = createContext<AssistantContextType | null>(null);
@@ -39,11 +68,15 @@ function getPageName(path: string): string {
 
 export function AutoAssistantProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [isLoading, setIsLoading] = useState(false);
-  const sessionIdRef = useRef(`sess_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  const sessionIdRef = useRef(loadSessionId());
   const [location] = useLocation();
   const { user, shop, token } = useAutoAuth();
+
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages]);
 
   const gatherContext = useCallback(() => {
     const path = window.location.pathname;
@@ -76,7 +109,7 @@ export function AutoAssistantProvider({ children }: { children: React.ReactNode 
       id: `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       role: "user",
       content: text,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -101,7 +134,7 @@ export function AutoAssistantProvider({ children }: { children: React.ReactNode 
         id: `msg_${Date.now()}_reply`,
         role: "assistant",
         content: data.message || "Sorry, I couldn't process that. Try again.",
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantMsg]);
     } catch {
@@ -109,7 +142,7 @@ export function AutoAssistantProvider({ children }: { children: React.ReactNode 
         id: `msg_${Date.now()}_error`,
         role: "assistant",
         content: "Sorry, I couldn't connect right now. Try again in a moment.",
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       }]);
     } finally {
       setIsLoading(false);
@@ -118,7 +151,12 @@ export function AutoAssistantProvider({ children }: { children: React.ReactNode 
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    sessionIdRef.current = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const newSessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    sessionIdRef.current = newSessionId;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(SESSION_KEY, newSessionId);
+    } catch {}
   }, []);
 
   return (
