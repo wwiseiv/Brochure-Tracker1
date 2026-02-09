@@ -86,11 +86,11 @@ export const SheetScrollFix = forwardRef<HTMLDivElement, SheetScrollFixProps>(
     
     const mergedRef = useCallback(
       (node: HTMLDivElement) => {
-        scrollRef.current = node;
+        (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
         if (typeof forwardedRef === 'function') {
           forwardedRef(node);
         } else if (forwardedRef) {
-          forwardedRef.current = node;
+          (forwardedRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
         }
       },
       [forwardedRef]
@@ -241,7 +241,7 @@ export function applyIOSScrollFix(element: HTMLElement): () => void {
   };
   
   element.style.overscrollBehavior = 'contain';
-  element.style.webkitOverflowScrolling = 'touch';
+  (element.style as any).webkitOverflowScrolling = 'touch';
   
   element.addEventListener('touchstart', handleTouchStart, { passive: true });
   element.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -250,7 +250,7 @@ export function applyIOSScrollFix(element: HTMLElement): () => void {
     element.removeEventListener('touchstart', handleTouchStart);
     element.removeEventListener('touchmove', handleTouchMove);
     element.style.overscrollBehavior = '';
-    element.style.webkitOverflowScrolling = '';
+    (element.style as any).webkitOverflowScrolling = '';
   };
 }
 

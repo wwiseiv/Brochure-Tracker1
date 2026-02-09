@@ -387,7 +387,7 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}): UseAudioRe
       const originalOnStop = mediaRecorderRef.current.onstop;
       
       mediaRecorderRef.current.onstop = (event) => {
-        originalOnStop?.call(mediaRecorderRef.current, event);
+        originalOnStop?.call(mediaRecorderRef.current!, event);
         setTimeout(() => {
           resolve(chunksRef.current.length > 0 
             ? new Blob(chunksRef.current, { type: mimeType || 'audio/webm' })

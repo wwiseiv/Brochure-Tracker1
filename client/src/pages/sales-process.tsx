@@ -877,7 +877,7 @@ export default function SalesProcessPage() {
                   Key Contacts
                 </h2>
                 <div className="space-y-3">
-                  {Object.entries(salesProcessData.contacts).map(([key, contact]) => (
+                  {Object.entries(salesProcessData.contacts).map(([key, contact]: [string, any]) => (
                     <Card key={key} className="p-3">
                       <div className="flex items-start justify-between">
                         <div>

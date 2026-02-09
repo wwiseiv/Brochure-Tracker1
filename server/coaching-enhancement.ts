@@ -29,6 +29,7 @@ export interface PsychographicType {
   whatWorks: string[];
   whatFails: string[];
   effectiveDrivers: string[];
+  avoidFor?: string[];
   recommendedTones: string[];
   roleplayBehavior: string;
 }

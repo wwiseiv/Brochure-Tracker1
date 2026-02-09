@@ -56,11 +56,14 @@ export function DealMeetingRecorder({ deal, onComplete }: DealMeetingRecorderPro
     try {
       const filename = createAudioFilename(`meeting-${deal.id}`, mimeType);
       const file = new File([audioBlob], filename, { type: mimeType });
-      const uploadedUrl = await uploadFile(file);
+      const uploadResult = await uploadFile(file);
+      if (!uploadResult) {
+        throw new Error("Upload failed");
+      }
       
       await completeRecordingMutation.mutateAsync({
         recordingId: recordingIdRef.current,
-        recordingUrl: uploadedUrl,
+        recordingUrl: uploadResult.uploadURL,
         durationSeconds: Math.floor(durationSeconds),
       });
     } catch (error) {

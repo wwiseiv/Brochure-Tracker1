@@ -100,7 +100,7 @@ export function calculateInterchange(
     averageTicket,
     transactionCount,
     cardMix,
-    category,
+    category: normalizedCategory as MerchantCategory,
     isCardPresent,
     interchangeCost: Math.round(interchangeCost * 100) / 100,
     assessmentCost: Math.round(assessmentCost * 100) / 100,

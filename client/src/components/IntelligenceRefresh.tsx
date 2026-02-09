@@ -175,7 +175,7 @@ export function RefreshButton({
   const refresh = useRefreshIntelligence(merchantId);
   
   const handleRefresh = async () => {
-    await refresh.mutateAsync();
+    await refresh.mutateAsync(undefined);
     onRefreshComplete?.();
   };
   

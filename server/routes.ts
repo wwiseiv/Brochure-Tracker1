@@ -29,6 +29,7 @@ import {
   deals,
   dealActivities,
   organizations,
+  organizationMembers,
   merchants,
 } from "@shared/schema";
 import { db } from "./db";

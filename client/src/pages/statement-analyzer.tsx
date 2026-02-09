@@ -1616,7 +1616,7 @@ ${new Date().toLocaleDateString()}
                         ? "border-primary bg-primary/5" 
                         : "hover:bg-muted/50"
                     } ${job.status === "completed" ? "hover:border-primary/50" : ""}`}
-                    onClick={() => loadJobResults(job)}
+                    onClick={() => loadJobResults(job as any)}
                     data-testid={`job-item-${job.id}`}
                   >
                     <div className="flex-1 min-w-0">

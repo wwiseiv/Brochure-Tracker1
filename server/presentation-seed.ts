@@ -2172,7 +2172,7 @@ export async function seedPresentationData() {
     await db.delete(presentationModules);
     console.log("Cleared existing presentation data.");
 
-    const insertedModules = await db.insert(presentationModules).values(modulesData).returning();
+    const insertedModules = await db.insert(presentationModules).values(modulesData as any).returning();
     console.log(`Inserted ${insertedModules.length} modules.`);
 
     const moduleIdMap = new Map<number, number>();
@@ -2195,7 +2195,7 @@ export async function seedPresentationData() {
         moduleId,
       };
 
-      const [insertedLesson] = await db.insert(presentationLessons).values(lessonToInsert).returning();
+      const [insertedLesson] = await db.insert(presentationLessons).values(lessonToInsert as any).returning();
       totalLessons++;
 
       if (lessonData.quizzes && lessonData.quizzes.length > 0) {
@@ -2207,7 +2207,7 @@ export async function seedPresentationData() {
           explanation: quiz.explanation,
         }));
 
-        await db.insert(presentationQuizzes).values(quizzesToInsert);
+        await db.insert(presentationQuizzes).values(quizzesToInsert as any);
         totalQuizzes += quizzesToInsert.length;
       }
     }
@@ -2236,7 +2236,7 @@ export async function seedPresentationData() {
           explanation: quiz.explanation,
         }));
 
-        await db.insert(presentationQuizzes).values(masteryQuizzesToInsert);
+        await db.insert(presentationQuizzes).values(masteryQuizzesToInsert as any);
         totalQuizzes += masteryQuizzesToInsert.length;
       }
     }

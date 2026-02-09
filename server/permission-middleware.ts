@@ -55,7 +55,7 @@ export function invalidatePermissionCache(orgId: number, userId?: string): void 
   if (userId) {
     permissionCache.delete(getCacheKey(userId, orgId));
   } else {
-    for (const key of permissionCache.keys()) {
+    for (const key of Array.from(permissionCache.keys())) {
       if (key.startsWith(`${orgId}:`)) {
         permissionCache.delete(key);
       }

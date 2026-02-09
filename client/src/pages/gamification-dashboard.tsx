@@ -563,10 +563,10 @@ export default function GamificationDashboardPage() {
           <div className="mb-6">
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Tier Medallions</p>
             <div className="grid grid-cols-4 gap-3">
-              {assetManifest?.assets && Object.entries(assetManifest.assets)
-                .filter(([, asset]) => asset.type === "tier")
-                .sort(([, a], [, b]) => (a.tier_level || 0) - (b.tier_level || 0))
-                .map(([assetId, asset]) => {
+              {assetManifest?.assets && (Object.entries(assetManifest.assets) as [string, any][])
+                .filter(([, asset]: [string, any]) => asset.type === "tier")
+                .sort(([, a]: [string, any], [, b]: [string, any]) => (a.tier_level || 0) - (b.tier_level || 0))
+                .map(([assetId, asset]: [string, any]) => {
                   const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
                   const isEarned = !!earnedItem;
                   return (
@@ -606,9 +606,9 @@ export default function GamificationDashboardPage() {
           <div className="mb-6">
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Training Badges</p>
             <div className="grid grid-cols-4 gap-3">
-              {assetManifest?.assets && Object.entries(assetManifest.assets)
-                .filter(([, asset]) => asset.type === "badge")
-                .map(([assetId, asset]) => {
+              {assetManifest?.assets && (Object.entries(assetManifest.assets) as [string, any][])
+                .filter(([, asset]: [string, any]) => asset.type === "badge")
+                .map(([assetId, asset]: [string, any]) => {
                   const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
                   const isEarned = !!earnedItem;
                   return (
@@ -648,9 +648,9 @@ export default function GamificationDashboardPage() {
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Certifications & Milestones</p>
             <div className="grid grid-cols-5 gap-3">
-              {assetManifest?.assets && Object.entries(assetManifest.assets)
-                .filter(([, asset]) => asset.type === "seal" || asset.type === "stage")
-                .map(([assetId, asset]) => {
+              {assetManifest?.assets && (Object.entries(assetManifest.assets) as [string, any][])
+                .filter(([, asset]: [string, any]) => asset.type === "seal" || asset.type === "stage")
+                .map(([assetId, asset]: [string, any]) => {
                   const earnedItem = earnedItemsData?.earnedItems?.find((item) => item.assetId === assetId);
                   const isEarned = !!earnedItem;
                   return (

@@ -691,7 +691,7 @@ export default function PresentationTrainingPage() {
                 </Card>
               )}
 
-              {(currentLesson.practicePrompt || currentLesson.practiceDrill) && (
+              {(currentLesson.practicePrompt || Boolean(currentLesson.practiceDrill)) && (
                 <Card className="p-4" data-testid="section-practice">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="w-5 h-5 text-green-500" />
@@ -701,13 +701,13 @@ export default function PresentationTrainingPage() {
                       return drill?.duration ? (
                         <Badge variant="outline" className="text-xs gap-1">
                           <Clock className="w-3 h-3" />
-                          {drill.duration}
+                          {String(drill.duration)}
                         </Badge>
                       ) : null;
                     })()}
                   </div>
                   
-                  {currentLesson.practiceDrill && typeof currentLesson.practiceDrill === 'object' && (() => {
+                  {Boolean(currentLesson.practiceDrill) && typeof currentLesson.practiceDrill === 'object' && (() => {
                     const drill = currentLesson.practiceDrill as PracticeDrillData;
                     return (
                     <div className="space-y-4 mb-6" data-testid="content-practice-drill">
