@@ -182,16 +182,16 @@ export default function AutoQuickBooks() {
   return (
     <AutoLayout>
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-green-500 flex items-center justify-center text-xl font-extrabold text-white shadow-md">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-green-500 flex items-center justify-center text-xl font-extrabold text-white shadow-md flex-shrink-0">
               QB
             </div>
-            <div>
-              <h1 className="text-xl font-bold" data-testid="text-qb-title">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold" data-testid="text-qb-title">
                 QuickBooks Integration
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 truncate">
                 PCB Auto → QuickBooks Online · Automatic Sync
               </p>
             </div>
@@ -221,7 +221,7 @@ export default function AutoQuickBooks() {
         </div>
 
         <Tabs value={tab} onValueChange={v => setTab(v as TabId)} className="space-y-4">
-          <TabsList className="flex flex-wrap">
+          <TabsList className="flex w-full overflow-x-auto">
             {tabs.map(t => (
               <TabsTrigger key={t.id} value={t.id} data-testid={`tab-${t.id}`}>
                 <t.icon className="h-4 w-4 mr-2" />
@@ -231,7 +231,7 @@ export default function AutoQuickBooks() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
                 { label: "Total Synced", value: MOCK_SUMMARY.totalSynced.toLocaleString(), sub: "all time", colorClass: "text-green-500" },
                 { label: "This Week", value: MOCK_SUMMARY.thisWeek, sub: "transactions", colorClass: "text-blue-500" },
@@ -241,9 +241,9 @@ export default function AutoQuickBooks() {
                 { label: "Errors", value: MOCK_SUMMARY.errors, sub: "need attention", colorClass: MOCK_SUMMARY.errors > 0 ? "text-red-500" : "text-green-500" },
               ].map((s, i) => (
                 <Card key={i} data-testid={`stat-${s.label.toLowerCase().replace(/\s/g, "-")}`}>
-                  <CardContent className="pt-4 pb-4">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{s.label}</div>
-                    <div className={`text-2xl font-extrabold tabular-nums mt-1 ${s.colorClass}`}>{s.value}</div>
+                  <CardContent className="p-3 sm:pt-4 sm:pb-4">
+                    <div className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide leading-tight">{s.label}</div>
+                    <div className={`text-xl sm:text-2xl font-extrabold tabular-nums mt-1 ${s.colorClass}`}>{s.value}</div>
                     <div className="text-xs text-muted-foreground mt-1">{s.sub}</div>
                   </CardContent>
                 </Card>

@@ -341,9 +341,9 @@ export function AutoLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
               <Wrench className="h-4 w-4 text-primary-foreground" />
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="font-bold text-sm" data-testid="text-brand-mobile">PCB Auto</span>
-              {shop && <span className="text-xs text-muted-foreground ml-2">{shop.name}</span>}
+              {shop && <span className="text-xs text-muted-foreground ml-2 truncate">{shop.name}</span>}
             </div>
           </div>
         </Link>

@@ -30,7 +30,7 @@ import {
   Cog,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import pcbAutoLogo from "@assets/IMG_3010-small_for_logon_1770571814665.png";
+import pcbAutoLogo from "@assets/Untitled_design_1770609957209.png";
 import featureRepairOrders from "@/assets/images/feature-repair-orders.png";
 import featureDvi from "@/assets/images/feature-dvi.png";
 import featureScheduling from "@/assets/images/feature-scheduling.png";

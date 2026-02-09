@@ -395,10 +395,10 @@ export default function AutoRepairOrders() {
             { label: "Outstanding", value: formatMoney(parseFloat(String(stats.outstanding)) || 0), testId: "stat-outstanding" },
             { label: "Avg Ticket", value: formatMoney(parseFloat(String(stats.avgTicket)) || 0), testId: "stat-avg-ticket" },
           ].map((stat) => (
-            <Card key={stat.testId} data-testid={stat.testId}>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                <p className="text-lg font-bold">{stat.value}</p>
+            <Card key={stat.testId} data-testid={stat.testId} className="min-w-0">
+              <CardContent className="p-3 min-w-0">
+                <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
+                <p className="text-base sm:text-lg font-bold truncate">{stat.value}</p>
               </CardContent>
             </Card>
           ))}

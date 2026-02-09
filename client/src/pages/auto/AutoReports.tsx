@@ -258,43 +258,43 @@ export default function AutoReports() {
                     Export to Excel
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Total Revenue</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-revenue">{formatCurrency(jobPL.summary.totalRevenue ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-total-revenue">{formatCurrency(jobPL.summary.totalRevenue ?? 0)}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-                      <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Total Cost</CardTitle>
+                      <TrendingDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-total-cost">{formatCurrency(jobPL.summary.totalCost ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400 truncate" data-testid="text-total-cost">{formatCurrency(jobPL.summary.totalCost ?? 0)}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Total Profit</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className={`text-2xl font-bold ${(jobPL.summary.totalProfit ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-total-profit">
+                      <div className={`text-xl sm:text-2xl font-bold truncate ${(jobPL.summary.totalProfit ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-total-profit">
                         {formatCurrency(jobPL.summary.totalProfit ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Margin</CardTitle>
-                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Avg Margin</CardTitle>
+                      <BarChart3 className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className={`text-2xl font-bold ${(jobPL.summary.avgMargin ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-avg-margin">
+                      <div className={`text-xl sm:text-2xl font-bold ${(jobPL.summary.avgMargin ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-avg-margin">
                         {(jobPL.summary.avgMargin ?? 0).toFixed(1)}%
                       </div>
                     </CardContent>
@@ -349,32 +349,32 @@ export default function AutoReports() {
                     Export to Excel
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <Card>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Parts Tax Collected</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Parts Tax Collected</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-parts-tax">{formatCurrency(salesTax.totalPartsTax ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-parts-tax">{formatCurrency(salesTax.totalPartsTax ?? 0)}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Labor Tax Collected</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Labor Tax Collected</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-labor-tax">{formatCurrency(salesTax.totalLaborTax ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-labor-tax">{formatCurrency(salesTax.totalLaborTax ?? 0)}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Tax</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Total Tax</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-tax">{formatCurrency(salesTax.totalTax ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-total-tax">{formatCurrency(salesTax.totalTax ?? 0)}</div>
                       <p className="text-xs text-muted-foreground mt-1">{salesTax.roCount} repair orders</p>
                     </CardContent>
                   </Card>
@@ -443,17 +443,17 @@ export default function AutoReports() {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-muted-foreground">Hours</p>
                             <p className="font-semibold">{tech.totalHours}</p>
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-muted-foreground">Revenue</p>
-                            <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(tech.totalRevenue ?? 0)}</p>
+                            <p className="font-semibold text-green-600 dark:text-green-400 truncate">{formatCurrency(tech.totalRevenue ?? 0)}</p>
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-muted-foreground">Rate</p>
-                            <p className="font-semibold">{formatCurrency(tech.effectiveRate ?? 0)}/hr</p>
+                            <p className="font-semibold truncate">{formatCurrency(tech.effectiveRate ?? 0)}/hr</p>
                           </div>
                         </div>
                         <div className="space-y-1">
@@ -485,50 +485,50 @@ export default function AutoReports() {
                     Export to Excel
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <Card>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Estimates</CardTitle>
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Estimates</CardTitle>
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-estimates">{approvals.totalEstimates}</div>
+                      <div className="text-xl sm:text-2xl font-bold" data-testid="text-total-estimates">{approvals.totalEstimates}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Approved</CardTitle>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <CardTitle className="text-sm font-medium truncate">Approved</CardTitle>
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-approved">{approvals.approved}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-approved">{approvals.approved}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Declined</CardTitle>
-                      <XCircle className="h-4 w-4 text-red-500" />
+                      <CardTitle className="text-sm font-medium truncate">Declined</CardTitle>
+                      <XCircle className="h-4 w-4 text-red-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-declined">{approvals.declined}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-declined">{approvals.declined}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      <CardTitle className="text-sm font-medium truncate">Pending</CardTitle>
+                      <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400" data-testid="text-pending">{approvals.pending}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400" data-testid="text-pending">{approvals.pending}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Conversion Rate</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-conversion-rate">{approvals.conversionRate ?? 0}%</div>
+                      <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-conversion-rate">{approvals.conversionRate ?? 0}%</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -561,7 +561,7 @@ export default function AutoReports() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold" data-testid="text-avg-approval-time">
+                      <div className="text-2xl sm:text-3xl font-bold" data-testid="text-avg-approval-time">
                         {(approvals.avgApprovalTimeHours ?? 0) < 24
                           ? `${(approvals.avgApprovalTimeHours ?? 0).toFixed(1)} hrs`
                           : `${((approvals.avgApprovalTimeHours ?? 0) / 24).toFixed(1)} days`}
@@ -602,45 +602,45 @@ export default function AutoReports() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">Total Collected</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-dp-total-collected">{formatCurrency(dualPricing.summary.totalCollected ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-dp-total-collected">{formatCurrency(dualPricing.summary.totalCollected ?? 0)}</div>
                       <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.totalTransactions} transactions</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Cash / Card Split</CardTitle>
-                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Cash / Card Split</CardTitle>
+                      <BarChart3 className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-dp-split">{dualPricing.summary.cashPercent ?? 0}% / {dualPricing.summary.cardPercent ?? 0}%</div>
+                      <div className="text-xl sm:text-2xl font-bold" data-testid="text-dp-split">{dualPricing.summary.cashPercent ?? 0}% / {dualPricing.summary.cardPercent ?? 0}%</div>
                       <p className="text-xs text-muted-foreground mt-1">{dualPricing.summary.cashTransactions} cash, {dualPricing.summary.cardTransactions} card</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">DP Earned</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium truncate">DP Earned</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-dp-earned">{formatCurrency(dualPricing.summary.totalDualPricingCollected ?? 0)}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400 truncate" data-testid="text-dp-earned">{formatCurrency(dualPricing.summary.totalDualPricingCollected ?? 0)}</div>
                       <p className="text-xs text-muted-foreground mt-1">Rate: {(dualPricing.summary.dualPricingRate ?? 0).toFixed(2)}%</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Transaction</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-xs sm:text-sm font-medium truncate">Avg Transaction</CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-sm font-semibold" data-testid="text-dp-avg-cash">Cash: {formatCurrency(dualPricing.summary.avgTransactionCash ?? 0)}</div>
-                      <div className="text-sm font-semibold" data-testid="text-dp-avg-card">Card: {formatCurrency(dualPricing.summary.avgTransactionCard ?? 0)}</div>
+                      <div className="text-sm font-semibold truncate" data-testid="text-dp-avg-cash">Cash: {formatCurrency(dualPricing.summary.avgTransactionCash ?? 0)}</div>
+                      <div className="text-sm font-semibold truncate" data-testid="text-dp-avg-card">Card: {formatCurrency(dualPricing.summary.avgTransactionCard ?? 0)}</div>
                     </CardContent>
                   </Card>
                 </div>

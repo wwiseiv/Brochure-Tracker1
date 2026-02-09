@@ -107,14 +107,14 @@ export default function AutoDashboard() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {statCards.map((stat) => (
-            <Link key={stat.label} href={stat.href}>
+            <Link key={stat.label} href={stat.href} className="min-w-0">
               <Card className="hover-elevate cursor-pointer" id={stat.id} data-testid={stat.id}>
-                <CardContent className="p-4">
+                <CardContent className="p-4 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                    <stat.icon className={`h-5 w-5 ${stat.color} shrink-0`} />
                   </div>
-                  <p className="text-2xl font-bold">{loading ? "..." : stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="text-xl sm:text-2xl font-bold truncate">{loading ? "..." : stat.value}</p>
+                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
                 </CardContent>
               </Card>
             </Link>
@@ -128,7 +128,7 @@ export default function AutoDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-3xl font-bold" data-testid="text-total-collected">
+              <div className="text-2xl sm:text-3xl font-bold" data-testid="text-total-collected">
                 ${dpStats.totalCollected.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
