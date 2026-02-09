@@ -1028,8 +1028,8 @@ export default function DealPipelinePage() {
     return (
       <div className="space-y-4">
         {/* Stage Progress Summary Bar - Clickable shortcuts */}
-        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="flex gap-1 min-w-max">
+        <div className="bg-card border border-border rounded-lg p-3 overflow-x-auto touch-pan-x scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="flex gap-1" style={{ width: 'max-content' }}>
             {STAGE_ORDER.map((stage, idx) => {
               const count = kanbanFilteredDeals.filter(d => d.currentStage === stage).length;
               const config = DEAL_STAGE_CONFIG[stage];
@@ -1056,8 +1056,8 @@ export default function DealPipelinePage() {
         </div>
 
         {/* Kanban Board - Full width with horizontal scroll */}
-        <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="flex gap-3" style={{ minWidth: `${STAGE_ORDER.length * 200 + (Object.keys(PHASE_GROUPS).length * 20)}px` }}>
+        <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', maxWidth: 'calc(100% + 2rem)' }}>
+          <div className="flex gap-3" style={{ width: 'max-content' }}>
             {Object.entries(PHASE_GROUPS).map(([phaseName, stages], phaseIdx) => (
               <div key={phaseName} className="flex gap-2">
                 {/* Phase Divider Label - shown between groups */}
@@ -1321,8 +1321,8 @@ export default function DealPipelinePage() {
 
             {/* Phase Filters - Only show in List view */}
             {viewMode === 'list' && (
-              <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <div className="flex gap-2" style={{ minWidth: "fit-content" }}>
+              <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', maxWidth: 'calc(100% + 2rem)' }}>
+                <div className="flex gap-2" style={{ width: 'max-content' }}>
                   {PHASES.map((phase) => (
                     <Button
                       key={phase}
