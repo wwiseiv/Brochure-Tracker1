@@ -111,7 +111,7 @@ interface DualPricingData {
 }
 
 const TAB_MAP: Record<string, string> = {
-  revenue: "job-pl",
+  revenue: "revenue",
   tax: "sales-tax",
   technician: "tech-productivity",
   customer: "approvals",
@@ -242,12 +242,237 @@ export default function AutoReports() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="flex w-full overflow-x-auto">
+            <TabsTrigger value="revenue" className="whitespace-nowrap" data-testid="tab-revenue">Revenue</TabsTrigger>
             <TabsTrigger value="job-pl" className="whitespace-nowrap" data-testid="tab-job-pl">Job P&L</TabsTrigger>
             <TabsTrigger value="sales-tax" className="whitespace-nowrap" data-testid="tab-sales-tax">Sales Tax</TabsTrigger>
             <TabsTrigger value="tech-productivity" className="whitespace-nowrap" data-testid="tab-tech-productivity">Tech Productivity</TabsTrigger>
             <TabsTrigger value="approvals" className="whitespace-nowrap" data-testid="tab-approvals">Approvals</TabsTrigger>
             <TabsTrigger value="dual-pricing" className="whitespace-nowrap" data-testid="tab-dual-pricing">Dual Pricing</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="revenue" className="space-y-4 mt-4">
+            {(() => {
+              const totalRevenue = jobPL?.summary?.totalRevenue ?? 0;
+              const totalProfit = jobPL?.summary?.totalProfit ?? 0;
+              const totalCost = jobPL?.summary?.totalCost ?? 0;
+              const avgMargin = jobPL?.summary?.avgMargin ?? 0;
+              const cashTotal = dualPricing?.summary?.totalCollected
+                ? (dualPricing.summary.totalCollected - dualPricing.summary.totalDualPricingCollected)
+                : 0;
+              const cardTotal = dualPricing?.summary?.totalDualPricingCollected ?? 0;
+              const cashCount = dualPricing?.summary?.cashTransactions ?? 0;
+              const cardCount = dualPricing?.summary?.cardTransactions ?? 0;
+              const totalTx = dualPricing?.summary?.totalTransactions ?? 0;
+              const cashPct = dualPricing?.summary?.cashPercent ?? 0;
+              const cardPct = dualPricing?.summary?.cardPercent ?? 0;
+              const dpEarned = dualPricing?.summary?.totalDualPricingCollected ?? 0;
+              const avgRoValue = jobPL?.details?.length ? totalRevenue / jobPL.details.length : 0;
+
+              const dailyMap: Record<string, { revenue: number; count: number; cash: number; card: number }> = {};
+              if (dualPricing?.transactions) {
+                for (const tx of dualPricing.transactions) {
+                  const day = tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Unknown";
+                  if (!dailyMap[day]) dailyMap[day] = { revenue: 0, count: 0, cash: 0, card: 0 };
+                  dailyMap[day].revenue += tx.totalCollected;
+                  dailyMap[day].count += 1;
+                  if (tx.method === "cash") dailyMap[day].cash += tx.amountPaid;
+                  else dailyMap[day].card += tx.amountPaid;
+                }
+              }
+              const dailyBreakdown = Object.entries(dailyMap).map(([day, data]) => ({ day, ...data }));
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                    <Card className="min-w-0">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium truncate">Total Revenue</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl font-bold truncate text-green-600 dark:text-green-400" data-testid="text-rev-total">{formatCurrency(totalRevenue)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">{jobPL?.details?.length ?? 0} completed jobs</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="min-w-0">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium truncate">Net Profit</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className={`text-xl sm:text-2xl font-bold truncate ${totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-rev-profit">{formatCurrency(totalProfit)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">{avgMargin.toFixed(1)}% margin</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="min-w-0">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium truncate">Avg Job Value</CardTitle>
+                        <BarChart3 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl font-bold truncate" data-testid="text-rev-avg">{formatCurrency(avgRoValue)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">{totalTx} total transactions</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="min-w-0">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium truncate">Dual Pricing Earned</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl font-bold truncate text-green-600 dark:text-green-400" data-testid="text-rev-dp">{formatCurrency(dpEarned)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">from {cardCount} card transactions</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-base font-semibold">Payment Breakdown</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Cash Payments</p>
+                            <p className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="text-rev-cash">{formatCurrency(dualPricing?.transactions?.filter(t => t.method === "cash").reduce((s, t) => s + t.amountPaid, 0) ?? 0)}</p>
+                            <p className="text-xs text-muted-foreground">{cashCount} transactions ({cashPct}%)</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Card Payments</p>
+                            <p className="text-lg font-semibold text-blue-600 dark:text-blue-400" data-testid="text-rev-card">{formatCurrency(dualPricing?.transactions?.filter(t => t.method === "card").reduce((s, t) => s + t.amountPaid, 0) ?? 0)}</p>
+                            <p className="text-xs text-muted-foreground">{cardCount} transactions ({cardPct}%)</p>
+                          </div>
+                        </div>
+                        {totalTx > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Cash {cashPct}%</span>
+                              <span>Card {cardPct}%</span>
+                            </div>
+                            <div className="w-full h-3 rounded-full bg-muted overflow-hidden flex">
+                              <div className="bg-green-500 h-full transition-all" style={{ width: `${cashPct}%` }} />
+                              <div className="bg-blue-500 h-full transition-all" style={{ width: `${cardPct}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-base font-semibold">Cost & Profit Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Revenue</span>
+                          <span className="text-sm font-medium">{formatCurrency(totalRevenue)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Parts & Labor Cost</span>
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">-{formatCurrency(totalCost)}</span>
+                        </div>
+                        <hr className="border-border" />
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">Net Profit</span>
+                          <span className={`text-sm font-bold ${totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>{formatCurrency(totalProfit)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Dual Pricing Earned</span>
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">+{formatCurrency(dpEarned)}</span>
+                        </div>
+                        <hr className="border-border" />
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">Total Earnings</span>
+                          <span className="text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(totalProfit + dpEarned)}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {dailyBreakdown.length > 0 && (
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-base font-semibold">Daily Revenue</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm" data-testid="table-daily-revenue">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-2 font-medium">Date</th>
+                                <th className="text-right py-2 font-medium">Cash</th>
+                                <th className="text-right py-2 font-medium">Card</th>
+                                <th className="text-right py-2 font-medium">Total</th>
+                                <th className="text-right py-2 font-medium">Transactions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dailyBreakdown.map((row) => (
+                                <tr key={row.day} className="border-b last:border-b-0">
+                                  <td className="py-2">{row.day}</td>
+                                  <td className="text-right py-2">{formatCurrency(row.cash)}</td>
+                                  <td className="text-right py-2">{formatCurrency(row.card)}</td>
+                                  <td className="text-right py-2 font-medium">{formatCurrency(row.revenue)}</td>
+                                  <td className="text-right py-2">{row.count}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {dualPricing?.transactions && dualPricing.transactions.length > 0 && (
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-base font-semibold">Transaction Details</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm" data-testid="table-revenue-transactions">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-2 font-medium">Date</th>
+                                <th className="text-left py-2 font-medium">RO #</th>
+                                <th className="text-left py-2 font-medium">Customer</th>
+                                <th className="text-left py-2 font-medium">Method</th>
+                                <th className="text-right py-2 font-medium">Cash Price</th>
+                                <th className="text-right py-2 font-medium">Card Price</th>
+                                <th className="text-right py-2 font-medium">Paid</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dualPricing.transactions.map((tx, i) => (
+                                <tr key={i} className="border-b last:border-b-0">
+                                  <td className="py-2 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                  <td className="py-2">{tx.roNumber}</td>
+                                  <td className="py-2 truncate max-w-[120px]">{tx.customerName}</td>
+                                  <td className="py-2">
+                                    <Badge variant={tx.method === "cash" ? "secondary" : "outline"} className="text-[10px]">
+                                      {tx.method === "cash" ? "Cash" : "Card"}
+                                    </Badge>
+                                  </td>
+                                  <td className="text-right py-2">{formatCurrency(tx.cashPrice)}</td>
+                                  <td className="text-right py-2">{formatCurrency(tx.cardPrice)}</td>
+                                  <td className="text-right py-2 font-medium">{formatCurrency(tx.totalCollected)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {(!jobPL && !dualPricing) && (
+                    <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No revenue data for the selected period</CardContent></Card>
+                  )}
+                </>
+              );
+            })()}
+          </TabsContent>
 
           <TabsContent value="job-pl" className="space-y-4 mt-4">
             {jobPL && (
