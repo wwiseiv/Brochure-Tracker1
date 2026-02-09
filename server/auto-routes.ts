@@ -367,7 +367,7 @@ router.post("/tech-portal/login", async (req: Request, res: Response) => {
       ));
 
     if (!user) return res.status(404).json({ error: "Employee not found" });
-    if (user.role !== "tech") return res.status(403).json({ error: "Tech portal access is for technicians only" });
+    if (user.role !== "technician" && user.role !== "tech") return res.status(403).json({ error: "Tech portal access is for technicians only" });
 
     if (user.pin && user.pin !== pin) {
       return res.status(401).json({ error: "Invalid PIN" });
@@ -5512,6 +5512,24 @@ const AI_HELP_NAV_MAP = [
   { key: 'settings-quickbooks', label: 'QuickBooks', route: '/auto/quickbooks' },
   { key: 'new-ro', label: 'New Work Order', route: '/auto/repair-orders/new' },
   { key: 'payment-processor', label: 'Payment Processor', route: '/auto/processor' },
+  { key: 'new-estimate', label: 'New Estimate', route: '/auto/repair-orders' },
+  { key: 'convert-estimate', label: 'Convert Estimate', route: '/auto/repair-orders' },
+  { key: 'tech-sessions', label: 'Active Techs', route: '/auto/dashboard' },
+  { key: 'addon-metrics', label: 'Add-On Metrics', route: '/auto/dashboard' },
+  { key: 'labor-types', label: 'Labor Types', route: '/auto/repair-orders' },
+  { key: 'warranty', label: 'Warranty Repairs', route: '/auto/repair-orders' },
+  { key: 'declined-services', label: 'Declined Services', route: '/auto/settings/campaigns' },
+  { key: 'campaigns', label: 'Follow-Up Campaigns', route: '/auto/settings/campaigns' },
+  { key: 'report-monthly', label: 'Monthly Summary', route: '/auto/reports-v2' },
+  { key: 'report-advisor', label: 'Advisor Performance', route: '/auto/reports-v2' },
+  { key: 'report-tech-efficiency', label: 'Tech Efficiency', route: '/auto/reports-v2' },
+  { key: 'employee-numbers', label: 'Employee Setup', route: '/auto/staff' },
+  { key: 'authorization', label: 'Customer Authorization', route: '/auto/repair-orders' },
+  { key: 'quick-ro', label: 'Quick Repair Order', route: '/auto/repair-orders' },
+  { key: 'tech-portal', label: 'Tech Portal', route: '/auto/tech-portal' },
+  { key: 'settings-locations', label: 'Shop Locations', route: '/auto/settings/locations' },
+  { key: 'settings-campaigns', label: 'Campaign Settings', route: '/auto/settings/campaigns' },
+  { key: 'analytics', label: 'Analytics', route: '/auto/reports-v2' },
 ];
 
 function buildAIHelpNavPrompt(): string {
@@ -5589,6 +5607,29 @@ A key profitability metric. View your shop metrics on the [[nav:revenue]] dashbo
 **Fees Saved**: Running total of credit card processing costs the shop avoided
 through dual pricing. Tracked on [[nav:fees-saved]].
 
+## New Features
+
+**Estimates vs Repair Orders:** Estimates and Repair Orders are separate. Estimates are quotes that can be converted to ROs. They have different number sequences (EST-XXXXX vs location-based). Users can find estimates on the [[nav:estimates]] page and convert them from there.
+
+**Labor Types:** Each service line now has TWO pay type classifications — one for parts and one for labor. The three types are Customer Pay (customer pays), Internal (shop absorbs the cost), and Warranty (vendor warranty like NAPA or CarQuest). Configured on each line in [[nav:work-orders]]. See [[nav:labor-types]] for more.
+
+**Tech Portal:** Technicians have their own view at [[nav:tech-portal]] where they clock in and out of specific RO lines. Tracks who worked on what and for how long. Techs log in with employee number + optional PIN. No pricing is visible.
+
+**Add-On Tracking:** Lines added after RO creation are automatically flagged as add-ons. This tracks upsell effectiveness. See [[nav:addon-metrics]] on the dashboard.
+
+**Declined Repair Follow-Ups:** When a customer declines a repair, it's saved automatically. The shop can configure automated follow-up emails/texts after configurable days (e.g., 3, 7, 14). Configure in [[nav:campaigns]].
+
+**Reports:** Three advanced reports available at [[nav:analytics]]:
+- [[nav:report-monthly]] — Total ROs, revenue, hours, average RO, add-on rates
+- [[nav:report-advisor]] — Per-advisor ROs, add-on conversion, revenue
+- [[nav:report-tech-efficiency]] — Billed vs actual hours, efficiency percentage
+
+**Customer Authorization:** Every repair and add-on must be authorized by the customer with timestamps. Digital signatures can be captured. See [[nav:authorization]].
+
+**Employee Numbers:** Each tech and advisor has a unique employee number. Set these in [[nav:employee-numbers]].
+
+**Quick RO:** For fast repair order creation, use [[nav:quick-ro]].
+
 ## Important
 - ALWAYS include at least one [[nav:key]] link when discussing a feature or section
 - For "where is X" questions, put the nav link FIRST in your response
@@ -5650,11 +5691,15 @@ router.get("/ai-help/suggestions", autoAuth, (req: Request, res: Response) => {
       { text: "Explain my approval rate", icon: "check" },
       { text: "What is ARO?", icon: "chart" },
       { text: "How does dual pricing work?", icon: "credit-card" },
+      { text: "Who is working in the shop right now?", icon: "wrench" },
+      { text: "Show me today's add-on metrics", icon: "trending-up" },
     ],
     "/auto/repair-orders": [
       { text: "How do I create a work order?", icon: "wrench" },
       { text: "How do I assign a tech?", icon: "user" },
       { text: "Where are estimates?", icon: "clipboard" },
+      { text: "How do labor types work?", icon: "tag" },
+      { text: "How do I mark a part as warranty?", icon: "shield" },
     ],
     "/auto/inspections": [
       { text: "How do DVIs work?", icon: "search" },
@@ -5670,6 +5715,30 @@ router.get("/ai-help/suggestions", autoAuth, (req: Request, res: Response) => {
       { text: "Add an appointment", icon: "calendar" },
       { text: "How do bays work?", icon: "layout" },
       { text: "Can I drag to reschedule?", icon: "move" },
+    ],
+    "/auto/tech-portal": [
+      { text: "How do I clock into a repair order?", icon: "clock" },
+      { text: "Can I work on two lines at once?", icon: "wrench" },
+      { text: "What does the asterisk mean on a line?", icon: "help-circle" },
+    ],
+    "/auto/reports-v2": [
+      { text: "What reports are available?", icon: "bar-chart" },
+      { text: "How is tech efficiency calculated?", icon: "clock" },
+      { text: "Can I export to Excel?", icon: "download" },
+    ],
+    "/auto/settings/campaigns": [
+      { text: "How do follow-up campaigns work?", icon: "mail" },
+      { text: "What merge fields can I use?", icon: "type" },
+      { text: "When are follow-up messages sent?", icon: "clock" },
+    ],
+    "/auto/staff": [
+      { text: "How do employee numbers work?", icon: "hash" },
+      { text: "How do I set a tech PIN?", icon: "key" },
+      { text: "What roles are available?", icon: "users" },
+    ],
+    "/auto/settings/locations": [
+      { text: "How do multiple locations work?", icon: "map-pin" },
+      { text: "How does location numbering work?", icon: "hash" },
     ],
   };
 

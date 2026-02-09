@@ -289,6 +289,132 @@ export const NAV_MAP: NavTarget[] = [
     toast: 'Payment Processor Settings',
     keywords: ['payment processor', 'processor', 'credit card processing', 'merchant services'],
   },
+
+  // ─── New Estimate ───
+  {
+    key: 'new-estimate',
+    label: 'New Estimate',
+    route: '/auto/repair-orders',
+    toast: 'Create New Estimate',
+    keywords: ['new estimate', 'create estimate', 'make estimate', 'write estimate', 'new quote'],
+  },
+  {
+    key: 'convert-estimate',
+    label: 'Convert Estimate',
+    route: '/auto/repair-orders',
+    toast: 'Convert an Estimate to a Repair Order',
+    keywords: ['convert estimate', 'estimate to ro', 'estimate to repair order', 'approve estimate'],
+  },
+
+  // ─── Tech Sessions / Time Tracking ───
+  {
+    key: 'tech-sessions',
+    label: 'Active Techs',
+    route: '/auto/dashboard',
+    highlightId: 'card-active-tech-sessions',
+    toast: 'Active Technician Sessions',
+    keywords: ['tech sessions', 'active techs', 'who is working', 'time tracking', 'tech time', 'labor clock'],
+  },
+
+  // ─── Add-On Metrics ───
+  {
+    key: 'addon-metrics',
+    label: 'Add-On Metrics',
+    route: '/auto/dashboard',
+    highlightId: 'card-todays-addons',
+    toast: 'Add-On / Upsell Metrics',
+    keywords: ['add-on metrics', 'addon', 'upsell', 'upsell rate', 'add-on approval', 'upsell tracking'],
+  },
+
+  // ─── Labor Types ───
+  {
+    key: 'labor-types',
+    label: 'Labor Types',
+    route: '/auto/repair-orders',
+    toast: 'Labor Type Classification — Customer Pay, Internal, Warranty',
+    keywords: ['labor type', 'labor types', 'customer pay', 'internal', 'warranty', 'warranty labor', 'internal labor', 'pay type'],
+  },
+
+  // ─── Warranty ───
+  {
+    key: 'warranty',
+    label: 'Warranty Repairs',
+    route: '/auto/repair-orders',
+    toast: 'Warranty Service Lines',
+    keywords: ['warranty', 'warranty repair', 'warranty parts', 'warranty claim', 'vendor warranty'],
+  },
+
+  // ─── Declined Services ───
+  {
+    key: 'declined-services',
+    label: 'Declined Services',
+    route: '/auto/settings/campaigns',
+    toast: 'Declined Repairs & Follow-Up',
+    keywords: ['declined', 'declined services', 'declined repairs', 'customer declined', 'follow up', 'follow-up', 'declined work'],
+  },
+
+  // ─── Follow-Up Campaigns ───
+  {
+    key: 'campaigns',
+    label: 'Follow-Up Campaigns',
+    route: '/auto/settings/campaigns',
+    toast: 'Declined Repair Follow-Up Campaign Settings',
+    keywords: ['campaigns', 'follow-up campaigns', 'follow up settings', 'declined follow-up', 'automated follow-up', 'email campaign', 'sms campaign'],
+  },
+
+  // ─── Monthly Summary Report ───
+  {
+    key: 'report-monthly',
+    label: 'Monthly Summary',
+    route: '/auto/reports-v2',
+    toast: 'Monthly Summary Report',
+    keywords: ['monthly summary', 'monthly report', 'month report', 'end of month', 'monthly numbers', 'monthly revenue', 'owner report'],
+  },
+
+  // ─── Advisor Performance Report ───
+  {
+    key: 'report-advisor',
+    label: 'Advisor Performance',
+    route: '/auto/reports-v2',
+    toast: 'Service Advisor Performance Report',
+    keywords: ['advisor performance', 'advisor report', 'service advisor', 'upsell performance', 'advisor metrics', 'advisor conversion', 'add-on rate'],
+  },
+
+  // ─── Tech Efficiency Report ───
+  {
+    key: 'report-tech-efficiency',
+    label: 'Tech Efficiency',
+    route: '/auto/reports-v2',
+    toast: 'Technician Efficiency Report',
+    keywords: ['tech efficiency', 'technician efficiency', 'billed hours', 'actual hours', 'efficiency ratio', 'tech performance', 'flat rate', 'book time'],
+  },
+
+  // ─── Employee Numbers ───
+  {
+    key: 'employee-numbers',
+    label: 'Employee Setup',
+    route: '/auto/staff',
+    toast: 'Staff — Employee Numbers & PINs',
+    keywords: ['employee number', 'employee numbers', 'tech number', 'advisor number', 'pin code', 'staff setup', 'employee id'],
+  },
+
+  // ─── Customer Authorization ───
+  {
+    key: 'authorization',
+    label: 'Customer Authorization',
+    route: '/auto/repair-orders',
+    toast: 'Customer Repair Authorization',
+    keywords: ['authorization', 'authorize', 'customer approval', 'repair approval', 'customer signature', 'sign off', 'approve repairs'],
+  },
+
+  // ─── Quick RO ───
+  {
+    key: 'quick-ro',
+    label: 'Quick Repair Order',
+    route: '/auto/repair-orders',
+    toast: 'Quick RO — Fast repair order creation',
+    keywords: ['quick ro', 'quick repair order', 'fast ro'],
+  },
 ];
 
 export function getNavTarget(key: string): NavTarget | undefined {
