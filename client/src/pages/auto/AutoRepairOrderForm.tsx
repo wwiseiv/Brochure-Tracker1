@@ -214,7 +214,15 @@ export default function AutoRepairOrderForm() {
   };
 
   const addLineItem = async () => {
-    if (!roId || !newItem.description || !newItem.unitPriceCash) return;
+    if (!roId) return;
+    if (!newItem.description.trim()) {
+      toast({ title: "Missing Description", description: "Please enter a description for the line item.", variant: "destructive" });
+      return;
+    }
+    if (!newItem.unitPriceCash || parseFloat(newItem.unitPriceCash) <= 0) {
+      toast({ title: "Missing Price", description: "Please enter a cash price for the line item.", variant: "destructive" });
+      return;
+    }
     try {
       const res = await autoFetch(`/api/auto/repair-orders/${roId}/line-items`, {
         method: "POST", body: JSON.stringify(newItem),
