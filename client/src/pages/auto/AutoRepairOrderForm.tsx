@@ -323,6 +323,7 @@ export default function AutoRepairOrderForm() {
       setLineItems([...lineItems, item]);
       setNewItem({ type: "labor", description: "", partNumber: "", quantity: "1", unitPriceCash: "", laborHours: "", isAdjustable: true, isNtnf: false, costPrice: "", isTaxable: true });
       await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      fetchPayments();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -332,7 +333,10 @@ export default function AutoRepairOrderForm() {
     try {
       await autoFetch(`/api/auto/line-items/${itemId}`, { method: "DELETE" });
       setLineItems(lineItems.filter(i => i.id !== itemId));
-      if (roId) await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      if (roId) {
+        await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+        fetchPayments();
+      }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -484,6 +488,7 @@ export default function AutoRepairOrderForm() {
       if (!res.ok) throw new Error(item.error);
       setLineItems(prev => [...prev, item]);
       await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      fetchPayments();
       toast({ title: "Part added to RO" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -511,6 +516,7 @@ export default function AutoRepairOrderForm() {
       if (!res.ok) throw new Error(item.error);
       setLineItems(prev => [...prev, item]);
       await autoFetch(`/api/auto/repair-orders/${roId}/recalculate`, { method: "POST" }).then(r => r.json()).then(setRo);
+      fetchPayments();
       toast({ title: "Labor operation added to RO" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1049,14 +1055,20 @@ export default function AutoRepairOrderForm() {
             </Card>
 
             <Dialog open={partsDialogOpen} onOpenChange={setPartsDialogOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    Parts Lookup
-                    <Badge variant="secondary" className="text-xs font-normal">Powered by PartsTech</Badge>
-                  </DialogTitle>
+              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                <DialogHeader className="flex-shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <DialogTitle className="flex items-center gap-2">
+                      Parts Lookup
+                      <Badge variant="secondary" className="text-xs font-normal">Powered by PartsTech</Badge>
+                    </DialogTitle>
+                    <Button size="sm" variant="ghost" onClick={() => setPartsDialogOpen(false)} data-testid="button-close-parts-dialog" className="flex-shrink-0">
+                      <X className="h-4 w-4" />
+                      <span className="ml-1 sm:hidden">Close</span>
+                    </Button>
+                  </div>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="space-y-4 flex-shrink-0">
                   {(() => {
                     const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
                     return vehicle ? (
@@ -1077,7 +1089,8 @@ export default function AutoRepairOrderForm() {
                       {partsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
                   </div>
-                  <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                </div>
+                  <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
                     {partsLoading && (
                       <div className="flex justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1131,19 +1144,24 @@ export default function AutoRepairOrderForm() {
                       </div>
                     ))}
                   </div>
-                </div>
               </DialogContent>
             </Dialog>
 
             <Dialog open={laborDialogOpen} onOpenChange={setLaborDialogOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    MOTOR Labor Guide
-                    <Badge variant="secondary" className="text-xs font-normal">Standard Labor Times</Badge>
-                  </DialogTitle>
+              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                <DialogHeader className="flex-shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <DialogTitle className="flex items-center gap-2">
+                      MOTOR Labor Guide
+                      <Badge variant="secondary" className="text-xs font-normal">Standard Labor Times</Badge>
+                    </DialogTitle>
+                    <Button size="sm" variant="ghost" onClick={() => setLaborDialogOpen(false)} data-testid="button-close-labor-dialog" className="flex-shrink-0">
+                      <X className="h-4 w-4" />
+                      <span className="ml-1 sm:hidden">Close</span>
+                    </Button>
+                  </div>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="space-y-4 flex-shrink-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     {(() => {
                       const vehicle = vehicles.find(v => v.id.toString() === form.vehicleId);
@@ -1179,7 +1197,8 @@ export default function AutoRepairOrderForm() {
                       {laborLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
                   </div>
-                  <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                </div>
+                  <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
                     {laborLoading && (
                       <div className="flex justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1242,7 +1261,6 @@ export default function AutoRepairOrderForm() {
                       );
                     })}
                   </div>
-                </div>
               </DialogContent>
             </Dialog>
 
