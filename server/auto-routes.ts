@@ -154,14 +154,11 @@ router.post("/auth/login", async (req: Request, res: Response) => {
     }
 
     if (!query.length) {
-      console.log("[AutoLogin] No user found for email:", email.toLowerCase());
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const user = query[0];
-    console.log("[AutoLogin] Found user:", user.id, "hash length:", user.passwordHash?.length, "hash prefix:", user.passwordHash?.substring(0, 7));
     const valid = await comparePasswords(password, user.passwordHash);
-    console.log("[AutoLogin] Password compare result:", valid);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -275,7 +272,7 @@ router.get("/auth/me", autoAuth, async (req: Request, res: Response) => {
 // SHOP MANAGEMENT (admin routes for PCBISV admin)
 // ============================================================================
 
-router.post("/admin/shops", async (req: Request, res: Response) => {
+router.post("/admin/shops", autoAuth, async (req: Request, res: Response) => {
   try {
     const { name, slug, address, city, state, zip, phone, email, website, timezone, taxRate, laborRate, cardFeePercent, ownerEmail, ownerFirstName, ownerLastName, ownerPassword } = req.body;
 
@@ -376,7 +373,7 @@ router.post("/admin/shops", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/admin/shops", async (_req: Request, res: Response) => {
+router.get("/admin/shops", autoAuth, async (_req: Request, res: Response) => {
   try {
     const shops = await db.select().from(autoShops).orderBy(desc(autoShops.createdAt));
     res.json(shops);
@@ -385,7 +382,7 @@ router.get("/admin/shops", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/admin/shops/:id", async (req: Request, res: Response) => {
+router.get("/admin/shops/:id", autoAuth, async (req: Request, res: Response) => {
   try {
     const shopId = parseInt(req.params.id);
     const shop = await db.select().from(autoShops).where(eq(autoShops.id, shopId)).limit(1);
