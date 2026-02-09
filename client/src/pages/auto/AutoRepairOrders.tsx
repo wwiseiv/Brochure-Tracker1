@@ -179,6 +179,28 @@ export default function AutoRepairOrders() {
   const [stats, setStats] = useState<Stats>({ totalRos: 0, totalBilled: 0, totalPaid: 0, outstanding: 0, avgTicket: 0 });
   const [loading, setLoading] = useState(true);
   const [hasEverLoaded, setHasEverLoaded] = useState(false);
+  const [printingId, setPrintingId] = useState<number | null>(null);
+
+  const handlePrintPdf = useCallback(async (roId: number) => {
+    setPrintingId(roId);
+    try {
+      const resp = await autoFetch(`/api/auto/repair-orders/${roId}/pdf`);
+      if (!resp.ok) throw new Error("PDF generation failed");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `repair-order-${roId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Print PDF error:", err);
+    } finally {
+      setPrintingId(null);
+    }
+  }, [autoFetch]);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -525,13 +547,14 @@ export default function AutoRepairOrders() {
                           <Button
                             size="icon"
                             variant="ghost"
+                            disabled={printingId === ro.id}
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(`/api/auto/repair-orders/${ro.id}/pdf`, "_blank");
+                              handlePrintPdf(ro.id);
                             }}
                             data-testid={`button-print-ro-${ro.id}`}
                           >
-                            <Printer className="h-4 w-4" />
+                            {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                           </Button>
                         </div>
                       </TableCell>
@@ -606,13 +629,14 @@ export default function AutoRepairOrders() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          disabled={printingId === ro.id}
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`/api/auto/repair-orders/${ro.id}/pdf`, "_blank");
+                            handlePrintPdf(ro.id);
                           }}
                           data-testid={`button-print-ro-mobile-${ro.id}`}
                         >
-                          <Printer className="h-4 w-4" />
+                          {printingId === ro.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
