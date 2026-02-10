@@ -12735,12 +12735,24 @@ Generate the following content in JSON format:
 
         console.log("[ProspectJobs] Processing job:", jobId);
 
-        // Build business types array for search
-        const businessTypesArray = (job.businessTypes || []).map((bt: string) => ({
-          code: "0000",
-          name: bt,
-          searchTerms: [bt],
-        }));
+        // Resolve MCC codes to actual business type names for the AI search
+        const mccData = await import("./data/mcc-codes.json");
+        const storedCodes = job.businessTypes || [];
+        const businessTypesArray = mccData.mccCodes
+          .filter((mcc: any) => storedCodes.includes(mcc.code))
+          .map((mcc: any) => ({
+            code: mcc.code,
+            name: mcc.title,
+            searchTerms: mcc.searchTerms || [mcc.title],
+          }));
+
+        // Fallback: if no MCC codes matched, use businessTypesDisplay
+        if (businessTypesArray.length === 0 && job.businessTypesDisplay) {
+          const displayNames = job.businessTypesDisplay.split(", ").filter(Boolean);
+          for (const name of displayNames) {
+            businessTypesArray.push({ code: "0000", name, searchTerms: [name] });
+          }
+        }
 
         // Run the AI search
         const searchResult = await searchLocalBusinesses({
