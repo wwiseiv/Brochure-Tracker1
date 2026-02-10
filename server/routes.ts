@@ -246,10 +246,6 @@ export async function registerRoutes(
   // Setup Proposal Intelligence API routes
   app.use("/api/proposal-intelligence", proposalIntelligenceRouter);
 
-  // Setup PCB Auto routes (isolated auto repair shop management)
-  const { registerAutoRoutes } = await import("./auto-routes");
-  registerAutoRoutes(app);
-
   // Seed Daily Edge content if not already present
   seedDailyEdgeContent().catch((error) => {
     console.error("Failed to seed Daily Edge content:", error);
