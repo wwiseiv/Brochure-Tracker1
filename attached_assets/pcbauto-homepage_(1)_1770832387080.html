@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PCB Auto — The complete auto repair shop management platform. Repair orders, inspections, scheduling, payments, and parts ordering — all connected.">
+<title>PCB Auto | Modern Shop Management for Auto Repair</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-950: #0a0e1a;
+  --navy-900: #0f1629;
+  --navy-800: #161e3a;
+  --navy-700: #1e2a4a;
+  --navy-600: #2a3a62;
+  --navy-100: #c8d0e8;
+  --navy-50: #edf0f7;
+  --indigo-700: #4338ca;
+  --indigo-600: #5046e5;
+  --indigo-500: #6366f1;
+  --indigo-400: #818cf8;
+  --indigo-300: #a5b4fc;
+  --indigo-200: #c7d2fe;
+  --indigo-100: #e0e7ff;
+  --indigo-50: #eef2ff;
+  --emerald-600: #059669;
+  --emerald-500: #10b981;
+  --emerald-400: #34d399;
+  --emerald-100: #d1fae5;
+  --emerald-50: #ecfdf5;
+  --amber-500: #f59e0b;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+  --white: #ffffff;
+  --red-500: #ef4444;
+  --yellow-500: #eab308;
+  --green-500: #22c55e;
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --section-py: clamp(4.5rem, 9vw, 7.5rem);
+  --container-max: 1200px;
+  --container-px: clamp(1.25rem, 4vw, 2rem);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.07), 0 4px 6px -4px rgba(0,0,0,0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.03);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+  --shadow-card-hover: 0 1px 3px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.09);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: var(--font-body); color: var(--slate-700); background: var(--white); line-height: 1.65; overflow-x: hidden; }
+img { max-width: 100%; display: block; }
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+.container { max-width: var(--container-max); margin: 0 auto; padding-left: var(--container-px); padding-right: var(--container-px); }
+
+h1, h2, h3, h4, h5 { font-family: var(--font-display); line-height: 1.15; letter-spacing: -0.025em; color: var(--slate-900); }
+h1 { font-size: clamp(2.5rem, 5.5vw, 3.75rem); font-weight: 800; }
+h2 { font-size: clamp(1.75rem, 4vw, 2.75rem); font-weight: 700; }
+h3 { font-size: clamp(1.25rem, 2.5vw, 1.5rem); font-weight: 700; }
+
+.section-label { display: inline-block; font-family: var(--font-display); font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--indigo-600); margin-bottom: 0.75rem; }
+.section-subtitle { font-size: clamp(1rem, 1.5vw, 1.125rem); color: var(--slate-500); max-width: 620px; line-height: 1.7; }
+.section-header { text-align: center; margin-bottom: 3.5rem; }
+.section-header .section-subtitle { margin: 1rem auto 0; }
+
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-weight: 600; font-size: 0.9375rem; padding: 0.8125rem 1.75rem; border-radius: var(--radius-md); transition: all 0.25s var(--ease-out); white-space: nowrap; }
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn-primary { background: var(--indigo-600); color: var(--white); box-shadow: 0 1px 2px rgba(80,70,229,0.3), 0 4px 12px rgba(80,70,229,0.15); }
+.btn-primary:hover { background: var(--indigo-500); transform: translateY(-1px); box-shadow: 0 1px 2px rgba(80,70,229,0.3), 0 8px 20px rgba(80,70,229,0.2); }
+.btn-secondary { background: var(--white); color: var(--slate-700); border: 1px solid var(--slate-200); box-shadow: var(--shadow-sm); }
+.btn-secondary:hover { background: var(--slate-50); border-color: var(--slate-300); transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--slate-600); padding: 0.8125rem 1.25rem; }
+.btn-ghost:hover { color: var(--indigo-600); }
+.btn-ghost svg { opacity: 0.5; }
+.cta-buttons { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+/* NAVBAR */
+.navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 1rem 0; transition: all 0.35s var(--ease-out); background: transparent; }
+.navbar.scrolled { background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04); padding: 0.65rem 0; }
+.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.nav-logo { display: flex; align-items: center; gap: 0.625rem; }
+.nav-logo-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--indigo-600); display: flex; align-items: center; justify-content: center; }
+.nav-logo-icon svg { width: 20px; height: 20px; color: var(--white); }
+.nav-logo-text { font-family: var(--font-display); font-size: 1.125rem; font-weight: 800; color: var(--slate-900); letter-spacing: -0.02em; }
+.nav-links { display: flex; list-style: none; gap: 0.25rem; }
+.nav-links a { font-family: var(--font-display); font-size: 0.875rem; font-weight: 500; color: var(--slate-600); padding: 0.5rem 0.875rem; border-radius: var(--radius-sm); transition: all 0.2s; }
+.nav-links a:hover { color: var(--slate-900); background: var(--slate-100); }
+.nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+.nav-signin { font-family: var(--font-display); font-size: 0.875rem; font-weight: 500; color: var(--slate-600); padding: 0.5rem 0.75rem; transition: color 0.2s; }
+.nav-signin:hover { color: var(--indigo-600); }
+.nav-cta { font-family: var(--font-display); font-size: 0.875rem; font-weight: 600; color: var(--white); background: var(--indigo-600); padding: 0.5rem 1.125rem; border-radius: var(--radius-sm); transition: all 0.2s; box-shadow: 0 1px 2px rgba(80,70,229,0.2); }
+.nav-cta:hover { background: var(--indigo-500); transform: translateY(-1px); }
+.nav-mobile-toggle { display: none; color: var(--slate-700); }
+@media (max-width: 768px) {
+  .nav-links { display: none; position: absolute; top: 100%; left: var(--container-px); right: var(--container-px); flex-direction: column; background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); padding: 0.75rem; border: 1px solid var(--slate-100); }
+  .nav-links.show { display: flex; }
+  .nav-links a { padding: 0.75rem 1rem; color: var(--slate-700) !important; }
+  .nav-signin { display: none; }
+  .nav-mobile-toggle { display: block; }
+}
+
+/* HERO — LIGHT */
+.hero { position: relative; padding: calc(5rem + 64px) 0 var(--section-py); background: var(--white); overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 50% at 70% 40%, rgba(99,102,241,0.06) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(16,185,129,0.04) 0%, transparent 60%); pointer-events: none; }
+.hero-pattern { position: absolute; inset: 0; background-image: radial-gradient(var(--slate-200) 1px, transparent 1px); background-size: 32px 32px; opacity: 0.5; pointer-events: none; mask-image: radial-gradient(ellipse 70% 60% at 65% 45%, black 0%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse 70% 60% at 65% 45%, black 0%, transparent 70%); }
+.hero .container { position: relative; display: grid; grid-template-columns: 1fr 1.1fr; gap: 4rem; align-items: center; }
+.hero-content h1 { color: var(--slate-900); margin-bottom: 1.25rem; }
+.hero-content h1 span { background: linear-gradient(135deg, var(--indigo-600), var(--emerald-500)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-subtitle { font-size: clamp(1rem, 1.6vw, 1.125rem); color: var(--slate-500); line-height: 1.75; max-width: 480px; margin-bottom: 2rem; }
+.hero-ctas { display: flex; gap: 0.875rem; margin-bottom: 2.25rem; }
+.hero-proof { display: flex; flex-direction: column; gap: 0.5rem; }
+.hero-proof-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--slate-500); font-weight: 500; }
+.hero-proof-item svg { width: 16px; height: 16px; color: var(--emerald-500); flex-shrink: 0; }
+
+.hero-visual { position: relative; }
+.hero-screenshot-placeholder { background: var(--white); border-radius: var(--radius-lg); border: 1px solid var(--slate-200); box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.02); overflow: hidden; }
+.screenshot-dots { display: flex; gap: 6px; padding: 12px 16px; background: var(--slate-50); border-bottom: 1px solid var(--slate-100); }
+.screenshot-dots span { width: 10px; height: 10px; border-radius: 50%; }
+.screenshot-dots span:nth-child(1) { background: var(--red-500); }
+.screenshot-dots span:nth-child(2) { background: var(--yellow-500); }
+.screenshot-dots span:nth-child(3) { background: var(--green-500); }
+.screenshot-mock-content { display: flex; min-height: 300px; }
+.screenshot-mock-sidebar { width: 180px; padding: 16px; background: var(--slate-50); border-right: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 10px; }
+.screenshot-mock-sidebar span { display: block; height: 10px; border-radius: 4px; background: var(--slate-200); }
+.screenshot-mock-main { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.mock-header { height: 32px; background: var(--indigo-50); border-radius: 6px; border: 1px solid var(--indigo-100); }
+.mock-row { height: 40px; background: var(--slate-50); border-radius: 6px; border: 1px solid var(--slate-100); }
+.mock-row:nth-child(3) { background: var(--emerald-50); border-color: var(--emerald-100); }
+
+.hero-badge { position: absolute; bottom: -16px; left: -24px; display: flex; align-items: center; gap: 0.75rem; background: var(--white); padding: 0.875rem 1.25rem; border-radius: var(--radius-md); box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.04); animation: float 5s ease-in-out infinite; }
+.hero-badge-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--emerald-50); display: flex; align-items: center; justify-content: center; }
+.hero-badge-icon svg { width: 18px; height: 18px; color: var(--emerald-500); }
+.hero-badge-text { font-family: var(--font-display); font-weight: 700; font-size: 0.875rem; color: var(--slate-900); line-height: 1.3; }
+.hero-badge-text span { display: block; font-weight: 400; font-size: 0.75rem; color: var(--slate-500); }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@media (max-width: 900px) {
+  .hero .container { grid-template-columns: 1fr; gap: 3rem; }
+  .hero-visual { max-width: 560px; }
+  .hero-badge { left: auto; right: -12px; bottom: -12px; }
+}
+
+/* TRUST STRIP */
+.trust-strip { background: var(--slate-50); border-top: 1px solid var(--slate-100); border-bottom: 1px solid var(--slate-100); padding: 2.5rem 0; }
+.trust-strip .container { display: flex; align-items: center; justify-content: center; gap: 3rem; }
+.trust-stat { text-align: center; }
+.trust-stat-number { font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; color: var(--slate-900); letter-spacing: -0.02em; }
+.trust-stat-label { font-size: 0.8125rem; color: var(--slate-500); font-weight: 500; margin-top: 0.125rem; }
+.trust-divider { width: 1px; height: 40px; background: var(--slate-200); }
+@media (max-width: 640px) { .trust-strip .container { gap: 1.5rem; flex-wrap: wrap; } .trust-divider { display: none; } .trust-stat { flex: 1; min-width: 120px; } }
+
+/* VIDEO — DARK */
+.video-section { background: var(--navy-950); padding: var(--section-py) 0; position: relative; overflow: hidden; }
+.video-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(16,185,129,0.05) 0%, transparent 60%); pointer-events: none; }
+.video-section .section-header h2 { color: var(--white); }
+.video-section .section-label { color: var(--indigo-400); }
+.video-section .section-subtitle { color: var(--slate-400); }
+.video-wrapper { position: relative; max-width: 860px; margin: 0 auto; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 16 / 9; box-shadow: 0 8px 40px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); }
+.video-wrapper iframe { width: 100%; height: 100%; border: none; }
+.video-features { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.625rem; margin-top: 2.25rem; }
+.video-feature-tag { font-family: var(--font-display); font-size: 0.8125rem; font-weight: 500; color: var(--slate-400); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); padding: 0.375rem 1rem; border-radius: 100px; }
+
+/* PILLARS — LIGHT */
+.pillars { padding: var(--section-py) 0; background: var(--white); }
+.pillars-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.pillar-card { background: var(--white); border-radius: var(--radius-lg); padding: 2.25rem; border: 1px solid var(--slate-200); box-shadow: var(--shadow-card); transition: all 0.35s var(--ease-out); }
+.pillar-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-card-hover); border-color: var(--indigo-200); }
+.pillar-number { font-family: var(--font-display); font-size: 3rem; font-weight: 800; color: var(--indigo-100); line-height: 1; margin-bottom: 1rem; }
+.pillar-icon { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--indigo-50); display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; }
+.pillar-icon svg { width: 24px; height: 24px; color: var(--indigo-600); }
+.pillar-card h3 { margin-bottom: 0.625rem; }
+.pillar-card > p { font-size: 0.9375rem; color: var(--slate-500); margin-bottom: 1.5rem; line-height: 1.7; }
+.pillar-features { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 1.25rem; border-top: 1px solid var(--slate-100); }
+.pillar-feature { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--slate-600); font-weight: 500; }
+.pillar-feature svg { width: 14px; height: 14px; color: var(--emerald-500); flex-shrink: 0; }
+@media (max-width: 768px) { .pillars-grid { grid-template-columns: 1fr; max-width: 440px; margin: 0 auto; } }
+
+/* FEATURE GRID */
+.features-grid-section { padding: var(--section-py) 0; background: var(--slate-50); }
+.features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+.feature-card { background: var(--white); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--slate-200); box-shadow: var(--shadow-sm); transition: all 0.35s var(--ease-out); }
+.feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-card-hover); }
+.feature-card-screenshot { padding: 1rem; background: var(--slate-50); border-bottom: 1px solid var(--slate-100); min-height: 120px; display: flex; align-items: center; justify-content: center; }
+.mock-ui { width: 100%; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--slate-200); background: var(--white); }
+.mock-topbar { display: flex; gap: 4px; padding: 6px 8px; background: var(--slate-100); border-bottom: 1px solid var(--slate-200); }
+.mock-topbar span { width: 6px; height: 6px; border-radius: 50%; background: var(--slate-300); }
+.mock-body { display: flex; min-height: 70px; padding: 8px; gap: 6px; }
+.mock-body-sidebar { width: 50px; display: flex; flex-direction: column; gap: 4px; }
+.mock-body-sidebar span { height: 6px; border-radius: 2px; background: var(--slate-200); }
+.mock-body-content { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.mock-body-content span { height: 8px; border-radius: 3px; background: var(--slate-100); width: 100%; }
+.feature-card-body { padding: 1.25rem; }
+.feature-card-title { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.feature-card-title svg { width: 18px; height: 18px; color: var(--indigo-500); flex-shrink: 0; }
+.feature-card-title h4 { font-size: 0.9375rem; font-weight: 700; color: var(--slate-900); letter-spacing: -0.01em; }
+.feature-card-body > p { font-size: 0.8125rem; color: var(--slate-500); line-height: 1.65; }
+@media (max-width: 1024px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .features-grid { grid-template-columns: 1fr; } }
+
+/* DEEP FEATURES */
+.deep-feature { padding: var(--section-py) 0; background: var(--white); }
+.deep-feature:nth-child(even) { background: var(--slate-50); }
+.deep-feature.dark-section { background: var(--navy-900) !important; }
+.deep-feature .container { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+.deep-feature.reversed .container { direction: rtl; }
+.deep-feature.reversed .container > * { direction: ltr; }
+.deep-feature-screenshot { border-radius: var(--radius-lg); padding: 3rem; display: flex; align-items: center; justify-content: center; min-height: 320px; background: var(--slate-50); border: 1px solid var(--slate-200); }
+.dark-section .deep-feature-screenshot { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); }
+.deep-feature-content .section-label { margin-bottom: 0.625rem; }
+.deep-feature-content h2 { margin-bottom: 1.25rem; }
+.deep-feature-content > p { color: var(--slate-500); font-size: 1rem; line-height: 1.8; margin-bottom: 1.5rem; }
+.dark-section .deep-feature-content h2 { color: var(--white); }
+.dark-section .deep-feature-content > p { color: var(--slate-400); }
+.dark-section .section-label { color: var(--indigo-400); }
+.feature-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.feature-tag { font-family: var(--font-display); font-size: 0.75rem; font-weight: 600; color: var(--indigo-700); background: var(--indigo-50); padding: 0.375rem 0.875rem; border-radius: 100px; border: 1px solid var(--indigo-100); }
+.dark-section .feature-tag { color: var(--indigo-300); background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.2); }
+@media (max-width: 768px) { .deep-feature .container { grid-template-columns: 1fr; gap: 2rem; } .deep-feature.reversed .container { direction: ltr; } }
+
+/* INTEGRATIONS */
+.integrations { padding: var(--section-py) 0; background: var(--slate-50); }
+.integrations-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; }
+.integration-card { background: var(--white); border-radius: var(--radius-lg); padding: 1.75rem; text-align: center; border: 1px solid var(--slate-200); box-shadow: var(--shadow-sm); transition: all 0.3s var(--ease-out); }
+.integration-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-card); border-color: var(--indigo-200); }
+.integration-icon { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--indigo-50); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+.integration-icon svg { width: 24px; height: 24px; color: var(--indigo-500); }
+.integration-card h4 { font-size: 0.875rem; font-weight: 700; color: var(--slate-900); margin-bottom: 0.25rem; }
+.integration-card p { font-size: 0.75rem; color: var(--slate-500); }
+@media (max-width: 768px) { .integrations-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 480px) { .integrations-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* CONSOLIDATION CTA — DARK */
+.consolidation { padding: var(--section-py) 0; background: var(--navy-950); text-align: center; position: relative; overflow: hidden; }
+.consolidation::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
+.consolidation::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(99,102,241,0.08) 0%, transparent 60%); pointer-events: none; }
+.consolidation .container { position: relative; }
+.consolidation .section-label { color: var(--indigo-400); }
+.consolidation h2 { color: var(--white); max-width: 720px; margin: 0 auto 1.25rem; }
+.consolidation > .container > p { color: var(--slate-400); max-width: 620px; margin: 0 auto 2rem; font-size: 1.0625rem; line-height: 1.7; }
+.consolidation .cta-buttons { justify-content: center; }
+.consolidation .btn-primary { background: var(--indigo-500); box-shadow: 0 1px 2px rgba(99,102,241,0.4), 0 4px 12px rgba(99,102,241,0.2); }
+.consolidation .btn-primary:hover { background: var(--indigo-400); }
+.consolidation .btn-secondary { background: rgba(255,255,255,0.06); color: var(--white); border: 1px solid rgba(255,255,255,0.12); }
+.consolidation .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+.cta-subtext { margin-top: 2rem; font-size: 0.8125rem; color: var(--slate-500); }
+.cta-subtext span { margin: 0 0.625rem; opacity: 0.4; }
+
+/* FAQ */
+.faq { padding: var(--section-py) 0; background: var(--white); }
+.faq-grid { max-width: 720px; margin: 0 auto; }
+.faq-item { border-bottom: 1px solid var(--slate-200); }
+.faq-question { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--slate-900); padding: 1.375rem 0; gap: 1rem; transition: color 0.2s; }
+.faq-question:hover { color: var(--indigo-600); }
+.faq-question svg { width: 20px; height: 20px; color: var(--slate-400); flex-shrink: 0; transition: transform 0.3s var(--ease-out); }
+.faq-item.open .faq-question svg { transform: rotate(180deg); }
+.faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.35s var(--ease-out); }
+.faq-item.open .faq-answer { max-height: 300px; }
+.faq-answer p { padding-bottom: 1.375rem; font-size: 0.9375rem; color: var(--slate-500); line-height: 1.75; }
+
+/* FINAL CTA — GRADIENT */
+.final-cta { padding: var(--section-py) 0; background: linear-gradient(165deg, var(--indigo-50) 0%, var(--white) 50%, var(--emerald-50) 100%); text-align: center; position: relative; }
+.final-cta::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(var(--slate-200) 1px, transparent 1px); background-size: 28px 28px; opacity: 0.3; pointer-events: none; }
+.final-cta .container { position: relative; }
+.final-cta h2 { margin-bottom: 1rem; color: var(--slate-900); }
+.final-cta p { color: var(--slate-500); font-size: 1.0625rem; max-width: 520px; margin: 0 auto 2rem; line-height: 1.7; }
+.final-cta .cta-buttons { justify-content: center; }
+
+/* FOOTER */
+.footer { background: var(--navy-950); padding: 4rem 0 2rem; }
+.footer-top { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 3rem; padding-bottom: 3rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.footer-brand p { color: var(--slate-500); font-size: 0.875rem; margin-top: 1rem; max-width: 280px; line-height: 1.7; }
+.footer-contact { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.625rem; }
+.footer-contact a { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--slate-500); transition: color 0.2s; }
+.footer-contact a:hover { color: var(--indigo-400); }
+.footer-contact svg { width: 14px; height: 14px; flex-shrink: 0; }
+.footer-col h4 { font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-400); margin-bottom: 1rem; }
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 0.5rem; }
+.footer-col a { font-size: 0.875rem; color: var(--slate-500); transition: color 0.2s; }
+.footer-col a:hover { color: var(--white); }
+.footer-bottom { padding-top: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.footer-bottom p { font-size: 0.8125rem; color: var(--slate-600); }
+.footer-bottom-links { display: flex; gap: 1.5rem; }
+.footer-bottom-links a { font-size: 0.8125rem; color: var(--slate-600); transition: color 0.2s; }
+.footer-bottom-links a:hover { color: var(--white); }
+@media (max-width: 768px) { .footer-top { grid-template-columns: 1fr 1fr; gap: 2rem; } .footer-brand { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .footer-top { grid-template-columns: 1fr; } }
+
+/* ANIMATIONS */
+.fade-up { opacity: 0; transform: translateY(30px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
+.fade-up.visible { opacity: 1; transform: translateY(0); }
+.stagger-children > * { opacity: 0; transform: translateY(20px); transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
+.stagger-children.visible > *:nth-child(1) { transition-delay: 0s; }
+.stagger-children.visible > *:nth-child(2) { transition-delay: 0.08s; }
+.stagger-children.visible > *:nth-child(3) { transition-delay: 0.16s; }
+.stagger-children.visible > *:nth-child(4) { transition-delay: 0.24s; }
+.stagger-children.visible > *:nth-child(5) { transition-delay: 0.32s; }
+.stagger-children.visible > *:nth-child(6) { transition-delay: 0.4s; }
+.stagger-children.visible > *:nth-child(7) { transition-delay: 0.48s; }
+.stagger-children.visible > *:nth-child(8) { transition-delay: 0.56s; }
+.stagger-children.visible > * { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+      </div>
+      <span class="nav-logo-text">PCB Auto</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#integrations">Integrations</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="#signin" class="nav-signin">Sign In</a>
+      <a href="#demo" class="nav-cta">Schedule a Demo</a>
+    </div>
+    <button class="nav-mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<section class="hero" id="hero">
+  <div class="hero-pattern"></div>
+  <div class="container">
+    <div class="hero-content fade-up">
+      <h1>One Platform.<br><span>Every Bay. Every RO.</span><br>Every Dollar.</h1>
+      <p class="hero-subtitle">Repair orders, digital inspections, parts ordering, scheduling, payments, and customer communication — built from the ground up for independent auto repair shops.</p>
+      <div class="hero-ctas">
+        <a href="#demo" class="btn btn-primary">Schedule a Demo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+        <a href="#video" class="btn btn-ghost">Watch the Video <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></a>
+      </div>
+      <div class="hero-proof">
+        <div class="hero-proof-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Built for independent shops</div>
+        <div class="hero-proof-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Bundled with payments</div>
+        <div class="hero-proof-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> A fraction of the cost</div>
+      </div>
+    </div>
+    <div class="hero-visual fade-up" style="transition-delay: 0.15s">
+      <div class="hero-screenshot-placeholder">
+        <div class="screenshot-dots"><span></span><span></span><span></span></div>
+        <div class="screenshot-mock-content">
+          <div class="screenshot-mock-sidebar"><span style="width:100%"></span><span style="width:80%"></span><span style="width:100%"></span><span style="width:60%"></span><span style="width:90%"></span><span style="width:70%"></span><span style="width:100%"></span></div>
+          <div class="screenshot-mock-main"><div class="mock-header"></div><div class="mock-row"></div><div class="mock-row"></div><div class="mock-row"></div><div class="mock-row"></div><div class="mock-row"></div></div>
+        </div>
+      </div>
+      <div class="hero-badge">
+        <div class="hero-badge-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="hero-badge-text">RO #1042 Paid<span>$847.50 via Text-to-Pay</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="trust-strip fade-up">
+  <div class="container">
+    <div class="trust-stat"><div class="trust-stat-number">133+</div><div class="trust-stat-label">Features Built</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-number">23</div><div class="trust-stat-label">Modules</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-number">50¢</div><div class="trust-stat-label">Per-Transaction Flat</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-number">24hr</div><div class="trust-stat-label">Setup to Live</div></div>
+  </div>
+</section>
+
+<section class="video-section" id="video">
+  <div class="container">
+    <div class="section-header fade-up">
+      <div class="section-label">See It In Action</div>
+      <h2>Everything Your Shop Needs — In One Walkthrough</h2>
+      <p class="section-subtitle">Watch how PCB Auto connects repair orders, inspections, parts, payments, and customer updates into one seamless workflow.</p>
+    </div>
+    <div class="video-wrapper fade-up">
+      <iframe src="https://player.vimeo.com/video/1163335594?badge=0&autopause=0&player_id=0&app_id=58479" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" title="PCB Auto Product Walkthrough" loading="lazy"></iframe>
+    </div>
+    <div class="video-features fade-up">
+      <span class="video-feature-tag">Repair Orders</span>
+      <span class="video-feature-tag">Digital Inspections</span>
+      <span class="video-feature-tag">Parts Ordering</span>
+      <span class="video-feature-tag">Scheduling</span>
+      <span class="video-feature-tag">Payments</span>
+      <span class="video-feature-tag">All Connected</span>
+    </div>
+  </div>
+</section>
+
+<section class="pillars" id="how-it-works">
+  <div class="container">
+    <div class="section-header fade-up">
+      <div class="section-label">How It Works</div>
+      <h2>Three Steps. One System. Zero Gaps.</h2>
+      <p class="section-subtitle">From the moment a customer calls to the moment you get paid — every step is connected.</p>
+    </div>
+    <div class="pillars-grid stagger-children">
+      <div class="pillar-card">
+        <div class="pillar-number">01</div>
+        <div class="pillar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+        <h3>Write It Up</h3>
+        <p>Build estimates and repair orders in clicks. VIN decode fills the vehicle. Service history is right there. Cash and card prices calculated automatically.</p>
+        <div class="pillar-features">
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Estimates → RO in one click</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Dual pricing on every line</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Customer approvals via text</div>
+        </div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-number">02</div>
+        <div class="pillar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+        <h3>Work the Bay</h3>
+        <p>Technicians see their jobs, run inspections on a tablet, order parts from PartsTech, and log time — all without walking to the front desk.</p>
+        <div class="pillar-features">
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 72-point digital inspections</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> PartsTech built in</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Tech time tracking</div>
+        </div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-number">03</div>
+        <div class="pillar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+        <h3>Get Paid</h3>
+        <p>Take payment at the counter, push to a terminal, or text a payment link. Cash or card. Receipts go out automatically. QuickBooks syncs in real time.</p>
+        <div class="pillar-features">
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> In-store + text-to-pay</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> QuickBooks auto-sync</div>
+          <div class="pillar-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Dual pricing splits tracked</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features-grid-section" id="features">
+  <div class="container">
+    <div class="section-header fade-up">
+      <div class="section-label">Everything Your Shop Needs</div>
+      <h2>Powerful Tools Built for Auto Repair</h2>
+      <p class="section-subtitle">Not a generic field service app repackaged. Every screen was designed for the way real shops actually work.</p>
+    </div>
+    <div class="features-grid stagger-children">
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-sidebar"><span></span><span></span><span></span><span></span></div><div class="mock-body-content"><span></span><span style="width:80%"></span><span style="width:60%"></span><span style="width:90%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><h4>Repair Orders & Estimates</h4></div><p>Build detailed estimates in minutes. Track every job from estimate to paid with a visual Kanban board.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content" style="gap:6px"><span style="background:rgba(16,185,129,0.15)"></span><span style="width:70%;background:rgba(234,179,8,0.15)"></span><span style="width:85%;background:rgba(239,68,68,0.1)"></span><span style="width:60%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><h4>72-Point Digital Inspections</h4></div><p>One-tap green/yellow/red scoring with camera photos. Customers get a visual report texted to their phone.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content"><span style="background:rgba(99,102,241,0.1)"></span><span style="width:90%"></span><span style="width:75%"></span><span style="width:85%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><h4>Dual Pricing — Cash & Card</h4></div><p>Show cash and card prices on every estimate, invoice, and receipt. Legal in all 50 states. Keep more margin.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-sidebar"><span></span><span></span><span></span></div><div class="mock-body-content"><span style="width:40%;background:rgba(16,185,129,0.12)"></span><span style="width:100%"></span><span style="width:70%"></span><span style="width:90%"></span><span style="width:60%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><h4>Parts Ordering — PartsTech</h4></div><p>Search 30,000+ supplier locations. See live inventory from O'Reilly, NAPA, AutoZone. Parts drop onto the RO with your markup.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content"><span style="width:80%;background:rgba(99,102,241,0.08)"></span><span style="width:100%;height:30px;background:rgba(99,102,241,0.04)"></span><span style="width:60%"></span><span style="width:90%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Scheduling & Bay Management</h4></div><p>Visual calendar with bay rows. Drag and drop appointments. Automatic text reminders sent to customers 24 hours before.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content"><span style="width:50%;background:rgba(99,102,241,0.1)"></span><span style="width:80%"></span><span style="width:65%"></span><span style="width:90%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><h4>Payments — Counter or Text-to-Pay</h4></div><p>Take payment at the counter, push to a terminal, or text a payment link. Customers choose cash or card. Receipts go out with PDF attached.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content"><span style="width:70%;background:rgba(99,102,241,0.08)"></span><span style="width:100%"></span><span style="width:55%"></span><span style="width:80%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><h4>Text, Email & Call — All Built In</h4></div><p>Text estimates, email invoices, call customers — without leaving the app. Every touchpoint logged on the customer timeline.</p></div></div>
+      <div class="feature-card"><div class="feature-card-screenshot"><div class="mock-ui"><div class="mock-topbar"><span></span><span></span><span></span></div><div class="mock-body"><div class="mock-body-content"><span style="width:40%;background:rgba(16,185,129,0.1)"></span><span style="width:70%;height:20px"></span><span style="width:90%"></span><span style="width:60%"></span></div></div></div></div><div class="feature-card-body"><div class="feature-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><h4>QuickBooks Auto-Sync</h4></div><p>Every invoice and payment syncs automatically. Dual pricing splits into its own income account. No CSV imports. Set it and forget it.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="deep-feature" id="dual-pricing">
+  <div class="container">
+    <div class="deep-feature-visual fade-up">
+      <div class="deep-feature-screenshot">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo-400)" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <div style="display:flex;gap:1.5rem;">
+            <div style="background:var(--emerald-50);border:1px solid var(--emerald-100);padding:0.75rem 1.5rem;border-radius:8px;text-align:center"><div style="font-size:0.75rem;color:var(--emerald-600);font-weight:600">Cash</div><div style="font-size:1.25rem;font-weight:800;color:var(--emerald-600);font-family:var(--font-display)">$549.64</div></div>
+            <div style="background:var(--indigo-50);border:1px solid var(--indigo-100);padding:0.75rem 1.5rem;border-radius:8px;text-align:center"><div style="font-size:0.75rem;color:var(--indigo-600);font-weight:600">Card</div><div style="font-size:1.25rem;font-weight:800;color:var(--indigo-600);font-family:var(--font-display)">$568.82</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="deep-feature-content fade-up">
+      <div class="section-label">Dual Pricing</div>
+      <h2>Keep Your Margins — Let Customers Choose</h2>
+      <p>Every estimate, invoice, and receipt shows two prices — a cash price and a card price. Your customer chooses how to pay. No surprises, no fine print. Legal in all 50 states. The difference goes straight to covering your processing costs, so you keep the same margin either way.</p>
+      <div class="feature-tags"><span class="feature-tag">Legal in all 50 states</span><span class="feature-tag">Cash & card on every document</span><span class="feature-tag">Configurable rate</span><span class="feature-tag">Customers simply see two prices</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="deep-feature reversed">
+  <div class="container">
+    <div class="deep-feature-visual fade-up">
+      <div class="deep-feature-screenshot">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo-400)" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <div style="display:flex;gap:0.5rem;"><span style="width:16px;height:16px;border-radius:50%;background:var(--green-500)"></span><span style="width:16px;height:16px;border-radius:50%;background:var(--yellow-500)"></span><span style="width:16px;height:16px;border-radius:50%;background:var(--red-500)"></span></div>
+          <div style="font-size:0.8125rem;color:var(--slate-500);font-weight:500">72-Point Vehicle Inspection</div>
+        </div>
+      </div>
+    </div>
+    <div class="deep-feature-content fade-up">
+      <div class="section-label">Digital Inspections</div>
+      <h2>Inspections That Sell Work — Without the Hard Sell</h2>
+      <p>Your tech does a 72-point inspection on a tablet, right in the bay. One tap for green, yellow, or red. Photos from the camera go right on the report. When it's done, the customer gets a clean visual report on their phone — they see exactly what needs attention, with pictures. Items they approve convert to service lines on the RO with one click.</p>
+      <div class="feature-tags"><span class="feature-tag">72-point checklist across 9 categories</span><span class="feature-tag">Photo capture built in</span><span class="feature-tag">Green / Yellow / Red one-tap scoring</span><span class="feature-tag">Customer report sent via text</span><span class="feature-tag">Approved items auto-create RO lines</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="deep-feature dark-section">
+  <div class="container">
+    <div class="deep-feature-visual fade-up">
+      <div class="deep-feature-screenshot">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo-400)" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <div style="font-size:0.875rem;color:var(--slate-400);border:1px solid rgba(255,255,255,0.1);padding:0.5rem 1rem;border-radius:8px;background:rgba(255,255,255,0.03)">🔍 Brake Pads - 2019 Ford F-150</div>
+          <div style="display:flex;gap:0.75rem;">
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.75rem;color:var(--slate-400);text-align:center;">O'Reilly<br/><strong style="color:var(--white)">$59.99</strong></div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.75rem;color:var(--slate-400);text-align:center;">NAPA<br/><strong style="color:var(--white)">$62.49</strong></div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.75rem;color:var(--slate-400);text-align:center;">AutoZone<br/><strong style="color:var(--white)">$57.99</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="deep-feature-content fade-up">
+      <div class="section-label">Parts Ordering</div>
+      <h2>Every Part, Every Supplier, One Search</h2>
+      <p>Search PartsTech's network of 30,000+ supplier locations without leaving the repair order. See live inventory, wholesale pricing, ratings, and delivery times from O'Reilly, NAPA, AutoZone, Advance, WorldPac, and more. Add parts to your cart, and they land on the RO with your markup already calculated. No double-entry. No mistakes.</p>
+      <div class="feature-tags"><span class="feature-tag">30,000+ supplier locations</span><span class="feature-tag">Live inventory and pricing</span><span class="feature-tag">Markup auto-applied</span><span class="feature-tag">Order tracking: quoted to installed</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="deep-feature reversed">
+  <div class="container">
+    <div class="deep-feature-visual fade-up">
+      <div class="deep-feature-screenshot">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo-400)" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <div style="max-width:250px;background:var(--indigo-50);border:1px solid var(--indigo-100);border-radius:12px;padding:1rem;font-size:0.8125rem;color:var(--slate-600);">
+            <div style="font-weight:700;margin-bottom:0.5rem;color:var(--indigo-600);font-family:var(--font-display)">AI Assistant</div>
+            "How do I add a line item for your service?" → walks you through it step by step.
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;"><span style="width:8px;height:8px;border-radius:50%;background:var(--indigo-500);"></span><span style="font-size:0.75rem;color:var(--slate-500);font-weight:500">Voice Input Available</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="deep-feature-content fade-up">
+      <div class="section-label">AI-Powered</div>
+      <h2>An Expert in Your Pocket — On Every Screen</h2>
+      <p>PCB Auto includes an AI assistant that lives on every page of the application. It knows which screen you're on, which repair order you're looking at, and how your shop is configured. Ask it anything — by typing or by voice. It walks you through the process step by step. New employee? They're productive on day one.</p>
+      <div class="feature-tags"><span class="feature-tag">Context-aware — knows your current page and RO</span><span class="feature-tag">Voice input — tap the mic and talk</span><span class="feature-tag">Read aloud — tap the speaker to hear the answer</span><span class="feature-tag">Guides new staff through any workflow</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="deep-feature">
+  <div class="container">
+    <div class="deep-feature-visual fade-up">
+      <div class="deep-feature-screenshot">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div style="font-size:1.5rem;font-weight:800;color:var(--emerald-600);font-family:var(--font-display)">QB</div>
+            <div style="font-size:0.875rem;color:var(--slate-500);font-weight:500">QuickBooks</div>
+            <span style="background:var(--emerald-50);border:1px solid var(--emerald-100);color:var(--emerald-600);font-size:0.75rem;font-weight:600;padding:0.25rem 0.5rem;border-radius:100px;">Connected</span>
+          </div>
+          <div style="display:flex;gap:1.25rem;">
+            <div style="text-align:center"><div style="font-size:1.25rem;font-weight:800;color:var(--slate-900);font-family:var(--font-display)">847</div><div style="font-size:0.6875rem;color:var(--slate-500)">Total Synced</div></div>
+            <div style="text-align:center"><div style="font-size:1.25rem;font-weight:800;color:var(--slate-900);font-family:var(--font-display)">22</div><div style="font-size:0.6875rem;color:var(--slate-500)">This Week</div></div>
+            <div style="text-align:center"><div style="font-size:1.25rem;font-weight:800;color:var(--emerald-600);font-family:var(--font-display)">$38,420</div><div style="font-size:0.6875rem;color:var(--slate-500)">Revenue</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="deep-feature-content fade-up">
+      <div class="section-label">Accounting</div>
+      <h2>Your Books Stay Current — Automatically</h2>
+      <p>Connect QuickBooks in 30 seconds. From that point on, every invoice and every payment syncs automatically. Labor goes to your labor income account. Parts to parts revenue. Dual pricing to its own trackable income account. Tax to your liability account. No more end-of-month data entry. No CSV imports. Your accountant will thank you.</p>
+      <div class="feature-tags"><span class="feature-tag">One-click QuickBooks Online connection</span><span class="feature-tag">Real-time invoice and payment sync</span><span class="feature-tag">Dual pricing tracked separately</span><span class="feature-tag">Chart of accounts fully configurable</span></div>
+    </div>
+  </div>
+</div>
+
+<section class="integrations" id="integrations">
+  <div class="container">
+    <div class="section-header fade-up"><div class="section-label">Integrations</div><h2>Connected to the Tools You Already Use</h2></div>
+    <div class="integrations-grid stagger-children">
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><h4>PartsTech</h4><p>Parts Ordering</p></div>
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><h4>QuickBooks</h4><p>Accounting</p></div>
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><h4>FluidPay</h4><p>Payment Gateway</p></div>
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><h4>Resend</h4><p>Email Delivery</p></div>
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h4>NHTSA</h4><p>VIN Decode</p></div>
+      <div class="integration-card"><div class="integration-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div><h4>Claude AI</h4><p>AI Assistant</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="consolidation">
+  <div class="container">
+    <div class="section-label" style="color:var(--indigo-400)">Why PCB Auto</div>
+    <h2>Stop Paying for Five Systems That Don't Talk to Each Other</h2>
+    <p>PCB Auto replaces your estimate tool, your inspection app, your parts catalog, your scheduler, and your payment system — with one platform that connects everything.</p>
+    <div class="cta-buttons">
+      <a href="#demo" class="btn btn-primary">Schedule a Demo</a>
+      <a href="#video" class="btn btn-secondary">Watch the Video</a>
+    </div>
+    <div class="cta-subtext">Built for independent auto repair shops <span>·</span> Bundled with payment processing <span>·</span> A fraction of the cost of Tekmetric or Shop-Ware</div>
+  </div>
+</section>
+
+<section class="faq" id="faq">
+  <div class="container">
+    <div class="section-header fade-up"><div class="section-label">FAQ</div><h2>Common Questions</h2></div>
+    <div class="faq-grid fade-up">
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">How is this different from Tekmetric or Shop-Ware?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>PCB Auto is built from scratch for independent shops that want a modern, all-in-one system at a fraction of the price. We bundle payment processing directly into the platform — which means your DMS and your payments are one system, not two vendors. You get dual pricing, digital inspections, PartsTech integration, AI assistance, and QuickBooks sync out of the box.</p></div></div>
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">How long does it take to get set up?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>Most shops are live within 24 hours. We configure your shop settings, import your customer list if you have one, and walk your team through the basics. The built-in AI assistant means new staff can figure things out on their own from day one.</p></div></div>
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">Will my technicians actually use this?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>Yes — because we designed it for them. Techs see their assigned jobs, tap to start/stop time, run inspections with one-tap scoring, and order parts without walking to the front. The interface is point-and-click simple. If they can use a phone, they can use PCB Auto.</p></div></div>
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">What does it cost?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>PCB Auto is bundled with payment processing, so your software cost is built into your processing relationship. For most shops, this means you're paying far less than a standalone DMS subscription. Contact us for specific pricing based on your shop size and volume.</p></div></div>
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">Can I migrate from my current system?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>Absolutely. We can import your customer database, vehicle records, and service history. Our team handles the migration so you don't have to. Most shops run both systems in parallel for a week, then switch over fully once comfortable.</p></div></div>
+      <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')">Is dual pricing legal?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><div class="faq-answer"><p>Yes. Dual pricing (showing a cash price and a card price) is legal in all 50 states. It's different from surcharging, which has restrictions in some states. PCB Auto's dual pricing is fully compliant — every document clearly shows both prices, and the customer simply chooses how to pay.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="final-cta">
+  <div class="container fade-up">
+    <h2>Ready to Run a Tighter Shop?</h2>
+    <p>See how PCB Auto connects every workflow — from the front desk to the bay to the bank.</p>
+    <div class="cta-buttons">
+      <a href="#demo" class="btn btn-primary">Schedule a Demo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      <a href="#signin" class="btn btn-secondary">Sign In</a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="nav-logo" style="margin-bottom:0"><div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#fff"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><span class="nav-logo-text" style="color:#fff">PCB Auto</span></div>
+        <p>Modern shop management for modern auto repair businesses.</p>
+        <div class="footer-contact">
+          <a href="mailto:hello@pcbancard.com"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> hello@pcbancard.com</a>
+          <a href="tel:+18885377332"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> (888) 537-7332</a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> 420 Boulevard Suite 206, Mountain Lakes, NJ 07046</a>
+        </div>
+      </div>
+      <div class="footer-col"><h4>Product</h4><ul><li><a href="#features">Features</a></li><li><a href="#how-it-works">How It Works</a></li><li><a href="#integrations">Integrations</a></li><li><a href="#demo">Schedule a Demo</a></li></ul></div>
+      <div class="footer-col"><h4>Features</h4><ul><li><a href="#">Repair Orders</a></li><li><a href="#">Digital Inspections</a></li><li><a href="#">Parts Ordering</a></li><li><a href="#">Payments</a></li><li><a href="#">Scheduling</a></li><li><a href="#">QuickBooks Sync</a></li></ul></div>
+      <div class="footer-col"><h4>Company</h4><ul><li><a href="#signin">Sign In</a></li><li><a href="#demo">Book a Demo</a></li><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms of Service</a></li></ul></div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 WPS, Inc. All rights reserved. PCB Auto™ is proprietary software.</p>
+      <div class="footer-bottom-links"><a href="#">Privacy</a><a href="#">Terms</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+document.querySelectorAll('.fade-up, .stagger-children').forEach(el => observer.observe(el));
+
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function(e) {
+    const href = this.getAttribute('href');
+    if (href === '#') return;
+    e.preventDefault();
+    const target = document.querySelector(href);
+    if (target) {
+      const targetPos = target.getBoundingClientRect().top + window.scrollY - navbar.offsetHeight - 20;
+      window.scrollTo({ top: targetPos, behavior: 'smooth' });
+    }
+  });
+});
+</script>
+</body>
+</html>
