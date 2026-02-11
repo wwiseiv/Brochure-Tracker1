@@ -68,21 +68,22 @@ export function DictationInput({
     onChange: handleInputChange,
     placeholder,
     disabled: disabled || isListening,
-    className: cn("pr-12", className),
     id,
     "data-testid": dataTestId,
   };
 
   return (
-    <div className="relative">
+    <div className={cn("relative", className)}>
       {multiline ? (
         <Textarea
           {...inputProps}
+          className="pr-12"
           rows={rows}
         />
       ) : (
         <Input
           {...inputProps}
+          className="pr-12"
         />
       )}
 
