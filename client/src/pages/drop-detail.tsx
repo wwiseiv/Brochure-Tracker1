@@ -447,7 +447,7 @@ export default function DropDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-4">
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -1134,7 +1134,7 @@ export default function DropDetailPage() {
         </Card>
       </main>
 
-      <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
+      <div className="sticky bottom-0 z-30 p-4 bg-gradient-to-t from-background via-background to-transparent">
         <div className="container max-w-md md:max-w-2xl lg:max-w-4xl mx-auto space-y-2">
           {drop.status === "pending" ? (
             <>
