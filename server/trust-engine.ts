@@ -390,11 +390,40 @@ export function parseTrustAssessmentResponse(
   jsonString: string,
   currentTrust: number
 ): TrustAssessmentResult {
-  try {
-    const cleaned = jsonString.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+  const safeDefault: TrustAssessmentResult = {
+    trustDelta: 0,
+    newScore: Math.max(0, Math.min(100, currentTrust)),
+    moodBand: getMoodBand(Math.max(0, Math.min(100, currentTrust))),
+    deceptionDeployed: false,
+    deceptionType: null,
+    deceptionCaught: null,
+    rationale: "Assessment parse error",
+    nextDeceptionHint: null,
+  };
 
-    const delta = Math.max(-10, Math.min(8, parseInt(parsed.trustDelta) || 0));
+  try {
+    if (!jsonString || typeof jsonString !== 'string') {
+      console.error("[TrustEngine] Invalid input to parseTrustAssessmentResponse:", typeof jsonString);
+      return safeDefault;
+    }
+
+    const cleaned = jsonString.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (jsonErr) {
+      console.error("[TrustEngine] JSON.parse failed:", jsonErr, cleaned.substring(0, 200));
+      return safeDefault;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      console.error("[TrustEngine] Parsed result is not an object:", typeof parsed);
+      return safeDefault;
+    }
+
+    const rawDelta = typeof parsed.trustDelta === 'number' ? parsed.trustDelta : parseInt(parsed.trustDelta);
+    const delta = isNaN(rawDelta) ? 0 : Math.max(-15, Math.min(15, rawDelta));
     const newScore = Math.max(0, Math.min(100, currentTrust + delta));
 
     return {
@@ -404,21 +433,12 @@ export function parseTrustAssessmentResponse(
       deceptionDeployed: Boolean(parsed.deceptionDeployed),
       deceptionType: parsed.deceptionType && DECEPTION_TYPES.includes(parsed.deceptionType) ? parsed.deceptionType : null,
       deceptionCaught: parsed.deceptionDeployed ? Boolean(parsed.deceptionCaught) : null,
-      rationale: parsed.rationale || "No rationale provided",
+      rationale: typeof parsed.rationale === 'string' ? parsed.rationale : "No rationale provided",
       nextDeceptionHint: parsed.suggestNextDeception && DECEPTION_TYPES.includes(parsed.suggestNextDeception) ? parsed.suggestNextDeception : null,
     };
   } catch (err) {
-    console.error("[TrustEngine] Failed to parse assessment:", err, jsonString);
-    return {
-      trustDelta: 0,
-      newScore: currentTrust,
-      moodBand: getMoodBand(currentTrust),
-      deceptionDeployed: false,
-      deceptionType: null,
-      deceptionCaught: null,
-      rationale: "Assessment parse error",
-      nextDeceptionHint: null,
-    };
+    console.error("[TrustEngine] Failed to parse assessment:", err, jsonString?.substring?.(0, 200));
+    return safeDefault;
   }
 }
 

@@ -6753,7 +6753,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
           const { getAdaptiveDifficulty, buildTrustAssessmentPrompt, parseTrustAssessmentResponse, getMoodBand, getMoodLabel } = await import("./trust-engine");
           
           const difficultyConfig = await getAdaptiveDifficulty(userId);
-          const currentTrust = typeof clientTrustScore === 'number' ? clientTrustScore : difficultyConfig.startingTrust;
+          const currentTrust = typeof clientTrustScore === 'number' ? Math.max(0, Math.min(100, clientTrustScore)) : difficultyConfig.startingTrust;
           const msgIdx = typeof messageIndex === 'number' ? messageIndex : 0;
           
           const contextMessages = recentMessages.slice(-4).map(m =>
@@ -6772,7 +6772,9 @@ Remember: You're helping them practice real sales conversations. Be challenging 
             temperature: 0.2,
           });
 
-          const assessmentText = assessmentResponse.choices[0]?.message?.content || '{}';
+          let assessmentText = assessmentResponse.choices[0]?.message?.content || '{}';
+          const jsonMatch = assessmentText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) assessmentText = jsonMatch[0];
           const trustResult = parseTrustAssessmentResponse(assessmentText, currentTrust);
           
           trustData = {
@@ -7161,9 +7163,18 @@ Provide constructive feedback in JSON format:
         const { saveTrustSessionSummary, buildTrustDebrief } = await import("./trust-engine");
         const { trustHistory: clientTrustHistory } = req.body;
         if (clientTrustHistory && Array.isArray(clientTrustHistory) && clientTrustHistory.length > 0) {
-          await saveTrustSessionSummary(sessionId, "roleplay", userId, clientTrustHistory, "adaptive");
-          const trustDebrief = buildTrustDebrief(clientTrustHistory, "Merchant");
-          feedback.trustDebrief = trustDebrief;
+          const validatedHistory = clientTrustHistory
+            .filter((h: any) => typeof h?.newScore === 'number')
+            .map((h: any) => ({
+              ...h,
+              newScore: Math.max(0, Math.min(100, h.newScore)),
+              delta: typeof h.delta === 'number' ? Math.max(-20, Math.min(20, h.delta)) : 0,
+            }));
+          if (validatedHistory.length > 0) {
+            await saveTrustSessionSummary(sessionId, "roleplay", userId, validatedHistory, "adaptive");
+            const trustDebrief = buildTrustDebrief(validatedHistory, "Merchant");
+            feedback.trustDebrief = trustDebrief;
+          }
         }
       } catch (trustErr) {
         console.error('[TrustEngine] Failed to save trust summary:', trustErr);
@@ -14769,7 +14780,7 @@ IMPORTANT RULES:
       const aiResponse = response.text || "Hmm, what was that?";
 
       let trustResult = null;
-      const currentTrust = typeof clientTrustScore === 'number' ? clientTrustScore : difficultyConfig.startingTrust;
+      const currentTrust = typeof clientTrustScore === 'number' ? Math.max(0, Math.min(100, clientTrustScore)) : difficultyConfig.startingTrust;
       const msgIdx = typeof messageIndex === 'number' ? messageIndex : 0;
 
       try {
@@ -14796,7 +14807,9 @@ IMPORTANT RULES:
           }
         });
 
-        const assessmentText = assessmentResponse.text || '{}';
+        let assessmentText = assessmentResponse.text || '{}';
+        const jsonMatch = assessmentText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) assessmentText = jsonMatch[0];
         trustResult = parseTrustAssessmentResponse(assessmentText, currentTrust);
       } catch (trustErr) {
         console.error('[TrustEngine] Assessment failed, using neutral:', trustErr);
