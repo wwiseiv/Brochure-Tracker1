@@ -637,6 +637,12 @@ export default function HelpPage() {
       link: "/admin",
       icon: <Building2 className="w-5 h-5 text-blue-600" />,
     },
+    {
+      title: "User Impersonation",
+      description: "View the app as any team member to provide better support. All sessions are logged for compliance.",
+      link: "/admin",
+      icon: <Eye className="w-5 h-5 text-blue-600" />,
+    },
   ];
 
   const rmFeatures: HelpItem[] = [
@@ -1239,10 +1245,160 @@ export default function HelpPage() {
     },
   ];
 
+  const gamificationFeatures: HelpItem[] = [
+    {
+      title: "XP Progression System",
+      description: "Earn XP for every action: drops, deals, training sessions, referrals. Watch your level grow as you develop your sales skills.",
+      link: "/gamification",
+      icon: <Star className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "Dual Badge System",
+      description: "Earn badges for both training milestones and field performance. Collect training badges by completing sessions and field badges for real sales achievements.",
+      link: "/gamification",
+      icon: <GraduationCap className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "Weighted Skill Score",
+      description: "Your Skill Score combines roleplay, gauntlet, scenario, delivery, and presentation performance into one metric showing your overall training progress.",
+      link: "/gamification",
+      icon: <Target className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "Streak Bonuses",
+      description: "Build daily training streaks for bonus XP. Longer streaks earn bigger multipliers. Keep your momentum going every day.",
+      link: "/gamification",
+      icon: <Flame className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "Leaderboard",
+      description: "See how you rank against other agents in your organization. Compete for the top spot on XP, badges, and skill scores.",
+      link: "/gamification",
+      icon: <BarChart3 className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "PDF Certificates",
+      description: "Earn and download professional PDF certificates for completed training milestones. Share them with your manager or add to your portfolio.",
+      link: "/gamification",
+      icon: <FileText className="w-5 h-5 text-yellow-500" />,
+    },
+    {
+      title: "Career Ladder",
+      description: "Progress through career levels from Rookie to Legend. Each level unlocks new recognition and shows your growth as a sales professional.",
+      link: "/gamification",
+      icon: <TrendingUp className="w-5 h-5 text-yellow-500" />,
+    },
+  ];
+
+  const trustScoringFeatures: HelpItem[] = [
+    {
+      title: "Hidden Trust Score",
+      description: "During roleplay, the merchant has a hidden trust score (0-100) that changes based on your approach. Build trust to unlock the sale, revealed in your debrief.",
+      link: "/coach",
+      icon: <Eye className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Live Mood Indicators",
+      description: "Watch the merchant's mood shift in real-time: Guarded (skeptical), Warming Up (interested), or Engaged (ready to talk business).",
+      link: "/coach",
+      icon: <Activity className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Deception Toolkit",
+      description: "Merchants may test you with 6 tactics: polite lies, time traps, honesty tests, red herrings, gatekeeper tests, and competitor bluffs. Spot them to score higher.",
+      link: "/coach",
+      icon: <AlertCircle className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Adaptive Difficulty",
+      description: "The system tracks your last 5 sessions and automatically adjusts difficulty. Consistently high scores unlock harder merchant personas.",
+      link: "/coach",
+      icon: <TrendingUp className="w-5 h-5 text-purple-600" />,
+    },
+    {
+      title: "Trust Progression Chart",
+      description: "After each session, see a visual chart of how trust evolved throughout your conversation. Identify where you gained or lost trust.",
+      link: "/coach",
+      icon: <BarChart3 className="w-5 h-5 text-purple-600" />,
+    },
+  ];
+
+  const emailDigestFeatures: HelpItem[] = [
+    {
+      title: "Automated Summaries",
+      description: "Receive AI-powered email digests summarizing your sales activity, upcoming follow-ups, and team performance highlights.",
+      link: "/profile",
+      icon: <Mail className="w-5 h-5 text-blue-500" />,
+    },
+    {
+      title: "Customizable Schedule",
+      description: "Choose when to receive digests: daily, weekly, or custom timing. Pause and resume anytime from your profile settings.",
+      link: "/profile",
+      icon: <Clock className="w-5 h-5 text-blue-500" />,
+    },
+    {
+      title: "Activity Highlights",
+      description: "Each digest includes your key metrics, deal movements, completed drops, and action items that need attention.",
+      link: "/profile",
+      icon: <TrendingUp className="w-5 h-5 text-blue-500" />,
+    },
+  ];
+
+  const meetingRecorderFeatures: HelpItem[] = [
+    {
+      title: "Upload Recordings",
+      description: "Upload audio recordings of sales meetings or calls. AI processes and analyzes the conversation for key insights.",
+      link: "/merchants",
+      icon: <Upload className="w-5 h-5 text-emerald-600" />,
+    },
+    {
+      title: "AI Analysis",
+      description: "Get AI-generated summaries including key discussion points, action items, objections raised, and suggested next steps.",
+      link: "/merchants",
+      icon: <Brain className="w-5 h-5 text-emerald-600" />,
+    },
+    {
+      title: "Merchant Linking",
+      description: "Link meeting recordings to specific merchant profiles so all interaction data stays organized in one place.",
+      link: "/merchants",
+      icon: <Store className="w-5 h-5 text-emerald-600" />,
+    },
+  ];
+
+  const salesVideosFeatures: HelpItem[] = [
+    {
+      title: "Video Library",
+      description: "Access curated training videos from Vimeo covering sales techniques, product knowledge, and best practices for payment processing.",
+      link: "/training/sales-videos",
+      icon: <GraduationCap className="w-5 h-5 text-teal-600" />,
+    },
+    {
+      title: "Progress Tracking",
+      description: "Track which videos you have watched and your completion percentage. Pick up where you left off anytime.",
+      link: "/training/sales-videos",
+      icon: <BarChart3 className="w-5 h-5 text-teal-600" />,
+    },
+  ];
+
+  const impersonationFeatures: HelpItem[] = [
+    {
+      title: "View as Any User",
+      description: "Admins can impersonate any team member to see the app exactly as they see it. Great for troubleshooting or training support.",
+      link: "/admin",
+      icon: <Eye className="w-5 h-5 text-blue-600" />,
+    },
+    {
+      title: "Audit Trail",
+      description: "All impersonation sessions are logged with start time, end time, and actions taken. Full transparency for compliance.",
+      link: "/admin",
+      icon: <Shield className="w-5 h-5 text-blue-600" />,
+    },
+  ];
+
   const interactiveTrainingFeatures: HelpItem[] = [
     {
       title: "Live Roleplay Simulator",
-      description: "Practice with 20 AI merchant personas. Each has unique personalities, objection styles, and weak points to discover.",
+      description: "Practice with 36 AI merchant personas. Each has unique personalities, objection styles, and weak points to discover.",
       link: "/interactive-training",
       icon: <Users className="w-5 h-5 text-purple-600" />,
     },
@@ -1642,7 +1798,12 @@ export default function HelpPage() {
             { title: "Proposal Generator", description: "Create professional branded proposals from pricing PDFs with equipment recommendations.", items: proposalFeatures, badge: "All Users", requiredFeature: "proposal_generator" },
             { title: "Presentation Training", description: "Master the PCBancard Dual Pricing presentation with interactive lessons and practice scenarios.", items: presentationFeatures, badge: "All Users", requiredFeature: "presentation_training" },
             { title: "Interactive AI Training", description: "AI-powered sales training with live roleplay, objection handling, scenario decisions, and delivery analysis with voice I/O.", items: interactiveTrainingFeatures, badge: "AI Powered", requiredFeature: "interactive_ai_training" },
+            { title: "Trust-Based Scoring", description: "Hidden trust mechanics and deception tactics that make AI roleplay sessions more realistic and challenging.", items: trustScoringFeatures, badge: "AI Powered", requiredFeature: "ai_coaching" },
+            { title: "Sales Videos Training", description: "Watch curated training videos to master sales techniques and payment processing knowledge.", items: salesVideosFeatures, badge: "All Users", requiredFeature: "sales_videos" },
             { title: "Offline & Mobile", description: "PCBancard Sales Intelligence Suite is designed for the field - works offline and installs like a native app.", items: offlineFeatures, badge: "All Users" },
+            { title: "Gamification & Leaderboards", description: "Track your progress with XP, badges, skill scores, streaks, and compete on the org-wide leaderboard.", items: gamificationFeatures, badge: "Gamification", requiredFeature: "gamification" },
+            { title: "Email Digest System", description: "Automated email summaries of your sales activity and upcoming action items.", items: emailDigestFeatures, badge: "All Users" },
+            { title: "Meeting Recorder", description: "Upload and analyze sales meeting recordings with AI-powered insights.", items: meetingRecorderFeatures, badge: "All Users" },
             { title: "Merchant Profiles", description: "Build comprehensive profiles of every merchant you visit. Track history, notes, and conversion likelihood.", items: merchantFeatures, badge: "All Users", requiredFeature: "merchant_profiles" },
             { title: "Inventory Tracking", description: "Keep track of your brochure inventory so you never run out in the field.", items: inventoryFeatures, badge: "All Users", requiredFeature: "brochure_inventory" },
             { title: "Referral Tracking", description: "Log and track referrals from existing merchants to grow your network.", items: referralFeatures, badge: "All Users", requiredFeature: "referral_tracking" },
@@ -1959,6 +2120,36 @@ export default function HelpPage() {
                 <AccordionTrigger className="text-sm">What is Sales Spark and how do I use it?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
                   Sales Spark is your AI prospecting coach on the Dashboard. Tap to expand it, then type or dictate what's on your mind (e.g., "I don't know who to call today"). Tap <strong>Spark My Day</strong> to get specific, actionable prospecting ideas tailored to payment processing sales. Toggle "Read aloud" to hear the advice spoken back to you.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-30">
+                <AccordionTrigger className="text-sm">How does the Gamification system work?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Earn XP for training activities, field work, and team engagement. Track your progress with badges, a weighted Skill Score, streak bonuses, and compete on the org-wide leaderboard. Download PDF certificates for milestones.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-31">
+                <AccordionTrigger className="text-sm">What is the Trust-Based Scoring System?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  During AI roleplay sessions, the merchant has a hidden trust score (0-100). Your approach, questions, and responses affect their trust level. Watch for mood indicators (Guarded, Warming Up, Engaged) and be ready for deception tactics like polite lies and competitor bluffs.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-32">
+                <AccordionTrigger className="text-sm">How do I access training videos?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Go to the Training section and tap Sales Videos. Watch curated Vimeo training content and track your viewing progress across the video library.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-33">
+                <AccordionTrigger className="text-sm">What is the Email Digest?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  The Email Digest sends you automated summaries of your sales activity, follow-ups due, and team highlights. Configure frequency and timing in your profile settings.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-34">
+                <AccordionTrigger className="text-sm">How does user impersonation work?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Admins can view the app as any team member by going to the Admin Dashboard and selecting a user to impersonate. This helps troubleshoot issues and provide training support. All sessions are logged for compliance.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

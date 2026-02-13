@@ -524,7 +524,7 @@ export default function ESignDocumentLibrary() {
                                 <Settings className="w-4 h-4" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Configure template - Link SignNow template</TooltipContent>
+                            <TooltipContent>Configure Template — link a SignNow template for e-signatures</TooltipContent>
                           </Tooltip>
                           <ChevronRight 
                             className="w-5 h-5 text-muted-foreground cursor-pointer" 
@@ -586,6 +586,7 @@ export default function ESignDocumentLibrary() {
                             setShowNewRequestDialog(true);
                           }}
                           data-testid={`button-use-package-${pkg.id}`}
+                          title="Use This Package — start a new e-sign request with all documents in this package"
                         >
                           <FilePlus2 className="w-4 h-4 mr-2" />
                           Use This Package
@@ -615,6 +616,7 @@ export default function ESignDocumentLibrary() {
               <Button
                 onClick={() => setShowNewRequestDialog(true)}
                 data-testid="button-new-request"
+                title="New Request — create a new e-signature request to send to a merchant"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Request
@@ -648,11 +650,11 @@ export default function ESignDocumentLibrary() {
                     }
                   </p>
                   {statusFilter ? (
-                    <Button variant="outline" onClick={() => setStatusFilter(null)} data-testid="button-clear-filter">
+                    <Button variant="outline" onClick={() => setStatusFilter(null)} data-testid="button-clear-filter" title="Show All Requests — clear the status filter">
                       Show All Requests
                     </Button>
                   ) : (
-                    <Button onClick={() => setShowNewRequestDialog(true)} data-testid="button-create-first">
+                    <Button onClick={() => setShowNewRequestDialog(true)} data-testid="button-create-first" title="Create Request — send your first e-signature request">
                       <Plus className="w-4 h-4 mr-2" />
                       Create Request
                     </Button>

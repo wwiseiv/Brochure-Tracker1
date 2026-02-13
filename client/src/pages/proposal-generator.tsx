@@ -1645,6 +1645,7 @@ export default function ProposalGeneratorPage() {
                   onClick={clearStatementUpload}
                   className="text-muted-foreground hover:text-destructive"
                   data-testid="button-clear-statement-files"
+                  title="Clear All — remove all uploaded statement files"
                 >
                   <X className="h-3 w-3 mr-1" />
                   Clear All
@@ -1683,7 +1684,7 @@ export default function ProposalGeneratorPage() {
                             <X className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Remove file - Delete from upload list</TooltipContent>
+                        <TooltipContent>Remove File — delete this file from the upload list</TooltipContent>
                       </Tooltip>
                     )}
                   </div>
@@ -1712,6 +1713,7 @@ export default function ProposalGeneratorPage() {
                   onClick={uploadAndExtractStatement}
                   disabled={statementFiles.length === 0}
                   data-testid="button-extract-statement"
+                  title="Extract Data with AI — analyze uploaded statements and auto-fill pricing fields"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Extract Data with AI
@@ -1791,6 +1793,7 @@ export default function ProposalGeneratorPage() {
                   onClick={applyExtractedStatementData}
                   className="flex-1"
                   data-testid="button-use-extracted-data"
+                  title="Use This Data — apply extracted values to proposal form fields"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Use This Data
@@ -1799,6 +1802,7 @@ export default function ProposalGeneratorPage() {
                   variant="outline" 
                   onClick={clearStatementUpload}
                   data-testid="button-clear-extracted-data"
+                  title="Clear — discard extracted data and start over"
                 >
                   <X className="h-4 w-4 mr-2" />
                   Clear
@@ -2020,6 +2024,7 @@ export default function ProposalGeneratorPage() {
             onClick={handleStartBuild}
             disabled={startBuildMutation.isPending || (!dualPricingFile && !interchangePlusFile && !statementExtractedData)}
             data-testid="button-start-build"
+            title="Build Proposal — start AI-powered proposal generation from your uploaded data"
           >
             {startBuildMutation.isPending ? (
               <>
@@ -3201,6 +3206,7 @@ export default function ProposalGeneratorPage() {
             setUploadedFiles([]);
           }}
           data-testid="button-back-upload"
+          title="Back — return to file upload step"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
@@ -3209,6 +3215,7 @@ export default function ProposalGeneratorPage() {
           className="flex-1"
           onClick={() => setStep("equipment")}
           data-testid="button-continue-equipment"
+          title="Continue to Equipment Selection — choose POS terminals and accessories"
         >
           Continue to Equipment Selection
         </Button>
@@ -3513,7 +3520,7 @@ export default function ProposalGeneratorPage() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Go back to review</p>
+            <p>Back to Review — return to the proposal review step</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip delayDuration={700}>
@@ -3533,7 +3540,7 @@ export default function ProposalGeneratorPage() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Generate basic proposal</p>
+            <p>Basic Proposal — generate a standard proposal without AI enhancement</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip delayDuration={700}>
@@ -3558,7 +3565,7 @@ export default function ProposalGeneratorPage() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Generate AI-enhanced proposal</p>
+            <p>Generate with AI — create a polished proposal enhanced by AI writing</p>
           </TooltipContent>
         </Tooltip>
       </div>
@@ -3685,6 +3692,7 @@ export default function ProposalGeneratorPage() {
               setMerchantInfoOpen(false);
             }}
             data-testid="button-new-proposal"
+            title="Create Another Proposal — start fresh with a new merchant"
           >
             Create Another Proposal
           </Button>
@@ -3704,6 +3712,7 @@ export default function ProposalGeneratorPage() {
               size="icon"
               onClick={() => navigate("/")}
               data-testid="button-back"
+              aria-label="Back to Home — return to the dashboard"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -3721,7 +3730,7 @@ export default function ProposalGeneratorPage() {
               You don't have permission to access the Proposal Generator.
               Contact your administrator to request access.
             </p>
-            <Button onClick={() => navigate("/")} data-testid="button-return-home">
+            <Button onClick={() => navigate("/")} data-testid="button-return-home" title="Return Home — go back to the main dashboard">
               Return Home
             </Button>
           </Card>

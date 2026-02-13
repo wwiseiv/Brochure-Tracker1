@@ -340,6 +340,7 @@ function MoreMenuButton() {
           data-testid="nav-more"
           className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] py-2 px-2 rounded-lg transition-colors text-muted-foreground hover-elevate"
           style={{ scrollSnapAlign: 'center' }}
+          aria-label="More — open menu with additional tools and settings"
         >
           <Menu className="w-5 h-5" />
           <span className="text-[10px] font-medium whitespace-nowrap">More</span>
@@ -361,6 +362,7 @@ export function HamburgerMenu() {
           size="icon" 
           className="min-h-[44px] min-w-[44px]"
           data-testid="button-hamburger-menu"
+          aria-label="Open navigation menu — access all tools and pages"
         >
           <Menu className="w-5 h-5" />
         </Button>

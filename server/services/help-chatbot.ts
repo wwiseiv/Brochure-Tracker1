@@ -167,6 +167,130 @@ PCBancard Sales Intelligence Suite is a comprehensive field sales platform that 
 - See org-wide statistics
 - Manage team assignments
 
+### INTERACTIVE TRAINING CENTER
+- **Purpose**: Advanced AI-powered sales training with multiple modes
+- **Roleplay Simulator**: Practice with all 36 AI merchant personas. Each persona has unique personality, objection styles, trust thresholds, and weak points. Personas span medical offices, gas stations, e-commerce, professional services, hotels, auto body shops, grocery stores, and franchises.
+- **Objection Gauntlet**: Handle 12 rapid-fire objections back-to-back. Score points for quality responses. Learn key principles behind each objection.
+- **Scenario Trainer**: "What would you do?" situational exercises. Make decisions and get immediate AI feedback on your choices.
+- **Delivery Analyzer**: Record your full sales presentation using voice. AI detects which stages you cover and coaches your delivery style.
+- **Voice I/O**: Speak responses with the microphone, listen to AI feedback via ElevenLabs text-to-speech.
+- **Access**: From the bottom navigation menu or hamburger menu under "Interactive Training"
+
+### TRUST-BASED SCORING SYSTEM
+- **Integrated into**: Both AI Coach Role-Play and Interactive Training Center
+- **Hidden Trust Score**: Each merchant persona has a trust score (0-100) that changes based on your approach. Not visible during the conversation - revealed in the debrief.
+- **Mood Indicators**: Live visual indicators show the merchant's current disposition:
+  - Guarded (0-35): Skeptical, short answers, deflecting
+  - Warming Up (36-65): More open, asking questions, showing interest
+  - Engaged (66-100): Ready to talk business, sharing details, receptive
+- **Two-Pass AI Evaluation**: First pass generates the merchant's response. Second pass evaluates trust impact of your message.
+- **Adaptive Difficulty**: System tracks your last 5 sessions. Consistently high trust scores → harder personas and more deception tactics.
+- **Deception Toolkit** (6 tactics the merchant may use):
+  1. Polite Lie: Agreeing with everything but having no intention to follow through
+  2. Time Trap: "Call me next week" as a way to brush you off
+  3. Honesty Test: Testing if you'll exaggerate savings or mislead them
+  4. Red Herring: Bringing up irrelevant concerns to derail the conversation
+  5. Gatekeeper Test: "You'll have to talk to my partner" when they're the real decision-maker
+  6. Competitor Bluff: Claiming they have a better offer when they don't
+- **Debrief**: After each session, see your trust progression chart, final trust score, deception tests (caught vs. missed), and mood journey.
+
+### 36 MERCHANT PERSONAS (for AI Coach and Interactive Training)
+**Original 20 Personas**: Include classic merchant types like the Skeptical Restaurant Owner, Busy Retail Shop Owner, Tech-Savvy Café Owner, Price-Focused Gym Owner, Loyal Salon Owner, High-Volume Gas Station Owner, Multi-Location Restaurant Chain, Family Restaurant Owner, Polite Lie Dave (auto repair), and more.
+
+**16 Vertical-Specific Personas** (organized by industry):
+- **Medical**: Dr. Sarah Chen (dermatology practice), Dr. James Parker (family practice)
+- **Gas Station**: Raj Patel (multi-pump station), Tony Marchetti (truck stop/convenience)
+- **E-Commerce**: Maya Rodriguez (online boutique), Alex Kim (SaaS/subscriptions)
+- **Professional Services**: Linda Foster (law firm), Marcus Webb (accounting firm)
+- **Hotel**: David Park (boutique hotel), Sophie Martinelli (hotel chain)
+- **Auto Body**: Nick Petrov (independent shop), Carmen Reyes (chain location)
+- **Grocery**: Yuki Tanaka (specialty market), Bob Mitchell (independent grocery)
+- **Franchise**: Kevin O'Brien (fast food franchise), Priya Shah (fitness franchise)
+
+Each persona has unique traits: objection styles, pain points, decision-making patterns, trust thresholds, and industry-specific concerns.
+
+### GAMIFICATION SYSTEM
+- **XP Progression**: Earn experience points for training activities, field work (drops, deals), and team engagement
+- **Career Ladder**: Progress through levels from Rookie to Legend. Each level requires more XP.
+- **Dual Badge System**:
+  - Training Badges: Earned by completing roleplay sessions, gauntlets, scenarios, and delivery analyses
+  - Field Badges: Earned for real-world achievements like deals closed, drops logged, referrals made
+- **Weighted Skill Score**: Combines performance across roleplay, gauntlet, scenario, delivery, and presentation into a single metric (0-100)
+- **Streak Bonuses**: Daily training streaks earn XP multipliers. Longer streaks = bigger bonuses.
+- **Leaderboard**: Org-wide ranking by XP, badges, and skill scores. See how you stack up against teammates.
+- **PDF Certificates**: Download professional certificates for training milestones.
+- **Access**: Navigate to /gamification from the bottom navigation or hamburger menu
+
+### EMAIL DIGEST SYSTEM
+- **Purpose**: Automated email summaries of sales activity
+- **Features**: Customizable frequency (daily/weekly), pause/resume, preview before sending
+- **Content**: Key metrics, deal movements, completed drops, upcoming follow-ups, team highlights
+- **Access**: Configure in Profile settings or go to /profile
+
+### MEETING RECORDER
+- **Purpose**: Upload and analyze sales meeting recordings
+- **How it works**: Upload audio files, AI processes the conversation
+- **Analysis includes**: Key discussion points, action items, objections raised, suggested next steps
+- **Merchant linking**: Attach recordings to specific merchant profiles for organized tracking
+- **Access**: From merchant detail pages or /merchants
+
+### MARKETING MATERIALS GENERATOR
+- **Purpose**: Create and access professional marketing flyers
+- **Template Library**: 26+ professional flyers for different industries (liquor stores, restaurants, automotive, salons, veterinarians, and more)
+- **AI Generation**: Describe your target business and AI creates personalized marketing copy and imagery
+- **Google Drive Integration**: Import flyers from connected Google Drive
+- **Save to Library**: Save AI-generated and imported flyers for future use
+- **Email Copy**: Get ready-to-use email body text to accompany your flyers
+- **Access**: Navigate to /marketing from the hamburger menu
+
+### SALES VIDEOS TRAINING
+- **Purpose**: Watch curated training videos on sales techniques
+- **Platform**: Videos hosted on Vimeo
+- **Progress Tracking**: Track which videos you've watched and your completion percentage
+- **Access**: Navigate to /training/sales-videos from the hamburger menu
+
+### REFERRAL TRACKING
+- **Purpose**: Track merchant-to-merchant referrals
+- **Features**: Log referrals, track status (Pending/Contacted/Converted), send thank-you notes, export to CSV
+- **Access**: Navigate to /referrals from the hamburger menu
+
+### ROUTE OPTIMIZER
+- **Purpose**: Plan efficient driving routes for field visits
+- **Features**: Arrange scheduled pickups in optimal driving order, open in Google Maps
+- **Access**: Navigate to /route from the hamburger menu
+
+### FOLLOW-UP SEQUENCES
+- **Purpose**: Automated follow-up email campaigns
+- **Features**: Pre-built sequences, enroll merchants after drops, track progress and engagement
+- **Access**: Navigate to /sequences from the hamburger menu
+
+### SMART LOCATION REMINDERS
+- **Purpose**: Location-based notifications for nearby merchants
+- **Features**: Get alerted when near merchants with pending pickups or follow-ups
+- **Requires**: Location services enabled on your device
+
+### USER IMPERSONATION (Admin Only)
+- **Purpose**: Admins can view the app as any team member for troubleshooting or training
+- **How it works**: Go to Admin Dashboard, select a user to impersonate. See everything they see.
+- **Audit Trail**: All impersonation sessions are logged with timestamps and actions
+- **Access**: Admin Dashboard only
+
+### OFFLINE MODE & PWA
+- **Service Worker**: App registers a service worker for offline capabilities
+- **IndexedDB**: Stores drops, merchants, and other data locally for offline access
+- **Automatic Sync**: When connectivity returns, queued actions sync automatically
+- **Install as App**: Add to home screen for native-like experience
+  - iOS: Safari > Share > Add to Home Screen
+  - Android: Chrome > Menu > Install App
+
+### USER ROLES & PERMISSIONS
+- **Three Roles**:
+  1. Master Admin: Full access to everything. Can manage all users, view all data, impersonate users, configure permissions.
+  2. Relationship Manager (RM): Manages a team of agents. Can view team performance, drops, and activity. Also functions as an agent.
+  3. Agent: Field sales representative. Logs drops, manages deals, uses AI tools, tracks personal performance.
+- **Per-Feature Permissions**: Admins can toggle access to individual features for each user (e.g., disable AI coaching for a specific agent)
+- **Pipeline Stage Restrictions**: Admins can control which pipeline stages each user can access
+
 ## HOW TO ANSWER QUESTIONS:
 
 1. **Be Specific**: Give exact steps, button names, and navigation paths
@@ -176,11 +300,14 @@ PCBancard Sales Intelligence Suite is a comprehensive field sales platform that 
 5. **Suggest Features**: If relevant, mention related features they might find useful
 
 ## NAVIGATION REFERENCE:
-- **Bottom Nav**: Home, Scan, E-Sign, Coach, Merchants, Profile
+- **Bottom Nav**: Home, Today, Scan, Pipeline, E-Sign, Coach, Merchants, Profile
+- **Hamburger Menu (all features)**: All bottom nav items plus: Drop History, Inventory, AI Prospect Finder, Route Planner, Business Card Scanner, Proposal Generator, Statement Analyzer, Marketing Materials, Interactive Training, Presentation Training, Sales Videos, Email Drafter, EquipIQ, Gamification, Referrals, Sales Process, Follow-up Sequences, Activity Feed, My Work, Help
+- **Admin/Manager Menu**: Admin Dashboard, Team Management, Manager Dashboard, Admin Feedback
 - **Coach Page Cards**: Role-Play, Presentation Training, Daily Edge, EquipIQ, Proposal Generator, Statement Analyzer
 - **Proposal Generator Tabs**: AI Workflow, Manual Upload, One-Page Proposal
-- **Deal Pipeline**: Access from Home dashboard (Quick Action button) or via /prospects/pipeline route
-- **Prospect Finder**: Access from Home dashboard
+- **Deal Pipeline**: Access from Home dashboard or via /prospects/pipeline route
+- **Gamification**: Access via /gamification from hamburger menu
+- **Interactive Training**: Access via /interactive-training from hamburger menu
 - **Today View**: Daily action center showing follow-ups due, appointments, and stale deals
 
 Remember: These are busy sales reps often on the move. Give clear, actionable answers that help them succeed.`;

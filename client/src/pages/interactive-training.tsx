@@ -124,7 +124,7 @@ export default function InteractiveTrainingPage() {
         <header className="sticky top-0 z-40 bg-card border-b border-border">
           <div className="container max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
             <Link href="/coach">
-              <Button variant="ghost" size="icon" data-testid="button-back">
+              <Button variant="ghost" size="icon" data-testid="button-back" aria-label="Back to Coach — return to AI coaching hub">
                 <ChevronLeft className="w-5 h-5" />
               </Button>
             </Link>
@@ -178,7 +178,7 @@ function TrainingMenu({ onSelectMode, difficultyFilter, setDifficultyFilter, fil
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => setShowPersonas(false)} data-testid="button-back-menu">
+          <Button variant="ghost" onClick={() => setShowPersonas(false)} data-testid="button-back-menu" title="Back to Menu — return to training mode selection">
             <ChevronLeft className="w-4 h-4 mr-2" />
             Back to Menu
           </Button>
@@ -517,7 +517,7 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-roleplay">
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-roleplay" aria-label="Exit roleplay — return to training menu">
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -554,6 +554,7 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
             onClick={requestCoaching}
             disabled={isGettingCoaching || messages.length < 2}
             data-testid="button-get-coaching"
+            title="Get Coaching — receive AI feedback on your current conversation"
           >
             <Sparkles className="w-4 h-4 mr-2" />
             Get Coaching
@@ -563,6 +564,7 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
             onClick={endSession}
             disabled={isEndingSession || sessionCompleted || sessionStats.exchanges < 2}
             data-testid="button-end-session"
+            title="End Session — finish roleplay and get performance summary with XP"
           >
             {isEndingSession ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ending...</>
@@ -1002,7 +1004,7 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" onClick={onBack} data-testid="button-back-objection">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-objection" title="Back to Menu — return to training mode selection">
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Menu
         </Button>
@@ -1056,6 +1058,7 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
               disabled={!userResponse.trim()}
               className="w-full bg-orange-500 hover:bg-orange-600"
               data-testid="button-submit-objection"
+              title="Submit Response — get AI scoring and see the best approach"
             >
               Submit Response
             </Button>
@@ -1149,6 +1152,7 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
                 onClick={nextObjection}
                 className="w-full bg-orange-500 hover:bg-orange-600"
                 data-testid="button-next-objection"
+                title="Next Objection — advance to the next challenge"
               >
                 Next Objection
               </Button>
@@ -1157,7 +1161,7 @@ function ObjectionGauntlet({ onBack }: ObjectionGauntletProps) {
                 <h3 className="text-2xl font-bold mb-2">Gauntlet Complete!</h3>
                 <p className="text-muted-foreground mb-4">Final Score: {score} points</p>
                 {/* XP earned will show via toast notification */}
-                <Button onClick={resetGauntlet} className="bg-orange-500 hover:bg-orange-600">
+                <Button onClick={resetGauntlet} className="bg-orange-500 hover:bg-orange-600" title="Try Again — restart the objection gauntlet with fresh challenges">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
@@ -1254,7 +1258,7 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" onClick={onBack} data-testid="button-back-scenario">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-scenario" title="Back to Menu — return to training mode selection">
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Menu
         </Button>
@@ -1352,6 +1356,7 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
                 onClick={nextScenario}
                 className="w-full bg-cyan-500 hover:bg-cyan-600"
                 data-testid="button-next-scenario"
+                title="Next Scenario — proceed to the next situational training"
               >
                 Next Scenario
               </Button>
@@ -1361,7 +1366,7 @@ function ScenarioTrainer({ onBack }: ScenarioTrainerProps) {
                 <p className="text-muted-foreground mb-4">
                   Final Score: {totalScore} / {SCENARIOS.length * 10} points
                 </p>
-                <Button onClick={resetTrainer} className="bg-cyan-500 hover:bg-cyan-600">
+                <Button onClick={resetTrainer} className="bg-cyan-500 hover:bg-cyan-600" title="Try Again — restart all scenarios from the beginning">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
@@ -1523,7 +1528,7 @@ function DeliveryAnalyzer({ onBack }: DeliveryAnalyzerProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" onClick={onBack} data-testid="button-back-analyzer">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-analyzer" title="Back to Menu — return to training mode selection">
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Menu
         </Button>
@@ -1556,6 +1561,7 @@ Example: 'Ever close the month—staring at the deposit screen, adding it up twi
               disabled={!presentationText.trim() || isAnalyzing}
               className="flex-1 bg-purple-500 hover:bg-purple-600"
               data-testid="button-analyze"
+              title="Analyze Delivery — AI evaluates which presentation stages you covered"
             >
               {isAnalyzing ? (
                 <>
@@ -1570,7 +1576,7 @@ Example: 'Ever close the month—staring at the deposit screen, adding it up twi
               )}
             </Button>
             {analysis && (
-              <Button variant="outline" onClick={reset}>
+              <Button variant="outline" onClick={reset} title="Reset — clear your script and start a new analysis">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Reset
               </Button>

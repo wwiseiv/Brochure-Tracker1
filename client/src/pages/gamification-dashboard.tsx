@@ -306,6 +306,7 @@ export default function GamificationDashboardPage() {
             size="icon"
             onClick={() => setLocation("/profile")}
             data-testid="button-back-profile"
+            aria-label="Back to Profile — return to your profile page"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -815,6 +816,7 @@ export default function GamificationDashboardPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               data-testid={`button-download-cert-${earned.id}`}
+                              title="Download PDF — save your certificate as a PDF file"
                             >
                               <Button variant="outline" size="sm">
                                 <Download className="h-4 w-4 mr-1" />
@@ -828,6 +830,7 @@ export default function GamificationDashboardPage() {
                               onClick={() => generateCertMutation.mutate(certType)}
                               disabled={generateCertMutation.isPending}
                               data-testid={`button-claim-cert-${certType}`}
+                              title="Claim Certificate — generate your achievement certificate"
                             >
                               {generateCertMutation.isPending ? (
                                 <>

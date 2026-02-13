@@ -471,7 +471,7 @@ export default function EquipIQPage() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{isRecording ? "Stop recording" : "Record voice message"}</p>
+                        <p>{isRecording ? "Stop Recording — finish and transcribe your input" : "Record Voice — describe merchant needs by speaking"}</p>
                       </TooltipContent>
                     </Tooltip>
                     <Tooltip delayDuration={700}>
@@ -485,7 +485,7 @@ export default function EquipIQPage() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Send message</p>
+                        <p>Send Message — get AI equipment recommendations</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>

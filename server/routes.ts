@@ -1963,7 +1963,7 @@ Format your response as JSON:
           role,
           agentStage: role === 'agent' ? 'trainee' : null,
           featureOverrides: {}
-        });
+        } as any);
       }
       
       // Sync permission role with org membership role (handles auto-upgrade from ensureOrgMembership)
@@ -2118,7 +2118,7 @@ Format your response as JSON:
           orgId: membership.orgId,
           role,
           agentStage: role === 'agent' ? 'trainee' : null
-        });
+        } as any);
       } else {
         await storage.updateUserPermissions(targetUserId, { 
           role, 
@@ -2186,7 +2186,7 @@ Format your response as JSON:
           orgId: membership.orgId,
           role: 'agent',
           agentStage: stage
-        });
+        } as any);
       } else {
         await storage.updateUserPermissions(targetUserId, { 
           agentStage: stage,
@@ -2309,7 +2309,7 @@ Format your response as JSON:
           role: 'agent',
           agentStage: 'trainee',
           featureOverrides: newOverrides
-        });
+        } as any);
       } else {
         console.log(`[PermissionOverride] Updating permissions for ${targetUserId}`);
         await storage.updateUserPermissions(targetUserId, { 
@@ -2383,7 +2383,7 @@ Format your response as JSON:
           role: preset.role,
           agentStage: preset.agentStage || null,
           featureOverrides: {}
-        });
+        } as any);
       } else {
         await storage.updateUserPermissions(targetUserId, { 
           role: preset.role,
@@ -2659,10 +2659,10 @@ Format your response as JSON:
       const impersonatedUser = await authStorage.getUser(session.impersonatedUserId);
       const originalUser = await authStorage.getUser(session.originalUserId);
       const originalMembership = await storage.getUserMembership(session.originalUserId);
-      const impersonatedMembership = await storage.getOrganizationMember(
+      const impersonatedMembership = session.organizationId ? await storage.getOrganizationMember(
         session.organizationId,
         session.impersonatedUserId
-      );
+      ) : undefined;
       
       res.json({
         valid: true,
@@ -2716,7 +2716,7 @@ Format your response as JSON:
             },
             startedAt: session.startedAt,
             expiresAt: session.expiresAt,
-            reason: session.reason,
+            reason: (session as any).reason,
           };
         })
       );
@@ -2781,7 +2781,7 @@ Format your response as JSON:
       if (membership.role !== "master_admin") {
         let perms = await storage.getUserPermissions(userId);
         if (!perms) {
-          perms = await storage.createUserPermissions(userId);
+          perms = await storage.createUserPermissions({ userId });
         }
         
         if (!perms.canViewLeaderboard) {
@@ -4276,7 +4276,7 @@ Format the response clearly with numbered action items. Be specific - instead of
         return res.status(403).json({ error: "You don't have permission to delete this merchant" });
       }
       
-      await storage.deleteMerchantWithRole(merchantId, orgId);
+      await storage.deleteMerchantWithRole(merchantId, membership.organization.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting merchant:", error);
@@ -10733,11 +10733,11 @@ Generate the following content in JSON format:
         if (!kept.phone && merge.phone) updates.phone = merge.phone;
         if (!kept.email && merge.email) updates.email = merge.email;
         if (!kept.website && merge.website) updates.website = merge.website;
-        if (!kept.address && merge.address) {
-          updates.address = merge.address;
+        if (!kept.addressLine1 && merge.addressLine1) {
+          updates.addressLine1 = merge.addressLine1;
           updates.city = merge.city;
           updates.state = merge.state;
-          updates.zip = merge.zip;
+          updates.zipCode = merge.zipCode;
         }
         // Add notes about merge
         const existingNotes = kept.notes || '';
@@ -11325,7 +11325,7 @@ Generate the following content in JSON format:
       
       const result = await paginateByStage(
         queryBuilder,
-        stages,
+        [...stages],
         { limitPerStage, cursors, sortBy, sortOrder },
         sortColumn,
         deals.id,
@@ -13031,7 +13031,7 @@ Generate the following content in JSON format:
       // Include validation info in response
       const response = {
         ...job,
-        extractedData: job.results?.statementData || getDefaultSanitizedData(),
+        extractedData: (job.results as any)?.statementData || getDefaultSanitizedData(),
         confidence: job.confidence || 0,
         needsManualReview: job.needsManualReview || job.status === 'needs_review',
         reviewReasons: job.reviewReasons || [],
@@ -13371,8 +13371,12 @@ Generate the following content in JSON format:
     res.json({ received: true });
 
     setImmediate(async () => {
-      const { processProposalParseJob } = await import("./services/proposal-parse-service");
-      await processProposalParseJob(jobId);
+      try {
+        const { processProposalParseJob } = await import("./services/proposal-parse-service");
+        await processProposalParseJob(jobId);
+      } catch (error) {
+        console.error("[ProposalParse] Error processing job:", jobId, error);
+      }
     });
   });
 
@@ -16108,7 +16112,8 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
       }
       
       const manifest = getAssetManifest();
-      if (!manifest.assets[assetId]) {
+      const manifestAssets = manifest.assets as Record<string, any>;
+      if (!manifestAssets[assetId]) {
         return res.status(400).json({ error: `Unknown assetId: ${assetId}` });
       }
       
@@ -16122,7 +16127,7 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
         userId: targetUserId,
         type,
         assetId,
-        title: title || manifest.assets[assetId].displayName,
+        title: title || manifestAssets[assetId].displayName,
         metadata: metadata || {},
       });
       
@@ -16147,11 +16152,12 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
       }
       
       const manifest = getAssetManifest();
-      if (!manifest.assets[primaryAssetId]) {
+      const certAssets = manifest.assets as Record<string, any>;
+      if (!certAssets[primaryAssetId]) {
         return res.status(400).json({ error: `Unknown asset: ${primaryAssetId}` });
       }
       
-      const asset = manifest.assets[primaryAssetId];
+      const asset = certAssets[primaryAssetId];
       const verificationCode = generateVerificationCode();
       
       const certTypeMap: Record<string, string> = {
@@ -16277,7 +16283,8 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const pdfParse = (await import("pdf-parse")).default;
+      const pdfParseModule = await import("pdf-parse");
+      const pdfParse = (pdfParseModule as any).default || pdfParseModule;
       const parsed = await pdfParse(req.file.buffer);
       const text = parsed.text || "";
 
@@ -16599,7 +16606,7 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
         user: targetMember ? {
           id: targetMember.userId,
           role: targetMember.role,
-          stage: targetMember.agentStage,
+          stage: (targetMember as any).agentStage,
           joinedAt: targetMember.createdAt,
         } : null,
         overallProgress,
@@ -16613,7 +16620,7 @@ Be specific, actionable, and supportive. No headers or bullet points - just flow
           totalModules: presLessons.length,
           items: presProgress.map(p => {
             const lesson = presLessons.find(l => l.id === p.lessonId);
-            return { ...p, lessonTitle: lesson?.title || `Lesson ${p.lessonId}`, moduleNumber: lesson?.moduleNumber };
+            return { ...p, lessonTitle: lesson?.title || `Lesson ${p.lessonId}`, moduleNumber: lesson?.moduleId };
           }),
         },
         salesCoach: {

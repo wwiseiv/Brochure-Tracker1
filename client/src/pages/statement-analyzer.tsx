@@ -1503,7 +1503,7 @@ ${new Date().toLocaleDateString()}
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Go back - Return to home page</TooltipContent>
+              <TooltipContent>Go Back — return to the home page</TooltipContent>
             </Tooltip>
           </Link>
           <div>
@@ -1518,6 +1518,7 @@ ${new Date().toLocaleDateString()}
             onClick={() => setShowMyAnalyses(!showMyAnalyses)}
             className="gap-2"
             data-testid="button-my-analyses"
+            title="My Analyses — view your past statement analysis history"
           >
             <History className="h-4 w-4" />
             My Analyses
@@ -1533,6 +1534,7 @@ ${new Date().toLocaleDateString()}
               size="sm" 
               onClick={copyAllForEmail}
               data-testid="button-copy-email-header"
+              title="Copy for Email — copy the full analysis to your clipboard for pasting into an email"
             >
               {copiedText === "Full Analysis" ? (
                 <>

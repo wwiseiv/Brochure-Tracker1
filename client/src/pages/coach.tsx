@@ -624,6 +624,7 @@ function DailyEdgeSection() {
                 variant="outline"
                 style={{ borderColor: beliefColor + "60", color: beliefColor }}
                 data-testid="button-discuss-daily-edge"
+                title="Discuss with AI Coach — explore today's mindset topic in depth"
               >
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Discuss This with AI Coach
@@ -665,7 +666,7 @@ function DailyEdgeSection() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Close chat</p>
+                <p>Close Chat — return to the Daily Edge card</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -729,7 +730,7 @@ function DailyEdgeSection() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isDailyEdgeRecording ? "Stop recording" : "Record voice message"}</p>
+                  <p>{isDailyEdgeRecording ? "Stop Recording — finish and transcribe your message" : "Record Voice — speak your message instead of typing"}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip delayDuration={700}>
@@ -749,7 +750,7 @@ function DailyEdgeSection() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Send message</p>
+                  <p>Send Message — get AI coaching response</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -1494,7 +1495,7 @@ export default function CoachPage() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Go back</p>
+              <p>Go Back — return to the previous page</p>
             </TooltipContent>
           </Tooltip>
           <div className="flex-1">
@@ -1883,6 +1884,7 @@ export default function CoachPage() {
                       disabled={isObjectionsTranscribing}
                       className={`h-11 w-11 flex-shrink-0 self-start ${isObjectionsRecording ? "animate-pulse" : ""}`}
                       data-testid="button-mic-objections"
+                      aria-label={isObjectionsRecording ? "Stop Recording — finish and transcribe" : "Record Voice — dictate custom objections"}
                     >
                       {isObjectionsTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
                     </Button>
@@ -1895,6 +1897,7 @@ export default function CoachPage() {
                 onClick={() => startSessionMutation.mutate()}
                 disabled={startSessionMutation.isPending}
                 data-testid="button-start-session"
+                title="Start Session — begin a roleplay practice with your chosen scenario"
               >
                 {startSessionMutation.isPending ? (
                   <>
@@ -2189,7 +2192,7 @@ export default function CoachPage() {
               )}
               </div>
 
-              <Button className="w-full h-12" onClick={handleNewSession} data-testid="button-new-session">
+              <Button className="w-full h-12" onClick={handleNewSession} data-testid="button-new-session" title="Practice Again — start a new roleplay session with fresh scenarios">
                 Practice Again
               </Button>
             </div>

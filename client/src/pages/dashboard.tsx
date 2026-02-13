@@ -167,7 +167,7 @@ export default function DashboardPage() {
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>View team activity feed</p>
+                  <p>View Activity Feed — see recent team drops and updates</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -181,7 +181,7 @@ export default function DashboardPage() {
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Admin dashboard</p>
+                  <p>Admin Dashboard — manage users, roles, and system settings</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Manager dashboard</p>
+                  <p>Manager Dashboard — view team performance and pipeline</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -263,7 +263,7 @@ export default function DashboardPage() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Sync offline drops</p>
+                    <p>Sync Now — upload pending offline drops to the server</p>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -285,7 +285,7 @@ export default function DashboardPage() {
               </Link>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Record a new brochure drop</p>
+              <p>Scan & Drop — scan QR code to log a new brochure drop</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Optimize your driving route</p>
+                        <p>Plan Route — optimize your driving route for today's pickups</p>
                       </TooltipContent>
                     </Tooltip>
                     <span className="text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                           </Link>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>View all today's scheduled pickups</p>
+                          <p>View All Pickups — see all today's scheduled pickups</p>
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                   Today's Actions
                 </h3>
                 <Link href="/today">
-                  <Button variant="ghost" size="sm" className="gap-1 text-emerald-600" data-testid="button-view-today">
+                  <Button variant="ghost" size="sm" className="gap-1 text-emerald-600" data-testid="button-view-today" title="View All — see follow-ups, appointments, and tasks for today">
                     View All
                     <ChevronRight className="w-4 h-4" />
                   </Button>
