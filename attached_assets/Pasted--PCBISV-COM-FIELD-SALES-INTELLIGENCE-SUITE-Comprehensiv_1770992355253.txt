@@ -1,0 +1,680 @@
+# PCBISV.COM — FIELD SALES INTELLIGENCE SUITE
+
+## Comprehensive System Audit, Test & Fix Prompt
+
+-----
+
+## ⚠️ SUPREME DIRECTIVE — READ THIS FIRST
+
+**DO NOT REMOVE ANY FEATURES. EVER. UNDER ANY CIRCUMSTANCES.**
+
+Your job is to:
+
+- ✅ FIX broken code
+- ✅ RESTORE accidentally removed or broken features
+- ✅ UPDATE outdated content (tooltips, help menu, AI assistant)
+- ✅ CORRECT errors without changing functionality
+- ✅ IMPROVE code quality while preserving ALL existing behavior
+- ✅ REMOVE all references to PCB Auto (it is now a standalone app — it does NOT belong in this platform)
+- ❌ NEVER delete features, even if they seem unused
+- ❌ NEVER simplify by removing functionality
+- ❌ NEVER “clean up” by deleting code you don’t understand
+- ❌ NEVER say “this feature was buggy so I removed it”
+
+If you find code that looks unused or broken: **FIX IT — don’t remove it.**
+If you can’t fix it, flag it in your report and move on.
+
+-----
+
+## 🏗️ WHAT THIS APP IS
+
+**PCBISV.com** is the PCBancard Sales Intelligence Suite — a comprehensive field sales intelligence platform for merchant services agents. It is a React/TypeScript + Node.js + PostgreSQL progressive web app hosted on Replit. It serves three user roles: **Admin**, **Manager (RM)**, and **Agent**.
+
+**PCB Auto is NOT part of this app.** PCB Auto is a standalone application for auto repair shops. If you find any PCB Auto routes, components, menu items, database tables, or references inside this codebase, **remove them cleanly** (delete the PCB Auto code, not the FSI Suite code). Do NOT break any FSI Suite features while removing PCB Auto references.
+
+-----
+
+## 📋 COMPLETE FEATURE INVENTORY — VERIFY EVERY SINGLE ONE
+
+The following is the authoritative, complete feature list. Every item below MUST exist, function correctly, and be accessible via navigation. If any feature is missing, broken, or unreachable: **restore or fix it**.
+
+### 1. Dashboard & Daily Operations
+
+- [ ] Home Dashboard with quick-access cards to all tools
+- [ ] “Today” view with daily tasks, follow-ups, and scheduled actions
+- [ ] Activity Feed showing team-wide actions in real time
+- [ ] Offline support (PWA with service worker and IndexedDB for working without internet)
+- [ ] Offline sync for queued actions when connectivity returns
+
+### 2. Brochure & Marketing Asset Management
+
+- [ ] QR code scanning to log brochure drops
+- [ ] New drop creation with location (GPS), business info, voice notes, and photos
+- [ ] Drop history with search and filtering
+- [ ] Brochure inventory tracking per rep
+- [ ] Pickup scheduling and reminders
+- [ ] Location-based reminders for nearby drops
+- [ ] Drop export to CSV
+
+### 3. CRM / Merchant Management
+
+- [ ] Merchant profiles with contact info, business details, and notes
+- [ ] Merchant detail pages with interaction history
+- [ ] Business lookup/validation when creating drops
+- [ ] Business card scanner (camera-based OCR to import contacts)
+
+### 4. Deal Pipeline & Sales Process
+
+- [ ] 14-stage sales pipeline
+- [ ] Prospect pipeline (Kanban and list views)
+- [ ] Team pipeline view (manager-level)
+- [ ] Pipeline analytics with charts and metrics
+- [ ] Deal sheets with revenue tracking
+- [ ] Follow-up scheduling and tracking
+- [ ] Referral tracking
+
+### 5. AI-Powered Prospecting
+
+- [ ] AI Prospect Finder (searches for leads based on criteria)
+- [ ] Prospecting advice coach on the dashboard
+- [ ] Route Planner for mapping field visits
+
+### 6. Proposals & Documents
+
+- [ ] Proposal Generator (AI-assisted, outputs PDF/Word)
+- [ ] Merchant data parsing from uploaded documents
+- [ ] Website scraping for business intelligence
+- [ ] Job-based generation with status tracking
+- [ ] One-Page Proposal Generator (7 templates + AI-Custom option)
+- [ ] Statement Analyzer (AI vision to find savings from uploaded statements)
+- [ ] E-Sign Integration (SignNow) with document library and request tracking
+- [ ] Marketing Materials Generator (AI-created sales collateral)
+
+### 7. AI Coach & Training Suite
+
+#### 7a. AI Coach (Practice Role-Play)
+
+- [ ] Role-play mode with AI merchant personas
+- [ ] Coaching mode (ask the AI coach questions)
+- [ ] 36 merchant personas (20 original + 16 vertical-specific across medical, gas station, e-commerce, professional services, hotel, auto body, grocery, franchise)
+- [ ] Voice input/output (speech-to-text for reps, text-to-speech for AI via ElevenLabs)
+- [ ] Real-time coaching hints during roleplay
+- [ ] Session feedback with scores for strengths, areas to improve, NEPQ technique usage, objection handling, rapport building
+- [ ] Psychographic adaptation analysis
+- [ ] Emotional driver tracking
+- [ ] Tonal effectiveness assessment
+- [ ] Corrective script suggestions
+- [ ] Session history and replay
+- [ ] Export/share feedback
+
+#### 7b. Interactive Training Center
+
+- [ ] Roleplay Simulator with all 36 merchant personas
+- [ ] Objection Gauntlet (rapid-fire objection handling drills with AI scoring)
+- [ ] Scenario Trainer
+- [ ] Delivery Analyzer (voice I/O with AI evaluation of delivery style)
+- [ ] Session tracking with AI-generated performance scores
+- [ ] Training knowledge base integration
+
+#### 7c. Trust-Based Scoring System (integrated into both Coach and Interactive Training)
+
+- [ ] Hidden trust scores (0-100) revealed in debrief
+- [ ] Live mood indicators (Guarded / Warming Up / Engaged)
+- [ ] Two-pass AI evaluation (one for persona response, one for trust assessment)
+- [ ] Adaptive difficulty (auto-adjusts based on last 5 sessions)
+- [ ] Deception Toolkit with 6 tactics: polite lie, time trap, honesty test, red herring, gatekeeper test, competitor bluff
+- [ ] Trust progression chart in session debrief
+- [ ] Deception test results (caught vs. missed)
+- [ ] Mood journey visualization
+
+#### 7d. Presentation Training
+
+- [ ] Structured modules and lessons
+- [ ] AI-powered Q&A on lesson content
+- [ ] Practice responses with AI feedback
+- [ ] Progress tracking per lesson
+
+#### 7e. Sales Videos Training
+
+- [ ] Vimeo-hosted training video library
+- [ ] Watch progress tracking
+
+#### 7f. Sales Process Reference
+
+- [ ] Step-by-step sales methodology guide
+
+### 8. EquipIQ (Equipment Recommendation Engine)
+
+- [ ] Business type assessment
+- [ ] AI-powered equipment recommendations
+- [ ] Product catalog with vendor details
+- [ ] Quiz-based matching with AI-generated questions
+- [ ] Saved recommendation history
+
+### 9. Communication Tools
+
+- [ ] AI Email Drafter (compose professional sales emails with AI assistance)
+- [ ] AI-Powered Email Digest System (automated summary emails)
+- [ ] Meeting Recording & Analysis (upload recordings for AI analysis)
+
+### 10. Gamification & Leaderboards
+
+- [ ] XP progression system with career ladder
+- [ ] Dual badge structures (training + field performance)
+- [ ] Weighted Skill Score
+- [ ] Streak bonuses for consistent activity
+- [ ] Leaderboards (org-wide ranking)
+- [ ] PDF certificates for achievements
+- [ ] Gamification Dashboard with stats and progress
+
+### 11. User & Team Management
+
+- [ ] Replit Auth (secure login via OpenID Connect)
+- [ ] Profile completion flow for new users
+- [ ] Three-tier role-based access control (Admin, Manager, Agent)
+- [ ] User impersonation (admin can view as any user)
+- [ ] Team Management panel (invite, manage roles, permissions)
+- [ ] Per-feature permission controls
+- [ ] Pipeline stage access restrictions
+- [ ] Organization consolidation tools
+- [ ] Accept-invite flow for new team members
+
+### 12. Admin & Reporting
+
+- [ ] Admin Dashboard with org-wide stats
+- [ ] Manager (RM) Dashboard
+- [ ] Agent Training Detail view (admin can review individual training progress)
+- [ ] Feedback & Issue Tracking (in-app form with file uploads)
+- [ ] Admin Feedback review panel
+- [ ] My Work / Personal Analytics page
+
+### 13. Help & Support
+
+- [ ] Help Center page
+- [ ] AI Help Chatbot (floating assistant available on every page)
+
+### 14. Technical / Platform
+
+- [ ] Mobile-first responsive design (PWA)
+- [ ] Dark mode support
+- [ ] Google Cloud Storage for file uploads (presigned URL flow)
+- [ ] PostgreSQL database
+- [ ] Multiple AI providers (Grok, Claude, Gemini, OpenAI, ElevenLabs)
+- [ ] Resend for transactional emails
+
+-----
+
+## 🔧 PHASE 1: CODEBASE INVENTORY & MAPPING
+
+**Before you fix anything, map everything.**
+
+### 1.1 Create Complete File Map
+
+```bash
+find . -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js" -o -name "*.css" -o -name "*.json" \) | grep -v node_modules | grep -v .git | sort
+```
+
+### 1.2 Map All Routes
+
+Find every route definition in the app. List them in a table:
+
+|Route Path|Component    |Feature Section|Working?|
+|----------|-------------|---------------|--------|
+|/dashboard|Dashboard.tsx|1. Dashboard   |✅/❌     |
+|…         |…            |…              |…       |
+
+### 1.3 Map All Navigation Links
+
+Find every sidebar item, navbar link, quick-access card, and in-page link. Cross-reference against the route map. Flag any link that points to a non-existent route.
+
+### 1.4 Map All API Endpoints
+
+List every backend route. Cross-reference with frontend API calls. Flag mismatches.
+
+### 1.5 Identify PCB Auto References
+
+Search the entire codebase for any references to PCB Auto, auto repair, repair orders, vehicle tracking, or the PCB Auto module. List all files containing these references. These will be cleaned out in Phase 3.
+
+**Present the complete inventory before proceeding.**
+
+-----
+
+## 🔍 PHASE 2: SYSTEMATIC CODE REVIEW
+
+Go through EVERY file in the codebase. For each file:
+
+1. **Read the code** — understand what it does
+1. **Check imports** — are all imports valid? Do imported files exist?
+1. **Check exports** — is everything that should be exported, exported?
+1. **Check API calls** — do endpoints exist? Are request/response shapes correct?
+1. **Check state management** — are there race conditions, stale closures, missing dependencies?
+1. **Check error handling** — are errors caught? Do failed API calls show user feedback?
+1. **Check TypeScript** — are there type errors, any casts that hide bugs, missing types?
+1. **Check for commented-out code** — is it dead code or accidentally disabled features?
+1. **Check conditional logic** — are there conditions that always fail (if false && …)?
+
+**Document every issue found. Do not fix yet — just catalog.**
+
+-----
+
+## 🔄 PHASE 3: RESTORE & CLEAN
+
+### 3.1 Restore Missing/Broken Features
+
+Cross-reference Phase 1 inventory against the Complete Feature Inventory above (all 14 sections). For every feature that is missing or broken:
+
+1. Check git history for accidentally removed code
+1. Find the original implementation
+1. Restore it or rebuild it
+1. Verify it works
+
+### 3.2 Remove PCB Auto References
+
+For every PCB Auto reference found in Phase 1.5:
+
+1. Remove the PCB Auto-specific code (routes, components, database migrations, menu items)
+1. Do NOT remove any shared utilities or infrastructure that other FSI features also use
+1. Remove PCB Auto from navigation menus, sidebar, dashboard cards, help content
+1. Clean up any database tables that are PCB Auto-only (if safe to do so)
+1. Verify no FSI features broke during removal
+
+### 3.3 Fix Broken Navigation
+
+Every feature in the inventory must be reachable via:
+
+- Sidebar navigation
+- Dashboard quick-access cards (where applicable)
+- Help menu links
+- AI assistant recommendations
+
+-----
+
+## 💬 PHASE 4: UPDATE ALL TOOLTIPS
+
+Find every tooltip, title attribute, aria-label, and placeholder text in the app.
+
+### Rules:
+
+- Every interactive element MUST have a tooltip
+- Tooltips must be specific and helpful (not generic like “Click here”)
+- Format: “[Action] — [Benefit/Context]”
+- Remove any PCB Auto references from tooltips
+
+### Examples:
+
+- ❌ “Submit” → ✅ “Submit proposal — generates PDF and saves to merchant profile”
+- ❌ “Click” → ✅ “Open AI Coach — practice sales conversations with AI merchant personas”
+- ❌ “Delete” → ✅ “Delete this drop record — this action cannot be undone”
+- ❌ “Run” → ✅ “Run statement analysis — AI scans for savings opportunities”
+
+**Update every tooltip. List all changes.**
+
+-----
+
+## 📖 PHASE 5: UPDATE HELP MENU / HELP CENTER
+
+Review and update ALL help content. The Help Center must include a guide or article for every major feature section (all 14 sections above).
+
+### Required Help Articles:
+
+1. Getting Started / Onboarding Guide
+1. Dashboard & Daily Operations
+1. Brochure & Marketing Asset Management
+1. CRM / Merchant Management
+1. Deal Pipeline & Sales Process
+1. AI-Powered Prospecting
+1. Proposals & Documents (including Statement Analyzer, E-Sign, One-Page Proposals)
+1. AI Coach & Training Suite (Role-Play, Objection Gauntlet, Trust Scoring, Presentation Training, Videos)
+1. EquipIQ Equipment Recommendations
+1. Communication Tools (Email Drafter, Email Digest, Meeting Recorder)
+1. Gamification & Leaderboards
+1. User & Team Management (Roles, Permissions, Impersonation)
+1. Admin & Reporting
+1. Troubleshooting & FAQ
+
+### For each article:
+
+- Verify accuracy against current app behavior
+- Update any outdated instructions
+- Remove any PCB Auto references
+- Ensure all in-article links work
+- Add missing content for new or undocumented features
+
+-----
+
+## 🤖 PHASE 6: UPDATE AI HELP CHATBOT
+
+Find the AI Help Chatbot (floating assistant) and update its knowledge base.
+
+### The AI assistant must know about:
+
+- All 14 feature sections and how to use each one
+- All 36 merchant personas in the AI Coach
+- The Trust-Based Scoring System and Deception Toolkit
+- How to navigate to every feature
+- User roles (Admin, Manager, Agent) and what each can access
+- Permission system and how toggles work
+- Common errors and how to fix them
+- How to use the Statement Analyzer, Proposal Generator, and EquipIQ
+- The gamification system (XP, badges, streaks, leaderboards)
+- Offline mode and how to sync data
+
+### The AI assistant must NOT reference:
+
+- PCB Auto (auto repair shops, repair orders, vehicle tracking)
+- Any features that don’t exist in the FSI Suite
+- Outdated instructions or deprecated workflows
+
+### Proactive triggers — the AI should offer help when:
+
+- A user lands on a page for the first time
+- A user appears stuck (no action for 30+ seconds on a complex page)
+- A user encounters an error
+- A user is on the training pages and hasn’t started a session
+
+**Update all AI assistant knowledge, triggers, and responses. List all changes.**
+
+-----
+
+## 🛠️ PHASE 7: FIX CODE ERRORS
+
+Now fix every issue cataloged in Phase 2. Follow these rules:
+
+### The Fix Protocol:
+
+1. **Show the broken code** (file, line number, what’s wrong)
+1. **Show your fix** (minimal change to resolve the issue)
+1. **Explain why** (one sentence)
+1. **Verify** (confirm fix doesn’t break other features)
+
+### Rules:
+
+- Fix with the SMALLEST change possible
+- Never remove features to fix bugs
+- Never refactor working code while fixing bugs
+- If a fix might affect other features, test those features too
+- If you can’t fix something safely, flag it and move on
+
+### Common fixes to look for:
+
+- Missing null/undefined checks
+- Broken API endpoint URLs
+- Missing error boundaries
+- Failed database queries with no error handling
+- Race conditions in async code
+- Missing loading states
+- Console errors and warnings
+- TypeScript type errors
+- Missing environment variable checks
+- Broken imports/exports
+- Stale closures in useEffect hooks
+- Missing dependency arrays in hooks
+
+-----
+
+## 🧪 PHASE 8: COMPREHENSIVE TESTING
+
+### 8.1 Role-Based Testing
+
+Test the entire app as each role:
+
+|Test                             |Admin|Manager|Agent|
+|---------------------------------|-----|-------|-----|
+|Dashboard loads                  |✅/❌  |✅/❌    |✅/❌  |
+|Can access all permitted features|✅/❌  |✅/❌    |✅/❌  |
+|Cannot access restricted features|N/A  |✅/❌    |✅/❌  |
+|Pipeline views work              |✅/❌  |✅/❌    |✅/❌  |
+|AI Coach works                   |✅/❌  |✅/❌    |✅/❌  |
+|Training center works            |✅/❌  |✅/❌    |✅/❌  |
+|Gamification displays            |✅/❌  |✅/❌    |✅/❌  |
+|Impersonation works              |✅/❌  |✅/❌    |N/A  |
+
+### 8.2 Navigation Testing
+
+- [ ] Every sidebar link navigates to the correct page
+- [ ] Every dashboard card links to the correct feature
+- [ ] Back button works correctly on every page
+- [ ] No 404 pages from internal navigation
+- [ ] No blank/white pages
+- [ ] Mobile sidebar/hamburger menu works
+
+### 8.3 Feature Testing
+
+For each of the 14 feature sections, verify:
+
+- [ ] Page loads without errors
+- [ ] All buttons and interactive elements work
+- [ ] Forms submit correctly
+- [ ] Data saves and persists
+- [ ] Error states display appropriately
+- [ ] Loading states display while data fetches
+- [ ] Empty states display when no data exists
+
+### 8.4 AI Feature Testing
+
+- [ ] AI Coach roleplay initiates and generates responses
+- [ ] All 36 personas are selectable and behave differently
+- [ ] Trust scoring works and displays in debrief
+- [ ] Deception Toolkit triggers during sessions
+- [ ] Voice input/output works (ElevenLabs TTS, browser STT)
+- [ ] Objection Gauntlet loads and scores correctly
+- [ ] Delivery Analyzer records and evaluates
+- [ ] Statement Analyzer processes uploaded images
+- [ ] Proposal Generator creates documents
+- [ ] AI Prospect Finder returns results
+- [ ] EquipIQ quiz generates recommendations
+- [ ] AI Email Drafter produces email content
+- [ ] AI Help Chatbot responds accurately on every page
+
+### 8.5 Mobile Responsiveness
+
+- [ ] All pages render correctly at 375px width (iPhone SE)
+- [ ] All pages render correctly at 390px width (iPhone 14)
+- [ ] All pages render correctly at 768px width (iPad)
+- [ ] Touch targets are at least 44px × 44px
+- [ ] No horizontal scroll on any page
+- [ ] Modals and drawers work on mobile
+- [ ] PWA install prompt works
+
+### 8.6 Dark Mode Testing
+
+- [ ] All pages render correctly in dark mode
+- [ ] No unreadable text (light on light, dark on dark)
+- [ ] Charts and graphs adapt to dark mode
+- [ ] Modals and popups respect dark mode
+
+### 8.7 Offline Testing
+
+- [ ] Service worker registers correctly
+- [ ] App loads when offline
+- [ ] Queued actions sync when back online
+- [ ] IndexedDB stores offline data correctly
+
+-----
+
+## 📊 PHASE 9: FINAL AUDIT REPORT
+
+After completing all phases, generate this report:
+
+```
+====================================================
+PCBISV.COM — FIELD SALES INTELLIGENCE SUITE
+SYSTEM AUDIT REPORT
+Date: [DATE]
+====================================================
+
+FEATURE STATUS (checked against master inventory):
+--------------------------------------------------
+Section 1 — Dashboard & Daily Operations:     [X/5 working]
+Section 2 — Brochure & Marketing:             [X/7 working]
+Section 3 — CRM / Merchant Management:        [X/4 working]
+Section 4 — Deal Pipeline & Sales:            [X/7 working]
+Section 5 — AI-Powered Prospecting:           [X/3 working]
+Section 6 — Proposals & Documents:            [X/8 working]
+Section 7 — AI Coach & Training Suite:        [X/30 working]
+Section 8 — EquipIQ:                          [X/5 working]
+Section 9 — Communication Tools:              [X/3 working]
+Section 10 — Gamification & Leaderboards:     [X/7 working]
+Section 11 — User & Team Management:          [X/9 working]
+Section 12 — Admin & Reporting:               [X/6 working]
+Section 13 — Help & Support:                  [X/2 working]
+Section 14 — Technical / Platform:            [X/6 working]
+
+TOTAL: [X/102 features verified]
+
+PCB AUTO REMOVAL:
+-----------------
+Files removed: [LIST]
+Menu items removed: [LIST]
+Routes removed: [LIST]
+Database changes: [LIST]
+Verification: No FSI features broken ✅/❌
+
+BROKEN FEATURES FOUND & FIXED:
+------------------------------
+1. [Feature] — [What was wrong] — [How fixed]
+2. ...
+
+FEATURES RESTORED FROM GIT HISTORY:
+------------------------------------
+1. [Feature] — [When removed] — [Restored from commit]
+2. ...
+
+TOOLTIPS UPDATED:
+-----------------
+Total tooltips audited: [N]
+Tooltips updated: [N]
+Tooltips added: [N]
+
+HELP CENTER UPDATES:
+--------------------
+Articles updated: [N]
+Articles added: [N]
+PCB Auto references removed: [N]
+
+AI ASSISTANT UPDATES:
+---------------------
+Knowledge base entries updated: [N]
+Triggers updated: [N]
+PCB Auto references removed: [N]
+
+CODE ERRORS FIXED:
+------------------
+Critical: [N]
+High: [N]
+Medium: [N]
+Low: [N]
+
+REMAINING ISSUES (could not fix):
+----------------------------------
+1. [Issue] — [Why it couldn't be fixed] — [Recommended action]
+2. ...
+
+ROLE-BASED ACCESS VERIFICATION:
+-------------------------------
+Admin:   All features accessible ✅/❌
+Manager: Correct restrictions ✅/❌
+Agent:   Correct restrictions ✅/❌
+
+MOBILE RESPONSIVE: ✅/❌
+DARK MODE: ✅/❌
+OFFLINE/PWA: ✅/❌
+====================================================
+```
+
+-----
+
+## 🚀 EXECUTION ORDER
+
+Run phases in this exact order:
+
+1. **Phase 1** — Map everything first (don’t touch code yet)
+1. **Phase 2** — Review all code, catalog all issues
+1. **Phase 3** — Restore missing features + remove PCB Auto
+1. **Phase 4** — Update tooltips
+1. **Phase 5** — Update help center
+1. **Phase 6** — Update AI assistant
+1. **Phase 7** — Fix code errors
+1. **Phase 8** — Test everything
+1. **Phase 9** — Generate report
+
+**Show me the Phase 1 inventory before moving to Phase 2.**
+**Get confirmation before executing Phase 3 (restore/remove operations).**
+**Generate the Phase 9 report when finished.**
+
+-----
+
+## 🔥 FOLLOW-UP PROMPTS
+
+### If a specific feature is broken:
+
+```
+The [FEATURE NAME] is broken.
+DO NOT remove it.
+1. Show me the code for this feature
+2. Identify why it's not working
+3. Fix it while keeping ALL original functionality
+4. Test that it works
+```
+
+### If you need to restore deleted code:
+
+```
+Check git history for any code deleted in the last 90 days.
+Look for:
+- Deleted files
+- Large code removals
+- Reverted commits
+- Commented out functions
+Restore any deleted FSI Suite features. Do NOT restore PCB Auto code.
+```
+
+### If PCB Auto removal breaks something:
+
+```
+The removal of PCB Auto references broke [FEATURE].
+The problem is [DESCRIPTION].
+Fix the FSI Suite feature WITHOUT re-adding PCB Auto code.
+If the feature shared code with PCB Auto, duplicate the shared code
+into the FSI Suite so it stands alone.
+```
+
+### If tooltips need a second pass:
+
+```
+Review all tooltips again. Check:
+- Are there any elements still missing tooltips?
+- Are any tooltips still generic ("Click here", "Submit", "Open")?
+- Do all tooltips follow the format: "[Action] — [Benefit/Context]"?
+- Are there any remaining PCB Auto references in tooltips?
+Fix any issues found.
+```
+
+### If the AI assistant needs refinement:
+
+```
+Test the AI Help Chatbot by asking it these questions:
+1. "How do I start a roleplay session?"
+2. "What are the 14 stages in the pipeline?"
+3. "How does the Trust Scoring system work?"
+4. "How do I analyze a merchant statement?"
+5. "What is EquipIQ?"
+6. "How do I use the Objection Gauntlet?"
+7. "How do I export my brochure drops?"
+8. "What's the difference between Admin, Manager, and Agent roles?"
+
+If any answer is wrong, incomplete, or references PCB Auto, fix the
+AI assistant's knowledge base.
+```
+
+-----
+
+## ⛔ REMEMBER
+
+- **FIX and RESTORE. Never DELETE.**
+- **The feature list above is the source of truth.** If it’s on the list, it must work.
+- **PCB Auto is gone.** Remove it cleanly. Don’t break FSI features in the process.
+- **Show your work.** Don’t just say “fixed” — show the before and after.
+- **When in doubt, ask.** Don’t guess and break things.
+
+**BEGIN WITH PHASE 1. Show me the complete codebase inventory.**

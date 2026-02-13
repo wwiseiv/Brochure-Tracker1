@@ -50,6 +50,10 @@ import {
   MessageSquarePlus,
   BookOpen,
   Swords,
+  Camera,
+  Boxes,
+  Repeat,
+  ClipboardList,
 } from "lucide-react";
 import pcbLogoFullColor from "@/assets/pcb_logo_fullcolor.png";
 
@@ -88,6 +92,10 @@ const pathToFeatureMap: Record<string, string> = {
   "/training/sales-videos": "video_hello",
   "/presentation-training": "presentation_training",
   "/interactive-training": "interactive_training",
+  "/inventory": "brochure_inventory",
+  "/sequences": "sequences",
+  "/sales-process": "sales_process",
+  "/prospects/scan-card": "business_card_scanner",
 };
 
 const menuCategories = [
@@ -104,6 +112,7 @@ const menuCategories = [
     title: "Prospecting",
     items: [
       { path: "/prospects/search", icon: Sparkles, label: "AI Prospect Finder" },
+      { path: "/prospects/scan-card", icon: Camera, label: "Scan Business Card" },
       { path: "/route", icon: MapPin, label: "Route Planner" },
     ],
   },
@@ -111,6 +120,7 @@ const menuCategories = [
     title: "Documents",
     items: [
       { path: "/scan", icon: QrCode, label: "Scan Brochure" },
+      { path: "/drops/new", icon: QrCode, label: "New Drop" },
       { path: "/esign", icon: FileSignature, label: "E-Sign" },
       { path: "/proposal-generator", icon: FileText, label: "Proposal Generator" },
       { path: "/statement-analyzer", icon: BarChart3, label: "Statement Analyzer" },
@@ -124,6 +134,7 @@ const menuCategories = [
       { path: "/interactive-training", icon: Swords, label: "Interactive Training" },
       { path: "/presentation-training", icon: BookOpen, label: "Presentation Training" },
       { path: "/training/sales-videos", icon: PlayCircle, label: "Sales Videos" },
+      { path: "/sales-process", icon: ClipboardList, label: "Sales Process" },
       { path: "/email", icon: MessageSquare, label: "Email Drafter" },
       { path: "/equipiq", icon: Package, label: "EquipIQ" },
       { path: "/gamification", icon: Trophy, label: "Gamification" },
@@ -133,7 +144,9 @@ const menuCategories = [
     title: "Activity",
     items: [
       { path: "/history", icon: History, label: "Drop History" },
+      { path: "/inventory", icon: Boxes, label: "Inventory" },
       { path: "/referrals", icon: Users2, label: "Referrals" },
+      { path: "/sequences", icon: Repeat, label: "Sequences" },
       { path: "/my-work", icon: Briefcase, label: "My Work" },
       { path: "/activity", icon: PenTool, label: "Activity Feed" },
     ],
