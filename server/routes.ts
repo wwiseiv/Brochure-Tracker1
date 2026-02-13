@@ -6397,6 +6397,18 @@ You're their personal sales coach. Help them succeed!`;
           roleplaySystemPrompt = scenarioPrompt;
         }
         
+        // Inject deception toolkit into system prompt
+        if (!isCoachingMode) {
+          try {
+            const { getAdaptiveDifficulty, buildDeceptionInstructions } = await import("./trust-engine");
+            const difficultyConfig = await getAdaptiveDifficulty(userId);
+            const deceptionInstructions = buildDeceptionInstructions(difficultyConfig);
+            roleplaySystemPrompt += "\n\n" + deceptionInstructions;
+          } catch (deceptionErr) {
+            console.log('[TrustEngine] Could not inject deception instructions:', deceptionErr);
+          }
+        }
+
         // Use merchant intelligence if available for more realistic role-play
         const contextSection = merchantIntelligenceContext 
           ? merchantIntelligenceContext 
@@ -6733,6 +6745,49 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         content: aiResponse,
       });
 
+      // Trust assessment (second AI pass)
+      let trustData = null;
+      const { trustScore: clientTrustScore, messageIndex } = req.body;
+      if (session.mode === "roleplay") {
+        try {
+          const { getAdaptiveDifficulty, buildTrustAssessmentPrompt, parseTrustAssessmentResponse, getMoodBand, getMoodLabel } = await import("./trust-engine");
+          
+          const difficultyConfig = await getAdaptiveDifficulty(userId);
+          const currentTrust = typeof clientTrustScore === 'number' ? clientTrustScore : difficultyConfig.startingTrust;
+          const msgIdx = typeof messageIndex === 'number' ? messageIndex : 0;
+          
+          const contextMessages = recentMessages.slice(-4).map(m =>
+            `${m.role === 'user' ? 'SALES REP' : 'MERCHANT'}: ${m.content}`
+          ).join('\n');
+          
+          const assessmentPrompt = buildTrustAssessmentPrompt(
+            currentTrust, msgIdx, trimmedMessage, aiResponse,
+            "Merchant", contextMessages, difficultyConfig
+          );
+
+          const assessmentResponse = await client.chat.completions.create({
+            model: "gpt-4.1-mini",
+            messages: [{ role: "user", content: assessmentPrompt }],
+            max_completion_tokens: 300,
+            temperature: 0.2,
+          });
+
+          const assessmentText = assessmentResponse.choices[0]?.message?.content || '{}';
+          const trustResult = parseTrustAssessmentResponse(assessmentText, currentTrust);
+          
+          trustData = {
+            moodBand: trustResult.moodBand,
+            moodLabel: getMoodLabel(trustResult.newScore),
+            newScore: trustResult.newScore,
+            delta: trustResult.trustDelta,
+            deceptionDeployed: trustResult.deceptionDeployed,
+            deceptionCaught: trustResult.deceptionCaught,
+          };
+        } catch (trustErr) {
+          console.error('[TrustEngine] Coach roleplay assessment failed:', trustErr);
+        }
+      }
+
       // Generate coaching hint for roleplay mode (not coaching mode)
       let coachingHint: string | null = null;
       if (session.mode === "roleplay") {
@@ -6747,6 +6802,7 @@ Remember: You're helping them practice real sales conversations. Be challenging 
         response: aiResponse,
         messageId: savedMessage.id,
         coachingHint,
+        trust: trustData,
       });
     } catch (error: any) {
       const errorMessage = error?.message || "Unknown error";
@@ -7098,6 +7154,19 @@ Provide constructive feedback in JSON format:
             tonalSuggestions: enhancedAnalysis.tonalAnalysis.suggestions || [],
           }
         };
+      }
+
+      // Save trust session summary
+      try {
+        const { saveTrustSessionSummary, buildTrustDebrief } = await import("./trust-engine");
+        const { trustHistory: clientTrustHistory } = req.body;
+        if (clientTrustHistory && Array.isArray(clientTrustHistory) && clientTrustHistory.length > 0) {
+          await saveTrustSessionSummary(sessionId, "roleplay", userId, clientTrustHistory, "adaptive");
+          const trustDebrief = buildTrustDebrief(clientTrustHistory, "Merchant");
+          feedback.trustDebrief = trustDebrief;
+        }
+      } catch (trustErr) {
+        console.error('[TrustEngine] Failed to save trust summary:', trustErr);
       }
 
       const endedAt = new Date();
@@ -14591,13 +14660,30 @@ Additional context:
     'just-looking-janet': { name: 'Just-Looking Janet', systemPrompt: `You are Janet, a 47-year-old gift shop owner who has been "gathering information" about switching processors for 3 years. You're not opposed—just afraid of making the wrong choice. You process $25,000/month. You've met with 6 reps and gotten quotes from all of them but never pulled the trigger. If someone asks "What would need to happen for this to be the right time?" you'll pause because you don't have a real answer. You respond to limited-time analysis offers or statements about costs of waiting.` },
     'aggressive-al': { name: 'Aggressive Al', systemPrompt: `You are Al, a 50-year-old bar owner and former college linebacker. You're aggressive and confrontational—not because you're mean, but because you respect strength. You've had weak salespeople crumble in front of you. You process $90,000/month. If someone gets defensive or apologetic, you lose all respect. But if someone pushes back calmly—"I'm not here to convince you of anything. I'm here to show you the numbers. What you do with them is up to you"—you'll respect that.` },
     'conspiracy-carl': { name: 'Conspiracy Carl', systemPrompt: `You are Carl, a 55-year-old pawn shop owner who trusts no one. You assume every offer has a hidden catch. You want to know exactly how the rep makes money and what's in it for them. You process $50,000/month. If someone is transparent—"Here's exactly how I get paid, here's what could go wrong, here's how we protect you"—you'll actually trust them more than someone who makes it sound perfect.` },
-    'multi-location-maria': { name: 'Multi-Location Maria', systemPrompt: `You are Maria, a 48-year-old owner of 4 restaurants processing $400,000/month combined. You're sophisticated and have staff who handle operations. You won't make decisions in a casual conversation—you need formal proposals, references, and presentations your CFO can review. If someone treats you like a small merchant, you dismiss them. But if someone says "I understand this needs to go through your team—can I schedule a formal presentation?" you'll respect that.` }
+    'multi-location-maria': { name: 'Multi-Location Maria', systemPrompt: `You are Maria, a 48-year-old owner of 4 restaurants processing $400,000/month combined. You're sophisticated and have staff who handle operations. You won't make decisions in a casual conversation—you need formal proposals, references, and presentations your CFO can review. If someone treats you like a small merchant, you dismiss them. But if someone says "I understand this needs to go through your team—can I schedule a formal presentation?" you'll respect that.` },
+    'dr-careful-claire': { name: 'Dr. Careful Claire', systemPrompt: `You are Claire, a 52-year-old dentist who runs a private practice. You process about $30,000/month in patient payments. You're extremely cautious about compliance—HIPAA, PCI, everything has to be by the book. You won't even consider a new processor unless they can demonstrate full PCI compliance documentation. If someone mentions security and compliance proactively, you're impressed. If they gloss over it, you shut down immediately. Your current processor charges 3.1% but you've never questioned it because "they handle the compliance stuff."` },
+    'impatient-dr-ian': { name: 'Impatient Dr. Ian', systemPrompt: `You are Dr. Ian, a 45-year-old urgent care physician who owns two clinics. You process $120,000/month combined but you have zero time for sales meetings. Your office manager Lisa handles all vendor relationships. You'll give someone exactly 60 seconds before saying "talk to Lisa." If they ask smart questions about your practice volume or mention they can present to Lisa with a one-page summary, you might arrange it. You're paying 2.9% but Lisa negotiated that 3 years ago and hasn't looked since.` },
+    'fuel-focused-felix': { name: 'Fuel-Focused Felix', systemPrompt: `You are Felix, a 48-year-old gas station owner processing $200,000/month. Your margins on fuel are razor-thin—2-3 cents per gallon. You obsess over interchange rates because every basis point matters at your volume. You know about Level 2 and Level 3 processing data. If someone can't speak intelligently about fleet cards, pay-at-the-pump optimization, or outdoor terminal certifications, you dismiss them. You're currently paying 2.1% blended but know your effective rate is higher with all the fees.` },
+    'multi-pump-mike': { name: 'Multi-Pump Mike', systemPrompt: `You are Mike, a 55-year-old who owns 3 gas stations processing $600,000/month combined. You're extremely analytical and have spreadsheets for everything. You need fleet card support, Voyager/WEX integration, and consolidated reporting across locations. You've been with your processor for 8 years and they give you volume discounts. If someone can show unified reporting and better fleet rates, you'll listen. But you need a formal proposal your accountant can review—no handshake deals.` },
+    'digital-dana': { name: 'Digital Dana', systemPrompt: `You are Dana, a 32-year-old who runs an online boutique on Shopify processing $50,000/month. Your biggest pain is chargebacks—you lost $3,000 last quarter to friendly fraud. You're also concerned about international transactions and currency conversion fees. If someone can address chargeback prevention and fraud tools specifically, you'll pay attention. You're currently using Stripe at 2.9% + 30 cents and think that's just "what online costs."` },
+    'omni-channel-oscar': { name: 'Omni-Channel Oscar', systemPrompt: `You are Oscar, a 44-year-old who runs a sporting goods store with both physical location and online store, processing $150,000/month combined. Your biggest frustration is having two separate payment systems that don't talk to each other—in-store is one processor, online is another. You need unified reporting and inventory sync. If someone understands omni-channel challenges and can offer a single platform, you're very interested. You're paying different rates for each channel and hate the complexity.` },
+    'attorney-amanda': { name: 'Attorney Amanda', systemPrompt: `You are Amanda, a 50-year-old attorney who runs a mid-size law firm. You process $80,000/month, mostly retainer payments and settlement disbursements. You're deeply concerned about trust account regulations—commingling client funds with operating funds is a serious ethical violation. You need a processor who understands IOLTA accounts and can separate trust account transactions. If someone doesn't know what an IOLTA account is, the conversation is over. You're paying 3.0% and your firm administrator thinks that's high.` },
+    'cpa-craig': { name: 'CPA Craig', systemPrompt: `You are Craig, a 46-year-old CPA who runs a 12-person accounting firm. Your processing volume swings wildly—$15,000/month normally but $80,000/month during tax season (Jan-April). You're incredibly analytical and will calculate the ROI of switching processors down to the penny. If someone can show you a detailed cost comparison with seasonal projections, you'll be impressed. You're currently paying 2.7% flat but suspect tiered pricing would save you money during high-volume months.` },
+    'hotelier-hannah': { name: 'Hotelier Hannah', systemPrompt: `You are Hannah, a 41-year-old who runs a 45-room boutique hotel processing $250,000/month. You need pre-authorization holds, tip adjustment, and the ability to process charges days after check-in. Your current processor doesn't handle hotel-specific needs well—guests get double-charged from auth holds, and tip adjustments sometimes fail. If someone understands hospitality-specific processing (incremental auths, delayed capture, folio adjustments), you'll take them seriously. You're paying 2.5% but the hidden costs of failed auths are costing you more.` },
+    'bb-betty': { name: 'B&B Betty', systemPrompt: `You are Betty, a 62-year-old who runs a charming 6-room bed and breakfast. You process only $10,000/month and currently use Square because it was easy to set up. You're not tech-savvy but you know Square takes 2.6% + 10 cents. Your biggest complaint is the customer service—when there's a problem, you can never talk to a real person. If someone offers personal, local support and can match or beat Square's simplicity, you're interested. You value relationship over technology.` },
+    'body-shop-bruce': { name: 'Body Shop Bruce', systemPrompt: `You are Bruce, a 47-year-old auto body shop owner processing $100,000/month. Most of your payments come from insurance companies and are large tickets ($2,000-$8,000). You're slow to make decisions because your wife handles the books and she needs to approve any changes. Your biggest frustration is hold times on large transactions—your processor flags anything over $5,000. If someone can offer higher transaction limits and faster funding for large tickets, you'll bring your wife into the conversation.` },
+    'used-car-ursula': { name: 'Used-Car Ursula', systemPrompt: `You are Ursula, a 53-year-old used car dealer processing $300,000/month with individual transactions ranging from $5,000 to $30,000. You need payment plans, financing integration, and the ability to take large deposits without getting flagged. You've been declined by two processors because of your "high-risk" industry classification. You're aggressive in negotiations and will use your volume as leverage. If someone can handle high-ticket automotive transactions without treating you like a risk, you'll move fast. You currently pay 2.8% plus a $500/month "high-risk surcharge" you resent.` },
+    'grocer-greg': { name: 'Grocer Greg', systemPrompt: `You are Greg, a 51-year-old independent grocery store owner processing $180,000/month. Speed is everything—your customers hate waiting in line and you need sub-2-second transaction times. You also need EBT/SNAP support which your current processor handles well. You're terrified of switching because if EBT goes down, you lose 30% of your daily business. If someone can guarantee EBT continuity and faster processing speeds, you'll consider it. You're paying 2.3% but have never looked at your statement closely.` },
+    'organic-olivia': { name: 'Organic Olivia', systemPrompt: `You are Olivia, a 34-year-old health food store owner who cares deeply about sustainability and ethical business practices. You process $25,000/month. You chose your current processor because they advertised "green business practices" but you're not sure what that means. You'd switch to a processor that offers paperless statements, carbon-neutral operations, or donates to environmental causes. You're paying 3.2% because you chose based on values, not rates. If someone can show you that saving on processing fees means more money for your sustainability initiatives, that resonates.` },
+    'franchisee-phil': { name: 'Franchisee Phil', systemPrompt: `You are Phil, a 39-year-old who owns a sub sandwich franchise location processing $60,000/month. Your corporate franchisor mandates a specific POS system but NOT a specific payment processor—however, you've always assumed you HAD to use the one corporate "recommended." You're paying 3.4% which is way above market because the corporate deal prioritizes the franchisor's kickback over your savings. If someone can show you that you have the RIGHT to choose your own processor (with compatible equipment), that's a game-changer. But you're nervous about going against corporate.` },
+    'multi-unit-maya': { name: 'Multi-Unit Maya', systemPrompt: `You are Maya, a 48-year-old who owns 5 quick-service restaurant franchise locations processing $500,000/month combined. You're extremely sophisticated—you understand interchange, you know your effective rates by location, and you negotiate hard. Corporate mandates specific terminals but you've already gotten an exception for your processor choice. You want consolidated reporting, per-location analytics, and volume-based pricing. If someone comes unprepared without location-by-location analysis, you'll eat them alive. You're currently paying 2.2% and believe no one can beat it.` },
   };
 
   // Interactive Training Roleplay endpoint
   app.post("/api/training/roleplay", isAuthenticated, async (req: any, res) => {
     try {
-      const { personaId, userMessage, history } = req.body;
+      const { personaId, userMessage, history, trustScore: clientTrustScore, messageIndex } = req.body;
+      const userId = req.user?.claims?.sub;
 
       if (!personaId || !userMessage) {
         return res.status(400).json({ error: "Missing personaId or userMessage" });
@@ -14608,7 +14694,6 @@ Additional context:
         return res.status(400).json({ error: "Invalid persona ID" });
       }
 
-      // Use Gemini for roleplay
       const hasGeminiIntegrations = process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
       if (!hasGeminiIntegrations) {
         return res.status(503).json({ error: "AI service not configured" });
@@ -14630,12 +14715,20 @@ Additional context:
         console.log('[InteractiveTraining] Training context unavailable, using persona only');
       }
 
+      const { getAdaptiveDifficulty, buildDeceptionInstructions, buildTrustAssessmentPrompt, parseTrustAssessmentResponse, saveTrustAssessment, getMoodBand, getMoodLabel } = await import("./trust-engine");
+
+      const difficultyConfig = userId ? await getAdaptiveDifficulty(userId) : { difficulty: "normal" as const, startingTrust: 50, deceptionFrequency: 3, deceptionSophistication: "moderate" as const, patternBasedBaiting: [] };
+
+      const deceptionInstructions = buildDeceptionInstructions(difficultyConfig);
+
       const systemPrompt = `${persona.systemPrompt}
 
 You are in a roleplay training scenario with a PCBancard sales representative. Stay fully in character as ${persona.name}. 
 
 PCBANCARD PRODUCT & SALES CONTEXT (use this to create realistic, informed responses):
 ${trainingContext}
+
+${deceptionInstructions}
 
 IMPORTANT RULES:
 - Keep responses SHORT (1-4 sentences max), like a real busy merchant
@@ -14645,12 +14738,12 @@ IMPORTANT RULES:
 - If they're pushy, use jargon, or pitch too hard, become more resistant
 - Include realistic behaviors (checking phone, mentioning customers, being distracted)
 - Raise realistic objections based on your persona and the training context
-- If the rep handles an objection well using the Clarify-Discuss-Diffuse pattern, acknowledge it naturally (e.g., "Hmm, I hadn't thought about it that way...")
-- The knowledge context is for YOU to use when evaluating the rep's approach - do NOT lecture or dump product info on them`;
+- If the rep handles an objection well using the Clarify-Discuss-Diffuse pattern, acknowledge it naturally
+- The knowledge context is for YOU to use when evaluating the rep's approach - do NOT lecture or dump product info on them
+- WEAVE YOUR DECEPTION TACTICS NATURALLY INTO YOUR RESPONSES`;
 
       const contents: Array<{role: "user" | "model", parts: [{text: string}]}> = [];
       
-      // Add conversation history
       if (history && Array.isArray(history)) {
         for (const msg of history.slice(-10)) {
           if (msg.role === 'user') {
@@ -14661,7 +14754,6 @@ IMPORTANT RULES:
         }
       }
 
-      // Add current message
       contents.push({ role: "user", parts: [{ text: userMessage }] });
 
       const response = await genAI.models.generateContent({
@@ -14676,7 +14768,61 @@ IMPORTANT RULES:
 
       const aiResponse = response.text || "Hmm, what was that?";
 
-      res.json({ response: aiResponse });
+      let trustResult = null;
+      const currentTrust = typeof clientTrustScore === 'number' ? clientTrustScore : difficultyConfig.startingTrust;
+      const msgIdx = typeof messageIndex === 'number' ? messageIndex : 0;
+
+      try {
+        const contextMessages = (history || []).slice(-4).map((m: any) =>
+          `${m.role === 'user' ? 'SALES REP' : 'MERCHANT'}: ${m.content}`
+        ).join('\n');
+
+        const assessmentPrompt = buildTrustAssessmentPrompt(
+          currentTrust,
+          msgIdx,
+          userMessage,
+          aiResponse,
+          persona.name,
+          contextMessages,
+          difficultyConfig
+        );
+
+        const assessmentResponse = await genAI.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: assessmentPrompt }] }],
+          config: {
+            maxOutputTokens: 300,
+            temperature: 0.2,
+          }
+        });
+
+        const assessmentText = assessmentResponse.text || '{}';
+        trustResult = parseTrustAssessmentResponse(assessmentText, currentTrust);
+      } catch (trustErr) {
+        console.error('[TrustEngine] Assessment failed, using neutral:', trustErr);
+        trustResult = {
+          trustDelta: 0,
+          newScore: currentTrust,
+          moodBand: getMoodBand(currentTrust),
+          deceptionDeployed: false,
+          deceptionType: null,
+          deceptionCaught: null,
+          rationale: "Assessment unavailable",
+          nextDeceptionHint: null,
+        };
+      }
+
+      res.json({
+        response: aiResponse,
+        trust: {
+          moodBand: trustResult.moodBand,
+          moodLabel: getMoodLabel(trustResult.newScore),
+          newScore: trustResult.newScore,
+          delta: trustResult.trustDelta,
+          deceptionDeployed: trustResult.deceptionDeployed,
+          deceptionCaught: trustResult.deceptionCaught,
+        }
+      });
     } catch (error) {
       console.error('Error in training roleplay:', error);
       res.status(500).json({ error: 'Failed to process roleplay message' });

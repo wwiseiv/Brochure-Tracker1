@@ -3525,3 +3525,74 @@ export const insertVideoWatchProgressSchema = createInsertSchema(videoWatchProgr
 });
 export type InsertVideoWatchProgress = z.infer<typeof insertVideoWatchProgressSchema>;
 export type VideoWatchProgress = typeof videoWatchProgress.$inferSelect;
+
+// Trust Assessments table - tracks individual trust score assessments during sessions
+export const trustAssessments = pgTable("trust_assessments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull(),
+  sessionType: varchar("session_type", { length: 20 }).notNull(), // 'training' or 'roleplay'
+  messageIndex: integer("message_index").notNull(),
+  trustScoreBefore: integer("trust_score_before").notNull(),
+  trustScoreAfter: integer("trust_score_after").notNull(),
+  trustDelta: integer("trust_delta").notNull(),
+  moodBand: varchar("mood_band", { length: 20 }).notNull(), // 'guarded', 'warming', 'engaged'
+  deceptionType: varchar("deception_type", { length: 30 }),
+  deceptionDeployed: boolean("deception_deployed").default(false),
+  deceptionCaught: boolean("deception_caught"),
+  rationale: text("rationale"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTrustAssessmentSchema = createInsertSchema(trustAssessments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTrustAssessment = z.infer<typeof insertTrustAssessmentSchema>;
+export type TrustAssessment = typeof trustAssessments.$inferSelect;
+
+// Trust Session Summaries table - aggregated trust data for entire sessions
+export const trustSessionSummaries = pgTable("trust_session_summaries", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull(),
+  sessionType: varchar("session_type", { length: 20 }).notNull(),
+  agentId: varchar("agent_id").notNull(),
+  startScore: integer("start_score").notNull().default(50),
+  endScore: integer("end_score").notNull(),
+  peakScore: integer("peak_score").notNull(),
+  lowestScore: integer("lowest_score").notNull(),
+  avgScore: integer("avg_score").notNull(),
+  totalDeceptions: integer("total_deceptions").default(0),
+  deceptionsCaught: integer("deceptions_caught").default(0),
+  moodTransitions: jsonb("mood_transitions"),
+  trustProgression: jsonb("trust_progression"),
+  deceptionDetails: jsonb("deception_details"),
+  coachingInsights: text("coaching_insights"),
+  difficultyUsed: varchar("difficulty_used", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTrustSessionSummarySchema = createInsertSchema(trustSessionSummaries).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTrustSessionSummary = z.infer<typeof insertTrustSessionSummarySchema>;
+export type TrustSessionSummary = typeof trustSessionSummaries.$inferSelect;
+
+// Agent Trust Profiles table - adaptive difficulty and trust pattern tracking
+export const agentTrustProfiles = pgTable("agent_trust_profiles", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  agentId: varchar("agent_id").notNull().unique(),
+  avgTrustLast5: integer("avg_trust_last5").default(50),
+  totalSessions: integer("total_sessions").default(0),
+  patternFlags: jsonb("pattern_flags").default({}),
+  adaptiveDifficulty: varchar("adaptive_difficulty", { length: 20 }).default("normal"),
+  lastSessionAt: timestamp("last_session_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAgentTrustProfileSchema = createInsertSchema(agentTrustProfiles).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertAgentTrustProfile = z.infer<typeof insertAgentTrustProfileSchema>;
+export type AgentTrustProfile = typeof agentTrustProfiles.$inferSelect;

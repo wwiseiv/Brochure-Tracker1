@@ -94,6 +94,7 @@ interface SessionFeedback {
   emotionalDriversUsed?: string[];
   tonalEffectiveness?: string;
   correctiveScript?: string;
+  trustDebrief?: string;
   analysis?: {
     psychographicType: string;
     psychographicConfidence: number;
@@ -981,6 +982,10 @@ export default function CoachPage() {
   const objectionsAudioChunksRef = useRef<Blob[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
   const [selectedMerchantCharacter, setSelectedMerchantCharacter] = useState<string | null>(null);
+  const [trustScore, setTrustScore] = useState(50);
+  const [trustHistory, setTrustHistory] = useState<Array<{delta: number; newScore: number; moodBand: string; deceptionDeployed: boolean; deceptionCaught: boolean | null}>>([]);
+  const [moodBand, setMoodBand] = useState<string>('warming');
+  const [moodLabel, setMoodLabel] = useState<string>('Warming Up');
 
   const { data: myPermissions } = useQuery<UserPermissions>({
     queryKey: ["/api/me/permissions"],
@@ -1073,6 +1078,8 @@ export default function CoachPage() {
     mutationFn: async (message: string) => {
       const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/message`, {
         message,
+        trustScore,
+        messageIndex: messages.filter(m => m.role === 'user').length,
       });
       return res.json();
     },
@@ -1083,11 +1090,23 @@ export default function CoachPage() {
         content: data.response,
       };
       setMessages((prev) => [...prev, newMessage]);
-      // Display coaching hint if available
       if (data.coachingHint) {
         setCoachingHint(data.coachingHint);
       } else {
         setCoachingHint(null);
+      }
+      
+      if (data.trust) {
+        setTrustScore(data.trust.newScore);
+        setMoodBand(data.trust.moodBand);
+        setMoodLabel(data.trust.moodLabel);
+        setTrustHistory(prev => [...prev, {
+          delta: data.trust.delta,
+          newScore: data.trust.newScore,
+          moodBand: data.trust.moodBand,
+          deceptionDeployed: data.trust.deceptionDeployed,
+          deceptionCaught: data.trust.deceptionCaught,
+        }]);
       }
     },
     onError: (error: Error) => {
@@ -1136,7 +1155,9 @@ export default function CoachPage() {
 
   const endSessionMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/end`);
+      const res = await apiRequest("POST", `/api/roleplay/sessions/${sessionId}/end`, {
+        trustHistory,
+      });
       return res.json();
     },
     onSuccess: (data) => {
@@ -1438,6 +1459,10 @@ export default function CoachPage() {
     setFeedback(null);
     setShowFeedback(false);
     setLastSpokenMessageId(null);
+    setTrustScore(50);
+    setTrustHistory([]);
+    setMoodBand('warming');
+    setMoodLabel('Warming Up');
   };
 
   const getScenarioLabel = (value: string) => {
@@ -2095,6 +2120,73 @@ export default function CoachPage() {
                     <p className="text-sm italic text-indigo-800 dark:text-indigo-200">"{feedback.correctiveScript}"</p>
                   </Card>
                 )}
+
+              {trustHistory.length > 0 && (
+                <div className="space-y-4 mt-4" data-testid="trust-debrief">
+                  <div className="text-center">
+                    <h4 className="text-lg font-bold mb-1">Trust Building Assessment</h4>
+                    <div className={`text-3xl font-bold ${
+                      trustScore >= 66 ? 'text-green-500' :
+                      trustScore >= 36 ? 'text-yellow-500' :
+                      'text-red-500'
+                    }`}>{trustScore}/100</div>
+                    <p className="text-xs text-muted-foreground">Final Trust Score</p>
+                  </div>
+
+                  <Card className="p-3">
+                    <h4 className="font-medium mb-2 text-sm">Trust Progression</h4>
+                    <div className="flex items-end gap-1 h-24">
+                      {trustHistory.map((h, i) => {
+                        const height = Math.max(4, (h.newScore / 100) * 100);
+                        return (
+                          <div
+                            key={i}
+                            className={`flex-1 rounded-t transition-all ${
+                              h.newScore >= 66 ? 'bg-green-500/70' :
+                              h.newScore >= 36 ? 'bg-yellow-500/70' :
+                              'bg-red-500/70'
+                            }`}
+                            style={{ height: `${height}%` }}
+                            title={`Exchange ${i+1}: ${h.newScore}/100 (${h.delta >= 0 ? '+' : ''}${h.delta})`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Start</span>
+                      <span>End</span>
+                    </div>
+                  </Card>
+
+                  {trustHistory.some(h => h.deceptionDeployed) && (
+                    <Card className="p-3">
+                      <h4 className="font-medium mb-2 text-sm">Deception Tests</h4>
+                      <div className="space-y-1.5">
+                        {trustHistory.filter(h => h.deceptionDeployed).map((h, i) => (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Test {i+1}</span>
+                            {h.deceptionCaught ? (
+                              <Badge className="bg-green-500/20 text-green-600 dark:text-green-400 text-xs">Caught</Badge>
+                            ) : (
+                              <Badge className="bg-red-500/20 text-red-600 dark:text-red-400 text-xs">Missed</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Caught {trustHistory.filter(h => h.deceptionDeployed && h.deceptionCaught).length} of {trustHistory.filter(h => h.deceptionDeployed).length} deception attempts
+                      </p>
+                    </Card>
+                  )}
+
+                  {feedback?.trustDebrief && (
+                    <Card className="p-3">
+                      <h4 className="font-medium mb-2 text-sm">Trust Analysis</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-line">{feedback.trustDebrief}</p>
+                    </Card>
+                  )}
+                </div>
+              )}
               </div>
 
               <Button className="w-full h-12" onClick={handleNewSession} data-testid="button-new-session">
@@ -2132,6 +2224,14 @@ export default function CoachPage() {
                       <Badge variant="outline" className="text-xs">
                         {difficultyOptions.find(d => d.value === difficulty)?.label || difficulty}
                       </Badge>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          moodBand === 'engaged' ? 'bg-green-500' :
+                          moodBand === 'warming' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`} />
+                        <span className="text-xs font-medium" data-testid="text-mood-label">{moodLabel}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

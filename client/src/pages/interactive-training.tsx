@@ -336,6 +336,10 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [sessionSummary, setSessionSummary] = useState<any>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [trustScore, setTrustScore] = useState(50);
+  const [trustHistory, setTrustHistory] = useState<any[]>([]);
+  const [moodBand, setMoodBand] = useState<string>('warming');
+  const [moodLabel, setMoodLabel] = useState<string>('Warming Up');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -357,7 +361,7 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
   }, []);
 
   const roleplayMutation = useMutation({
-    mutationFn: async (data: { personaId: string; userMessage: string; history: Message[] }) => {
+    mutationFn: async (data: { personaId: string; userMessage: string; history: Message[]; trustScore: number; messageIndex: number }) => {
       const res = await apiRequest("POST", "/api/training/roleplay", data);
       return res.json();
     },
@@ -374,6 +378,20 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
         }).catch(() => {});
       }
       setSessionStats(prev => ({ ...prev, exchanges: prev.exchanges + 1 }));
+      
+      if (data.trust) {
+        setTrustScore(data.trust.newScore);
+        setMoodBand(data.trust.moodBand);
+        setMoodLabel(data.trust.moodLabel);
+        setTrustHistory(prev => [...prev, {
+          trustDelta: data.trust.delta,
+          newScore: data.trust.newScore,
+          moodBand: data.trust.moodBand,
+          deceptionDeployed: data.trust.deceptionDeployed,
+          deceptionCaught: data.trust.deceptionCaught,
+        }]);
+      }
+      
       setIsLoading(false);
     },
     onError: (error: Error) => {
@@ -426,7 +444,9 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
     roleplayMutation.mutate({
       personaId: persona.id,
       userMessage: input.trim(),
-      history: messages
+      history: messages,
+      trustScore: trustScore,
+      messageIndex: sessionStats.exchanges,
     });
   };
 
@@ -512,6 +532,14 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
           </Badge>
         </div>
 
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${
+              moodBand === 'engaged' ? 'bg-green-500' :
+              moodBand === 'warming' ? 'bg-yellow-500' :
+              'bg-red-500'
+            }`} />
+            <span className="text-sm font-medium" data-testid="text-mood-label">{moodLabel}</span>
+          </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Time</p>
@@ -642,6 +670,90 @@ function RoleplaySimulator({ persona, onBack }: RoleplaySimulatorProps) {
             <p className="text-sm text-muted-foreground text-center italic">
               Recommended next: {sessionSummary.aiFeedback.nextStep}
             </p>
+          )}
+
+          {trustHistory.length > 0 && (
+            <div className="space-y-4" data-testid="trust-debrief">
+              <div className="text-center">
+                <h3 className="text-xl font-bold mb-2">Trust Building Assessment</h3>
+                <div className={`text-4xl font-bold mb-1 ${
+                  trustScore >= 66 ? 'text-green-500' :
+                  trustScore >= 36 ? 'text-yellow-500' :
+                  'text-red-500'
+                }`}>{trustScore}/100</div>
+                <p className="text-sm text-muted-foreground">Final Trust Score</p>
+              </div>
+
+              <Card className="p-4">
+                <h4 className="font-bold mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Trust Progression
+                </h4>
+                <div className="flex items-end gap-1 h-32">
+                  {trustHistory.map((h: any, i: number) => {
+                    const height = Math.max(4, (h.newScore / 100) * 100);
+                    return (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-t transition-all ${
+                          h.newScore >= 66 ? 'bg-green-500/70' :
+                          h.newScore >= 36 ? 'bg-yellow-500/70' :
+                          'bg-red-500/70'
+                        }`}
+                        style={{ height: `${height}%` }}
+                        title={`Exchange ${i+1}: ${h.newScore}/100 (${h.trustDelta >= 0 ? '+' : ''}${h.trustDelta})`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>Start</span>
+                  <span>End</span>
+                </div>
+              </Card>
+
+              {trustHistory.some((h: any) => h.deceptionDeployed) && (
+                <Card className="p-4">
+                  <h4 className="font-bold mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    Deception Tests
+                  </h4>
+                  <div className="space-y-2">
+                    {trustHistory.filter((h: any) => h.deceptionDeployed).map((h: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between gap-1 text-sm">
+                        <span className="capitalize">{(h.deceptionType || 'unknown').replace(/_/g, ' ')}</span>
+                        {h.deceptionCaught ? (
+                          <Badge className="bg-green-500/20 text-green-600 dark:text-green-400">Caught</Badge>
+                        ) : (
+                          <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">Missed</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 text-sm text-muted-foreground">
+                    Caught {trustHistory.filter((h: any) => h.deceptionDeployed && h.deceptionCaught).length} of {trustHistory.filter((h: any) => h.deceptionDeployed).length} deception attempts
+                  </div>
+                </Card>
+              )}
+
+              <Card className="p-4">
+                <h4 className="font-bold mb-3">Mood Journey</h4>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {trustHistory.map((h: any, i: number) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${
+                        h.moodBand === 'engaged' ? 'bg-green-500' :
+                        h.moodBand === 'warming' ? 'bg-yellow-500' :
+                        'bg-red-500'
+                      }`} />
+                      {i < trustHistory.length - 1 && (
+                        <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
           )}
 
           <div className="flex gap-3 justify-center">
