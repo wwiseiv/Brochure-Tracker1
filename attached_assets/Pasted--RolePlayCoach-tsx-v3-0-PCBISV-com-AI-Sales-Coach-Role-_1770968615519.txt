@@ -1,0 +1,796 @@
+/**
+
+- RolePlayCoach.tsx v3.0
+- PCBISV.com — AI Sales Coach Role-Play Interface
+- 
+- Features:
+- - XP bar and level display
+- - Badge showcase
+- - Vertical selector (8 industries)
+- - Team leaderboard tab
+- - Animated debrief with gamification
+- - Mood indicator (no score visible)
+    */
+
+import React, { useState, useRef, useEffect } from ‘react’;
+
+// ============================================================
+// CONFIG — adjust to your project
+// ============================================================
+const API_BASE = ‘/api/roleplay’;
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface ChatMessage {
+role: ‘user’ | ‘buyer’ | ‘system’;
+content: string;
+timestamp: Date;
+mood?: string;
+}
+
+interface XPBreakdown {
+base: number;
+trustBonus: number;
+deceptionCaughtBonus: number;
+industryKnowledgeBonus: number;
+cleanCloseBonus: number;
+streakMultiplier: number;
+total: number;
+}
+
+interface BadgeProgress {
+badgeId: string;
+name: string;
+description: string;
+icon: string;
+currentProgress: number;
+target: number;
+isComplete: boolean;
+justCompleted: boolean;
+}
+
+interface Debrief {
+sessionId: string;
+persona: string;
+businessType: string;
+vertical: string;
+finalTrustScore: number;
+trustProgression: number[];
+outcome: string;
+deceptionsDeployed: Array<{
+type: string;
+statement: string;
+truth: string;
+wasCaught: boolean;
+}>;
+keyMoments: {
+bestMove: { quote: string; reason: string; impact: number } | null;
+biggestMiss: { quote: string; reason: string; impact: number } | null;
+};
+coachingTips: string[];
+xp: XPBreakdown;
+badgeProgress: BadgeProgress[];
+difficultyRecommendation: string;
+suggestedVertical: string;
+duration: number;
+totalTurns: number;
+}
+
+interface ProfileData {
+level: number;
+totalXP: number;
+xpProgress: { current: number; needed: number; level: number };
+winRate: number;
+currentStreak: number;
+totalSessions: number;
+averageTrustScore: number;
+badges: BadgeProgress[];
+verticalStats: Record<string, { sessions: number; avgScore: number; wins: number }>;
+}
+
+interface LeaderboardEntry {
+agentId: string;
+totalXP: number;
+level: number;
+winRate: number;
+sessions: number;
+currentStreak: number;
+}
+
+type ViewState = ‘lobby’ | ‘active’ | ‘debrief’;
+type LobbyTab = ‘play’ | ‘stats’ | ‘team’;
+
+const VERTICALS = [
+{ id: ‘auto_repair’, label: ‘Auto Repair’, icon: ‘🔧’ },
+{ id: ‘restaurant’, label: ‘Restaurant / Bar’, icon: ‘🍽️’ },
+{ id: ‘medical’, label: ‘Medical / Dental’, icon: ‘🏥’ },
+{ id: ‘retail’, label: ‘Retail’, icon: ‘🛍️’ },
+{ id: ‘b2b_wholesale’, label: ‘B2B / Wholesale’, icon: ‘🏭’ },
+{ id: ‘gas_station’, label: ‘Gas Station’, icon: ‘⛽’ },
+{ id: ‘ecommerce’, label: ‘E-Commerce’, icon: ‘🛒’ },
+{ id: ‘professional_services’, label: ‘Professional Services’, icon: ‘⚖️’ },
+];
+
+// ============================================================
+// STYLES (inline for portability — swap to your CSS framework)
+// ============================================================
+
+const font = “‘Inter’, -apple-system, BlinkMacSystemFont, ‘Segoe UI’, sans-serif”;
+const colors = {
+bg: ‘#0F172A’,
+card: ‘#1E293B’,
+cardBorder: ‘#334155’,
+accent: ‘#3B82F6’,
+accentGlow: ‘#3B82F620’,
+success: ‘#10B981’,
+danger: ‘#EF4444’,
+warning: ‘#F59E0B’,
+textPrimary: ‘#F1F5F9’,
+textSecondary: ‘#94A3B8’,
+textMuted: ‘#64748B’,
+};
+
+// ============================================================
+// SMALL COMPONENTS
+// ============================================================
+
+const MoodIndicator: React.FC<{ mood: string }> = ({ mood }) => {
+const cfg: Record<string, { color: string; label: string }> = {
+hostile: { color: ‘#EF4444’, label: ‘Hostile’ },
+guarded: { color: ‘#F97316’, label: ‘Guarded’ },
+skeptical: { color: ‘#EAB308’, label: ‘Skeptical’ },
+neutral: { color: ‘#A3A3A3’, label: ‘Neutral’ },
+warming: { color: ‘#22C55E’, label: ‘Warming’ },
+engaged: { color: ‘#10B981’, label: ‘Engaged’ },
+collaborative: { color: ‘#06B6D4’, label: ‘Open’ },
+};
+const c = cfg[mood] || cfg.neutral;
+return (
+<div style={{
+display: ‘inline-flex’, alignItems: ‘center’, gap: 6,
+padding: ‘4px 12px’, borderRadius: 16,
+background: `${c.color}20`, border: `1px solid ${c.color}40`,
+fontSize: 12, fontWeight: 600, color: c.color,
+}}>
+<span style={{ width: 8, height: 8, borderRadius: ‘50%’, background: c.color }} />
+{c.label}
+</div>
+);
+};
+
+const XPBar: React.FC<{ current: number; needed: number; level: number }> = ({ current, needed, level }) => {
+const pct = needed > 0 ? Math.min(100, (current / needed) * 100) : 100;
+return (
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: 10 }}>
+<div style={{
+width: 32, height: 32, borderRadius: ‘50%’,
+background: `linear-gradient(135deg, ${colors.accent}, #8B5CF6)`,
+display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’,
+fontSize: 13, fontWeight: 800, color: ‘white’,
+}}>
+{level}
+</div>
+<div style={{ flex: 1 }}>
+<div style={{
+height: 6, borderRadius: 3, background: colors.cardBorder, overflow: ‘hidden’,
+}}>
+<div style={{
+height: ‘100%’, borderRadius: 3, width: `${pct}%`,
+background: `linear-gradient(90deg, ${colors.accent}, #8B5CF6)`,
+transition: ‘width 0.6s ease’,
+}} />
+</div>
+<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+{current} / {needed} XP to Level {level + 1}
+</div>
+</div>
+</div>
+);
+};
+
+const TrustChart: React.FC<{ data: number[] }> = ({ data }) => {
+if (data.length < 2) return null;
+const w = 380, h = 100, pad = 16;
+const cw = w - pad * 2, ch = h - pad * 2;
+const pts = data.map((v, i) => {
+const x = pad + (i / (data.length - 1)) * cw;
+const y = pad + ch - (v / 100) * ch;
+return { x, y, v };
+});
+const line = pts.map(p => `${p.x},${p.y}`).join(’ ’);
+return (
+<svg width={w} height={h} style={{ borderRadius: 8, background: ‘#0F172A’ }}>
+{[30, 60, 80].map(v => (
+<line key={v} x1={pad} y1={pad + ch - (v / 100) * ch} x2={pad + cw} y2={pad + ch - (v / 100) * ch}
+stroke={colors.cardBorder} strokeDasharray=“3,3” />
+))}
+<polyline points={line} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
+{pts.map((p, i) => (
+<circle key={i} cx={p.x} cy={p.y} r={2.5} fill={p.v >= 81 ? colors.success : p.v >= 50 ? colors.warning : colors.danger} />
+))}
+</svg>
+);
+};
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
+interface Props {
+agentId: string;
+agentName?: string;
+teamId?: string;
+}
+
+const RolePlayCoach: React.FC<Props> = ({ agentId, agentName, teamId }) => {
+const [view, setView] = useState<ViewState>(‘lobby’);
+const [lobbyTab, setLobbyTab] = useState<LobbyTab>(‘play’);
+const [sessionId, setSessionId] = useState<string | null>(null);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [input, setInput] = useState(’’);
+const [loading, setLoading] = useState(false);
+const [mood, setMood] = useState(‘guarded’);
+const [debrief, setDebrief] = useState<Debrief | null>(null);
+const [profile, setProfile] = useState<ProfileData | null>(null);
+const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+const [selectedVertical, setSelectedVertical] = useState<string | null>(null);
+const [debriefProfile, setDebriefProfile] = useState<any>(null);
+
+const chatEnd = useRef<HTMLDivElement>(null);
+const inputRef = useRef<HTMLTextAreaElement>(null);
+
+useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: ‘smooth’ }); }, [messages]);
+useEffect(() => { loadProfile(); if (teamId) loadLeaderboard(); }, [agentId]);
+
+const loadProfile = async () => {
+try {
+const r = await fetch(`${API_BASE}/profile?agentId=${agentId}`);
+if (r.ok) setProfile(await r.json());
+} catch {}
+};
+
+const loadLeaderboard = async () => {
+if (!teamId) return;
+try {
+const r = await fetch(`${API_BASE}/leaderboard?teamId=${teamId}`);
+if (r.ok) {
+const data = await r.json();
+setLeaderboard(data.leaderboard || []);
+}
+} catch {}
+};
+
+const startSession = async () => {
+setLoading(true);
+try {
+const r = await fetch(`${API_BASE}/start`, {
+method: ‘POST’,
+headers: { ‘Content-Type’: ‘application/json’ },
+body: JSON.stringify({ agentId, teamId, vertical: selectedVertical }),
+});
+const data = await r.json();
+if (data.error) throw new Error(data.error);
+
+```
+  setSessionId(data.sessionId);
+  setMessages([
+    { role: 'system', content: `Session started • Difficulty: ${data.difficulty.toUpperCase()}`, timestamp: new Date() },
+    { role: 'buyer', content: data.buyerOpening, timestamp: new Date(), mood: 'guarded' },
+  ]);
+  setMood('guarded');
+  setView('active');
+} catch (e: any) {
+  alert(e.message);
+} finally { setLoading(false); }
+```
+
+};
+
+const sendMessage = async () => {
+if (!input.trim() || !sessionId || loading) return;
+const msg = input.trim();
+setInput(’’);
+setLoading(true);
+setMessages(prev => […prev, { role: ‘user’, content: msg, timestamp: new Date() }]);
+
+```
+try {
+  const r = await fetch(`${API_BASE}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, message: msg }),
+  });
+  const data = await r.json();
+
+  if (data.debrief) {
+    setDebrief(data.debrief);
+    setDebriefProfile(data.profile);
+    setView('debrief');
+  } else {
+    setMessages(prev => [...prev, { role: 'buyer', content: data.buyerResponse, timestamp: new Date(), mood: data.buyerMood }]);
+    setMood(data.buyerMood);
+  }
+} catch {
+  setMessages(prev => [...prev, { role: 'system', content: 'Connection error. Try again.', timestamp: new Date() }]);
+} finally {
+  setLoading(false);
+  inputRef.current?.focus();
+}
+```
+
+};
+
+const endSession = async () => {
+if (!sessionId) return;
+setLoading(true);
+try {
+const r = await fetch(`${API_BASE}/end`, {
+method: ‘POST’,
+headers: { ‘Content-Type’: ‘application/json’ },
+body: JSON.stringify({ sessionId }),
+});
+const data = await r.json();
+setDebrief(data.debrief);
+setDebriefProfile(data.profile);
+setView(‘debrief’);
+} catch {} finally { setLoading(false); }
+};
+
+const resetToLobby = () => {
+setView(‘lobby’);
+setSessionId(null);
+setMessages([]);
+setDebrief(null);
+setDebriefProfile(null);
+setMood(‘guarded’);
+loadProfile();
+if (teamId) loadLeaderboard();
+};
+
+// ── LOBBY ──────────────────────────────────────────────────
+
+if (view === ‘lobby’) {
+return (
+<div style={{ maxWidth: 600, margin: ‘0 auto’, padding: 24, fontFamily: font, color: colors.textPrimary }}>
+{/* Header */}
+<div style={{ textAlign: ‘center’, marginBottom: 24 }}>
+<div style={{ fontSize: 36, marginBottom: 4 }}>🎭</div>
+<h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: colors.textPrimary }}>
+Sales Role-Play Coach
+</h2>
+<p style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+Practice your pitch against an AI buyer who fights back
+</p>
+</div>
+
+```
+    {/* XP Bar */}
+    {profile && profile.totalSessions > 0 && (
+      <div style={{ marginBottom: 20, padding: '14px 16px', background: colors.card, borderRadius: 10, border: `1px solid ${colors.cardBorder}` }}>
+        <XPBar current={profile.xpProgress?.current || 0} needed={profile.xpProgress?.needed || 100} level={profile.level} />
+      </div>
+    )}
+
+    {/* Tabs */}
+    <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+      {(['play', 'stats', ...(teamId ? ['team'] : [])] as LobbyTab[]).map(tab => (
+        <button key={tab} onClick={() => setLobbyTab(tab)} style={{
+          flex: 1, padding: '8px 12px', fontSize: 13, fontWeight: 600,
+          background: lobbyTab === tab ? colors.accent : 'transparent',
+          color: lobbyTab === tab ? 'white' : colors.textSecondary,
+          border: `1px solid ${lobbyTab === tab ? colors.accent : colors.cardBorder}`,
+          borderRadius: 8, cursor: 'pointer', textTransform: 'capitalize',
+        }}>{tab === 'team' ? 'Leaderboard' : tab}</button>
+      ))}
+    </div>
+
+    {/* PLAY TAB */}
+    {lobbyTab === 'play' && (
+      <>
+        {/* Vertical Selector */}
+        <div style={{
+          background: colors.card, borderRadius: 10, padding: 16, marginBottom: 16,
+          border: `1px solid ${colors.cardBorder}`,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 1 }}>
+            CHOOSE A VERTICAL (optional)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+            <button
+              onClick={() => setSelectedVertical(null)}
+              style={{
+                gridColumn: '1 / -1', padding: '8px 12px', fontSize: 13, fontWeight: 500,
+                background: selectedVertical === null ? `${colors.accent}20` : 'transparent',
+                color: selectedVertical === null ? colors.accent : colors.textSecondary,
+                border: `1px solid ${selectedVertical === null ? colors.accent : colors.cardBorder}`,
+                borderRadius: 8, cursor: 'pointer',
+              }}
+            >🎲 Random (recommended)</button>
+            {VERTICALS.map(v => (
+              <button key={v.id} onClick={() => setSelectedVertical(v.id)} style={{
+                padding: '8px 10px', fontSize: 12, fontWeight: 500, textAlign: 'left',
+                background: selectedVertical === v.id ? `${colors.accent}20` : 'transparent',
+                color: selectedVertical === v.id ? colors.accent : colors.textSecondary,
+                border: `1px solid ${selectedVertical === v.id ? colors.accent : colors.cardBorder}`,
+                borderRadius: 8, cursor: 'pointer',
+              }}>
+                {v.icon} {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Rules */}
+        <div style={{
+          background: '#1C1917', borderRadius: 10, padding: 16, marginBottom: 16,
+          border: '1px solid #44403C', fontSize: 13, color: '#A8A29E', lineHeight: 1.7,
+        }}>
+          <strong style={{ color: '#FBBF24' }}>⚡ HOW IT WORKS</strong><br />
+          You walk into a business cold. The buyer has a hidden Trust Score. They WILL lie to you.
+          They WILL test you. Pitch too early and you're done. Listen first, diagnose second, prescribe last.
+          Say <strong style={{ color: colors.textPrimary }}>STOP</strong> anytime to end and get your debrief + XP.
+        </div>
+
+        <button onClick={startSession} disabled={loading} style={{
+          width: '100%', padding: 14, fontSize: 15, fontWeight: 700, color: 'white',
+          background: loading ? colors.textMuted : `linear-gradient(135deg, ${colors.accent}, #7C3AED)`,
+          border: 'none', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer',
+        }}>
+          {loading ? 'Setting the scene...' : 'Start Role-Play'}
+        </button>
+      </>
+    )}
+
+    {/* STATS TAB */}
+    {lobbyTab === 'stats' && profile && (
+      <div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16,
+        }}>
+          {[
+            { label: 'Sessions', value: profile.totalSessions, color: colors.textPrimary },
+            { label: 'Win Rate', value: `${profile.winRate}%`, color: colors.success },
+            { label: 'Avg Trust', value: profile.averageTrustScore, color: colors.accent },
+          ].map((s, i) => (
+            <div key={i} style={{
+              background: colors.card, borderRadius: 10, padding: 14, textAlign: 'center',
+              border: `1px solid ${colors.cardBorder}`,
+            }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Badges */}
+        {profile.badges && profile.badges.length > 0 && (
+          <div style={{ background: colors.card, borderRadius: 10, padding: 16, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 1 }}>BADGES</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {profile.badges.map((b, i) => (
+                <div key={i} title={`${b.name}: ${b.description} (${b.currentProgress}/${b.target})`} style={{
+                  padding: '6px 10px', borderRadius: 8, fontSize: 12,
+                  background: b.isComplete ? `${colors.success}20` : `${colors.cardBorder}80`,
+                  border: `1px solid ${b.isComplete ? colors.success : colors.cardBorder}`,
+                  color: b.isComplete ? colors.success : colors.textMuted,
+                  opacity: b.isComplete ? 1 : 0.7,
+                }}>
+                  {b.icon} {b.name} {b.isComplete ? '✓' : `${b.currentProgress}/${b.target}`}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vertical breakdown */}
+        {profile.verticalStats && (
+          <div style={{ background: colors.card, borderRadius: 10, padding: 16, border: `1px solid ${colors.cardBorder}` }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 1 }}>VERTICAL PERFORMANCE</div>
+            {VERTICALS.map(v => {
+              const stat = profile.verticalStats[v.id];
+              if (!stat || stat.sessions === 0) return (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: colors.textMuted, opacity: 0.5 }}>
+                  <span>{v.icon} {v.label}</span><span>Not attempted</span>
+                </div>
+              );
+              return (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: colors.textSecondary }}>
+                  <span>{v.icon} {v.label}</span>
+                  <span>{stat.sessions} sessions • Avg {stat.avgScore} • {stat.wins}W</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* TEAM TAB */}
+    {lobbyTab === 'team' && (
+      <div style={{ background: colors.card, borderRadius: 10, padding: 16, border: `1px solid ${colors.cardBorder}` }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 12, letterSpacing: 1 }}>TEAM LEADERBOARD</div>
+        {leaderboard.length === 0 ? (
+          <div style={{ fontSize: 13, color: colors.textMuted, textAlign: 'center', padding: 20 }}>
+            No team sessions yet. Be the first!
+          </div>
+        ) : (
+          leaderboard.map((entry, i) => (
+            <div key={entry.agentId} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
+              borderBottom: i < leaderboard.length - 1 ? `1px solid ${colors.cardBorder}` : 'none',
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, fontWeight: 700,
+                background: i === 0 ? '#FBBF24' : i === 1 ? '#9CA3AF' : i === 2 ? '#B45309' : colors.cardBorder,
+                color: i < 3 ? '#0F172A' : colors.textSecondary,
+              }}>
+                {i + 1}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: entry.agentId === agentId ? colors.accent : colors.textPrimary }}>
+                  {entry.agentId === agentId ? `${agentName || 'You'} ⭐` : entry.agentId}
+                </div>
+                <div style={{ fontSize: 11, color: colors.textMuted }}>
+                  Level {entry.level} • {entry.sessions} sessions • {entry.winRate}% WR
+                </div>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: colors.accent }}>{entry.totalXP} XP</div>
+            </div>
+          ))
+        )}
+      </div>
+    )}
+  </div>
+);
+```
+
+}
+
+// ── DEBRIEF VIEW ──────────────────────────────────────────
+
+if (view === ‘debrief’ && debrief) {
+const outcomeStyles: Record<string, { emoji: string; label: string; color: string }> = {
+deal_won: { emoji: ‘🏆’, label: ‘DEAL WON’, color: colors.success },
+soft_maybe: { emoji: ‘🤔’, label: ‘SOFT MAYBE’, color: colors.warning },
+lost: { emoji: ‘❌’, label: ‘LOST’, color: colors.danger },
+blown: { emoji: ‘💥’, label: ‘BLOWN’, color: ‘#B91C1C’ },
+};
+const oc = outcomeStyles[debrief.outcome] || outcomeStyles.lost;
+
+```
+return (
+  <div style={{ maxWidth: 600, margin: '0 auto', padding: 24, fontFamily: font, color: colors.textPrimary }}>
+    {/* Header */}
+    <div style={{
+      textAlign: 'center', padding: 24,
+      background: `linear-gradient(135deg, ${colors.card}, #0F172A)`,
+      borderRadius: 12, border: `1px solid ${colors.cardBorder}`, marginBottom: 16,
+    }}>
+      <div style={{ fontSize: 12, color: colors.textMuted, letterSpacing: 2, marginBottom: 8 }}>SESSION DEBRIEF</div>
+      <div style={{ fontSize: 44 }}>{oc.emoji}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: oc.color }}>{oc.label}</div>
+      <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 6 }}>
+        {debrief.persona} — {debrief.vertical.replace('_', ' ')} • {debrief.totalTurns} turns • {Math.round(debrief.duration / 60)}m
+      </div>
+    </div>
+
+    {/* XP Earned */}
+    <div style={{
+      background: `linear-gradient(135deg, ${colors.accent}15, #7C3AED15)`,
+      borderRadius: 12, padding: 16, marginBottom: 12,
+      border: `1px solid ${colors.accent}30`,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: colors.accent, marginBottom: 8, letterSpacing: 1 }}>XP EARNED</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 32, fontWeight: 700, color: colors.accent }}>+{debrief.xp.total}</span>
+        <span style={{ fontSize: 13, color: colors.textMuted }}>XP</span>
+        {debrief.xp.streakMultiplier > 1 && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#FBBF24', background: '#FBBF2420', padding: '2px 8px', borderRadius: 10 }}>
+            {debrief.xp.streakMultiplier}x STREAK
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: colors.textSecondary }}>
+        {debrief.xp.base > 0 && <span>Base: {debrief.xp.base}</span>}
+        {debrief.xp.trustBonus > 0 && <span>• Trust: +{debrief.xp.trustBonus}</span>}
+        {debrief.xp.deceptionCaughtBonus > 0 && <span>• Lies caught: +{debrief.xp.deceptionCaughtBonus}</span>}
+        {debrief.xp.industryKnowledgeBonus > 0 && <span>• Industry: +{debrief.xp.industryKnowledgeBonus}</span>}
+        {debrief.xp.cleanCloseBonus > 0 && <span>• Close: +{debrief.xp.cleanCloseBonus}</span>}
+      </div>
+      {debriefProfile && (
+        <div style={{ marginTop: 10 }}>
+          <XPBar current={debriefProfile.xpProgress?.current || 0} needed={debriefProfile.xpProgress?.needed || 100} level={debriefProfile.level} />
+        </div>
+      )}
+    </div>
+
+    {/* Badges earned */}
+    {debrief.badgeProgress.filter(b => b.justCompleted).length > 0 && (
+      <div style={{
+        background: `${colors.success}10`, borderRadius: 12, padding: 16, marginBottom: 12,
+        border: `1px solid ${colors.success}30`, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: colors.success, marginBottom: 8 }}>🎉 NEW BADGE UNLOCKED</div>
+        {debrief.badgeProgress.filter(b => b.justCompleted).map((b, i) => (
+          <div key={i} style={{ fontSize: 18, fontWeight: 700, color: colors.textPrimary }}>
+            {b.icon} {b.name}
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Trust Score */}
+    <div style={{ background: colors.card, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${colors.cardBorder}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted, letterSpacing: 1 }}>TRUST PROGRESSION</span>
+        <span style={{ fontSize: 28, fontWeight: 700, color: colors.textPrimary }}>
+          {debrief.finalTrustScore}<span style={{ fontSize: 14, color: colors.textMuted }}>/100</span>
+        </span>
+      </div>
+      <TrustChart data={debrief.trustProgression} />
+    </div>
+
+    {/* Lies */}
+    {debrief.deceptionsDeployed.length > 0 && (
+      <div style={{ background: '#1C1917', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #44403C' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#FB923C', marginBottom: 10, letterSpacing: 1 }}>
+          🎭 LIES THE BUYER TOLD YOU
+        </div>
+        {debrief.deceptionsDeployed.map((d, i) => (
+          <div key={i} style={{
+            padding: 10, background: '#292524', borderRadius: 8, marginBottom: 6,
+            border: `1px solid ${d.wasCaught ? colors.success : colors.danger}30`,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 2 }}>"{d.statement}"</div>
+            <div style={{ fontSize: 12, color: colors.textSecondary }}>Truth: {d.truth}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: d.wasCaught ? colors.success : colors.danger, marginTop: 4 }}>
+              {d.wasCaught ? '✅ You caught it!' : '❌ You missed it'}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Key Moments */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      {debrief.keyMoments.bestMove && (
+        <div style={{ background: `${colors.success}10`, borderRadius: 10, padding: 14, border: `1px solid ${colors.success}30` }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: colors.success, marginBottom: 6 }}>🟢 BEST (+{debrief.keyMoments.bestMove.impact})</div>
+          <div style={{ fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginBottom: 4 }}>"{debrief.keyMoments.bestMove.quote}"</div>
+          <div style={{ fontSize: 11, color: colors.textMuted }}>{debrief.keyMoments.bestMove.reason}</div>
+        </div>
+      )}
+      {debrief.keyMoments.biggestMiss && (
+        <div style={{ background: `${colors.danger}10`, borderRadius: 10, padding: 14, border: `1px solid ${colors.danger}30` }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: colors.danger, marginBottom: 6 }}>🔴 MISS ({debrief.keyMoments.biggestMiss.impact})</div>
+          <div style={{ fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginBottom: 4 }}>"{debrief.keyMoments.biggestMiss.quote}"</div>
+          <div style={{ fontSize: 11, color: colors.textMuted }}>{debrief.keyMoments.biggestMiss.reason}</div>
+        </div>
+      )}
+    </div>
+
+    {/* Coaching */}
+    <div style={{ background: `${colors.accent}10`, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${colors.accent}30` }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: colors.accent, marginBottom: 10, letterSpacing: 1 }}>💡 COACHING TIPS</div>
+      {debrief.coachingTips.map((tip, i) => (
+        <div key={i} style={{
+          fontSize: 13, color: colors.textSecondary, lineHeight: 1.6,
+          paddingLeft: 12, borderLeft: `3px solid ${colors.accent}`, marginBottom: 8,
+        }}>{tip}</div>
+      ))}
+    </div>
+
+    {/* Next session */}
+    <div style={{ textAlign: 'center', fontSize: 12, color: colors.textMuted, marginBottom: 16, padding: 8, background: colors.card, borderRadius: 8, border: `1px solid ${colors.cardBorder}` }}>
+      Next difficulty: <strong>{debrief.difficultyRecommendation.toUpperCase()}</strong>
+      {debrief.suggestedVertical && <> • Suggested vertical: <strong>{debrief.suggestedVertical.replace('_', ' ')}</strong></>}
+    </div>
+
+    <button onClick={resetToLobby} style={{
+      width: '100%', padding: 14, fontSize: 15, fontWeight: 700, color: 'white',
+      background: `linear-gradient(135deg, ${colors.accent}, #7C3AED)`,
+      border: 'none', borderRadius: 10, cursor: 'pointer',
+    }}>
+      Back to Lobby
+    </button>
+  </div>
+);
+```
+
+}
+
+// ── ACTIVE CHAT ───────────────────────────────────────────
+
+return (
+<div style={{ display: ‘flex’, flexDirection: ‘column’, height: ‘100vh’, maxWidth: 700, margin: ‘0 auto’, fontFamily: font, color: colors.textPrimary }}>
+{/* Header */}
+<div style={{
+display: ‘flex’, alignItems: ‘center’, justifyContent: ‘space-between’,
+padding: ‘10px 16px’, background: colors.card, borderBottom: `1px solid ${colors.cardBorder}`, flexShrink: 0,
+}}>
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: 10 }}>
+<span style={{ fontSize: 18 }}>🎭</span>
+<span style={{ fontSize: 14, fontWeight: 600 }}>Role-Play Active</span>
+</div>
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: 10 }}>
+<MoodIndicator mood={mood} />
+<button onClick={endSession} style={{
+padding: ‘5px 12px’, fontSize: 12, fontWeight: 600,
+color: ‘#FCA5A5’, background: ‘transparent’,
+border: ‘1px solid #FCA5A5’, borderRadius: 6, cursor: ‘pointer’,
+}}>End</button>
+</div>
+</div>
+
+```
+  {/* Messages */}
+  <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10, background: colors.bg }}>
+    {messages.map((msg, i) => (
+      <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+        <div style={{
+          maxWidth: msg.role === 'system' ? '100%' : '80%',
+          padding: msg.role === 'system' ? '6px 14px' : '10px 14px',
+          borderRadius: 10, fontSize: msg.role === 'system' ? 11 : 14, lineHeight: 1.6,
+          ...(msg.role === 'user' ? {
+            background: colors.accent, color: 'white', borderBottomRightRadius: 4,
+          } : msg.role === 'buyer' ? {
+            background: colors.card, color: colors.textPrimary, borderBottomLeftRadius: 4,
+            border: `1px solid ${colors.cardBorder}`,
+          } : {
+            background: 'transparent', color: colors.textMuted, textAlign: 'center' as const, width: '100%',
+          }),
+        }}>
+          {msg.role === 'buyer' && (
+            <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 3, fontWeight: 600, letterSpacing: 1 }}>BUYER</div>
+          )}
+          {msg.content}
+        </div>
+      </div>
+    ))}
+    {loading && (
+      <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <div style={{ padding: '10px 14px', background: colors.card, borderRadius: 10, fontSize: 13, color: colors.textMuted, border: `1px solid ${colors.cardBorder}` }}>
+          Thinking...
+        </div>
+      </div>
+    )}
+    <div ref={chatEnd} />
+  </div>
+
+  {/* Input */}
+  <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.cardBorder}`, background: colors.card, flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+      <textarea
+        ref={inputRef}
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+        placeholder="You're the salesperson. What do you say?"
+        rows={2}
+        disabled={loading}
+        style={{
+          flex: 1, padding: '10px 12px', fontSize: 14, border: `1px solid ${colors.cardBorder}`,
+          borderRadius: 8, resize: 'none', outline: 'none', fontFamily: font,
+          background: colors.bg, color: colors.textPrimary, lineHeight: 1.5,
+        }}
+      />
+      <button onClick={sendMessage} disabled={loading || !input.trim()} style={{
+        padding: '10px 18px', fontSize: 13, fontWeight: 600, color: 'white',
+        background: loading || !input.trim() ? colors.textMuted : colors.accent,
+        border: 'none', borderRadius: 8, cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+      }}>Send</button>
+    </div>
+    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: 'center' }}>
+      Type <strong>STOP</strong> to end and get your debrief + XP
+    </div>
+  </div>
+</div>
+```
+
+);
+};
+
+export default RolePlayCoach;

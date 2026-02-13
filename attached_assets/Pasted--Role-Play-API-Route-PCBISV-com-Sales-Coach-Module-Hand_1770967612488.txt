@@ -1,0 +1,440 @@
+/**
+
+- Role-Play API Route
+- PCBISV.com — Sales Coach Module
+- 
+- Handles the chat loop between the sales agent (user) and
+- the AI Skeptical Buyer. Manages hidden trust state and
+- session lifecycle.
+- 
+- Endpoints:
+- POST /api/roleplay/start     — Begin a new role-play session
+- POST /api/roleplay/message   — Send a message in an active session
+- POST /api/roleplay/end       — End session and get debrief
+- GET  /api/roleplay/history   — Get agent’s session history
+- GET  /api/roleplay/profile   — Get agent’s performance profile
+  */
+
+import { Router, Request, Response } from ‘express’;
+import fs from ‘fs’;
+import path from ‘path’;
+import { TrustScoreEngine, PerformanceTracker, SessionResult } from ‘./trust-score-engine’;
+
+const router = Router();
+const engine = new TrustScoreEngine();
+
+// ============================================================
+// CONFIGURATION — Adjust these to match your Replit setup
+// ============================================================
+
+// Path to the system prompt file
+const SYSTEM_PROMPT_PATH = path.join(__dirname, ‘skeptical-buyer-prompt.md’);
+
+// Your LLM API call function — replace this with whatever your
+// Replit project already uses. This is a generic wrapper.
+async function callLLM(messages: Array<{ role: string; content: string }>): Promise<string> {
+// —————————————————––
+// OPTION A: If your Replit uses OpenAI
+// —————————————————––
+// const { Configuration, OpenAIApi } = require(‘openai’);
+// const openai = new OpenAIApi(new Configuration({ apiKey: process.env.OPENAI_API_KEY }));
+// const response = await openai.createChatCompletion({
+//   model: ‘gpt-4’,
+//   messages,
+//   temperature: 0.85,
+//   max_tokens: 800,
+// });
+// return response.data.choices[0].message?.content || ‘’;
+
+// —————————————————––
+// OPTION B: If your Replit uses Anthropic Claude
+// —————————————————––
+// const Anthropic = require(’@anthropic-ai/sdk’);
+// const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// const systemMsg = messages.find(m => m.role === ‘system’)?.content || ‘’;
+// const chatMessages = messages.filter(m => m.role !== ‘system’);
+// const response = await client.messages.create({
+//   model: ‘claude-sonnet-4-20250514’,
+//   max_tokens: 800,
+//   system: systemMsg,
+//   messages: chatMessages.map(m => ({ role: m.role as ‘user’ | ‘assistant’, content: m.content })),
+// });
+// return response.content[0].type === ‘text’ ? response.content[0].text : ‘’;
+
+// —————————————————––
+// OPTION C: Auto-detect (recommended for your setup)
+// —————————————————––
+// Uncomment whichever API client your project already imports.
+// The key insight: this function just needs to return a string.
+// Whatever chat function your existing AI coach uses, reuse it here.
+
+throw new Error(
+’LLM not configured. Uncomment Option A (OpenAI) or Option B (Anthropic) in roleplay-api.ts, ’ +
+‘or replace callLLM() with your existing chat function.’
+);
+}
+
+/**
+
+- Extended LLM call that asks for both a response AND a trust assessment.
+- We use a two-pass approach:
+- 1. Get the buyer’s response (shown to user)
+- 1. Get a hidden assessment (used to update trust score)
+   */
+   async function callLLMWithAssessment(
+   messages: Array<{ role: string; content: string }>,
+   hiddenContext: string
+   ): Promise<{ response: string; assessment: TrustAssessment }> {
+
+// Pass 1: Get the in-character response
+const buyerResponse = await callLLM(messages);
+
+// Pass 2: Get hidden trust assessment (not shown to user)
+const assessmentPrompt = [
+{
+role: ‘system’,
+content: `You are an analytical engine. Given the following role-play conversation,
+assess the LAST message from the salesperson (user). Output ONLY valid JSON, no markdown.
+
+${hiddenContext}
+
+Respond with this exact JSON structure:
+{
+“trustDelta”: <number between -20 and +20>,
+“reason”: “<brief explanation of why trust changed>”,
+“action”: “<what the salesperson did, quoted or summarized>”,
+“deceptionDeployed”: null or {
+“type”: “<polite_lie|time_trap|honesty_test|red_herring|gatekeeper_test|competitor_bluff>”,
+“statement”: “<what the buyer said>”,
+“truth”: “<the hidden truth>”,
+“wasCaught”: <true|false>
+},
+“persona”: “<name if first turn, null otherwise>”,
+“businessType”: “<type if first turn, null otherwise>”
+}`
+},
+…messages.slice(1), // Skip the system prompt, include conversation
+{ role: ‘assistant’, content: buyerResponse }, // Include the buyer’s response for context
+];
+
+const assessmentRaw = await callLLM(assessmentPrompt);
+
+let assessment: TrustAssessment;
+try {
+// Clean the response — LLMs sometimes wrap JSON in backticks
+const cleaned = assessmentRaw.replace(/`json\n?/g, '').replace(/`\n?/g, ‘’).trim();
+assessment = JSON.parse(cleaned);
+} catch (e) {
+// Fallback: neutral assessment if parsing fails
+assessment = {
+trustDelta: 0,
+reason: ‘Assessment parsing failed — neutral turn’,
+action: ‘unknown’,
+deceptionDeployed: null,
+persona: null,
+businessType: null,
+};
+}
+
+return { response: buyerResponse, assessment };
+}
+
+interface TrustAssessment {
+trustDelta: number;
+reason: string;
+action: string;
+deceptionDeployed: {
+type: string;
+statement: string;
+truth: string;
+wasCaught: boolean;
+} | null;
+persona: string | null;
+businessType: string | null;
+}
+
+// ============================================================
+// IN-MEMORY STORAGE (Replace with your DB in production)
+// ============================================================
+
+// Session conversation histories
+const conversationHistories: Map<string, Array<{ role: string; content: string }>> = new Map();
+
+// Completed session results (persist these to your DB)
+const sessionResults: Map<string, SessionResult[]> = new Map(); // agentId -> results[]
+
+// Load the system prompt once
+let systemPromptCache: string | null = null;
+function getSystemPrompt(): string {
+if (!systemPromptCache) {
+systemPromptCache = fs.readFileSync(SYSTEM_PROMPT_PATH, ‘utf-8’);
+}
+return systemPromptCache;
+}
+
+// ============================================================
+// ENDPOINTS
+// ============================================================
+
+/**
+
+- POST /api/roleplay/start
+- Begin a new role-play session
+- 
+- Body: { agentId: string, scenario?: string }
+  */
+  router.post(’/start’, async (req: Request, res: Response) => {
+  try {
+  const { agentId, scenario } = req.body;
+  
+  if (!agentId) {
+  return res.status(400).json({ error: ‘agentId is required’ });
+  }
+  
+  // Check agent’s history for adaptive difficulty
+  const agentHistory = sessionResults.get(agentId) || [];
+  const profile = PerformanceTracker.buildProfile(agentId, agentHistory);
+  const adaptiveContext = PerformanceTracker.buildAdaptiveContext(profile);
+  
+  // Start the engine session
+  const session = engine.startSession(agentId, profile.currentDifficulty);
+  
+  // Build the initial messages array
+  const systemMessage = [
+  getSystemPrompt(),
+  ‘\n—\n’,
+  adaptiveContext,
+  ‘\n—\n’,
+  session.systemContext,
+  scenario ? `\nSCENARIO OVERRIDE: ${scenario}` : ‘’,
+  ].join(’\n’);
+  
+  const messages: Array<{ role: string; content: string }> = [
+  { role: ‘system’, content: systemMessage },
+  ];
+  
+  // Store conversation history
+  conversationHistories.set(session.sessionId, messages);
+  
+  // Get the buyer’s opening (the AI starts in character)
+  const openingPrompt = [
+  …messages,
+  {
+  role: ‘user’,
+  content: ‘[The salesperson has just walked into the business / called on the phone. You are the buyer. React naturally — you did NOT ask for this visit. Set the scene briefly and respond in character.]’,
+  },
+  ];
+  
+  const buyerOpening = await callLLM(openingPrompt);
+  
+  // Add the opening to history
+  messages.push(
+  { role: ‘user’, content: ‘[Session Start]’ },
+  { role: ‘assistant’, content: buyerOpening }
+  );
+  
+  res.json({
+  sessionId: session.sessionId,
+  difficulty: session.difficulty,
+  buyerOpening,
+  message: ‘Role-play started. You are the salesperson. The buyer is waiting.’,
+  });
+  } catch (error: any) {
+  console.error(‘Roleplay start error:’, error);
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- POST /api/roleplay/message
+- Send a message in an active role-play session
+- 
+- Body: { sessionId: string, message: string }
+  */
+  router.post(’/message’, async (req: Request, res: Response) => {
+  try {
+  const { sessionId, message } = req.body;
+  
+  if (!sessionId || !message) {
+  return res.status(400).json({ error: ‘sessionId and message are required’ });
+  }
+  
+  // Check for end triggers
+  const endTriggers = [‘stop’, ‘end’, ‘debrief’, ‘quit’];
+  if (endTriggers.includes(message.trim().toLowerCase())) {
+  // Redirect to end session
+  return endSessionHandler(sessionId, res);
+  }
+  
+  const session = engine.getSession(sessionId);
+  if (!session || !session.isActive) {
+  return res.status(404).json({ error: ‘Session not found or already ended’ });
+  }
+  
+  const history = conversationHistories.get(sessionId);
+  if (!history) {
+  return res.status(404).json({ error: ‘Conversation history not found’ });
+  }
+  
+  // Add user message to history
+  history.push({ role: ‘user’, content: message });
+  
+  // Update system message with current hidden state
+  history[0] = {
+  role: ‘system’,
+  content: history[0].content.replace(
+  /[HIDDEN STATE[\s\S]*?[END HIDDEN STATE]/,
+  session.systemContext
+  ),
+  };
+  
+  // Get AI response + hidden trust assessment
+  const { response: buyerResponse, assessment } = await callLLMWithAssessment(
+  history,
+  session.systemContext
+  );
+  
+  // Update trust score
+  engine.processTurn(sessionId, {
+  trustDelta: assessment.trustDelta,
+  reason: assessment.reason,
+  action: assessment.action,
+  persona: assessment.persona || undefined,
+  businessType: assessment.businessType || undefined,
+  deception: assessment.deceptionDeployed
+  ? {
+  type: assessment.deceptionDeployed.type as any,
+  statement: assessment.deceptionDeployed.statement,
+  truth: assessment.deceptionDeployed.truth,
+  wasCaught: assessment.deceptionDeployed.wasCaught,
+  turn: session.currentTurn,
+  }
+  : undefined,
+  });
+  
+  // Add buyer response to history
+  history.push({ role: ‘assistant’, content: buyerResponse });
+  
+  // Return response (trust score is HIDDEN from the user)
+  res.json({
+  sessionId,
+  buyerResponse,
+  turn: session.currentTurn,
+  // Hint at trust level without revealing the number
+  buyerMood: getTrustMoodIndicator(session.trustScore),
+  });
+  } catch (error: any) {
+  console.error(‘Roleplay message error:’, error);
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- POST /api/roleplay/end
+- End session and get the full debrief
+- 
+- Body: { sessionId: string }
+  */
+  router.post(’/end’, async (req: Request, res: Response) => {
+  const { sessionId } = req.body;
+  if (!sessionId) {
+  return res.status(400).json({ error: ‘sessionId is required’ });
+  }
+  return endSessionHandler(sessionId, res);
+  });
+
+async function endSessionHandler(sessionId: string, res: Response) {
+try {
+const session = engine.getSession(sessionId);
+if (!session) {
+return res.status(404).json({ error: ‘Session not found’ });
+}
+
+```
+const result = engine.endSession(sessionId);
+
+// Store result for performance tracking
+const agentResults = sessionResults.get(result.agentId) || [];
+agentResults.push(result);
+sessionResults.set(result.agentId, agentResults);
+
+// Clean up conversation history
+conversationHistories.delete(sessionId);
+
+res.json({
+  debrief: result,
+  message: 'Session ended. Review your debrief below.',
+});
+```
+
+} catch (error: any) {
+console.error(‘Roleplay end error:’, error);
+res.status(500).json({ error: error.message });
+}
+}
+
+/**
+
+- GET /api/roleplay/history?agentId=xxx
+- Get an agent’s session history
+  */
+  router.get(’/history’, (req: Request, res: Response) => {
+  const agentId = req.query.agentId as string;
+  if (!agentId) {
+  return res.status(400).json({ error: ‘agentId is required’ });
+  }
+
+const history = sessionResults.get(agentId) || [];
+res.json({
+agentId,
+totalSessions: history.length,
+sessions: history.map(s => ({
+sessionId: s.sessionId,
+persona: s.persona,
+finalTrustScore: s.finalTrustScore,
+outcome: s.outcome,
+duration: s.duration,
+totalTurns: s.totalTurns,
+createdAt: s.createdAt,
+})),
+});
+});
+
+/**
+
+- GET /api/roleplay/profile?agentId=xxx
+- Get an agent’s performance profile
+  */
+  router.get(’/profile’, (req: Request, res: Response) => {
+  const agentId = req.query.agentId as string;
+  if (!agentId) {
+  return res.status(400).json({ error: ‘agentId is required’ });
+  }
+
+const history = sessionResults.get(agentId) || [];
+const profile = PerformanceTracker.buildProfile(agentId, history);
+res.json(profile);
+});
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+/**
+
+- Convert trust score to a vague mood indicator.
+- This gives the UI something to display without revealing the actual number.
+  */
+  function getTrustMoodIndicator(score: number): string {
+  if (score <= 15) return ‘hostile’;
+  if (score <= 30) return ‘guarded’;
+  if (score <= 45) return ‘skeptical’;
+  if (score <= 60) return ‘neutral’;
+  if (score <= 75) return ‘warming’;
+  if (score <= 90) return ‘engaged’;
+  return ‘collaborative’;
+  }
+
+export default router;

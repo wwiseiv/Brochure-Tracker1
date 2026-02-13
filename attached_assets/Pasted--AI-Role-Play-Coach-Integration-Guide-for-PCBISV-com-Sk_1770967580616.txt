@@ -1,0 +1,198 @@
+# 🎭 AI Role-Play Coach — Integration Guide for PCBISV.com
+
+## Skeptical Buyer Training Module
+
+-----
+
+## What You’re Getting
+
+Five files that add a **trust-based AI role-play system** to your Sales Coach module:
+
+|File                       |Purpose                                                                         |
+|---------------------------|--------------------------------------------------------------------------------|
+|`skeptical-buyer-prompt.md`|The AI’s brain — system prompt with personas, deception toolkit, trust tiers    |
+|`trust-score-engine.ts`    |Hidden state machine — tracks trust score, generates debriefs, adapts difficulty|
+|`roleplay-api.ts`          |Backend API routes — chat loop, session lifecycle, performance history          |
+|`RolePlayCoach.tsx`        |React UI — chat interface, mood indicator, debrief panel, performance stats     |
+|`INTEGRATION-README.md`    |This file                                                                       |
+
+-----
+
+## Quick Start (3 Steps)
+
+### Step 1: Drop the files into your Replit project
+
+```
+your-project/
+├── server/
+│   ├── routes/
+│   │   └── roleplay-api.ts        ← PUT HERE
+│   ├── services/
+│   │   └── trust-score-engine.ts   ← PUT HERE
+│   └── prompts/
+│       └── skeptical-buyer-prompt.md  ← PUT HERE
+├── client/
+│   └── components/
+│       └── RolePlayCoach.tsx       ← PUT HERE
+```
+
+Adjust paths to match your project structure. The key is:
+
+- Backend files go near your other API routes
+- The prompt file goes wherever your server can read it
+- The React component goes with your other components
+
+### Step 2: Wire up the API route
+
+In your main server file (likely `server/index.ts` or `server/app.ts`), add:
+
+```typescript
+import roleplayRouter from './routes/roleplay-api';
+
+// Add this with your other routes
+app.use('/api/roleplay', roleplayRouter);
+```
+
+### Step 3: Configure your LLM connection
+
+Open `roleplay-api.ts` and find the `callLLM()` function (around line 45). Uncomment **Option A** (OpenAI) or **Option B** (Anthropic) depending on what your project already uses.
+
+**If you’re not sure which API your project uses**, search your codebase for:
+
+- `OPENAI_API_KEY` → You’re using OpenAI, uncomment Option A
+- `ANTHROPIC_API_KEY` → You’re using Anthropic, uncomment Option B
+- If you have an existing chat function, just call that instead
+
+-----
+
+## How It Works Under the Hood
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│  React UI   │────▶│  API Route   │────▶│  LLM (GPT/Claude)│
+│ RolePlayCoach│◀────│ roleplay-api │◀────│  + System Prompt │
+└─────────────┘     └──────┬───────┘     └─────────────────┘
+                           │
+                    ┌──────┴───────┐
+                    │ Trust Score  │
+                    │   Engine     │
+                    │ (hidden state)│
+                    └──────────────┘
+```
+
+**Flow for each message:**
+
+1. User types a message (their sales pitch/response)
+1. API sends message + hidden trust context to LLM
+1. LLM responds in character as the buyer
+1. A second “assessment” LLM call evaluates what the salesperson did
+1. Trust Score Engine updates the hidden score
+1. Response sent back to UI with a vague “mood” indicator (never the actual number)
+1. On session end, full debrief with lies revealed, coaching tips, and score progression
+
+-----
+
+## How the System Gets Smarter Over Time
+
+The **PerformanceTracker** class (in `trust-score-engine.ts`) builds a profile for each agent:
+
+- **Adaptive Difficulty:** If an agent wins 3 sessions in a row, difficulty automatically increases. The AI becomes harder to crack, uses more sophisticated deception, and adds stakeholder complications (“My boss would kill me”).
+- **Pattern Detection:** Tracks common mistakes (e.g., “Pitched before diagnosing” appears 4 times) and injects that into the system prompt so the AI specifically targets those weak spots.
+- **Strength Recognition:** Also tracks what the agent does well, so the AI can challenge those strengths at higher difficulty levels.
+
+-----
+
+## Persistence (Important for “Getting Smarter”)
+
+Right now, session results are stored **in memory** (they disappear on Replit restart). To make learning persistent:
+
+### Option A: Use your existing PostgreSQL database
+
+Add a `roleplay_sessions` table:
+
+```sql
+CREATE TABLE roleplay_sessions (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  persona TEXT,
+  business_type TEXT,
+  final_trust_score INTEGER,
+  trust_progression JSONB,
+  outcome TEXT,
+  deceptions_deployed JSONB,
+  trust_events JSONB,
+  key_moments JSONB,
+  coaching_tips JSONB,
+  difficulty_recommendation TEXT,
+  duration INTEGER,
+  total_turns INTEGER,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_roleplay_agent ON roleplay_sessions(agent_id);
+```
+
+Then replace the `sessionResults` Map in `roleplay-api.ts` with database queries.
+
+### Option B: Use Replit’s built-in Key-Value store
+
+```typescript
+import { Client } from "@replit/object-storage";
+const storage = new Client();
+
+// Save session result
+await storage.set(`roleplay:${agentId}:${sessionId}`, JSON.stringify(result));
+
+// Load agent history
+const keys = await storage.list({ prefix: `roleplay:${agentId}:` });
+```
+
+-----
+
+## Adding the Component to Your Existing UI
+
+In whatever page/route houses your AI Sales Coach:
+
+```tsx
+import RolePlayCoach from '../components/RolePlayCoach';
+
+// Inside your component:
+<RolePlayCoach agentId={currentUser.id} />
+```
+
+The component handles its own state — lobby → active chat → debrief → back to lobby.
+
+-----
+
+## Customizing Personas for PCB Auto
+
+Want auto-repair-specific buyers? Edit `skeptical-buyer-prompt.md`, Section 1 (PERSONA SELECTION). You can add rows like:
+
+|Persona  |Business                       |Hidden Pain                                                                                                                      |Personality                                                           |
+|---------|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+|**Mike** |Independent auto shop, 15 years|Customers disputing brake jobs. Needs next-day funding because parts suppliers demand COD.                                       |Blue-collar, no BS, will literally walk away if you waste his time.   |
+|**Sarah**|Multi-location tire/auto chain |Corporate gave her a processing contract 3 years ago that’s bleeding money. She has no authority to change it — but she wants to.|Professional, data-driven, needs ammo to take to her regional manager.|
+
+-----
+
+## Troubleshooting
+
+**“LLM not configured” error**
+→ You haven’t uncommented one of the options in `callLLM()`. Open `roleplay-api.ts` and pick Option A or B.
+
+**Trust assessment always returns 0**
+→ The assessment LLM call is getting JSON parsing errors. Check your LLM’s response format. Some models wrap JSON in backticks — the code handles this, but edge cases happen.
+
+**Buyer responses feel too easy**
+→ The system starts at “normal” difficulty for first-time users. After 3 sessions, it adapts. Or you can force hard mode by passing `difficulty: 'hard'` in the start request.
+
+**Component doesn’t match your UI theme**
+→ The component uses inline styles for portability. Replace with your project’s CSS framework (Tailwind, etc.) as needed. The structure is the important part.
+
+-----
+
+## Architecture Notes
+
+- **Two-pass LLM calls** are intentional. Pass 1 gets the buyer’s in-character response. Pass 2 gets a structured trust assessment. This prevents the buyer from accidentally revealing trust mechanics in their dialogue.
+- **The mood indicator** is deliberately vague (“guarded”, “warming”) rather than showing a number. This mirrors real sales — you have to read the room, not a dashboard.
+- **Session results are designed for export.** The `SessionResult` type contains everything needed for reporting, leaderboards, or certification tracking.

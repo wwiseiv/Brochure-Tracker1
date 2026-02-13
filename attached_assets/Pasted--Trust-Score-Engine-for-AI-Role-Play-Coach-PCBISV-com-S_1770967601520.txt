@@ -1,0 +1,497 @@
+/**
+
+- Trust Score Engine for AI Role-Play Coach
+- PCBISV.com — Sales Coach Module
+- 
+- Manages hidden trust state between conversation turns,
+- tracks session history for adaptive difficulty,
+- and generates debrief analytics.
+  */
+
+// ============================================================
+// TYPES
+// ============================================================
+
+export interface TrustEvent {
+turn: number;
+action: string;
+modifier: number;
+reason: string;
+timestamp: Date;
+}
+
+export interface DeceptionDeployed {
+type: ‘polite_lie’ | ‘time_trap’ | ‘honesty_test’ | ‘red_herring’ | ‘gatekeeper_test’ | ‘competitor_bluff’;
+statement: string;
+truth: string;
+wasCaught: boolean;
+turn: number;
+}
+
+export interface SessionResult {
+sessionId: string;
+agentId: string;
+persona: string;
+businessType: string;
+finalTrustScore: number;
+trustProgression: number[];
+outcome: ‘deal_won’ | ‘soft_maybe’ | ‘lost’ | ‘blown’;
+deceptionsDeployed: DeceptionDeployed[];
+trustEvents: TrustEvent[];
+keyMoments: {
+bestMove: { quote: string; reason: string; impact: number } | null;
+biggestMiss: { quote: string; reason: string; impact: number } | null;
+};
+coachingTips: string[];
+difficultyRecommendation: ‘increase’ | ‘maintain’ | ‘decrease’;
+duration: number; // seconds
+totalTurns: number;
+createdAt: Date;
+}
+
+export interface SessionState {
+sessionId: string;
+agentId: string;
+trustScore: number;
+trustProgression: number[];
+trustEvents: TrustEvent[];
+deceptionsDeployed: DeceptionDeployed[];
+currentTurn: number;
+persona: string | null;
+businessType: string | null;
+difficulty: ‘easy’ | ‘normal’ | ‘hard’;
+startedAt: Date;
+isActive: boolean;
+// Hidden context injected into each AI message
+systemContext: string;
+}
+
+export interface AgentPerformanceProfile {
+agentId: string;
+totalSessions: number;
+averageTrustScore: number;
+recentAverage: number; // last 3 sessions
+bestScore: number;
+worstScore: number;
+dealsWon: number;
+dealsClosed: number;
+commonMistakes: { action: string; frequency: number }[];
+strengths: { action: string; frequency: number }[];
+currentDifficulty: ‘easy’ | ‘normal’ | ‘hard’;
+lastSessionDate: Date | null;
+}
+
+// ============================================================
+// TRUST SCORE ENGINE CLASS
+// ============================================================
+
+export class TrustScoreEngine {
+private sessions: Map<string, SessionState> = new Map();
+
+/**
+
+- Start a new role-play session
+  */
+  startSession(agentId: string, difficulty?: ‘easy’ | ‘normal’ | ‘hard’): SessionState {
+  const sessionId = `rp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+```
+const startingTrust = difficulty === 'hard' ? 15 : difficulty === 'easy' ? 25 : 20;
+
+const state: SessionState = {
+  sessionId,
+  agentId,
+  trustScore: startingTrust,
+  trustProgression: [startingTrust],
+  trustEvents: [],
+  deceptionsDeployed: [],
+  currentTurn: 0,
+  persona: null,
+  businessType: null,
+  difficulty: difficulty || 'normal',
+  startedAt: new Date(),
+  isActive: true,
+  systemContext: '',
+};
+
+this.sessions.set(sessionId, state);
+state.systemContext = this.buildSystemContext(state);
+return state;
+```
+
+}
+
+/**
+
+- Process a conversation turn and update trust state.
+- Called AFTER the AI responds, with the AI’s internal trust assessment.
+  */
+  processTurn(
+  sessionId: string,
+  aiAssessment: {
+  trustDelta: number;
+  reason: string;
+  action: string;
+  persona?: string;
+  businessType?: string;
+  deception?: DeceptionDeployed;
+  }
+  ): SessionState {
+  const state = this.sessions.get(sessionId);
+  if (!state || !state.isActive) {
+  throw new Error(`Session ${sessionId} not found or inactive`);
+  }
+
+```
+state.currentTurn += 1;
+
+// Update persona if first turn
+if (aiAssessment.persona && !state.persona) {
+  state.persona = aiAssessment.persona;
+  state.businessType = aiAssessment.businessType || 'unknown';
+}
+
+// Apply trust modification with bounds
+const oldScore = state.trustScore;
+state.trustScore = Math.max(0, Math.min(100, state.trustScore + aiAssessment.trustDelta));
+state.trustProgression.push(state.trustScore);
+
+// Record the event
+state.trustEvents.push({
+  turn: state.currentTurn,
+  action: aiAssessment.action,
+  modifier: aiAssessment.trustDelta,
+  reason: aiAssessment.reason,
+  timestamp: new Date(),
+});
+
+// Record deception if deployed
+if (aiAssessment.deception) {
+  state.deceptionsDeployed.push(aiAssessment.deception);
+}
+
+// Rebuild system context for next turn
+state.systemContext = this.buildSystemContext(state);
+
+return state;
+```
+
+}
+
+/**
+
+- End a session and generate the final result
+  */
+  endSession(sessionId: string): SessionResult {
+  const state = this.sessions.get(sessionId);
+  if (!state) {
+  throw new Error(`Session ${sessionId} not found`);
+  }
+
+```
+state.isActive = false;
+
+// Determine outcome
+let outcome: SessionResult['outcome'];
+if (state.trustScore >= 71) outcome = 'deal_won';
+else if (state.trustScore >= 50) outcome = 'soft_maybe';
+else if (state.trustScore >= 20) outcome = 'lost';
+else outcome = 'blown';
+
+// Find key moments
+const positiveEvents = state.trustEvents.filter(e => e.modifier > 0);
+const negativeEvents = state.trustEvents.filter(e => e.modifier < 0);
+
+const bestEvent = positiveEvents.sort((a, b) => b.modifier - a.modifier)[0] || null;
+const worstEvent = negativeEvents.sort((a, b) => a.modifier - b.modifier)[0] || null;
+
+// Generate coaching tips based on what happened
+const coachingTips = this.generateCoachingTips(state);
+
+// Determine difficulty recommendation
+const difficultyRecommendation = this.recommendDifficulty(state);
+
+const result: SessionResult = {
+  sessionId: state.sessionId,
+  agentId: state.agentId,
+  persona: state.persona || 'Unknown',
+  businessType: state.businessType || 'Unknown',
+  finalTrustScore: state.trustScore,
+  trustProgression: state.trustProgression,
+  outcome,
+  deceptionsDeployed: state.deceptionsDeployed,
+  trustEvents: state.trustEvents,
+  keyMoments: {
+    bestMove: bestEvent
+      ? { quote: bestEvent.action, reason: bestEvent.reason, impact: bestEvent.modifier }
+      : null,
+    biggestMiss: worstEvent
+      ? { quote: worstEvent.action, reason: worstEvent.reason, impact: worstEvent.modifier }
+      : null,
+  },
+  coachingTips,
+  difficultyRecommendation,
+  duration: Math.round((Date.now() - state.startedAt.getTime()) / 1000),
+  totalTurns: state.currentTurn,
+  createdAt: new Date(),
+};
+
+// Clean up
+this.sessions.delete(sessionId);
+
+return result;
+```
+
+}
+
+/**
+
+- Get current session state (for internal use — never expose trust score to user)
+  */
+  getSession(sessionId: string): SessionState | undefined {
+  return this.sessions.get(sessionId);
+  }
+
+/**
+
+- Build the hidden system context injected into each AI turn.
+- This is what makes the AI “aware” of trust state without revealing it.
+  */
+  private buildSystemContext(state: SessionState): string {
+  const tier = this.getTrustTier(state.trustScore);
+  const deceptionsUsed = state.deceptionsDeployed.map(d => d.type);
+  const availableDeceptions = [
+  ‘polite_lie’, ‘time_trap’, ‘honesty_test’,
+  ‘red_herring’, ‘gatekeeper_test’, ‘competitor_bluff’
+  ].filter(d => !deceptionsUsed.includes(d as any));
+
+```
+return `
+```
+
+[HIDDEN STATE — DO NOT REVEAL TO USER]
+Current Trust Score: ${state.trustScore}/100
+Trust Tier: ${tier}
+Session Turn: ${state.currentTurn}
+Difficulty: ${state.difficulty}
+Deceptions already used: ${deceptionsUsed.join(’, ‘) || ‘none’}
+Available deceptions: ${availableDeceptions.join(’, ‘)}
+Trust progression: ${state.trustProgression.join(’ → ’)}
+Last trust change: ${state.trustEvents.length > 0
+? `${state.trustEvents[state.trustEvents.length - 1].modifier > 0 ? '+' : ''}${state.trustEvents[state.trustEvents.length - 1].modifier} (${state.trustEvents[state.trustEvents.length - 1].reason})`
+: ‘N/A’}
+
+BEHAVIORAL INSTRUCTION: You are currently in ${tier} mode. Act accordingly per the system prompt behavioral tiers.
+${state.difficulty === ‘hard’ ? ‘HARD MODE: Be more sophisticated with deception. Add internal politics. Be harder to crack.’ : ‘’}
+${state.difficulty === ‘easy’ ? ‘EASY MODE: Drop a hint if the agent is struggling. Be slightly more forthcoming.’ : ‘’}
+[END HIDDEN STATE]
+`.trim();
+}
+
+private getTrustTier(score: number): string {
+if (score <= 30) return ‘HOSTILE/GUARDED (Tier 1)’;
+if (score <= 60) return ‘NEUTRAL/TESTING (Tier 2)’;
+if (score <= 80) return ‘WARMING (Tier 3)’;
+return ‘COLLABORATIVE (Tier 4)’;
+}
+
+private generateCoachingTips(state: SessionState): string[] {
+const tips: string[] = [];
+const negEvents = state.trustEvents.filter(e => e.modifier < 0);
+const posEvents = state.trustEvents.filter(e => e.modifier > 0);
+
+```
+// Analyze patterns
+const pitchedEarly = negEvents.some(e => e.reason.toLowerCase().includes('pitch'));
+const happyEars = negEvents.some(e => e.reason.toLowerCase().includes('happy ears') || e.reason.toLowerCase().includes('brush-off'));
+const overPromised = negEvents.some(e => e.reason.toLowerCase().includes('promise') || e.reason.toLowerCase().includes('guarantee'));
+const defendedPrice = negEvents.some(e => e.reason.toLowerCase().includes('price') || e.reason.toLowerCase().includes('defend'));
+
+if (pitchedEarly) {
+  tips.push(
+    "You pitched before diagnosing. Try the Sandler 'Pain Funnel': ask 3 questions about their problem before you mention a single feature. Example: 'What's that costing you in real dollars?'"
+  );
+}
+
+if (happyEars) {
+  tips.push(
+    "You accepted a brush-off as a real answer. When someone says 'We're happy,' try a Label: 'It sounds like you don't want to fix what isn't broken.' This invites the REAL answer."
+  );
+}
+
+if (overPromised) {
+  tips.push(
+    "You over-promised to close. Buyers test your integrity. Next time, try: 'I'd be lying if I said we could do that. Here's what IS realistic...' — Honesty builds more trust than any promise."
+  );
+}
+
+if (defendedPrice) {
+  tips.push(
+    "You defended price instead of exploring value. When they say 'too expensive,' ask: 'Compared to what?' or 'What would make the difference worth it to you?' — Reframe from cost to cost-of-inaction."
+  );
+}
+
+// Check for uncaught deceptions
+const uncaughtLies = state.deceptionsDeployed.filter(d => !d.wasCaught);
+if (uncaughtLies.length > 0) {
+  tips.push(
+    `You missed ${uncaughtLies.length} test(s) the buyer threw at you. Practice active listening — when something feels too easy or too convenient, probe deeper. Real buyers rarely give you straight answers.`
+  );
+}
+
+// Positive reinforcement
+if (posEvents.length > 0) {
+  const bestTechnique = posEvents.sort((a, b) => b.modifier - a.modifier)[0];
+  tips.push(
+    `Strong move: "${bestTechnique.action}" — Keep doing this. It shows confidence and genuine curiosity.`
+  );
+}
+
+// Default tip if nothing else triggered
+if (tips.length === 0) {
+  tips.push(
+    "Focus on asking better questions. The best salespeople talk less than 30% of the time. Your job is to make the buyer feel heard, not impressed."
+  );
+}
+
+return tips.slice(0, 3); // Max 3 tips
+```
+
+}
+
+private recommendDifficulty(state: SessionState): ‘increase’ | ‘maintain’ | ‘decrease’ {
+if (state.trustScore >= 71) return ‘increase’;
+if (state.trustScore < 35) return ‘decrease’;
+return ‘maintain’;
+}
+}
+
+// ============================================================
+// PERFORMANCE TRACKER (Persists across sessions)
+// ============================================================
+
+export class PerformanceTracker {
+/**
+
+- Build a performance profile from session history.
+- Pass in all stored SessionResults for this agent.
+  */
+  static buildProfile(agentId: string, sessions: SessionResult[]): AgentPerformanceProfile {
+  const agentSessions = sessions.filter(s => s.agentId === agentId);
+
+```
+if (agentSessions.length === 0) {
+  return {
+    agentId,
+    totalSessions: 0,
+    averageTrustScore: 0,
+    recentAverage: 0,
+    bestScore: 0,
+    worstScore: 0,
+    dealsWon: 0,
+    dealsClosed: agentSessions.length,
+    commonMistakes: [],
+    strengths: [],
+    currentDifficulty: 'normal',
+    lastSessionDate: null,
+  };
+}
+
+const scores = agentSessions.map(s => s.finalTrustScore);
+const recent = agentSessions.slice(-3).map(s => s.finalTrustScore);
+
+// Aggregate mistakes and strengths
+const mistakeMap = new Map<string, number>();
+const strengthMap = new Map<string, number>();
+
+agentSessions.forEach(session => {
+  session.trustEvents.forEach(event => {
+    if (event.modifier < 0) {
+      const count = mistakeMap.get(event.reason) || 0;
+      mistakeMap.set(event.reason, count + 1);
+    } else if (event.modifier > 0) {
+      const count = strengthMap.get(event.reason) || 0;
+      strengthMap.set(event.reason, count + 1);
+    }
+  });
+});
+
+const commonMistakes = Array.from(mistakeMap.entries())
+  .map(([action, frequency]) => ({ action, frequency }))
+  .sort((a, b) => b.frequency - a.frequency)
+  .slice(0, 5);
+
+const strengths = Array.from(strengthMap.entries())
+  .map(([action, frequency]) => ({ action, frequency }))
+  .sort((a, b) => b.frequency - a.frequency)
+  .slice(0, 5);
+
+// Determine difficulty based on recent performance
+const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+let currentDifficulty: 'easy' | 'normal' | 'hard' = 'normal';
+if (recentAvg > 70) currentDifficulty = 'hard';
+else if (recentAvg < 40) currentDifficulty = 'easy';
+
+return {
+  agentId,
+  totalSessions: agentSessions.length,
+  averageTrustScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+  recentAverage: Math.round(recentAvg),
+  bestScore: Math.max(...scores),
+  worstScore: Math.min(...scores),
+  dealsWon: agentSessions.filter(s => s.outcome === 'deal_won').length,
+  dealsClosed: agentSessions.length,
+  commonMistakes,
+  strengths,
+  currentDifficulty,
+  lastSessionDate: agentSessions[agentSessions.length - 1].createdAt,
+};
+```
+
+}
+
+/**
+
+- Generate adaptive difficulty context for the system prompt
+- based on agent’s historical performance.
+  */
+  static buildAdaptiveContext(profile: AgentPerformanceProfile): string {
+  if (profile.totalSessions === 0) {
+  return ‘[SESSION_HISTORY: First session. Use default difficulty. Be moderately challenging.]’;
+  }
+
+```
+const mistakeWarnings = profile.commonMistakes.slice(0, 3)
+  .map(m => `- Frequently: ${m.action} (${m.frequency} times)`)
+  .join('\n');
+
+const strengthNotes = profile.strengths.slice(0, 3)
+  .map(s => `- Good at: ${s.action} (${s.frequency} times)`)
+  .join('\n');
+
+return `
+```
+
+[SESSION_HISTORY]
+Agent has completed ${profile.totalSessions} sessions.
+Average trust score: ${profile.averageTrustScore}/100
+Recent 3-session average: ${profile.recentAverage}/100
+Win rate: ${Math.round((profile.dealsWon / profile.dealsClosed) * 100)}%
+Recommended difficulty: ${profile.currentDifficulty.toUpperCase()}
+
+Common mistakes to exploit:
+${mistakeWarnings || ‘- No clear patterns yet’}
+
+Strengths to challenge:
+${strengthNotes || ‘- No clear patterns yet’}
+
+ADAPTIVE INSTRUCTION: Set difficulty to ${profile.currentDifficulty.toUpperCase()}.
+${profile.currentDifficulty === ‘hard’ ? ‘Be more sophisticated. Use layered deception. Add stakeholder complications.’ : ‘’}
+${profile.currentDifficulty === ‘easy’ ? ‘Be slightly more forthcoming. Drop hints when they struggle.’ : ‘’}
+${profile.currentDifficulty === ‘normal’ ? ‘Standard difficulty. This agent is in the growth zone.’ : ‘’}
+[END SESSION_HISTORY]
+`.trim();
+}
+}
+
+export default TrustScoreEngine;

@@ -1,0 +1,205 @@
+# 🎭 AI Role-Play Coach v3.0 — PCBISV.com Integration Guide
+
+## What’s In The Box
+
+|File                       |What It Does                                                                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`skeptical-buyer-prompt.md`|16 buyer personas across 8 verticals with industry-specific hidden pain points, deception toolkit, and XP/badge-aware debrief format                  |
+|`trust-score-engine.ts`    |Hidden trust state machine + XP calculator + badge tracker + adaptive difficulty + team leaderboard builder                                           |
+|`roleplay-api.ts`          |**Self-configuring** API — auto-detects your LLM (OpenAI or Anthropic), auto-detects your database (PostgreSQL or in-memory), registers its own routes|
+|`RolePlayCoach.tsx`        |React UI with dark theme, XP bar, badge display, vertical selector, team leaderboard tab, mood indicator, animated debrief                            |
+|`INTEGRATION-README.md`    |This file                                                                                                                                             |
+
+-----
+
+## Setup (3 Steps)
+
+### Step 1: Drop files into your project
+
+Put them wherever makes sense for your structure:
+
+```
+your-project/
+├── server/
+│   ├── routes/
+│   │   └── roleplay-api.ts
+│   ├── services/
+│   │   └── trust-score-engine.ts
+│   └── prompts/
+│       └── skeptical-buyer-prompt.md
+├── client/
+│   └── components/
+│       └── RolePlayCoach.tsx
+```
+
+### Step 2: Register the route
+
+In your main server file, add ONE line:
+
+```typescript
+// Option A: If you use Express router
+import roleplayRouter from './routes/roleplay-api';
+app.use('/api/roleplay', roleplayRouter);
+
+// Option B: Auto-register (the file exports a helper)
+import { registerRolePlayRoutes } from './routes/roleplay-api';
+registerRolePlayRoutes(app);
+```
+
+### Step 3: Ensure your API key is set
+
+The API auto-detects which LLM you use. Just make sure one of these exists in your Replit Secrets:
+
+- `ANTHROPIC_API_KEY` → Will use Claude Sonnet
+- `OPENAI_API_KEY` → Will use GPT-4
+
+**For persistent learning (optional but recommended):**
+
+- `DATABASE_URL` → Will use PostgreSQL instead of in-memory storage
+
+If `DATABASE_URL` exists, the system auto-creates its table on first run. If not, it uses in-memory storage (works fine but resets when Replit restarts).
+
+-----
+
+## Add the Component to Your UI
+
+```tsx
+import RolePlayCoach from '../components/RolePlayCoach';
+
+// Single agent
+<RolePlayCoach agentId={currentUser.id} />
+
+// With team leaderboard
+<RolePlayCoach
+  agentId={currentUser.id}
+  agentName={currentUser.name}
+  teamId={currentUser.teamId}
+/>
+```
+
+-----
+
+## XP & Badge System
+
+### XP Per Session
+
+|Source                        |Amount                                       |
+|------------------------------|---------------------------------------------|
+|Completed session             |25 XP base                                   |
+|Trust bonus                   |1 XP per point above 50                      |
+|Caught a lie                  |15 XP per deception caught                   |
+|Passed industry knowledge test|20 XP                                        |
+|Clean close (Trust 81+)       |30 XP                                        |
+|Win streak multiplier         |1.25x (2 wins), 1.5x (3 wins), 2.0x (5+ wins)|
+
+### Levels
+
+|Level      |XP Required|
+|-----------|-----------|
+|1          |0          |
+|2          |100        |
+|3          |250        |
+|5          |850        |
+|10         |5,200      |
+|15 (Master)|23,000     |
+
+### Badges (20 Total)
+
+- **Lie Detector** — Catch 10 deceptions
+- **Trust Builder** — Reach Trust 80+ five times
+- **Hot Streak** — 5 consecutive wins
+- **The Closer** — Win 25 sessions
+- **8 Vertical Specialist badges** — Complete 5 sessions per vertical
+- **Marathon Runner** — 50 total sessions
+- **Perfect Score** — Hit Trust 95+
+- **Comeback King** — Win after dropping below 15
+- **Industry Expert** — Pass 10 knowledge tests
+- **No-Pitch Pro** — Win 5 times without pitching too early
+
+### Hooking Into Your Existing Gamification
+
+The debrief response includes `xp.total` and `badgeProgress[]`. To sync with your existing system:
+
+```typescript
+// After ending a session
+const response = await fetch('/api/roleplay/end', { ... });
+const { debrief, profile } = await response.json();
+
+// Feed into your existing XP system
+await yourExistingXPService.addXP(agentId, debrief.xp.total, 'roleplay');
+
+// Check for new badges
+debrief.badgeProgress
+  .filter(b => b.justCompleted)
+  .forEach(badge => {
+    yourExistingBadgeService.award(agentId, badge.badgeId, badge.name);
+  });
+```
+
+-----
+
+## The 16 Personas
+
+### Auto Repair
+
+- **Tony Russo** — Independent shop, 22 years. Chargebacks on big repairs. Slow funding killing his parts float.
+- **Lisa Chen** — 3-location chain. Locked into corporate contract. Needs data to convince regional manager.
+
+### Restaurant / Bar
+
+- **Maria Gonzalez** — Family restaurant, 3 locations. POS crashes during rush. Trapped in equipment lease.
+- **Derek Washington** — Sports bar. Two processors, can’t reconcile. Got burned by Square’s rolling reserve.
+
+### Medical / Dental
+
+- **Dr. David Patel** — Family practice. No HIPAA BAA from processor. Staff manually keying payments.
+- **Dr. Rachel Torres, DDS** — Solo dentist. CareCredit eating 8-12%. Needs in-house payment plans.
+
+### Retail
+
+- **Karen Mitchell** — Boutique + Shopify. Two systems, can’t reconcile. Returns nightmare.
+- **Ahmad Hassan** — Convenience store. Hidden compliance fees. Interested in cash discount but worried it’s illegal.
+
+### B2B / Wholesale
+
+- **James Crawford** — $2.1M/month distributor. $12.8K PCI fee. Doesn’t know Level 2/3 processing exists.
+- **Priya Sharma** — Food distributor. AR team drowning. No QuickBooks integration.
+
+### Gas Station
+
+- **Bobby Tran** — Gas + c-store + car wash. Three MIDs, no idea of blended rate. Locked in 5-year contract.
+- **Denise Williams** — Branded stations. Mandated fuel processor but getting gouged on c-store side.
+
+### E-Commerce
+
+- **Zach Morgan** — DTC supplements. Chargeback rate approaching 1% threshold. Flagged as high-risk.
+- **Natalie Park** — Online furniture. Gateway double-dip. Doesn’t know about AVS or 3D Secure.
+
+### Professional Services
+
+- **Michael Rivera, Esq.** — Law firm. Needs IOLTA trust account splitting. 15 hrs/week manual reconciliation.
+- **Sandra Kim, CPA** — Accounting firm. Volume spikes trigger rolling reserves every tax season.
+
+Each persona has: hidden pain points, specific industry knowledge gaps, a distinct personality, and pre-loaded deception strategies that match their character.
+
+-----
+
+## How It Gets Smarter
+
+1. **Per-Session:** The AI tracks trust score changes in real-time, adjusting buyer behavior tier by tier.
+1. **Per-Agent:** After each session, the PerformanceTracker analyzes patterns — if an agent keeps pitching too early, the next buyer specifically baits them into pitching. If they’re good at catching lies, the lies get more sophisticated.
+1. **Per-Team:** The leaderboard creates healthy competition. Agents can see each other’s levels and win rates without seeing individual debrief details.
+1. **Adaptive Difficulty:** Automatic based on recent 3-session average. Hard mode starts trust lower, uses layered deception, and adds stakeholder complications.
+
+-----
+
+## Troubleshooting
+
+|Problem                     |Fix                                                                                                                                                                      |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|“No LLM configured”         |Add `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` to Replit Secrets                                                                                                            |
+|System prompt not found     |Place `skeptical-buyer-prompt.md` in project root, server dir, or prompts dir                                                                                            |
+|Sessions don’t persist      |Add `DATABASE_URL` to Replit Secrets pointing to your PostgreSQL instance                                                                                                |
+|Buyer too easy              |Force hard mode: `POST /api/roleplay/start` with body `{ "agentId": "...", "difficulty": "hard" }` — but normally just let the adaptive system handle it after 3 sessions|
+|Assessment JSON parse errors|Some edge cases with unusual LLM responses. The fallback returns a neutral assessment (0 trust change). This is rare and doesn’t break anything.                         |
+|UI doesn’t match your theme |Replace inline styles with your CSS framework. The component structure and logic are the important parts.                                                                |

@@ -1,0 +1,845 @@
+/**
+
+- RolePlayCoach.tsx
+- PCBISV.com — AI Sales Coach Role-Play Interface
+- 
+- Drop this into your existing React component structure.
+- Adjust imports and API base URL to match your project.
+  */
+
+import React, { useState, useRef, useEffect, useCallback } from ‘react’;
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface ChatMessage {
+role: ‘user’ | ‘buyer’ | ‘system’;
+content: string;
+timestamp: Date;
+mood?: string;
+}
+
+interface SessionDebrief {
+sessionId: string;
+agentId: string;
+persona: string;
+businessType: string;
+finalTrustScore: number;
+trustProgression: number[];
+outcome: ‘deal_won’ | ‘soft_maybe’ | ‘lost’ | ‘blown’;
+deceptionsDeployed: Array<{
+type: string;
+statement: string;
+truth: string;
+wasCaught: boolean;
+turn: number;
+}>;
+keyMoments: {
+bestMove: { quote: string; reason: string; impact: number } | null;
+biggestMiss: { quote: string; reason: string; impact: number } | null;
+};
+coachingTips: string[];
+difficultyRecommendation: string;
+duration: number;
+totalTurns: number;
+}
+
+interface PerformanceProfile {
+totalSessions: number;
+averageTrustScore: number;
+recentAverage: number;
+bestScore: number;
+dealsWon: number;
+dealsClosed: number;
+currentDifficulty: string;
+commonMistakes: Array<{ action: string; frequency: number }>;
+strengths: Array<{ action: string; frequency: number }>;
+}
+
+type ViewState = ‘lobby’ | ‘active’ | ‘debrief’;
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+// Adjust this to match your Replit project’s API base
+const API_BASE = ‘/api/roleplay’;
+
+// ============================================================
+// MOOD INDICATOR COMPONENT
+// ============================================================
+
+const MoodIndicator: React.FC<{ mood: string }> = ({ mood }) => {
+const moodConfig: Record<string, { color: string; icon: string; label: string }> = {
+hostile:       { color: ‘#DC2626’, icon: ‘🔴’, label: ‘Hostile’ },
+guarded:       { color: ‘#EA580C’, icon: ‘🟠’, label: ‘Guarded’ },
+skeptical:     { color: ‘#D97706’, icon: ‘🟡’, label: ‘Skeptical’ },
+neutral:       { color: ‘#CA8A04’, icon: ‘🟡’, label: ‘Neutral’ },
+warming:       { color: ‘#65A30D’, icon: ‘🟢’, label: ‘Warming Up’ },
+engaged:       { color: ‘#16A34A’, icon: ‘🟢’, label: ‘Engaged’ },
+collaborative: { color: ‘#059669’, icon: ‘🟢’, label: ‘Collaborative’ },
+};
+
+const config = moodConfig[mood] || moodConfig.neutral;
+
+return (
+<div style={{
+display: ‘flex’,
+alignItems: ‘center’,
+gap: ‘8px’,
+padding: ‘6px 14px’,
+borderRadius: ‘20px’,
+backgroundColor: `${config.color}18`,
+border: `1px solid ${config.color}40`,
+fontSize: ‘13px’,
+fontWeight: 600,
+color: config.color,
+}}>
+<span>{config.icon}</span>
+<span>Buyer Mood: {config.label}</span>
+</div>
+);
+};
+
+// ============================================================
+// TRUST PROGRESSION CHART (Simple SVG)
+// ============================================================
+
+const TrustChart: React.FC<{ progression: number[] }> = ({ progression }) => {
+if (progression.length < 2) return null;
+
+const width = 400;
+const height = 120;
+const padding = 20;
+const chartW = width - padding * 2;
+const chartH = height - padding * 2;
+
+const points = progression.map((score, i) => {
+const x = padding + (i / (progression.length - 1)) * chartW;
+const y = padding + chartH - (score / 100) * chartH;
+return `${x},${y}`;
+}).join(’ ’);
+
+// Color zones
+const zones = [
+{ y1: 0, y2: 30, color: ‘#FEE2E2’ },   // Hostile
+{ y1: 30, y2: 60, color: ‘#FEF9C3’ },   // Testing
+{ y1: 60, y2: 80, color: ‘#DCFCE7’ },    // Warming
+{ y1: 80, y2: 100, color: ‘#D1FAE5’ },   // Collaborative
+];
+
+return (
+<svg width={width} height={height} style={{ borderRadius: ‘8px’, backgroundColor: ‘#F9FAFB’ }}>
+{/* Zone backgrounds */}
+{zones.map((zone, i) => (
+<rect
+key={i}
+x={padding}
+y={padding + chartH - (zone.y2 / 100) * chartH}
+width={chartW}
+height={((zone.y2 - zone.y1) / 100) * chartH}
+fill={zone.color}
+opacity={0.5}
+/>
+))}
+{/* Grid lines */}
+{[25, 50, 75].map(v => (
+<line
+key={v}
+x1={padding}
+y1={padding + chartH - (v / 100) * chartH}
+x2={padding + chartW}
+y2={padding + chartH - (v / 100) * chartH}
+stroke=”#E5E7EB”
+strokeDasharray=“4,4”
+/>
+))}
+{/* Trust line */}
+<polyline
+points={points}
+fill="none"
+stroke="#3B82F6"
+strokeWidth={2.5}
+strokeLinejoin="round"
+/>
+{/* Data points */}
+{progression.map((score, i) => {
+const x = padding + (i / (progression.length - 1)) * chartW;
+const y = padding + chartH - (score / 100) * chartH;
+return <circle key={i} cx={x} cy={y} r={3} fill="#3B82F6" />;
+})}
+{/* Labels */}
+<text x={padding} y={height - 2} fontSize={10} fill=”#9CA3AF”>Start</text>
+<text x={padding + chartW} y={height - 2} fontSize={10} fill=”#9CA3AF” textAnchor=“end”>End</text>
+<text x={padding - 2} y={padding + 4} fontSize={10} fill=”#9CA3AF” textAnchor=“end”>100</text>
+<text x={padding - 2} y={padding + chartH + 4} fontSize={10} fill=”#9CA3AF” textAnchor=“end”>0</text>
+</svg>
+);
+};
+
+// ============================================================
+// DEBRIEF PANEL
+// ============================================================
+
+const DebriefPanel: React.FC<{ debrief: SessionDebrief; onNewSession: () => void }> = ({ debrief, onNewSession }) => {
+const outcomeConfig: Record<string, { emoji: string; label: string; color: string }> = {
+deal_won:   { emoji: ‘🏆’, label: ‘DEAL WON’, color: ‘#059669’ },
+soft_maybe: { emoji: ‘🤔’, label: ‘SOFT MAYBE’, color: ‘#D97706’ },
+lost:       { emoji: ‘❌’, label: ‘LOST’, color: ‘#DC2626’ },
+blown:      { emoji: ‘💥’, label: ‘BLOWN’, color: ‘#7C2D12’ },
+};
+
+const outcome = outcomeConfig[debrief.outcome] || outcomeConfig.lost;
+
+return (
+<div style={{
+maxWidth: ‘640px’,
+margin: ‘0 auto’,
+padding: ‘24px’,
+fontFamily: “‘Inter’, -apple-system, sans-serif”,
+}}>
+{/* Header */}
+<div style={{
+textAlign: ‘center’,
+padding: ‘24px’,
+background: ‘linear-gradient(135deg, #1E293B 0%, #334155 100%)’,
+borderRadius: ‘12px’,
+color: ‘white’,
+marginBottom: ‘20px’,
+}}>
+<div style={{ fontSize: ‘14px’, opacity: 0.7, letterSpacing: ‘2px’, marginBottom: ‘8px’ }}>
+SESSION DEBRIEF
+</div>
+<div style={{ fontSize: ‘48px’, marginBottom: ‘4px’ }}>{outcome.emoji}</div>
+<div style={{ fontSize: ‘24px’, fontWeight: 700, color: outcome.color }}>
+{outcome.label}
+</div>
+<div style={{ fontSize: ‘14px’, opacity: 0.7, marginTop: ‘8px’ }}>
+{debrief.persona} — {debrief.businessType} • {debrief.totalTurns} turns • {Math.round(debrief.duration / 60)}m
+</div>
+</div>
+
+```
+  {/* Trust Score */}
+  <div style={{
+    background: '#F8FAFC',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '16px',
+    border: '1px solid #E2E8F0',
+  }}>
+    <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', marginBottom: '12px' }}>
+      TRUST PROGRESSION
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+      <div style={{ fontSize: '36px', fontWeight: 700, color: '#1E293B' }}>
+        {debrief.finalTrustScore}<span style={{ fontSize: '16px', color: '#94A3B8' }}>/100</span>
+      </div>
+    </div>
+    <TrustChart progression={debrief.trustProgression} />
+  </div>
+
+  {/* Lies Told */}
+  {debrief.deceptionsDeployed.length > 0 && (
+    <div style={{
+      background: '#FFF7ED',
+      borderRadius: '12px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid #FED7AA',
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#9A3412', marginBottom: '12px' }}>
+        🎭 LIES THE BUYER TOLD YOU
+      </div>
+      {debrief.deceptionsDeployed.map((d, i) => (
+        <div key={i} style={{
+          padding: '12px',
+          background: 'white',
+          borderRadius: '8px',
+          marginBottom: i < debrief.deceptionsDeployed.length - 1 ? '8px' : 0,
+          border: '1px solid #FED7AA',
+        }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
+            "{d.statement}"
+          </div>
+          <div style={{ fontSize: '13px', color: '#78716C', marginBottom: '4px' }}>
+            Truth: {d.truth}
+          </div>
+          <div style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: d.wasCaught ? '#059669' : '#DC2626',
+          }}>
+            {d.wasCaught ? '✅ You caught it!' : '❌ You missed it'}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Key Moments */}
+  <div style={{
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    marginBottom: '16px',
+  }}>
+    {debrief.keyMoments.bestMove && (
+      <div style={{
+        background: '#F0FDF4',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid #BBF7D0',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: '#166534', marginBottom: '8px' }}>
+          🟢 BEST MOVE (+{debrief.keyMoments.bestMove.impact})
+        </div>
+        <div style={{ fontSize: '13px', fontStyle: 'italic', marginBottom: '6px' }}>
+          "{debrief.keyMoments.bestMove.quote}"
+        </div>
+        <div style={{ fontSize: '12px', color: '#4B5563' }}>
+          {debrief.keyMoments.bestMove.reason}
+        </div>
+      </div>
+    )}
+    {debrief.keyMoments.biggestMiss && (
+      <div style={{
+        background: '#FEF2F2',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid #FECACA',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: '#991B1B', marginBottom: '8px' }}>
+          🔴 BIGGEST MISS ({debrief.keyMoments.biggestMiss.impact})
+        </div>
+        <div style={{ fontSize: '13px', fontStyle: 'italic', marginBottom: '6px' }}>
+          "{debrief.keyMoments.biggestMiss.quote}"
+        </div>
+        <div style={{ fontSize: '12px', color: '#4B5563' }}>
+          {debrief.keyMoments.biggestMiss.reason}
+        </div>
+      </div>
+    )}
+  </div>
+
+  {/* Coaching Tips */}
+  <div style={{
+    background: '#EFF6FF',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '16px',
+    border: '1px solid #BFDBFE',
+  }}>
+    <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E40AF', marginBottom: '12px' }}>
+      💡 COACHING TIPS
+    </div>
+    {debrief.coachingTips.map((tip, i) => (
+      <div key={i} style={{
+        fontSize: '14px',
+        color: '#1E293B',
+        lineHeight: 1.6,
+        marginBottom: i < debrief.coachingTips.length - 1 ? '10px' : 0,
+        paddingLeft: '12px',
+        borderLeft: '3px solid #3B82F6',
+      }}>
+        {tip}
+      </div>
+    ))}
+  </div>
+
+  {/* Difficulty Recommendation */}
+  <div style={{
+    textAlign: 'center',
+    padding: '12px',
+    background: '#F1F5F9',
+    borderRadius: '8px',
+    fontSize: '13px',
+    color: '#475569',
+    marginBottom: '20px',
+  }}>
+    Next session difficulty: <strong>{debrief.difficultyRecommendation.toUpperCase()}</strong>
+  </div>
+
+  {/* New Session Button */}
+  <button
+    onClick={onNewSession}
+    style={{
+      width: '100%',
+      padding: '14px 24px',
+      fontSize: '16px',
+      fontWeight: 700,
+      color: 'white',
+      background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+      border: 'none',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      transition: 'transform 0.15s ease',
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+  >
+    Start New Role-Play
+  </button>
+</div>
+```
+
+);
+};
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
+interface RolePlayCoachProps {
+agentId: string; // Pass this from your auth/user context
+}
+
+const RolePlayCoach: React.FC<RolePlayCoachProps> = ({ agentId }) => {
+const [view, setView] = useState<ViewState>(‘lobby’);
+const [sessionId, setSessionId] = useState<string | null>(null);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [input, setInput] = useState(’’);
+const [isLoading, setIsLoading] = useState(false);
+const [currentMood, setCurrentMood] = useState(‘guarded’);
+const [debrief, setDebrief] = useState<SessionDebrief | null>(null);
+const [profile, setProfile] = useState<PerformanceProfile | null>(null);
+
+const chatEndRef = useRef<HTMLDivElement>(null);
+const inputRef = useRef<HTMLTextAreaElement>(null);
+
+// Auto-scroll
+useEffect(() => {
+chatEndRef.current?.scrollIntoView({ behavior: ‘smooth’ });
+}, [messages]);
+
+// Load profile on mount
+useEffect(() => {
+loadProfile();
+}, [agentId]);
+
+const loadProfile = async () => {
+try {
+const res = await fetch(`${API_BASE}/profile?agentId=${agentId}`);
+if (res.ok) {
+const data = await res.json();
+setProfile(data);
+}
+} catch (err) {
+console.error(‘Failed to load profile:’, err);
+}
+};
+
+const startSession = async () => {
+setIsLoading(true);
+try {
+const res = await fetch(`${API_BASE}/start`, {
+method: ‘POST’,
+headers: { ‘Content-Type’: ‘application/json’ },
+body: JSON.stringify({ agentId }),
+});
+const data = await res.json();
+
+```
+  setSessionId(data.sessionId);
+  setMessages([
+    {
+      role: 'system',
+      content: `Role-play started • Difficulty: ${data.difficulty.toUpperCase()}`,
+      timestamp: new Date(),
+    },
+    {
+      role: 'buyer',
+      content: data.buyerOpening,
+      timestamp: new Date(),
+      mood: 'guarded',
+    },
+  ]);
+  setCurrentMood('guarded');
+  setView('active');
+} catch (err) {
+  console.error('Failed to start session:', err);
+} finally {
+  setIsLoading(false);
+}
+```
+
+};
+
+const sendMessage = async () => {
+if (!input.trim() || !sessionId || isLoading) return;
+
+```
+const userMessage = input.trim();
+setInput('');
+setIsLoading(true);
+
+setMessages(prev => [
+  ...prev,
+  { role: 'user', content: userMessage, timestamp: new Date() },
+]);
+
+try {
+  const res = await fetch(`${API_BASE}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, message: userMessage }),
+  });
+  const data = await res.json();
+
+  if (data.debrief) {
+    // Session was ended (user said STOP/END/DEBRIEF)
+    setDebrief(data.debrief);
+    setView('debrief');
+  } else {
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'buyer',
+        content: data.buyerResponse,
+        timestamp: new Date(),
+        mood: data.buyerMood,
+      },
+    ]);
+    setCurrentMood(data.buyerMood);
+  }
+} catch (err) {
+  console.error('Message failed:', err);
+  setMessages(prev => [
+    ...prev,
+    { role: 'system', content: 'Connection error. Try again.', timestamp: new Date() },
+  ]);
+} finally {
+  setIsLoading(false);
+  inputRef.current?.focus();
+}
+```
+
+};
+
+const endSession = async () => {
+if (!sessionId) return;
+setIsLoading(true);
+try {
+const res = await fetch(`${API_BASE}/end`, {
+method: ‘POST’,
+headers: { ‘Content-Type’: ‘application/json’ },
+body: JSON.stringify({ sessionId }),
+});
+const data = await res.json();
+setDebrief(data.debrief);
+setView(‘debrief’);
+loadProfile(); // Refresh profile
+} catch (err) {
+console.error(‘Failed to end session:’, err);
+} finally {
+setIsLoading(false);
+}
+};
+
+const handleKeyDown = (e: React.KeyboardEvent) => {
+if (e.key === ‘Enter’ && !e.shiftKey) {
+e.preventDefault();
+sendMessage();
+}
+};
+
+const resetToLobby = () => {
+setView(‘lobby’);
+setSessionId(null);
+setMessages([]);
+setDebrief(null);
+setCurrentMood(‘guarded’);
+loadProfile();
+};
+
+// ============================================================
+// RENDER: LOBBY VIEW
+// ============================================================
+
+if (view === ‘lobby’) {
+return (
+<div style={{
+maxWidth: ‘560px’,
+margin: ‘40px auto’,
+padding: ‘32px’,
+fontFamily: “‘Inter’, -apple-system, sans-serif”,
+}}>
+<div style={{ textAlign: ‘center’, marginBottom: ‘32px’ }}>
+<div style={{ fontSize: ‘40px’, marginBottom: ‘8px’ }}>🎭</div>
+<h2 style={{ fontSize: ‘24px’, fontWeight: 700, color: ‘#1E293B’, margin: 0 }}>
+Sales Role-Play Coach
+</h2>
+<p style={{ fontSize: ‘14px’, color: ‘#64748B’, marginTop: ‘8px’ }}>
+Practice your pitch against an AI buyer who fights back.
+</p>
+</div>
+
+```
+    {/* Performance Card */}
+    {profile && profile.totalSessions > 0 && (
+      <div style={{
+        background: '#F8FAFC',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '24px',
+        border: '1px solid #E2E8F0',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginBottom: '12px', letterSpacing: '1px' }}>
+          YOUR STATS
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', textAlign: 'center' }}>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1E293B' }}>{profile.totalSessions}</div>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>Sessions</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#3B82F6' }}>{profile.recentAverage}</div>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>Avg Trust</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#059669' }}>
+              {profile.dealsClosed > 0 ? Math.round((profile.dealsWon / profile.dealsClosed) * 100) : 0}%
+            </div>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>Win Rate</div>
+          </div>
+        </div>
+        <div style={{
+          marginTop: '12px',
+          textAlign: 'center',
+          fontSize: '12px',
+          color: '#64748B',
+          padding: '6px',
+          background: '#EFF6FF',
+          borderRadius: '6px',
+        }}>
+          Next session difficulty: <strong>{profile.currentDifficulty.toUpperCase()}</strong>
+        </div>
+      </div>
+    )}
+
+    {/* Rules Card */}
+    <div style={{
+      background: '#FFFBEB',
+      borderRadius: '12px',
+      padding: '20px',
+      marginBottom: '24px',
+      border: '1px solid #FDE68A',
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#92400E', marginBottom: '8px' }}>
+        ⚡ HOW IT WORKS
+      </div>
+      <div style={{ fontSize: '14px', color: '#78716C', lineHeight: 1.7 }}>
+        You're a merchant services rep walking into a business cold. The buyer has a hidden Trust Score — 
+        your job is to earn it. They WILL lie to you. They WILL test you. Pitch too early and you're done. 
+        Listen first, diagnose second, prescribe last. Say <strong>STOP</strong> anytime to end and get your debrief.
+      </div>
+    </div>
+
+    <button
+      onClick={startSession}
+      disabled={isLoading}
+      style={{
+        width: '100%',
+        padding: '16px',
+        fontSize: '16px',
+        fontWeight: 700,
+        color: 'white',
+        background: isLoading
+          ? '#94A3B8'
+          : 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+        border: 'none',
+        borderRadius: '10px',
+        cursor: isLoading ? 'not-allowed' : 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {isLoading ? 'Setting the scene...' : 'Start Role-Play'}
+    </button>
+  </div>
+);
+```
+
+}
+
+// ============================================================
+// RENDER: DEBRIEF VIEW
+// ============================================================
+
+if (view === ‘debrief’ && debrief) {
+return <DebriefPanel debrief={debrief} onNewSession={resetToLobby} />;
+}
+
+// ============================================================
+// RENDER: ACTIVE CHAT VIEW
+// ============================================================
+
+return (
+<div style={{
+display: ‘flex’,
+flexDirection: ‘column’,
+height: ‘100vh’,
+maxWidth: ‘700px’,
+margin: ‘0 auto’,
+fontFamily: “‘Inter’, -apple-system, sans-serif”,
+}}>
+{/* Header */}
+<div style={{
+display: ‘flex’,
+alignItems: ‘center’,
+justifyContent: ‘space-between’,
+padding: ‘12px 20px’,
+background: ‘#1E293B’,
+color: ‘white’,
+flexShrink: 0,
+}}>
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: ‘12px’ }}>
+<span style={{ fontSize: ‘20px’ }}>🎭</span>
+<span style={{ fontSize: ‘15px’, fontWeight: 600 }}>Role-Play Active</span>
+</div>
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: ‘12px’ }}>
+<MoodIndicator mood={currentMood} />
+<button
+onClick={endSession}
+style={{
+padding: ‘6px 14px’,
+fontSize: ‘13px’,
+fontWeight: 600,
+color: ‘#FCA5A5’,
+background: ‘transparent’,
+border: ‘1px solid #FCA5A5’,
+borderRadius: ‘6px’,
+cursor: ‘pointer’,
+}}
+>
+End Session
+</button>
+</div>
+</div>
+
+```
+  {/* Chat Area */}
+  <div style={{
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  }}>
+    {messages.map((msg, i) => (
+      <div
+        key={i}
+        style={{
+          display: 'flex',
+          justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+        }}
+      >
+        <div style={{
+          maxWidth: msg.role === 'system' ? '100%' : '80%',
+          padding: msg.role === 'system' ? '8px 16px' : '12px 16px',
+          borderRadius: '12px',
+          fontSize: msg.role === 'system' ? '12px' : '14px',
+          lineHeight: 1.6,
+          ...(msg.role === 'user' ? {
+            background: '#2563EB',
+            color: 'white',
+            borderBottomRightRadius: '4px',
+          } : msg.role === 'buyer' ? {
+            background: '#F1F5F9',
+            color: '#1E293B',
+            borderBottomLeftRadius: '4px',
+            border: '1px solid #E2E8F0',
+          } : {
+            background: '#FFF7ED',
+            color: '#9A3412',
+            textAlign: 'center' as const,
+            width: '100%',
+            borderRadius: '8px',
+          }),
+        }}>
+          {msg.role === 'buyer' && (
+            <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '4px', fontWeight: 600 }}>
+              BUYER
+            </div>
+          )}
+          {msg.content}
+        </div>
+      </div>
+    ))}
+    {isLoading && (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-start',
+      }}>
+        <div style={{
+          padding: '12px 16px',
+          background: '#F1F5F9',
+          borderRadius: '12px',
+          fontSize: '14px',
+          color: '#94A3B8',
+        }}>
+          <span style={{ animation: 'pulse 1.5s infinite' }}>The buyer is thinking...</span>
+        </div>
+      </div>
+    )}
+    <div ref={chatEndRef} />
+  </div>
+
+  {/* Input Area */}
+  <div style={{
+    padding: '16px 20px',
+    borderTop: '1px solid #E2E8F0',
+    background: 'white',
+    flexShrink: 0,
+  }}>
+    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+      <textarea
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="You're the salesperson. What do you say?"
+        rows={2}
+        style={{
+          flex: 1,
+          padding: '12px 14px',
+          fontSize: '14px',
+          border: '1px solid #D1D5DB',
+          borderRadius: '10px',
+          resize: 'none',
+          outline: 'none',
+          fontFamily: 'inherit',
+          lineHeight: 1.5,
+        }}
+        disabled={isLoading}
+      />
+      <button
+        onClick={sendMessage}
+        disabled={isLoading || !input.trim()}
+        style={{
+          padding: '12px 20px',
+          fontSize: '14px',
+          fontWeight: 600,
+          color: 'white',
+          background: isLoading || !input.trim() ? '#94A3B8' : '#2563EB',
+          border: 'none',
+          borderRadius: '10px',
+          cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Send
+      </button>
+    </div>
+    <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px', textAlign: 'center' }}>
+      Type <strong>STOP</strong> to end the session and get your debrief
+    </div>
+  </div>
+</div>
+```
+
+);
+};
+
+export default RolePlayCoach;

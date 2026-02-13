@@ -1,0 +1,596 @@
+/**
+
+- Role-Play API v3.0 — Self-Configuring
+- PCBISV.com — Sales Coach Module
+- 
+- This file auto-detects your Replit environment:
+- - Finds your LLM API client (OpenAI or Anthropic)
+- - Works as Express middleware OR standalone server
+- - Uses available storage (PostgreSQL, Replit DB, or in-memory)
+- 
+- ENDPOINTS:
+- POST /api/roleplay/start       — Begin new session
+- POST /api/roleplay/message     — Send message in session
+- POST /api/roleplay/end         — End session, get debrief
+- GET  /api/roleplay/profile     — Agent performance profile
+- GET  /api/roleplay/leaderboard — Team leaderboard
+- GET  /api/roleplay/history     — Agent session history
+  */
+
+import { Router, Request, Response } from ‘express’;
+import fs from ‘fs’;
+import path from ‘path’;
+import {
+TrustScoreEngine,
+PerformanceTracker,
+SessionResult,
+Vertical,
+Difficulty,
+} from ‘./trust-score-engine’;
+
+// ============================================================
+// AUTO-DETECTION: Find your LLM client
+// ============================================================
+
+let llmProvider: ‘openai’ | ‘anthropic’ | ‘none’ = ‘none’;
+let llmClient: any = null;
+
+async function detectAndInitLLM() {
+// Try Anthropic first (common in PCBISV.com setups)
+if (process.env.ANTHROPIC_API_KEY) {
+try {
+const Anthropic = require(’@anthropic-ai/sdk’);
+llmClient = new Anthropic.default?.({ apiKey: process.env.ANTHROPIC_API_KEY })
+|| new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+llmProvider = ‘anthropic’;
+console.log(’[RolePlay] ✅ Detected Anthropic API’);
+return;
+} catch (e) {
+console.log(’[RolePlay] Anthropic SDK not installed, trying OpenAI…’);
+}
+}
+
+// Try OpenAI
+if (process.env.OPENAI_API_KEY) {
+try {
+const OpenAI = require(‘openai’);
+llmClient = new OpenAI.default?.({ apiKey: process.env.OPENAI_API_KEY })
+|| new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+llmProvider = ‘openai’;
+console.log(’[RolePlay] ✅ Detected OpenAI API’);
+return;
+} catch (e) {
+console.log(’[RolePlay] OpenAI SDK not installed.’);
+}
+}
+
+console.warn(’[RolePlay] ⚠️  No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your Replit Secrets.’);
+}
+
+// Initialize on import
+detectAndInitLLM();
+
+// ============================================================
+// LLM CALL WRAPPER
+// ============================================================
+
+async function callLLM(messages: Array<{ role: string; content: string }>, temperature = 0.85): Promise<string> {
+if (llmProvider === ‘none’ || !llmClient) {
+// Re-try detection in case env vars were added after startup
+await detectAndInitLLM();
+if (llmProvider === ‘none’) {
+throw new Error(
+’No LLM configured. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to your Replit Secrets tab. ’ +
+‘Then restart the server.’
+);
+}
+}
+
+if (llmProvider === ‘anthropic’) {
+const systemMsg = messages.find(m => m.role === ‘system’)?.content || ‘’;
+const chatMessages = messages
+.filter(m => m.role !== ‘system’)
+.map(m => ({ role: m.role as ‘user’ | ‘assistant’, content: m.content }));
+
+```
+// Ensure alternating messages (Anthropic requirement)
+const cleaned: typeof chatMessages = [];
+for (const msg of chatMessages) {
+  if (cleaned.length === 0 || cleaned[cleaned.length - 1].role !== msg.role) {
+    cleaned.push(msg);
+  } else {
+    cleaned[cleaned.length - 1].content += '\n' + msg.content;
+  }
+}
+// Ensure starts with user
+if (cleaned.length === 0 || cleaned[0].role !== 'user') {
+  cleaned.unshift({ role: 'user', content: '[Continue the conversation]' });
+}
+
+const response = await llmClient.messages.create({
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 1000,
+  temperature,
+  system: systemMsg,
+  messages: cleaned,
+});
+
+return response.content[0]?.type === 'text' ? response.content[0].text : '';
+```
+
+}
+
+if (llmProvider === ‘openai’) {
+const response = await llmClient.chat.completions.create({
+model: ‘gpt-4’,
+messages,
+temperature,
+max_tokens: 1000,
+});
+return response.choices[0]?.message?.content || ‘’;
+}
+
+throw new Error(‘Unknown LLM provider’);
+}
+
+// ============================================================
+// STORAGE LAYER (Auto-detects available storage)
+// ============================================================
+
+interface StorageAdapter {
+saveSession(result: SessionResult): Promise<void>;
+getAgentSessions(agentId: string): Promise<SessionResult[]>;
+getTeamSessions(teamId: string): Promise<SessionResult[]>;
+}
+
+// In-memory fallback (works immediately, resets on restart)
+class MemoryStorage implements StorageAdapter {
+private sessions: SessionResult[] = [];
+
+async saveSession(result: SessionResult) {
+this.sessions.push(result);
+}
+
+async getAgentSessions(agentId: string) {
+return this.sessions.filter(s => s.agentId === agentId);
+}
+
+async getTeamSessions(teamId: string) {
+return this.sessions.filter(s => s.teamId === teamId);
+}
+}
+
+// PostgreSQL adapter (if DATABASE_URL is available)
+class PostgresStorage implements StorageAdapter {
+private pool: any;
+
+constructor() {
+const { Pool } = require(‘pg’);
+this.pool = new Pool({ connectionString: process.env.DATABASE_URL });
+this.ensureTable();
+}
+
+private async ensureTable() {
+try {
+await this.pool.query(`CREATE TABLE IF NOT EXISTS roleplay_sessions ( id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, team_id TEXT, data JSONB NOT NULL, created_at TIMESTAMP DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_rp_agent ON roleplay_sessions(agent_id); CREATE INDEX IF NOT EXISTS idx_rp_team ON roleplay_sessions(team_id);`);
+console.log(’[RolePlay] ✅ PostgreSQL storage ready’);
+} catch (e: any) {
+console.warn(’[RolePlay] PostgreSQL table creation failed:’, e.message);
+}
+}
+
+async saveSession(result: SessionResult) {
+await this.pool.query(
+‘INSERT INTO roleplay_sessions (id, agent_id, team_id, data) VALUES ($1, $2, $3, $4)’,
+[result.sessionId, result.agentId, result.teamId || null, JSON.stringify(result)]
+);
+}
+
+async getAgentSessions(agentId: string): Promise<SessionResult[]> {
+const res = await this.pool.query(
+‘SELECT data FROM roleplay_sessions WHERE agent_id = $1 ORDER BY created_at ASC’,
+[agentId]
+);
+return res.rows.map((r: any) => r.data);
+}
+
+async getTeamSessions(teamId: string): Promise<SessionResult[]> {
+const res = await this.pool.query(
+‘SELECT data FROM roleplay_sessions WHERE team_id = $1 ORDER BY created_at ASC’,
+[teamId]
+);
+return res.rows.map((r: any) => r.data);
+}
+}
+
+// Auto-detect storage
+function createStorage(): StorageAdapter {
+if (process.env.DATABASE_URL) {
+try {
+const storage = new PostgresStorage();
+console.log(’[RolePlay] Using PostgreSQL storage (persistent)’);
+return storage;
+} catch (e) {
+console.log(’[RolePlay] PostgreSQL unavailable, falling back to memory’);
+}
+}
+console.log(’[RolePlay] Using in-memory storage (resets on restart)’);
+return new MemoryStorage();
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+const router = Router();
+const engine = new TrustScoreEngine();
+const storage = createStorage();
+
+// Conversation histories (always in-memory — these are ephemeral)
+const conversations: Map<string, Array<{ role: string; content: string }>> = new Map();
+
+// Load system prompt
+let systemPromptCache: string | null = null;
+function getSystemPrompt(): string {
+if (!systemPromptCache) {
+// Try multiple locations
+const paths = [
+path.join(__dirname, ‘skeptical-buyer-prompt.md’),
+path.join(__dirname, ‘..’, ‘prompts’, ‘skeptical-buyer-prompt.md’),
+path.join(__dirname, ‘..’, ‘skeptical-buyer-prompt.md’),
+path.join(process.cwd(), ‘skeptical-buyer-prompt.md’),
+];
+for (const p of paths) {
+if (fs.existsSync(p)) {
+systemPromptCache = fs.readFileSync(p, ‘utf-8’);
+console.log(`[RolePlay] ✅ Loaded system prompt from ${p}`);
+return systemPromptCache;
+}
+}
+throw new Error(
+‘System prompt not found. Place skeptical-buyer-prompt.md in your project root or server directory.’
+);
+}
+return systemPromptCache;
+}
+
+// ============================================================
+// TWO-PASS LLM: Response + Hidden Assessment
+// ============================================================
+
+interface TrustAssessment {
+trustDelta: number;
+reason: string;
+action: string;
+category: ‘positive’ | ‘negative’ | ‘neutral’;
+persona?: string;
+businessType?: string;
+vertical?: Vertical;
+passedKnowledgeTest?: boolean;
+deceptionDeployed?: {
+type: string;
+statement: string;
+truth: string;
+wasCaught: boolean;
+};
+}
+
+async function callLLMWithAssessment(
+messages: Array<{ role: string; content: string }>,
+hiddenContext: string
+): Promise<{ response: string; assessment: TrustAssessment }> {
+// Pass 1: Get buyer’s in-character response
+const buyerResponse = await callLLM(messages);
+
+// Pass 2: Hidden trust assessment
+const assessmentMessages = [
+{
+role: ‘system’,
+content: `You are an analytical engine for a sales training system. Assess the salesperson’s LAST message. Output ONLY valid JSON, no markdown backticks.
+
+${hiddenContext}
+
+JSON structure (output ONLY this, nothing else):
+{
+“trustDelta”: <-20 to +20>,
+“reason”: “<why trust changed>”,
+“action”: “<what the salesperson did>”,
+“category”: “<positive|negative|neutral>”,
+“persona”: “<persona name if this is the first turn, null otherwise>”,
+“businessType”: “<business type if first turn, null otherwise>”,
+“vertical”: “<auto_repair|restaurant|medical|retail|b2b_wholesale|gas_station|ecommerce|professional_services if first turn, null otherwise>”,
+“passedKnowledgeTest”: <true if they correctly answered an industry knowledge question, false otherwise>,
+“deceptionDeployed”: null or {“type”:”<type>”,“statement”:”<buyer’s lie>”,“truth”:”<real truth>”,“wasCaught”:<true|false>}
+}`,
+},
+…messages.slice(1),
+{ role: ‘assistant’, content: buyerResponse },
+];
+
+const raw = await callLLM(assessmentMessages, 0.3);
+let assessment: TrustAssessment;
+try {
+const cleaned = raw.replace(/`json\n?/g, '').replace(/`\n?/g, ‘’).trim();
+assessment = JSON.parse(cleaned);
+} catch {
+assessment = {
+trustDelta: 0,
+reason: ‘Assessment parse error — neutral turn’,
+action: ‘unknown’,
+category: ‘neutral’,
+};
+}
+
+return { response: buyerResponse, assessment };
+}
+
+// ============================================================
+// MOOD INDICATOR (vague, never reveals actual score)
+// ============================================================
+
+function getMoodIndicator(score: number): string {
+if (score <= 15) return ‘hostile’;
+if (score <= 30) return ‘guarded’;
+if (score <= 45) return ‘skeptical’;
+if (score <= 60) return ‘neutral’;
+if (score <= 75) return ‘warming’;
+if (score <= 90) return ‘engaged’;
+return ‘collaborative’;
+}
+
+// ============================================================
+// ENDPOINTS
+// ============================================================
+
+/**
+
+- POST /api/roleplay/start
+- Body: { agentId, teamId?, vertical?, scenario? }
+  */
+  router.post(’/start’, async (req: Request, res: Response) => {
+  try {
+  const { agentId, teamId, vertical, scenario } = req.body;
+  if (!agentId) return res.status(400).json({ error: ‘agentId is required’ });
+  
+  // Load agent history for adaptive difficulty
+  const history = await storage.getAgentSessions(agentId);
+  const profile = PerformanceTracker.buildProfile(agentId, history);
+  const adaptiveContext = PerformanceTracker.buildAdaptiveContext(profile);
+  
+  // Start engine session
+  const session = engine.startSession(agentId, profile.currentDifficulty, teamId);
+  
+  // Build system message
+  const systemMessage = [
+  getSystemPrompt(),
+  ‘\n—\n’,
+  adaptiveContext,
+  ‘\n—\n’,
+  session.systemContext,
+  vertical ? `\nVERTICAL OVERRIDE: Choose a persona from the ${vertical.replace('_', ' ')} vertical.` : ‘’,
+  scenario ? `\nSCENARIO: ${scenario}` : ‘’,
+  ].join(’\n’);
+  
+  const messages: Array<{ role: string; content: string }> = [
+  { role: ‘system’, content: systemMessage },
+  ];
+  
+  conversations.set(session.sessionId, messages);
+  
+  // Get buyer’s opening
+  const openingMessages = [
+  …messages,
+  {
+  role: ‘user’,
+  content: ‘[The salesperson has just walked in / called. You are the buyer. Set the scene in 2-3 sentences and respond in character. You did NOT ask for this visit.]’,
+  },
+  ];
+  
+  const buyerOpening = await callLLM(openingMessages);
+  messages.push(
+  { role: ‘user’, content: ‘[Session Start]’ },
+  { role: ‘assistant’, content: buyerOpening }
+  );
+  
+  res.json({
+  sessionId: session.sessionId,
+  difficulty: session.difficulty,
+  buyerOpening,
+  agentLevel: profile.level,
+  agentXP: profile.totalXP,
+  });
+  } catch (error: any) {
+  console.error(’[RolePlay] Start error:’, error);
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- POST /api/roleplay/message
+- Body: { sessionId, message }
+  */
+  router.post(’/message’, async (req: Request, res: Response) => {
+  try {
+  const { sessionId, message } = req.body;
+  if (!sessionId || !message) return res.status(400).json({ error: ‘sessionId and message required’ });
+  
+  // Check end triggers
+  if ([‘stop’, ‘end’, ‘debrief’, ‘quit’].includes(message.trim().toLowerCase())) {
+  return handleEnd(sessionId, res);
+  }
+  
+  const session = engine.getSession(sessionId);
+  if (!session?.isActive) return res.status(404).json({ error: ‘Session not found or ended’ });
+  
+  const history = conversations.get(sessionId);
+  if (!history) return res.status(404).json({ error: ‘Conversation not found’ });
+  
+  history.push({ role: ‘user’, content: message });
+  
+  // Update hidden state in system message
+  history[0].content = history[0].content.replace(
+  /[HIDDEN STATE[\s\S]*?[END HIDDEN STATE]/,
+  session.systemContext
+  );
+  
+  const { response: buyerResponse, assessment } = await callLLMWithAssessment(history, session.systemContext);
+  
+  engine.processTurn(sessionId, {
+  trustDelta: assessment.trustDelta,
+  reason: assessment.reason,
+  action: assessment.action,
+  category: assessment.category,
+  persona: assessment.persona || undefined,
+  businessType: assessment.businessType || undefined,
+  vertical: assessment.vertical || undefined,
+  passedKnowledgeTest: assessment.passedKnowledgeTest,
+  deception: assessment.deceptionDeployed
+  ? { …assessment.deceptionDeployed, turn: session.currentTurn }
+  : undefined,
+  });
+  
+  history.push({ role: ‘assistant’, content: buyerResponse });
+  
+  res.json({
+  sessionId,
+  buyerResponse,
+  turn: session.currentTurn,
+  buyerMood: getMoodIndicator(session.trustScore),
+  });
+  } catch (error: any) {
+  console.error(’[RolePlay] Message error:’, error);
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- POST /api/roleplay/end
+- Body: { sessionId }
+  */
+  router.post(’/end’, async (req: Request, res: Response) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: ‘sessionId required’ });
+  return handleEnd(sessionId, res);
+  });
+
+async function handleEnd(sessionId: string, res: Response) {
+try {
+const session = engine.getSession(sessionId);
+if (!session) return res.status(404).json({ error: ‘Session not found’ });
+
+```
+const history = await storage.getAgentSessions(session.agentId);
+const result = engine.endSession(sessionId, history);
+
+await storage.saveSession(result);
+conversations.delete(sessionId);
+
+// Get updated profile
+const updatedHistory = await storage.getAgentSessions(result.agentId);
+const profile = PerformanceTracker.buildProfile(result.agentId, updatedHistory);
+
+res.json({
+  debrief: result,
+  profile: {
+    level: profile.level,
+    totalXP: profile.totalXP,
+    xpProgress: PerformanceTracker.getXPForNextLevel(profile.totalXP),
+    winRate: profile.winRate,
+    currentStreak: profile.currentStreak,
+  },
+});
+```
+
+} catch (error: any) {
+console.error(’[RolePlay] End error:’, error);
+res.status(500).json({ error: error.message });
+}
+}
+
+/**
+
+- GET /api/roleplay/profile?agentId=xxx
+  */
+  router.get(’/profile’, async (req: Request, res: Response) => {
+  try {
+  const agentId = req.query.agentId as string;
+  if (!agentId) return res.status(400).json({ error: ‘agentId required’ });
+  
+  const sessions = await storage.getAgentSessions(agentId);
+  const profile = PerformanceTracker.buildProfile(agentId, sessions);
+  const xpProgress = PerformanceTracker.getXPForNextLevel(profile.totalXP);
+  
+  res.json({ …profile, xpProgress });
+  } catch (error: any) {
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- GET /api/roleplay/leaderboard?teamId=xxx
+  */
+  router.get(’/leaderboard’, async (req: Request, res: Response) => {
+  try {
+  const teamId = req.query.teamId as string;
+  if (!teamId) return res.status(400).json({ error: ‘teamId required’ });
+  
+  const sessions = await storage.getTeamSessions(teamId);
+  const leaderboard = PerformanceTracker.buildTeamLeaderboard(teamId, sessions);
+  
+  res.json({ teamId, leaderboard });
+  } catch (error: any) {
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+/**
+
+- GET /api/roleplay/history?agentId=xxx&limit=20
+  */
+  router.get(’/history’, async (req: Request, res: Response) => {
+  try {
+  const agentId = req.query.agentId as string;
+  const limit = parseInt(req.query.limit as string) || 20;
+  if (!agentId) return res.status(400).json({ error: ‘agentId required’ });
+  
+  const sessions = await storage.getAgentSessions(agentId);
+  const recent = sessions.slice(-limit).reverse();
+  
+  res.json({
+  agentId,
+  total: sessions.length,
+  sessions: recent.map(s => ({
+  sessionId: s.sessionId,
+  persona: s.persona,
+  vertical: s.vertical,
+  finalTrustScore: s.finalTrustScore,
+  outcome: s.outcome,
+  xpEarned: s.xp.total,
+  duration: s.duration,
+  totalTurns: s.totalTurns,
+  createdAt: s.createdAt,
+  })),
+  });
+  } catch (error: any) {
+  res.status(500).json({ error: error.message });
+  }
+  });
+
+// ============================================================
+// SELF-REGISTRATION HELPER
+// ============================================================
+
+/**
+
+- Call this if you want the module to register itself on your Express app.
+- Usage: registerRolePlayRoutes(app);
+  */
+  export function registerRolePlayRoutes(app: any, basePath = ‘/api/roleplay’) {
+  app.use(basePath, router);
+  console.log(`[RolePlay] ✅ Routes registered at ${basePath}`);
+  }
+
+export default router;

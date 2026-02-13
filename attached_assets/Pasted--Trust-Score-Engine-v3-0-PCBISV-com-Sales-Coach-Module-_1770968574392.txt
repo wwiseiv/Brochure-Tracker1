@@ -1,0 +1,812 @@
+/**
+
+- Trust Score Engine v3.0
+- PCBISV.com — Sales Coach Module
+- 
+- Features:
+- - Hidden trust state management
+- - XP calculation with bonus multipliers
+- - Badge progress tracking
+- - Multi-agent team support
+- - Adaptive difficulty based on performance history
+- - Vertical-specific performance tracking
+    */
+
+// ============================================================
+// TYPES
+// ============================================================
+
+export type Vertical =
+| ‘auto_repair’ | ‘restaurant’ | ‘medical’ | ‘retail’
+| ‘b2b_wholesale’ | ‘gas_station’ | ‘ecommerce’ | ‘professional_services’;
+
+export type Difficulty = ‘easy’ | ‘normal’ | ‘hard’;
+export type Outcome = ‘deal_won’ | ‘soft_maybe’ | ‘lost’ | ‘blown’;
+export type BadgeId =
+| ‘lie_detector’ | ‘trust_builder’ | ‘hot_streak’ | ‘ice_breaker’
+| ‘closer’ | ‘vertical_auto’ | ‘vertical_restaurant’ | ‘vertical_medical’
+| ‘vertical_retail’ | ‘vertical_b2b’ | ‘vertical_gas’ | ‘vertical_ecom’
+| ‘vertical_professional’ | ‘marathon’ | ‘perfect_score’ | ‘comeback_king’
+| ‘industry_expert’ | ‘objection_master’ | ‘empathy_engine’ | ‘no_pitch_pro’;
+
+export interface TrustEvent {
+turn: number;
+action: string;
+modifier: number;
+reason: string;
+category: ‘positive’ | ‘negative’ | ‘neutral’;
+timestamp: Date;
+}
+
+export interface DeceptionDeployed {
+type: string;
+statement: string;
+truth: string;
+wasCaught: boolean;
+turn: number;
+}
+
+export interface XPBreakdown {
+base: number;
+trustBonus: number;
+deceptionCaughtBonus: number;
+industryKnowledgeBonus: number;
+cleanCloseBonus: number;
+streakMultiplier: number;
+total: number;
+}
+
+export interface BadgeProgress {
+badgeId: BadgeId;
+name: string;
+description: string;
+icon: string;
+currentProgress: number;
+target: number;
+isComplete: boolean;
+justCompleted: boolean; // True if completed THIS session
+}
+
+export interface SessionResult {
+sessionId: string;
+agentId: string;
+teamId?: string;
+persona: string;
+businessType: string;
+vertical: Vertical;
+finalTrustScore: number;
+trustProgression: number[];
+outcome: Outcome;
+deceptionsDeployed: DeceptionDeployed[];
+trustEvents: TrustEvent[];
+keyMoments: {
+bestMove: { quote: string; reason: string; impact: number } | null;
+biggestMiss: { quote: string; reason: string; impact: number } | null;
+};
+coachingTips: string[];
+xp: XPBreakdown;
+badgeProgress: BadgeProgress[];
+difficultyRecommendation: Difficulty;
+suggestedVertical: Vertical;
+duration: number;
+totalTurns: number;
+createdAt: Date;
+}
+
+export interface SessionState {
+sessionId: string;
+agentId: string;
+teamId?: string;
+trustScore: number;
+trustProgression: number[];
+trustEvents: TrustEvent[];
+deceptionsDeployed: DeceptionDeployed[];
+currentTurn: number;
+persona: string | null;
+businessType: string | null;
+vertical: Vertical | null;
+difficulty: Difficulty;
+passedKnowledgeTest: boolean;
+startedAt: Date;
+isActive: boolean;
+systemContext: string;
+}
+
+export interface AgentProfile {
+agentId: string;
+teamId?: string;
+totalSessions: number;
+totalXP: number;
+level: number;
+averageTrustScore: number;
+recentAverage: number;
+bestScore: number;
+winRate: number;
+currentStreak: number; // consecutive wins
+bestStreak: number;
+currentDifficulty: Difficulty;
+verticalStats: Record<Vertical, { sessions: number; avgScore: number; wins: number }>;
+weakestVertical: Vertical;
+strongestVertical: Vertical;
+badges: BadgeProgress[];
+commonMistakes: Array<{ action: string; frequency: number }>;
+strengths: Array<{ action: string; frequency: number }>;
+lastSessionDate: Date | null;
+}
+
+// ============================================================
+// BADGE DEFINITIONS
+// ============================================================
+
+const BADGE_DEFINITIONS: Record<BadgeId, { name: string; description: string; icon: string; target: number }> = {
+lie_detector:          { name: ‘Lie Detector’,         description: ‘Catch deceptions during role-play’,         icon: ‘🔍’, target: 10 },
+trust_builder:         { name: ‘Trust Builder’,        description: ‘Reach Trust 80+ in a session’,              icon: ‘💎’, target: 5 },
+hot_streak:            { name: ‘Hot Streak’,           description: ‘Win consecutive sessions’,                   icon: ‘🔥’, target: 5 },
+ice_breaker:           { name: ‘Ice Breaker’,          description: ‘Win a session starting at Hard difficulty’,  icon: ‘🧊’, target: 3 },
+closer:                { name: ‘The Closer’,           description: ‘Win sessions (Trust 81+)’,                   icon: ‘🏆’, target: 25 },
+vertical_auto:         { name: ‘Auto Expert’,          description: ‘Complete auto repair sessions’,              icon: ‘🔧’, target: 5 },
+vertical_restaurant:   { name: ‘Restaurant Pro’,       description: ‘Complete restaurant sessions’,               icon: ‘🍽️’, target: 5 },
+vertical_medical:      { name: ‘Medical Specialist’,   description: ‘Complete medical/dental sessions’,           icon: ‘🏥’, target: 5 },
+vertical_retail:       { name: ‘Retail Master’,        description: ‘Complete retail sessions’,                   icon: ‘🛍️’, target: 5 },
+vertical_b2b:          { name: ‘B2B Authority’,        description: ‘Complete B2B/wholesale sessions’,            icon: ‘🏭’, target: 5 },
+vertical_gas:          { name: ‘Fuel Expert’,          description: ‘Complete gas station sessions’,              icon: ‘⛽’, target: 5 },
+vertical_ecom:         { name: ‘E-Commerce Ace’,       description: ‘Complete e-commerce sessions’,               icon: ‘🛒’, target: 5 },
+vertical_professional: { name: ‘Pro Services Expert’,  description: ‘Complete professional services sessions’,    icon: ‘⚖️’, target: 5 },
+marathon:              { name: ‘Marathon Runner’,       description: ‘Complete total role-play sessions’,          icon: ‘🏃’, target: 50 },
+perfect_score:         { name: ‘Perfect Score’,        description: ‘Achieve Trust 95+ in a session’,             icon: ‘💯’, target: 1 },
+comeback_king:         { name: ‘Comeback King’,        description: ‘Win after dropping below Trust 15’,          icon: ‘👑’, target: 3 },
+industry_expert:       { name: ‘Industry Expert’,      description: ‘Pass industry knowledge tests’,              icon: ‘🎓’, target: 10 },
+objection_master:      { name: ‘Objection Master’,     description: ‘Catch red herring/fake objections’,          icon: ‘🛡️’, target: 8 },
+empathy_engine:        { name: ‘Empathy Engine’,       description: ‘Score +15 via emotion labeling’,             icon: ‘❤️’, target: 10 },
+no_pitch_pro:          { name: ‘No-Pitch Pro’,         description: ‘Win without getting a “pitched too early” penalty’, icon: ‘🎯’, target: 5 },
+};
+
+// XP required per level (cumulative)
+const LEVEL_THRESHOLDS = [
+0,      // Level 1
+100,    // Level 2
+250,    // Level 3
+500,    // Level 4
+850,    // Level 5
+1300,   // Level 6
+1900,   // Level 7
+2700,   // Level 8
+3800,   // Level 9
+5200,   // Level 10
+7000,   // Level 11
+9500,   // Level 12
+13000,  // Level 13
+17500,  // Level 14
+23000,  // Level 15 (Master)
+];
+
+const VERTICAL_BADGE_MAP: Record<Vertical, BadgeId> = {
+auto_repair: ‘vertical_auto’,
+restaurant: ‘vertical_restaurant’,
+medical: ‘vertical_medical’,
+retail: ‘vertical_retail’,
+b2b_wholesale: ‘vertical_b2b’,
+gas_station: ‘vertical_gas’,
+ecommerce: ‘vertical_ecom’,
+professional_services: ‘vertical_professional’,
+};
+
+// ============================================================
+// TRUST SCORE ENGINE
+// ============================================================
+
+export class TrustScoreEngine {
+private sessions: Map<string, SessionState> = new Map();
+
+startSession(agentId: string, difficulty: Difficulty = ‘normal’, teamId?: string): SessionState {
+const sessionId = `rp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const startingTrust = difficulty === ‘hard’ ? 15 : difficulty === ‘easy’ ? 25 : 20;
+
+```
+const state: SessionState = {
+  sessionId,
+  agentId,
+  teamId,
+  trustScore: startingTrust,
+  trustProgression: [startingTrust],
+  trustEvents: [],
+  deceptionsDeployed: [],
+  currentTurn: 0,
+  persona: null,
+  businessType: null,
+  vertical: null,
+  difficulty,
+  passedKnowledgeTest: false,
+  startedAt: new Date(),
+  isActive: true,
+  systemContext: '',
+};
+
+this.sessions.set(sessionId, state);
+state.systemContext = this.buildSystemContext(state);
+return state;
+```
+
+}
+
+processTurn(
+sessionId: string,
+assessment: {
+trustDelta: number;
+reason: string;
+action: string;
+category?: ‘positive’ | ‘negative’ | ‘neutral’;
+persona?: string;
+businessType?: string;
+vertical?: Vertical;
+deception?: DeceptionDeployed;
+passedKnowledgeTest?: boolean;
+}
+): SessionState {
+const state = this.sessions.get(sessionId);
+if (!state || !state.isActive) {
+throw new Error(`Session ${sessionId} not found or inactive`);
+}
+
+```
+state.currentTurn += 1;
+
+if (assessment.persona && !state.persona) {
+  state.persona = assessment.persona;
+  state.businessType = assessment.businessType || 'unknown';
+  state.vertical = assessment.vertical || null;
+}
+
+if (assessment.passedKnowledgeTest) {
+  state.passedKnowledgeTest = true;
+}
+
+// Apply trust with bounds
+state.trustScore = Math.max(0, Math.min(100, state.trustScore + assessment.trustDelta));
+state.trustProgression.push(state.trustScore);
+
+state.trustEvents.push({
+  turn: state.currentTurn,
+  action: assessment.action,
+  modifier: assessment.trustDelta,
+  reason: assessment.reason,
+  category: assessment.category || (assessment.trustDelta > 0 ? 'positive' : assessment.trustDelta < 0 ? 'negative' : 'neutral'),
+  timestamp: new Date(),
+});
+
+if (assessment.deception) {
+  state.deceptionsDeployed.push(assessment.deception);
+}
+
+state.systemContext = this.buildSystemContext(state);
+return state;
+```
+
+}
+
+endSession(sessionId: string, agentHistory: SessionResult[] = []): SessionResult {
+const state = this.sessions.get(sessionId);
+if (!state) throw new Error(`Session ${sessionId} not found`);
+
+```
+state.isActive = false;
+
+// Determine outcome
+let outcome: Outcome;
+if (state.trustScore >= 81) outcome = 'deal_won';
+else if (state.trustScore >= 50) outcome = 'soft_maybe';
+else if (state.trustScore >= 20) outcome = 'lost';
+else outcome = 'blown';
+
+// Calculate XP
+const xp = this.calculateXP(state, outcome, agentHistory);
+
+// Calculate badge progress
+const badges = this.calculateBadgeProgress(state, outcome, agentHistory);
+
+// Key moments
+const positiveEvents = state.trustEvents.filter(e => e.category === 'positive').sort((a, b) => b.modifier - a.modifier);
+const negativeEvents = state.trustEvents.filter(e => e.category === 'negative').sort((a, b) => a.modifier - b.modifier);
+
+// Coaching tips
+const coachingTips = this.generateCoachingTips(state);
+
+// Difficulty recommendation
+const recentScores = [...agentHistory.slice(-2).map(s => s.finalTrustScore), state.trustScore];
+const recentAvg = recentScores.reduce((a, b) => a + b, 0) / recentScores.length;
+const difficultyRec: Difficulty = recentAvg > 70 ? 'hard' : recentAvg < 40 ? 'easy' : 'normal';
+
+// Suggest weakest vertical
+const suggestedVertical = this.findWeakestVertical(agentHistory, state.vertical);
+
+const result: SessionResult = {
+  sessionId: state.sessionId,
+  agentId: state.agentId,
+  teamId: state.teamId,
+  persona: state.persona || 'Unknown',
+  businessType: state.businessType || 'Unknown',
+  vertical: state.vertical || 'auto_repair',
+  finalTrustScore: state.trustScore,
+  trustProgression: state.trustProgression,
+  outcome,
+  deceptionsDeployed: state.deceptionsDeployed,
+  trustEvents: state.trustEvents,
+  keyMoments: {
+    bestMove: positiveEvents[0]
+      ? { quote: positiveEvents[0].action, reason: positiveEvents[0].reason, impact: positiveEvents[0].modifier }
+      : null,
+    biggestMiss: negativeEvents[0]
+      ? { quote: negativeEvents[0].action, reason: negativeEvents[0].reason, impact: negativeEvents[0].modifier }
+      : null,
+  },
+  coachingTips,
+  xp,
+  badgeProgress: badges,
+  difficultyRecommendation: difficultyRec,
+  suggestedVertical,
+  duration: Math.round((Date.now() - state.startedAt.getTime()) / 1000),
+  totalTurns: state.currentTurn,
+  createdAt: new Date(),
+};
+
+this.sessions.delete(sessionId);
+return result;
+```
+
+}
+
+getSession(sessionId: string): SessionState | undefined {
+return this.sessions.get(sessionId);
+}
+
+// ── XP CALCULATION ──────────────────────────────────────────
+
+private calculateXP(state: SessionState, outcome: Outcome, history: SessionResult[]): XPBreakdown {
+const base = 25; // Every completed session
+const trustBonus = Math.max(0, state.trustScore - 50); // 1 XP per point above 50
+const deceptionsCaught = state.deceptionsDeployed.filter(d => d.wasCaught).length;
+const deceptionCaughtBonus = deceptionsCaught * 15;
+const industryKnowledgeBonus = state.passedKnowledgeTest ? 20 : 0;
+const cleanCloseBonus = outcome === ‘deal_won’ ? 30 : 0;
+
+```
+// Streak multiplier: consecutive wins
+let streak = 0;
+for (let i = history.length - 1; i >= 0; i--) {
+  if (history[i].outcome === 'deal_won') streak++;
+  else break;
+}
+if (outcome === 'deal_won') streak++;
+const streakMultiplier = streak >= 5 ? 2.0 : streak >= 3 ? 1.5 : streak >= 2 ? 1.25 : 1.0;
+
+const subtotal = base + trustBonus + deceptionCaughtBonus + industryKnowledgeBonus + cleanCloseBonus;
+const total = Math.round(subtotal * streakMultiplier);
+
+return { base, trustBonus, deceptionCaughtBonus, industryKnowledgeBonus, cleanCloseBonus, streakMultiplier, total };
+```
+
+}
+
+// ── BADGE PROGRESS ──────────────────────────────────────────
+
+private calculateBadgeProgress(state: SessionState, outcome: Outcome, history: SessionResult[]): BadgeProgress[] {
+const allSessions = […history]; // Don’t include current yet — we calculate progress
+const badges: BadgeProgress[] = [];
+
+```
+const makeBadge = (id: BadgeId, currentProgress: number): BadgeProgress => {
+  const def = BADGE_DEFINITIONS[id];
+  const previousProgress = this.getPreviousBadgeCount(id, allSessions, state);
+  return {
+    badgeId: id,
+    name: def.name,
+    description: def.description,
+    icon: def.icon,
+    currentProgress,
+    target: def.target,
+    isComplete: currentProgress >= def.target,
+    justCompleted: currentProgress >= def.target && previousProgress < def.target,
+  };
+};
+
+// Lie Detector — total deceptions caught
+const totalCaught = allSessions.reduce((sum, s) => sum + s.deceptionsDeployed.filter(d => d.wasCaught).length, 0)
+  + state.deceptionsDeployed.filter(d => d.wasCaught).length;
+badges.push(makeBadge('lie_detector', totalCaught));
+
+// Trust Builder — sessions with Trust 80+
+const trustBuilderCount = allSessions.filter(s => s.finalTrustScore >= 80).length + (state.trustScore >= 80 ? 1 : 0);
+badges.push(makeBadge('trust_builder', trustBuilderCount));
+
+// Hot Streak — current consecutive wins
+let streak = 0;
+for (let i = allSessions.length - 1; i >= 0; i--) {
+  if (allSessions[i].outcome === 'deal_won') streak++;
+  else break;
+}
+if (outcome === 'deal_won') streak++;
+badges.push(makeBadge('hot_streak', streak));
+
+// Closer — total wins
+const totalWins = allSessions.filter(s => s.outcome === 'deal_won').length + (outcome === 'deal_won' ? 1 : 0);
+badges.push(makeBadge('closer', totalWins));
+
+// Vertical badge for current session's vertical
+if (state.vertical) {
+  const vertBadgeId = VERTICAL_BADGE_MAP[state.vertical];
+  const vertCount = allSessions.filter(s => s.vertical === state.vertical).length + 1;
+  badges.push(makeBadge(vertBadgeId, vertCount));
+}
+
+// Marathon — total sessions
+badges.push(makeBadge('marathon', allSessions.length + 1));
+
+// Perfect Score
+const perfectCount = allSessions.filter(s => s.finalTrustScore >= 95).length + (state.trustScore >= 95 ? 1 : 0);
+badges.push(makeBadge('perfect_score', perfectCount));
+
+// Comeback King — won after dropping below 15
+const hadComeback = state.trustProgression.some(s => s < 15) && outcome === 'deal_won';
+const prevComebacks = allSessions.filter(s => s.trustProgression.some(t => t < 15) && s.outcome === 'deal_won').length;
+badges.push(makeBadge('comeback_king', prevComebacks + (hadComeback ? 1 : 0)));
+
+// Industry Expert — passed knowledge tests
+const knowledgeCount = allSessions.filter(s => s.trustEvents.some(e => e.reason.toLowerCase().includes('knowledge test'))).length
+  + (state.passedKnowledgeTest ? 1 : 0);
+badges.push(makeBadge('industry_expert', knowledgeCount));
+
+// No Pitch Pro — won without "pitched too early" penalty
+const pitchedEarly = state.trustEvents.some(e => e.category === 'negative' && e.reason.toLowerCase().includes('pitch'));
+const noPitchWins = allSessions.filter(s => 
+  s.outcome === 'deal_won' && !s.trustEvents.some(e => e.category === 'negative' && e.reason.toLowerCase().includes('pitch'))
+).length + (outcome === 'deal_won' && !pitchedEarly ? 1 : 0);
+badges.push(makeBadge('no_pitch_pro', noPitchWins));
+
+// Only return badges that have progress or were just completed
+return badges.filter(b => b.currentProgress > 0 || b.justCompleted);
+```
+
+}
+
+private getPreviousBadgeCount(badgeId: BadgeId, history: SessionResult[], _state: SessionState): number {
+// Simplified: return the count from history alone (before current session)
+const badge = history.length > 0 && history[history.length - 1].badgeProgress
+? history[history.length - 1].badgeProgress.find(b => b.badgeId === badgeId)
+: null;
+return badge ? badge.currentProgress : 0;
+}
+
+// ── COACHING TIPS ───────────────────────────────────────────
+
+private generateCoachingTips(state: SessionState): string[] {
+const tips: string[] = [];
+const neg = state.trustEvents.filter(e => e.category === ‘negative’);
+const pos = state.trustEvents.filter(e => e.category === ‘positive’);
+
+```
+const patterns = {
+  pitchedEarly: neg.some(e => e.reason.toLowerCase().includes('pitch')),
+  happyEars: neg.some(e => e.reason.toLowerCase().includes('happy ears') || e.reason.toLowerCase().includes('brush-off')),
+  overPromised: neg.some(e => e.reason.toLowerCase().includes('promise') || e.reason.toLowerCase().includes('guarantee')),
+  defendedPrice: neg.some(e => e.reason.toLowerCase().includes('price') || e.reason.toLowerCase().includes('defend')),
+  noIndustryKnowledge: neg.some(e => e.reason.toLowerCase().includes('industry') || e.reason.toLowerCase().includes('knowledge')),
+  gotFlustered: neg.some(e => e.reason.toLowerCase().includes('fluster') || e.reason.toLowerCase().includes('defensive')),
+  trashedCompetitor: neg.some(e => e.reason.toLowerCase().includes('trash') || e.reason.toLowerCase().includes('competitor')),
+};
+
+if (patterns.pitchedEarly) {
+  tips.push("You pitched before diagnosing. Use the Sandler Pain Funnel: ask 3 questions about their problem before mentioning a single feature. Try: 'Tell me about your current setup — what's working and what's not?'");
+}
+if (patterns.happyEars) {
+  tips.push("You accepted a brush-off as a real answer. When someone says 'We're happy,' try a Label: 'It sounds like switching feels like more trouble than it's worth.' This invites the REAL answer without arguing.");
+}
+if (patterns.overPromised) {
+  tips.push("You over-promised to close. Buyers TEST your integrity with impossible requests. Next time: 'I'd be lying if I said we could do that. Here's what IS realistic...' — Honesty builds more trust than any promise.");
+}
+if (patterns.defendedPrice) {
+  tips.push("You defended price instead of exploring value. When they say 'too expensive,' ask: 'Help me understand — compared to what?' or 'What would make the difference worth it?' Reframe from cost to cost-of-inaction.");
+}
+if (patterns.noIndustryKnowledge) {
+  tips.push(`Study the ${state.vertical?.replace('_', ' ')} vertical before your next session. Know the specific pain points: interchange categories, common equipment issues, compliance requirements. Industry knowledge is the fastest trust builder.`);
+}
+if (patterns.gotFlustered) {
+  tips.push("You got rattled when challenged. Practice the 'Strip Line' technique: when a buyer pushes back hard, pause, then say 'You know, you might be right. Maybe this isn't a fit.' The pause shows composure. The negative reverse shows confidence.");
+}
+if (patterns.trashedCompetitor) {
+  tips.push("Never trash their current provider. It insults their judgment for choosing them. Instead: 'They're a solid company. What specifically has been working well for you with them?' This is both classy and diagnostic.");
+}
+
+// Uncaught deceptions
+const uncaught = state.deceptionsDeployed.filter(d => !d.wasCaught);
+if (uncaught.length > 0) {
+  tips.push(`You missed ${uncaught.length} test(s). When something feels too easy or too convenient, probe deeper. Try: 'Help me understand that — what's driving that concern?' Real buyers rarely give straight answers.`);
+}
+
+// Positive reinforcement
+if (pos.length > 0) {
+  const best = pos.sort((a, b) => b.modifier - a.modifier)[0];
+  tips.push(`Strong move: "${best.action}" — This earned you +${best.modifier} trust. Keep doing this.`);
+}
+
+if (tips.length === 0) {
+  tips.push("Focus on asking better questions. The best reps talk less than 30% of the time. Your job is to make the buyer feel heard, not impressed.");
+}
+
+return tips.slice(0, 3);
+```
+
+}
+
+// ── WEAKEST VERTICAL ───────────────────────────────────────
+
+private findWeakestVertical(history: SessionResult[], currentVertical: Vertical | null): Vertical {
+const allVerticals: Vertical[] = [
+‘auto_repair’, ‘restaurant’, ‘medical’, ‘retail’,
+‘b2b_wholesale’, ‘gas_station’, ‘ecommerce’, ‘professional_services’
+];
+
+```
+// Find verticals never attempted
+const attempted = new Set(history.map(s => s.vertical));
+const unattempted = allVerticals.filter(v => !attempted.has(v) && v !== currentVertical);
+if (unattempted.length > 0) {
+  return unattempted[Math.floor(Math.random() * unattempted.length)];
+}
+
+// Find vertical with lowest average score
+const verticalScores: Record<string, number[]> = {};
+history.forEach(s => {
+  if (!verticalScores[s.vertical]) verticalScores[s.vertical] = [];
+  verticalScores[s.vertical].push(s.finalTrustScore);
+});
+
+let weakest: Vertical = 'auto_repair';
+let lowestAvg = Infinity;
+for (const [vert, scores] of Object.entries(verticalScores)) {
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  if (avg < lowestAvg) {
+    lowestAvg = avg;
+    weakest = vert as Vertical;
+  }
+}
+
+return weakest;
+```
+
+}
+
+// ── SYSTEM CONTEXT BUILDER ─────────────────────────────────
+
+private buildSystemContext(state: SessionState): string {
+const tier = state.trustScore <= 30 ? ‘HOSTILE/GUARDED (Tier 1)’
+: state.trustScore <= 60 ? ‘NEUTRAL/TESTING (Tier 2)’
+: state.trustScore <= 80 ? ‘WARMING (Tier 3)’
+: ‘COLLABORATIVE (Tier 4)’;
+
+```
+const usedDeceptions = state.deceptionsDeployed.map(d => d.type);
+const allDeceptions = ['polite_lie', 'time_trap', 'honesty_test', 'red_herring', 'gatekeeper_test', 'competitor_bluff', 'loyalty_test', 'knowledge_test'];
+const available = allDeceptions.filter(d => !usedDeceptions.includes(d));
+
+return `
+```
+
+[HIDDEN STATE — DO NOT REVEAL TO USER]
+Trust Score: ${state.trustScore}/100
+Trust Tier: ${tier}
+Turn: ${state.currentTurn}
+Difficulty: ${state.difficulty.toUpperCase()}
+Deceptions used: ${usedDeceptions.join(’, ‘) || ‘none yet’}
+Available deceptions: ${available.join(’, ‘)}
+Trust progression: ${state.trustProgression.join(’ → ’)}
+${state.trustEvents.length > 0 ? `Last change: ${state.trustEvents[state.trustEvents.length - 1].modifier > 0 ? '+' : ''}${state.trustEvents[state.trustEvents.length - 1].modifier} (${state.trustEvents[state.trustEvents.length - 1].reason})` : ‘’}
+
+BEHAVIORAL INSTRUCTION: Act as ${tier} per system prompt.
+${state.difficulty === ‘hard’ ? ‘HARD MODE: Layered deception. Add stakeholder complications. Multi-layer hidden pain.’ : ‘’}
+${state.difficulty === ‘easy’ ? ‘EASY MODE: Be slightly more forthcoming. Drop a hint if they struggle.’ : ‘’}
+[END HIDDEN STATE]`.trim();
+}
+}
+
+// ============================================================
+// PERFORMANCE TRACKER (Multi-agent + Team support)
+// ============================================================
+
+export class PerformanceTracker {
+
+static getLevel(totalXP: number): number {
+for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i–) {
+if (totalXP >= LEVEL_THRESHOLDS[i]) return i + 1;
+}
+return 1;
+}
+
+static getXPForNextLevel(totalXP: number): { current: number; needed: number; level: number } {
+const level = this.getLevel(totalXP);
+if (level >= LEVEL_THRESHOLDS.length) {
+return { current: totalXP, needed: 0, level };
+}
+const nextThreshold = LEVEL_THRESHOLDS[level]; // level is 1-indexed, so LEVEL_THRESHOLDS[level] is next
+const currentThreshold = LEVEL_THRESHOLDS[level - 1];
+return {
+current: totalXP - currentThreshold,
+needed: nextThreshold - currentThreshold,
+level,
+};
+}
+
+static buildProfile(agentId: string, sessions: SessionResult[]): AgentProfile {
+const agentSessions = sessions.filter(s => s.agentId === agentId);
+
+```
+const defaultVerticalStats = (): Record<Vertical, { sessions: number; avgScore: number; wins: number }> => {
+  const verticals: Vertical[] = ['auto_repair', 'restaurant', 'medical', 'retail', 'b2b_wholesale', 'gas_station', 'ecommerce', 'professional_services'];
+  const stats: any = {};
+  verticals.forEach(v => { stats[v] = { sessions: 0, avgScore: 0, wins: 0 }; });
+  return stats;
+};
+
+if (agentSessions.length === 0) {
+  return {
+    agentId,
+    totalSessions: 0,
+    totalXP: 0,
+    level: 1,
+    averageTrustScore: 0,
+    recentAverage: 0,
+    bestScore: 0,
+    winRate: 0,
+    currentStreak: 0,
+    bestStreak: 0,
+    currentDifficulty: 'normal',
+    verticalStats: defaultVerticalStats(),
+    weakestVertical: 'auto_repair',
+    strongestVertical: 'auto_repair',
+    badges: [],
+    commonMistakes: [],
+    strengths: [],
+    lastSessionDate: null,
+  };
+}
+
+const scores = agentSessions.map(s => s.finalTrustScore);
+const recent = agentSessions.slice(-3).map(s => s.finalTrustScore);
+const totalXP = agentSessions.reduce((sum, s) => sum + s.xp.total, 0);
+const wins = agentSessions.filter(s => s.outcome === 'deal_won').length;
+
+// Streak calculation
+let currentStreak = 0;
+for (let i = agentSessions.length - 1; i >= 0; i--) {
+  if (agentSessions[i].outcome === 'deal_won') currentStreak++;
+  else break;
+}
+let bestStreak = 0, tempStreak = 0;
+agentSessions.forEach(s => {
+  if (s.outcome === 'deal_won') { tempStreak++; bestStreak = Math.max(bestStreak, tempStreak); }
+  else tempStreak = 0;
+});
+
+// Vertical stats
+const vertStats = defaultVerticalStats();
+agentSessions.forEach(s => {
+  if (vertStats[s.vertical]) {
+    vertStats[s.vertical].sessions++;
+    vertStats[s.vertical].avgScore += s.finalTrustScore;
+    if (s.outcome === 'deal_won') vertStats[s.vertical].wins++;
+  }
+});
+Object.values(vertStats).forEach(v => {
+  if (v.sessions > 0) v.avgScore = Math.round(v.avgScore / v.sessions);
+});
+
+// Weakest/strongest
+const attemptedVerticals = Object.entries(vertStats).filter(([_, v]) => v.sessions > 0);
+const weakest = attemptedVerticals.length > 0
+  ? attemptedVerticals.sort((a, b) => a[1].avgScore - b[1].avgScore)[0][0] as Vertical
+  : 'auto_repair';
+const strongest = attemptedVerticals.length > 0
+  ? attemptedVerticals.sort((a, b) => b[1].avgScore - a[1].avgScore)[0][0] as Vertical
+  : 'auto_repair';
+
+// Mistakes & strengths
+const mistakeMap = new Map<string, number>();
+const strengthMap = new Map<string, number>();
+agentSessions.forEach(s => {
+  s.trustEvents.forEach(e => {
+    const map = e.category === 'negative' ? mistakeMap : e.category === 'positive' ? strengthMap : null;
+    if (map) map.set(e.reason, (map.get(e.reason) || 0) + 1);
+  });
+});
+
+const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+const difficulty: Difficulty = recentAvg > 70 ? 'hard' : recentAvg < 40 ? 'easy' : 'normal';
+
+// Get latest badge progress
+const latestBadges = agentSessions[agentSessions.length - 1]?.badgeProgress || [];
+
+return {
+  agentId,
+  teamId: agentSessions[0]?.teamId,
+  totalSessions: agentSessions.length,
+  totalXP,
+  level: this.getLevel(totalXP),
+  averageTrustScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+  recentAverage: Math.round(recentAvg),
+  bestScore: Math.max(...scores),
+  winRate: Math.round((wins / agentSessions.length) * 100),
+  currentStreak,
+  bestStreak,
+  currentDifficulty: difficulty,
+  verticalStats: vertStats,
+  weakestVertical: weakest,
+  strongestVertical: strongest,
+  badges: latestBadges,
+  commonMistakes: Array.from(mistakeMap.entries()).map(([action, frequency]) => ({ action, frequency })).sort((a, b) => b.frequency - a.frequency).slice(0, 5),
+  strengths: Array.from(strengthMap.entries()).map(([action, frequency]) => ({ action, frequency })).sort((a, b) => b.frequency - a.frequency).slice(0, 5),
+  lastSessionDate: agentSessions[agentSessions.length - 1].createdAt,
+};
+```
+
+}
+
+static buildAdaptiveContext(profile: AgentProfile): string {
+if (profile.totalSessions === 0) {
+return ‘[SESSION_HISTORY: First session. Normal difficulty. Be moderately challenging.]’;
+}
+
+```
+const mistakes = profile.commonMistakes.slice(0, 3).map(m => `- ${m.action} (${m.frequency}x)`).join('\n');
+const strengths = profile.strengths.slice(0, 3).map(s => `- ${s.action} (${s.frequency}x)`).join('\n');
+
+return `
+```
+
+[SESSION_HISTORY]
+Sessions: ${profile.totalSessions} | Level: ${profile.level} | XP: ${profile.totalXP}
+Avg trust: ${profile.averageTrustScore} | Recent avg: ${profile.recentAverage} | Win rate: ${profile.winRate}%
+Current streak: ${profile.currentStreak} wins | Best: ${profile.bestStreak}
+Weakest vertical: ${profile.weakestVertical.replace(’_’, ’ ’)}
+Difficulty: ${profile.currentDifficulty.toUpperCase()}
+
+Exploit these patterns:
+${mistakes || ‘- No clear patterns yet’}
+
+Challenge these strengths:
+${strengths || ‘- No clear patterns yet’}
+
+${profile.currentDifficulty === ‘hard’ ? ‘HARD MODE: Sophisticated deception. Stakeholder complications. Multi-layer pain.’ : ‘’}
+${profile.currentDifficulty === ‘easy’ ? ‘EASY MODE: More forthcoming. Drop hints when struggling.’ : ‘’}
+[END SESSION_HISTORY]`.trim();
+}
+
+// ── TEAM LEADERBOARD ────────────────────────────────────────
+
+static buildTeamLeaderboard(teamId: string, allSessions: SessionResult[]): Array<{
+agentId: string;
+totalXP: number;
+level: number;
+winRate: number;
+sessions: number;
+currentStreak: number;
+}> {
+const teamSessions = allSessions.filter(s => s.teamId === teamId);
+const agentIds = […new Set(teamSessions.map(s => s.agentId))];
+
+```
+return agentIds.map(agentId => {
+  const profile = this.buildProfile(agentId, teamSessions);
+  return {
+    agentId,
+    totalXP: profile.totalXP,
+    level: profile.level,
+    winRate: profile.winRate,
+    sessions: profile.totalSessions,
+    currentStreak: profile.currentStreak,
+  };
+}).sort((a, b) => b.totalXP - a.totalXP);
+```
+
+}
+}
+
+export default TrustScoreEngine;
